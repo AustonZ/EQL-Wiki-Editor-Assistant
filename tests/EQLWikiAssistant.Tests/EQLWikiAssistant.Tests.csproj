@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Capture\EQLWikiAssistant.Capture.csproj" />
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Ocr\EQLWikiAssistant.Ocr.csproj" />
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Wiki\EQLWikiAssistant.Wiki.csproj" />
+    <ProjectReference Include="..\..\tools\EQLWikiAssistant.TestSupport\EQLWikiAssistant.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

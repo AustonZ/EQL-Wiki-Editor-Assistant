@@ -9,4 +9,8 @@
   <Folder Name="/tests/">
     <Project Path="tests/EQLWikiAssistant.Tests/EQLWikiAssistant.Tests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/EQLWikiAssistant.TestSupport/EQLWikiAssistant.TestSupport.csproj" />
+    <Project Path="tools/OcrSpike/OcrSpike.csproj" />
+  </Folder>
 </Solution>

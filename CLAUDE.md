@@ -31,17 +31,30 @@ The full design rationale, wiki research findings, and milestone plan live in
 
 ## Solution layout
 
-- `src/EQLWikiAssistant.Core` (`net10.0`, no Windows APIs) — wiki-agnostic domain models (`Item` etc.) and the
-  shared pipeline abstractions (`IEntityKind` and friends). Anything here must stay portable and free of MediaWiki
-  syntax knowledge — see "Wiki mapping layer" below.
-- `src/EQLWikiAssistant.Capture` (`net10.0-windows`) — global hotkey + Windows Graphics Capture of the game window.
-- `src/EQLWikiAssistant.Ocr` (`net10.0-windows`) — `IOcrEngine` abstraction; default implementation wraps
-  `Windows.Media.Ocr`. Kept swappable in case accuracy on real screenshots requires Tesseract/ONNX instead.
+- `src/EQLWikiAssistant.Core` (`net10.0`, no Windows APIs) — wiki-agnostic domain models (`Item` etc.), shared
+  pipeline abstractions (`IEntityKind` and friends), **and the portable ports** `IOcrEngine` + `CapturedImage`/
+  `Rect`/`OcrLine`/`OcrWord` (`Core.Ocr` namespace). Anything here must stay portable and free of MediaWiki syntax
+  knowledge — see "Wiki mapping layer" below. Interfaces the pipeline depends on live here even though their real
+  implementations are Windows-only, since `Core` can't reference the Windows-only projects.
+- `src/EQLWikiAssistant.Capture` (`net10.0-windows10.0.19041.0`) — global hotkey + Windows Graphics Capture of the
+  game window.
+- `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — `WindowsOcrEngine : IOcrEngine`, wrapping
+  `Windows.Media.Ocr`. Kept swappable (via the `Core`-side interface) in case accuracy requires Tesseract/ONNX
+  instead — see the milestone 1 findings below on where it currently falls short.
 - `src/EQLWikiAssistant.Wiki` (`net10.0`) — MediaWiki API client (bot-password auth), wikitext parsing/rendering,
   the local icon file cache, and the checked-items ledger.
-- `src/EQLWikiAssistant.App` (`net10.0-windows`, WPF) — UI: capture trigger, review/diff screen, settings/mapping
-  editor, ledger view.
-- `tests/EQLWikiAssistant.Tests` (`net10.0-windows`) — unit and golden-file tests across all projects.
+- `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: capture trigger, review/diff screen,
+  settings/mapping editor, ledger view.
+- `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
+- `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) —
+  `TestSupport.ImageFile` loads a screenshot file from disk into a `CapturedImage` (the real app only ever captures
+  a live window, never reads a file — this exists for tests/tooling); `OcrSpike` is a CLI for iterating on
+  OCR/locate accuracy against real sample screenshots (crop, upscale, run `WindowsOcrEngine`, dump recognized
+  lines+bounding boxes). Keep using it — don't recreate an ad hoc version — when tuning milestone 2's locate logic.
+
+Note: WinRT namespaces like `Windows.Media.Ocr` and `Windows.Graphics.Capture` are only projected on a Windows-SDK-
+versioned TFM (`net10.0-windows10.0.19041.0`), not plain `net10.0-windows` — every project that touches them must
+use the versioned form.
 
 ## Key architectural ideas
 
@@ -92,6 +105,17 @@ equipped/traded, but some items are natively `No Trade` with no `Attunable` stat
 disambiguate these, so a flag mismatch here may need the user's judgment rather than being auto-corrected — same
 "user can override/cancel" pattern as the exaltation case, no separate pipeline behavior.
 
+**OCR is lossy in specific, known ways — the milestone 2 parser must compensate, not trust it verbatim.** Confirmed
+against real screenshots via `tools/OcrSpike` (see the plan's milestone 1 writeup for full detail): always upscale
+crops before recognition (`CapturedImage.Resize`, 3x+); different scales drop different fields, so a missing
+expected value means "OCR uncertain," not "absent from the game" — surface it for user confirmation rather than
+silently accepting emptiness. `rn`->`m` and `ti`->`b` are consistent, scale-independent misreads on label words
+(`Ornamentation`, `Worn`, `Description`, `Exaltation`) — fix via a small fixed-vocabulary lexicon with edit-distance
+correction, not by tuning OCR further. Payload text (item/exaltation names) can also take single-character hits, so
+the native-vs-foreign exaltation name check and any wiki-page-title lookup by OCR'd name must use fuzzy/edit-distance
+comparison, never exact equality. The item name usually appears twice (title bar + content) — reconcile both rather
+than trusting one.
+
 ## Wiki reference (eqlwiki.com)
 
 - MediaWiki 1.45.3, `api.php` at the site root (no script path). `login`/`clientlogin` API modules are available;
@@ -114,13 +138,18 @@ disambiguate these, so a flag mismatch here may need the user's judgment rather 
 
 ## Commands
 
-No dependencies beyond the .NET SDK (net10.0 targets; net10.0-windows for the Windows-specific projects).
+No dependencies beyond the .NET SDK (net10.0 / net10.0-windows10.0.19041.0 targets — see Solution layout above).
+Windows OCR also needs a language pack installed (Settings -> Time & Language -> Language -> Optical character
+recognition).
 
 ```powershell
 dotnet build                                                    # build everything
 dotnet test                                                     # run all tests
 dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test class
 dotnet run --project src/EQLWikiAssistant.App                   # run the WPF app
+
+# OCR/locate tuning against a real sample screenshot:
+dotnet run --project tools/OcrSpike -- "samples/some item.jpg" --crop x,y,w,h --scale 3.0 --save out.png
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).
