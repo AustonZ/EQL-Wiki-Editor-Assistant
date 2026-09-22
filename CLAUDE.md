@@ -70,10 +70,13 @@ downloaded at most once into a local on-disk cache before any icon comparison.
 them must be located and processed. A partially obscured window must be detected and surfaced to the user as a
 warning rather than silently processed as if complete.
 
-**Item leveling (`+X`).** Items (and spells) can be leveled up in-game (`Robe of the Ishva +2`); the wiki only
-stores level-0 data. The `+X` suffix must be stripped before using the name to key the ledger or look up the wiki
-page, and captured stats must be scaled back down to level-0 equivalents (known formula, rounding-tolerant) before
-diffing/writing. The captured level is kept on the parsed `Item` for the fingerprint but is never written to the wiki.
+**Item leveling (`+X`) — v1 only processes `+0`.** Items (and spells) can be leveled up in-game (`Robe of the Ishva
++2`); the wiki only stores level-0 data. The `+X` suffix is always stripped before using the name to key the ledger
+or look up the wiki page. Real per-stat level-0 downscaling is **deferred** (the actual formula isn't safely
+reverse-engineerable from the wiki — see the plan's "Item leveling" and milestone 8 sections): a parsed item with
+`X>0` is treated as ineligible in v1 — warn the user, skip it, write no ledger row — via a placeholder
+`ILevelNormalizer` seam rather than guessed-at math. Don't implement real stat scaling without re-reading that plan
+section first; it documents what was already investigated (and ruled out) on the wiki side.
 
 **Exaltation eligibility.** Item windows can show "exaltation" slots (Ornamentation/Focus/Click/Worn/Proc), each
 either `empty` or holding `<Name> (Exaltation)`. A slot only appears once its tier unlocks it — below that, a native
