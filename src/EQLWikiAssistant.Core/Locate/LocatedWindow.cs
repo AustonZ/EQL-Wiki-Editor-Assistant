@@ -3,9 +3,11 @@ using EQLWikiAssistant.Core.Ocr;
 namespace EQLWikiAssistant.Core.Locate;
 
 /// <summary>
-/// One item detail window found in a screenshot, as a cluster of OCR lines rather than a pixel-perfect
-/// bounding box (see ItemWindowLocator for why). <see cref="Bounds"/> is the union of its member lines'
-/// bounding boxes, not the window's true chrome edges — it will run a little inside the actual border/icon.
+/// One item window found in a screenshot. <see cref="Bounds"/> is the window's real pixel extent, traced by
+/// <see cref="WindowBoundsFinder"/> — not a text bounding box. When <see cref="PossiblyOccluded"/> is true,
+/// bounds couldn't be established cleanly (something is drawn over part of the window): <see cref="Lines"/> is
+/// empty and <see cref="Bounds"/> is just the "Description" tab's own small box, useful only for telling the
+/// user roughly where the obstructed window is, not for cropping/parsing.
 /// </summary>
 public sealed record LocatedWindow(
     Rect Bounds,

@@ -8,9 +8,10 @@ namespace EQLWikiAssistant.Tests.Locate;
 
 /// <summary>
 /// Golden tests against real, full (uncropped) screenshots in the gitignored samples/ folder — see
-/// WindowsOcrEngineTests for the skip-if-missing rationale. These exercise the whole pipeline (OCR the full
-/// frame, then locate) since that is what actually matters: locate is only as good as its input, and whole-
-/// screenshot OCR behaves differently from OCR-ing a hand-picked crop (see the plan's milestone 2 writeup).
+/// WindowsOcrEngineTests for the skip-if-missing rationale. These exercise the real pipeline end to end
+/// (whole-frame OCR to find anchors, pixel border tracing for bounds, a second crop+OCR pass for content) since
+/// that's what actually matters here — see the plan's milestone 2 writeup for why an OCR-line-clustering
+/// approach was tried first and replaced with this one.
 /// </summary>
 public class ItemWindowLocatorTests
 {
@@ -18,7 +19,7 @@ public class ItemWindowLocatorTests
 
     public ItemWindowLocatorTests(ITestOutputHelper output) => _output = output;
 
-    private async Task<(CapturedImage Image, IReadOnlyList<OcrLine> Lines)?> LoadAndRecognize(string fileName)
+    private async Task<(CapturedImage Image, IOcrEngine Engine)?> Load(string fileName)
     {
         string path = Path.Combine(RepoPaths.SamplesDirectory, fileName);
         if (!File.Exists(path))
@@ -26,81 +27,98 @@ public class ItemWindowLocatorTests
             _output.WriteLine($"Skipping: {path} not present (samples/ is gitignored, personal data).");
             return null;
         }
-
-        CapturedImage image = await ImageFile.LoadAsync(path);
-        using RapidOcrEngine engine = new();
-        IReadOnlyList<OcrLine> lines = await engine.RecognizeAsync(image);
-        return (image, lines);
+        return (await ImageFile.LoadAsync(path), new RapidOcrEngine());
     }
 
     [Fact]
-    public async Task Locate_SingleWindowScreenshot_FindsExactlyOneWindow()
+    public async Task LocateAsync_SingleWindowScreenshot_FindsExactlyOneCleanWindow()
     {
-        var loaded = await LoadAndRecognize("simple 1 item.jpg");
-        if (loaded is not { } l) return;
+        if (await Load("simple 1 item.jpg") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
 
-        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Lines);
+            Assert.Single(windows);
+            LocatedWindow window = windows[0];
+            string allText = string.Join('\n', window.Lines.Select(x => x.Text));
+            _output.WriteLine(allText);
 
-        Assert.Single(windows);
-        LocatedWindow window = windows[0];
-        string allText = string.Join('\n', window.Lines.Select(x => x.Text));
-        _output.WriteLine(allText);
-
-        Assert.Contains("Water Flask", allText);
-        Assert.False(window.HasLoreTab);
-        Assert.False(window.PossiblyOccluded);
+            Assert.False(window.PossiblyOccluded);
+            Assert.Contains("Water Flask", allText);
+            Assert.False(window.HasLoreTab);
+        }
     }
 
     [Fact]
-    public async Task Locate_ThreeAdjacentWindows_SeparatesAllThreeWithoutCrossContamination()
+    public async Task LocateAsync_ThreeAdjacentWindows_SeparatesAllThreeCleanly()
     {
-        var loaded = await LoadAndRecognize("screen capture 3 item windows.png");
-        if (loaded is not { } l) return;
+        if (await Load("screen capture 3 item windows.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            foreach (var w in windows)
+                _output.WriteLine($"{w.Bounds} occluded={w.PossiblyOccluded} HasLoreTab={w.HasLoreTab}\n  " +
+                    string.Join("\n  ", w.Lines.Select(x => x.Text)));
 
-        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Lines);
-        foreach (var w in windows)
-            _output.WriteLine($"{w.Bounds} HasLoreTab={w.HasLoreTab}\n  " + string.Join("\n  ", w.Lines.Select(x => x.Text)));
+            Assert.Equal(3, windows.Count);
+            Assert.All(windows, w => Assert.False(w.PossiblyOccluded));
 
-        Assert.Equal(3, windows.Count);
+            // Every window's own bounds should be a plausible single-window size (catches cross-contamination
+            // with a neighbor or the surrounding HUD, the original failure mode this design replaced).
+            Assert.All(windows, w => Assert.True(w.Bounds.Width < 650 && w.Bounds.Height < 750,
+                $"Window bounds {w.Bounds} look too large for a single item window."));
 
-        // Each window should be a plausible single-window size, not have swallowed a neighbor or the HUD.
-        Assert.All(windows, w => Assert.True(w.Bounds.Width < 700 && w.Bounds.Height < 900,
-            $"Window bounds {w.Bounds} look too large for a single item window — likely cross-contamination."));
+            string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
+            Assert.Contains(texts, t => t.Contains("Slime Blood of Cazic-Thule"));
+            Assert.Contains(texts, t => t.Contains("Lustrous Russet Bracer"));
+            Assert.Contains(texts, t => t.Contains("Bloodmoon"));
 
-        string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
-        Assert.Contains(texts, t => t.Contains("Slime Blood of Cazic-Thule"));
-        Assert.Contains(texts, t => t.Contains("Lustrous Russet Bracer"));
-        Assert.Contains(texts, t => t.Contains("Bloodmoon"));
-
-        // Bloodmoon is the one with a Lore tab; the other two don't have one.
-        Assert.Single(windows, w => w.HasLoreTab);
-
-        // No window's text should contain another window's item name (cross-contamination check).
-        LocatedWindow bloodmoon = windows.Single(w => w.HasLoreTab);
-        string bloodmoonText = string.Join('\n', bloodmoon.Lines.Select(x => x.Text));
-        Assert.DoesNotContain("Slime Blood", bloodmoonText);
-        Assert.DoesNotContain("Lustrous Russet", bloodmoonText);
+            // Bloodmoon is the one with a Lore tab; no cross-contamination between windows' own item names.
+            Assert.Single(windows, w => w.HasLoreTab);
+            string bloodmoonText = texts.Single(t => t.Contains("Bloodmoon"));
+            Assert.DoesNotContain("Slime Blood", bloodmoonText);
+            Assert.DoesNotContain("Lustrous Russet", bloodmoonText);
+        }
     }
 
     [Fact]
-    public async Task Locate_TooltipNextToRealWindows_ExcludesTheTooltip()
+    public async Task LocateAsync_TooltipNextToRealWindows_ExcludesTheTooltip()
     {
-        var loaded = await LoadAndRecognize("2 items plus a tooltip.jpg");
-        if (loaded is not { } l) return;
+        if (await Load("2 items plus a tooltip.jpg") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            foreach (var w in windows)
+                _output.WriteLine($"{w.Bounds} occluded={w.PossiblyOccluded}\n  " + string.Join("\n  ", w.Lines.Select(x => x.Text)));
 
-        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Lines);
-        foreach (var w in windows)
-            _output.WriteLine($"{w.Bounds}\n  " + string.Join("\n  ", w.Lines.Select(x => x.Text)));
+            // "Fairy-Hide Mantle +1" is a hover tooltip (no title bar, no Description tab — see the plan's
+            // window-vs-tooltip rule) sitting right next to these windows; it must never appear as a window or
+            // leak into one's content. (The Tenderizer window is a known hard case here — it sits with zero
+            // gap against an unrelated Bank window, so it's expected to come back PossiblyOccluded; only
+            // Fishbone Earring is asserted clean.)
+            string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
+            Assert.All(texts, t => Assert.DoesNotContain("Fairy-Hide Mantle", t));
+            Assert.All(texts, t => Assert.DoesNotContain("Guardian Spirit", t)); // the tooltip's own click effect
 
-        // "Fairy-Hide Mantle +1" is a hover tooltip (no title bar, no Description tab — see the plan's
-        // window-vs-tooltip rule) sitting right next to these two real windows; only the 2 real windows
-        // (The Tenderizer +7, Fishbone Earring +5) should be found.
-        Assert.Equal(2, windows.Count);
+            LocatedWindow? fishbone = windows.FirstOrDefault(w => w.Lines.Any(x => x.Text.Contains("Fishbone Earring")));
+            Assert.NotNull(fishbone);
+            Assert.False(fishbone!.PossiblyOccluded);
+        }
+    }
 
-        string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
-        Assert.Contains(texts, t => t.Contains("Tenderizer"));
-        Assert.Contains(texts, t => t.Contains("Fishbone Earring"));
-        Assert.All(texts, t => Assert.DoesNotContain("Fairy-Hide Mantle", t));
-        Assert.All(texts, t => Assert.DoesNotContain("Guardian Spirit", t)); // the tooltip's own click effect
+    [Fact]
+    public async Task LocateAsync_WindowObscuredByBagPanels_IsReportedOccludedWithNoData()
+    {
+        if (await Load("single item occluded by bag windows.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            foreach (var w in windows)
+                _output.WriteLine($"{w.Bounds} occluded={w.PossiblyOccluded}, {w.Lines.Count} line(s)");
+
+            Assert.Single(windows);
+            Assert.True(windows[0].PossiblyOccluded);
+            Assert.Empty(windows[0].Lines);
+        }
     }
 }

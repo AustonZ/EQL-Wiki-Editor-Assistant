@@ -3,9 +3,10 @@ using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.TestSupport;
 
-// Milestone 2 spike tool: run whole-screenshot OCR + ItemWindowLocator against a real screenshot and report
-// what windows were found, so the clustering thresholds can be tuned against real data. --save draws a
-// rectangle around each found window (green = clean, red = possibly occluded) for visual verification.
+// Milestone 2 spike tool: run ItemWindowLocator (whole-screenshot OCR to find Description tabs, pixel border
+// tracing to find each window's real bounds, occluded windows reported with no data) against a real
+// screenshot. --save draws a rectangle around each found window (green = clean, red = occluded) for visual
+// verification.
 //
 // Usage: LocateSpike <imagePath> [--save pngPath]
 
@@ -27,11 +28,8 @@ Console.WriteLine($"Loaded {imagePath} ({image.Width}x{image.Height})");
 
 using var engine = new RapidOcrEngine();
 var sw = System.Diagnostics.Stopwatch.StartNew();
-IReadOnlyList<OcrLine> lines = await engine.RecognizeAsync(image);
-Console.WriteLine($"OCR: {lines.Count} line(s) in {sw.ElapsedMilliseconds}ms");
-
-IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(image, lines);
-Console.WriteLine($"Located {windows.Count} window(s):");
+IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, engine);
+Console.WriteLine($"Located {windows.Count} window(s) in {sw.ElapsedMilliseconds}ms:");
 
 for (int i = 0; i < windows.Count; i++)
 {

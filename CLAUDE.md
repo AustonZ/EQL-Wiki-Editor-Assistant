@@ -33,12 +33,12 @@ The full design rationale, wiki research findings, and milestone plan live in
 
 - `src/EQLWikiAssistant.Core` (`net10.0`, no Windows APIs) — wiki-agnostic domain models (`Item` etc.), shared
   pipeline abstractions (`IEntityKind` and friends), the portable ports `IOcrEngine` + `CapturedImage`/`Rect`/
-  `OcrLine`/`OcrWord` (`Core.Ocr`), **`ItemWindowLocator`** (`Core.Locate` — groups a screenshot's OCR lines into
-  per-window clusters; see "Locating item windows" below), and `EditDistance` (`Core.Text` — fuzzy string
-  matching, used by locate and destined for the future field-label lexicon and exaltation name checks). Anything
-  here must stay portable and free of MediaWiki syntax knowledge — see "Wiki mapping layer" below. Interfaces the
-  pipeline depends on live here even though their real implementations are Windows-only, since `Core` can't
-  reference the Windows-only projects.
+  `OcrLine`/`OcrWord` (`Core.Ocr`), **`ItemWindowLocator`/`WindowBoundsFinder`** (`Core.Locate` — finds each item
+  window's real pixel bounds in a full screenshot by tracing its border, not by clustering text; see "Locating
+  item windows" below), and `EditDistance` (`Core.Text` — fuzzy string matching, used by locate and destined for
+  the future field-label lexicon and exaltation name checks). Anything here must stay portable and free of
+  MediaWiki syntax knowledge — see "Wiki mapping layer" below. Interfaces the pipeline depends on live here even
+  though their real implementations are Windows-only, since `Core` can't reference the Windows-only projects.
 - `src/EQLWikiAssistant.Capture` (`net10.0-windows10.0.19041.0`) — `GlobalHotKey` (Win32 `RegisterHotKey`, its own
   message-only window/thread, no UI-framework dependency), `WindowFinder` (find a window by title), `WindowCapturer`
   (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device).
@@ -111,32 +111,47 @@ downloaded at most once into a local on-disk cache before any icon comparison.
 
 **Multi-window / occlusion handling.** A single screenshot may contain more than one item detail window; all of
 them must be located and processed. A partially obscured window must be detected and surfaced to the user as a
-warning rather than silently processed as if complete. Implemented as `ItemWindowLocator.PossiblyOccluded` (no
-title-bar line found above the window's `Description` anchor) — a real but **unvalidated** heuristic, since no
-genuinely occluded sample exists yet (see the plan's "Needed from the user"). Don't treat it as more trustworthy
-than that without testing it against a real occluded window first.
+warning rather than silently processed as if complete. Implemented as `ItemWindowLocator`/`WindowBoundsFinder`
+(`Core.Locate`), validated against real occluded samples — see "Locating item windows" below for the design and
+its one documented residual gap, which **Parse is required to close** with a second, content-level check.
 
-**Locating item windows (`ItemWindowLocator`, `Core.Locate`).** Run OCR on the *whole* screenshot (see "Full-frame
-OCR" below), then cluster its lines into per-window groups — no pixel-level text detection of our own is needed,
-RapidOCR's detector already finds everything, locate just groups it correctly. Two simpler approaches were tried
-and failed for specific, informative reasons (full writeup in the plan's milestone 2 section — read it before
-reimplementing this from scratch, the failure modes are the actual design constraint):
-- Pure bounding-box-gap clustering bridges across *different*, merely-nearby UI panels on a busy real screenshot
-  (character sheet, buffs, inventory grid all densely packed).
-- Adding a pixel "dark bridge" check (window interiors are near-black, ~RGB(16,16,16); real gaps are a distinctly
-  lighter color, ~RGB(150+,120+,70+) — a wide, reliable margin) fixes that, but *two different item windows*
-  sitting close together are both dark UI too, so pure darkness still can't tell "same window" from "next one over."
-- What works: each `Description` tab line seeds one window; unclaimed lines join the nearest anchor whose (a)
-  fixed, anchor-relative size envelope contains them (this — not cluster-relative growth — is what actually caps
-  runaway spread into a neighbor) and (b) dark-pixel bridge reaches them from an already-claimed line.
-- A real bug worth remembering if this code gets touched: sampling the "bridge" between two boxes that already
-  touch/overlap (common for adjacent text rows) can land the sample *inside* one box's own text glyph — a bright
-  pixel, falsely read as "not dark," wrongly splitting two lines that belong together. Fix was to compute the
-  actual gap rectangle (never sample inside either box) and skip the check entirely when boxes already touch.
-- Validated against 6 real screenshots (`tools/LocateSpike`, golden tests in `Tests/Locate/`): single windows,
-  3 adjacent windows (correctly separated, no cross-contamination), and a tooltip sitting against two real
-  windows (tooltip fully excluded even though it visually overlaps one). `LocatedWindow.Bounds` is the union of
-  its lines' boxes, not pixel-exact chrome — fine for grouping, but add a margin if pixels are ever cropped from it.
+**Locating item windows (`ItemWindowLocator` + `WindowBoundsFinder`, `Core.Locate`).** Run OCR on the *whole*
+screenshot (see "Full-frame OCR" below) to find each window's `Description` tab, then trace that window's real
+*pixel* bounds outward from the tab — this is **not** OCR-line clustering; that was the first design and it was
+explicitly replaced (by the user's direction, after real occluded samples broke it) once testing showed
+text-proximity clustering cannot reliably tell "this window's own content" from "a different, adjacent dark
+window" when the two are genuinely adjacent with no lighter gap between them — which is exactly what real
+occlusion looks like. **Before touching this code, read the plan's milestone 2 section in full** — the failed
+attempts, every threshold here, and the residual gap were all arrived at empirically against real screenshots,
+not derived on paper, and re-tuning in isolation without retesting against `tools/LocateSpike`'s full real-sample
+set is very likely to silently reintroduce a bug this history already found and fixed once.
+- The border itself isn't a distinctly-colored line (checked directly, including by zooming into real
+  screenshots) — it's the sharp edge of the near-black interior (~RGB(16,16,16)) against the tan game world
+  (~RGB(150-170,120-140,70-90)) or a different UI panel.
+- A single ray per edge doesn't work: a window's own bright text (title, tab label, stat lines) stops a naive
+  scan almost immediately, but tolerating brightness to get past that also risks tolerating straight through a
+  genuine gap into a different window. The fix: every edge (top/bottom/left/right) is found by probing several
+  rows/columns and taking the *largest same-value cluster* (~40% threshold, deliberately not a plain majority —
+  a wide title can legitimately claim more probes than the true edge), where each probe tolerates a short bright
+  run (skip one glyph/line of text) but stops at a sustained one (~26px+, a real exit).
+- Consensus alone can't catch an occluding panel that's adjacent along an *entire* side (every probe agrees on
+  the same wrong, oversized answer) — caught instead by hard sanity ceilings on the final width/height (600 /
+  700px, over the largest real window measured, ~550x655).
+- **Known, accepted residual gap**: a real sample has another window covering only ~20% of this window's own
+  title ("Lustrous " of "Lustrous Russet Bracer +6") — too small a minority to break consensus, so bounds come
+  back clean while the crop's own title text is truncated (reads `"s Russet Bracer +6 (Augmented)"`). Geometry
+  cannot close this. **Parse must reconcile the title-bar name against the content-area name** (every real item
+  window repeats its own name a few lines into the content) and treat a mismatch as suspect. Never treat "bounds
+  found" as "definitely not occluded."
+- Some genuinely hard cases are left as false negatives (conservatively reported occluded) rather than chased
+  further, per the user's framing — that's the safe failure direction. E.g. one real sample has an item window
+  sitting with *zero* gap directly against an unrelated NPC bank window; there's no pixel signal left to tell
+  them apart, so it's correctly-if-conservatively reported as unresolved rather than guessed at.
+- Validated against 7 real screenshots (`tools/LocateSpike --save` draws a debug overlay, green/red by
+  `PossiblyOccluded`; golden tests in `Tests/Locate/`): single windows, multiple different multi-window layouts
+  (including genuinely cascaded/overlapping windows), a tooltip adjacent to real windows (fully excluded even
+  though it visually overlaps one), and both real occluded-window samples (one correctly caught by geometry, the
+  other being the documented gap above).
 
 **Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.**
 `RapidOcrOptions.Default.ImgResize` (1024) downsamples any larger image before detection; at a real 2560x1440
