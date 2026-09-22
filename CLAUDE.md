@@ -70,6 +70,25 @@ downloaded at most once into a local on-disk cache before any icon comparison.
 them must be located and processed. A partially obscured window must be detected and surfaced to the user as a
 warning rather than silently processed as if complete.
 
+**Item leveling (`+X`).** Items (and spells) can be leveled up in-game (`Robe of the Ishva +2`); the wiki only
+stores level-0 data. The `+X` suffix must be stripped before using the name to key the ledger or look up the wiki
+page, and captured stats must be scaled back down to level-0 equivalents (known formula, rounding-tolerant) before
+diffing/writing. The captured level is kept on the parsed `Item` for the fingerprint but is never written to the wiki.
+
+**Exaltation eligibility.** Item windows can show "exaltation" slots (Ornamentation/Focus/Click/Worn/Proc), each
+either `empty` or holding `<Name> (Exaltation)`. A slot only appears once its tier unlocks it — below that, a native
+effect the item shipped with (e.g. a click effect) shows as a plain stat line instead. When a slot is filled, compare
+`<Name>` to the item's own base name: a match means it's the item's own (now-removable) native exaltation — proceed
+normally. A mismatch means a *foreign* exaltation is attached (the item has been augmented from another item) — the
+item is **not eligible for automated processing**; warn the user, let them cancel, and **write no ledger entry at
+all** (not `flagged`, not `skipped` — it was never actually checked). Note the window title's `(Augmented)` suffix
+fires for a filled native slot too, so it is not itself a foreign-modification signal.
+
+**Known unresolvable ambiguity: Attunable vs. No Trade.** An item natively `Attunable` shows `No Trade` once
+equipped/traded, but some items are natively `No Trade` with no `Attunable` state ever. The window can't
+disambiguate these, so a flag mismatch here may need the user's judgment rather than being auto-corrected — same
+"user can override/cancel" pattern as the exaltation case, no separate pipeline behavior.
+
 ## Wiki reference (eqlwiki.com)
 
 - MediaWiki 1.45.3, `api.php` at the site root (no script path). `login`/`clientlogin` API modules are available;
