@@ -36,8 +36,11 @@ The full design rationale, wiki research findings, and milestone plan live in
   `Rect`/`OcrLine`/`OcrWord` (`Core.Ocr` namespace). Anything here must stay portable and free of MediaWiki syntax
   knowledge — see "Wiki mapping layer" below. Interfaces the pipeline depends on live here even though their real
   implementations are Windows-only, since `Core` can't reference the Windows-only projects.
-- `src/EQLWikiAssistant.Capture` (`net10.0-windows10.0.19041.0`) — global hotkey + Windows Graphics Capture of the
-  game window.
+- `src/EQLWikiAssistant.Capture` (`net10.0-windows10.0.19041.0`) — `GlobalHotKey` (Win32 `RegisterHotKey`, its own
+  message-only window/thread, no UI-framework dependency), `WindowFinder` (find a window by title), `WindowCapturer`
+  (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device).
+  **Read the `[GeneratedComInterface]` note below before touching `Interop/`** — it documents a real, confirmed
+  runtime failure mode, not a style preference.
 - `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — `WindowsOcrEngine : IOcrEngine`, wrapping
   `Windows.Media.Ocr`. Kept swappable (via the `Core`-side interface) in case accuracy requires Tesseract/ONNX
   instead — see the milestone 1 findings below on where it currently falls short.
@@ -46,17 +49,33 @@ The full design rationale, wiki research findings, and milestone plan live in
 - `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: capture trigger, review/diff screen,
   settings/mapping editor, ledger view.
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
-- `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) —
-  `TestSupport.ImageFile` loads a screenshot file from disk into a `CapturedImage` (the real app only ever captures
-  a live window, never reads a file — this exists for tests/tooling); `OcrSpike` is a CLI for iterating on
-  OCR/locate accuracy against real sample screenshots (crop, upscale, run `WindowsOcrEngine`, dump recognized
-  lines+bounding boxes). Keep using it — don't recreate an ad hoc version — when tuning milestone 2's locate logic.
+- `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike` (`net10.0-windows10.0.19041.0`,
+  dev-only, not shipped) — `TestSupport.ImageFile` loads a screenshot file from disk into a `CapturedImage` (the
+  real app only ever captures a live window, never reads a file — this exists for tests/tooling), plus
+  `TestSupport.RepoPaths` for finding `samples/` reliably from a test/tool's output directory; `OcrSpike` is a CLI
+  for iterating on OCR/locate accuracy against real sample screenshots (crop, upscale, run `WindowsOcrEngine`, dump
+  recognized lines+bounding boxes); `CaptureSpike` is a CLI for `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
+  windows, capture one to a PNG, test-fire a hotkey). Keep using these — don't recreate ad hoc versions — when
+  tuning locate logic or debugging capture.
 
 Note: WinRT namespaces like `Windows.Media.Ocr` and `Windows.Graphics.Capture` are only projected on a Windows-SDK-
 versioned TFM (`net10.0-windows10.0.19041.0`), not plain `net10.0-windows` — every project that touches them must
 use the versioned form.
 
 ## Key architectural ideas
+
+**`[GeneratedComInterface]`, never `[ComImport]`, for the Windows Graphics Capture interop.**
+`src/EQLWikiAssistant.Capture/Interop/` declares two hand-written COM interfaces
+(`IGraphicsCaptureItemInterop`, `IDirect3DDxgiInterfaceAccess`) that aren't exposed by the plain WinRT projection.
+Declaring these with the classic `[ComImport]` attribute **compiles fine but throws `InvalidCastException`
+("Specified cast is not valid") at runtime** the moment you call through them on an object obtained from a CsWinRT
+`ComWrappers`-based type (e.g. anything from `SomeWinRtType.As<T>()`) — confirmed by testing against the live game
+window, not a hypothetical. Use `[GeneratedComInterface]` (`System.Runtime.InteropServices.Marshalling`,
+.NET 8+ source-generated COM interop) instead; it's compatible. Two more traps in the same area: `IGraphicsCaptureItem`'s
+IID must be the literal `79C3F95B-31F7-4EC2-A464-632EF5D30760` — `typeof(GraphicsCaptureItem).GUID` is a different,
+wrong value and fails the same way (`E_NOINTERFACE` → `InvalidCastException`, easy to conflate with the first
+issue); and `Direct3D11CaptureFramePool.Create(...)` silently never raises `FrameArrived` without a `DispatcherQueue`
+pumped on the calling thread — use `CreateFreeThreaded(...)` instead (fine on this app's Windows 11 target).
 
 **Wiki mapping layer.** The wiki's templates and conventions are expected to keep changing (it's a young wiki for
 a young game), so `Core` domain models must never encode MediaWiki syntax directly. A "wiki mapping" — versioned
