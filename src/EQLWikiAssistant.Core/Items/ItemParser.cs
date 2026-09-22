@@ -36,7 +36,7 @@ public static class ItemParser
     private static readonly string[] ExaltationLabels =
         ["Ornamentation", "Focus Exaltation", "Click Exaltation", "Worn Exaltation", "Proc Exaltation"];
     private static readonly string[] EffectLabels =
-        ["Focus Effect", "Click Effect", "Combat Effect", "Proc Effect"];
+        ["Focus Effect", "Click Effect", "Combat Effect", "Proc Effect", "Charge Effect"];
 
     public static ParsedItem Parse(IReadOnlyList<OcrLine> lines)
     {
@@ -185,24 +185,36 @@ public static class ItemParser
     private static IEnumerable<string> SplitList(string text, char separator = ',') =>
         text.Split(separator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
+    /// <summary>Extracts the name and "+X" level, tolerant of trailing OCR noise after either — a title bar
+    /// occasionally picks up a stray "? x"-ish fragment from a nearby checkbox/lock icon (confirmed on a real
+    /// capture), which broke an earlier version of this that required "+X" to be the literal end of the string.
+    /// Finds the level suffix anywhere in the (parenthetical-stripped) text rather than anchoring to the end, so
+    /// trailing junk is simply ignored rather than corrupting the whole name or hiding the level entirely.</summary>
     private static (string Name, int Level) ExtractNameLevel(string raw)
     {
         string s = StripParentheticalSuffix(raw.Trim(), "Augmented");
-        Match m = Regex.Match(s, @"^(?<name>.*?)\s*\+(?<level>\d+)$");
+        Match m = Regex.Match(s, @"\+(?<level>\d+)\b");
         if (m.Success && int.TryParse(m.Groups["level"].Value, out int lvl))
-            return (m.Groups["name"].Value.Trim(), lvl);
-        return (s, 0);
+            return (s[..m.Index].Trim(), lvl);
+        return (s.Trim(), 0);
     }
 
-    /// <summary>Strips a trailing "(Word)" suffix if the parenthesized text closely matches <paramref name="word"/>
-    /// — used for both "(Augmented)" on titles and "(Exaltation)" on exaltation slot values, tolerant of OCR noise
-    /// around the parens/word itself.</summary>
+    /// <summary>Strips a "(Word)" span if the parenthesized text closely matches <paramref name="word"/> — used
+    /// for both "(Augmented)" on titles and "(Exaltation)" on exaltation slot values, tolerant of OCR noise
+    /// around the parens/word itself. Finds the matching ')' rather than assuming the parenthetical runs to the
+    /// end of the string, so trailing OCR noise after it (see <see cref="ExtractNameLevel"/>) doesn't prevent the
+    /// match or get silently absorbed into the returned text.</summary>
     private static string StripParentheticalSuffix(string s, string word)
     {
-        int idx = s.LastIndexOf('(');
-        if (idx <= 0) return s;
-        string inner = s[idx..].Trim().Trim('(', ')').Trim();
-        return EditDistance.IsCloseMatch(inner, word, maxDistance: 2) ? s[..idx].Trim() : s;
+        int openIdx = s.LastIndexOf('(');
+        if (openIdx < 0) return s;
+        int closeIdx = s.IndexOf(')', openIdx);
+        if (closeIdx < 0) return s;
+
+        string inner = s[(openIdx + 1)..closeIdx].Trim();
+        if (!EditDistance.IsCloseMatch(inner, word, maxDistance: 2)) return s;
+
+        return (s[..openIdx] + s[(closeIdx + 1)..]).Trim();
     }
 
     /// <summary>Fuzzy-compares the title-bar name against the content-area name. Threshold is generous enough to
@@ -279,10 +291,22 @@ public static class ItemParser
             bool bareLabel = text.EndsWith(':') || text.EndsWith('.');
             if (bareLabel && i + 1 < row.Count)
             {
-                string label = FieldLabelLexicon.Correct(text.TrimEnd(':', '.').Trim());
-                string value = row[i + 1].Text.Trim();
-                stats.Add(new KeyValuePair<string, string>(label, value));
-                i += 2;
+                string nextText = row[i + 1].Text.Trim();
+                // The next fragment must actually look like a value, not another bare label — if a value
+                // fragment was dropped by OCR (confirmed real: a real capture had a numeric value missing
+                // entirely), the next surviving fragment is the *next label*, and pairing them would silently
+                // produce nonsense like "Strength: SV. Magic:". Flag the orphaned label instead.
+                bool nextLooksLikeValue = nextText.Length > 0 && !nextText.EndsWith(':') && !nextText.EndsWith('.');
+                if (nextLooksLikeValue)
+                {
+                    string label = FieldLabelLexicon.Correct(text.TrimEnd(':', '.').Trim());
+                    stats.Add(new KeyValuePair<string, string>(label, nextText));
+                    i += 2;
+                    continue;
+                }
+
+                warnings.Add($"Unparsed line in stat block: \"{text}\" (no adjacent value found — likely an OCR-dropped value)");
+                i++;
                 continue;
             }
 

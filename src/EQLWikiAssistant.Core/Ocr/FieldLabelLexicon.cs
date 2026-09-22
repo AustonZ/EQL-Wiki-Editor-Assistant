@@ -23,7 +23,7 @@ public static class FieldLabelLexicon
         "SV. Magic", "SV. Fire", "SV. Cold", "SV. Poison", "SV. Disease", "SV. Void",
         "Base Dmg", "Delay", "Skill", "Dmg Bon", "Ratio", "Range",
         "Value",
-        "Focus Effect", "Click Effect", "Combat Effect", "Proc Effect",
+        "Focus Effect", "Click Effect", "Combat Effect", "Proc Effect", "Charge Effect",
         "Cast Time", "Cooldown", "Required Level", "Charges",
     ];
 
