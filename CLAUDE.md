@@ -152,6 +152,19 @@ the mandatory upscale-before-recognition step and any multi-scale-pass plan — 
 upscaling measurably hurt it in testing. Construct `RapidOcrEngine` once and reuse it (it loads 3 ONNX models in
 its constructor) rather than per-capture.
 
+A broader census across 6 real windows (~100+ recognized lines: weapons, armor, ammo, a charge item, a consumable,
+a quest token) found the `orn`->`om`-ish cluster to be the **only** recurring substantive error — digits (incl.
+lone `1`), fractions, apostrophes, and decimals all came through reliably. Don't pre-emptively guard against other
+classic small-text OCR confusions (`0`/`O`, `1`/`l`/`I`, `cl`/`d`, etc.) without evidence; none showed up here.
+
+**Where the label-correction fix belongs**: not inside either `IOcrEngine` implementation (that's game-domain
+vocabulary, not an OCR-engine concern, and will differ per future `IEntityKind`) — it's a milestone 2 Parse-step
+component, e.g. `Core.Ocr.FieldLabelLexicon`, living with the Item parser: a small list of expected field labels
+with edit-distance (≤1-2) correction applied per recognized label token before matching it to a field. Keep it
+separate from the wiki mapping config (that's user-editable MediaWiki vocabulary; this is stable game-UI
+vocabulary) and testable on plain strings without an image/OCR round-trip. Start small (really just
+`Ornamentation`/`Worn` today) and grow only as real evidence demands.
+
 ## Wiki reference (eqlwiki.com)
 
 - MediaWiki 1.45.3, `api.php` at the site root (no script path). `login`/`clientlogin` API modules are available;
