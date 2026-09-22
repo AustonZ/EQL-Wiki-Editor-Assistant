@@ -1,0 +1,284 @@
+using EQLWikiAssistant.Core.Items;
+using EQLWikiAssistant.Core.Locate;
+using EQLWikiAssistant.Core.Ocr;
+using EQLWikiAssistant.Ocr;
+using EQLWikiAssistant.TestSupport;
+using Xunit.Abstractions;
+
+namespace EQLWikiAssistant.Tests.Items;
+
+/// <summary>
+/// Deterministic unit tests build an OcrLine list by hand from a real, verbatim <c>LocateSpike</c> capture (a
+/// "Lustrous Russet Bracer +6" window — see the plan's milestone 2 writeup for the full dump) so the parser's
+/// logic is covered without needing samples/ present. Golden tests below additionally run the real pipeline
+/// end-to-end against real screenshots, same pattern as ItemWindowLocatorTests.
+/// </summary>
+public class ItemParserTests
+{
+    private readonly ITestOutputHelper _output;
+    public ItemParserTests(ITestOutputHelper output) => _output = output;
+
+    private static OcrLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
+
+    // Verbatim real capture of "Lustrous Russet Bracer +6", a native (removable) Focus Exaltation, and the
+    // confirmed real OCR corruptions "Omamentation" (Ornamentation) and "Wom Exaltation" (Worn Exaltation).
+    private static readonly OcrLine[] LustrousBracerLines =
+    [
+        L("Lustrous Russet Bracer +6 (Augmented)", 96, 0),
+        L("Description", 170, 18),
+        L("Lustrous Russet Bracer +6", 62, 49),
+        L("No Trade", 61, 64),
+        L("Class: WAR CLR PAL RNG SHD BRD ROG SHM BER", 61, 78),
+        L("Race: ALL", 60, 95),
+        L("Wrist", 61, 113),
+        L("Merge", 19, 142),
+        L("Place", 73, 140),
+        L("Tier6 42/64", 117, 138),
+        L("Item", 26, 158),
+        L("Item", 74, 156),
+        L("This item can be upgraded.", 118, 164),
+        L("Size:", 10, 191),
+        L("SMALL", 82, 191),
+        L("AC:", 141, 193),
+        L("15", 228, 193),
+        L("Weight.", 10, 206),
+        L("1.2", 105, 209),
+        L("Strength:", 12, 241),
+        L("9", 95, 242),
+        L("SV. Magic:", 141, 239),
+        L("13", 229, 241),
+        L("Dexterity.", 13, 256),
+        L("9", 95, 257),
+        L("SV. Fire:", 142, 256),
+        L("13", 230, 257),
+        L("SV. Cold:", 142, 272),
+        L("13", 229, 272),
+        L("SV. Void:", 141, 288),
+        L("6", 234, 289),
+        L("Modified", 37, 322),
+        L("Lustrous Russet Bracer +6", 129, 322),
+        L("Omamentation: empty", 42, 351),
+        L("Focus Exaltation: Runed Mithril Bracer (Exaltation)", 40, 372),
+        L("Click Exaltation: empty", 40, 397),
+        L("Wom Exaltation: empty", 40, 419),
+        L("Proc Exaltation: empty", 39, 442),
+        L("Focus Effect Reagent Conservation II", 12, 469),
+    ];
+
+    [Fact]
+    public void Parse_RealBracerCapture_ExtractsCoreFields()
+    {
+        ParsedItem item = ItemParser.Parse(LustrousBracerLines);
+
+        Assert.Equal("Lustrous Russet Bracer", item.Name);
+        Assert.Equal(6, item.Level);
+        Assert.False(item.TitleContentNameMismatch);
+        Assert.Contains("No Trade", item.Flags);
+        Assert.Contains("WAR", item.Classes);
+        Assert.Contains("BER", item.Classes);
+        Assert.Contains("ALL", item.Races);
+        Assert.Equal("Wrist", item.Slot);
+    }
+
+    [Fact]
+    public void Parse_RealBracerCapture_PairsSplitStatFragmentsAcrossTwoColumns()
+    {
+        ParsedItem item = ItemParser.Parse(LustrousBracerLines);
+        var stats = item.Stats.ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        Assert.Equal("SMALL", stats["Size"]);
+        Assert.Equal("15", stats["AC"]);
+        Assert.Equal("1.2", stats["Weight"]); // "Weight." period, not colon — still corrected
+        Assert.Equal("9", stats["Strength"]);
+        Assert.Equal("13", stats["SV. Magic"]);
+        Assert.Equal("9", stats["Dexterity"]); // "Dexterity." period, not colon
+    }
+
+    [Fact]
+    public void Parse_RealBracerCapture_CorrectsKnownExaltationLabelCorruptions()
+    {
+        ParsedItem item = ItemParser.Parse(LustrousBracerLines);
+
+        Assert.Contains(item.ExaltationSlots, e => e.Kind == ExaltationKind.Ornamentation && e.Name is null);
+        Assert.Contains(item.ExaltationSlots, e => e.Kind == ExaltationKind.Worn && e.Name is null);
+        Assert.Contains(item.ExaltationSlots, e => e.Kind == ExaltationKind.Click && e.Name is null);
+        Assert.Contains(item.ExaltationSlots, e => e.Kind == ExaltationKind.Proc && e.Name is null);
+    }
+
+    [Fact]
+    public void Parse_RealBracerCapture_ForeignExaltationDetected()
+    {
+        ParsedItem item = ItemParser.Parse(LustrousBracerLines);
+        ExaltationSlot focus = item.ExaltationSlots.Single(e => e.Kind == ExaltationKind.Focus);
+
+        Assert.Equal("Runed Mithril Bracer", focus.Name);
+        Assert.True(ItemParser.IsForeignExaltation(focus, item.Name));
+    }
+
+    [Fact]
+    public void Parse_RealBracerCapture_ExtractsFocusEffect()
+    {
+        ParsedItem item = ItemParser.Parse(LustrousBracerLines);
+        EffectEntry effect = Assert.Single(item.Effects);
+
+        Assert.Equal("Focus", effect.Kind);
+        Assert.Equal("Reagent Conservation II", effect.Description);
+    }
+
+    [Fact]
+    public void IsForeignExaltation_NameMatchesItemBaseName_IsNative()
+    {
+        var native = new ExaltationSlot(ExaltationKind.Focus, "Bloodmoon");
+        Assert.False(ItemParser.IsForeignExaltation(native, "Bloodmoon"));
+    }
+
+    [Fact]
+    public void IsForeignExaltation_EmptySlot_IsNeverForeign()
+    {
+        var empty = new ExaltationSlot(ExaltationKind.Focus, null);
+        Assert.False(ItemParser.IsForeignExaltation(empty, "Anything"));
+    }
+
+    [Fact]
+    public void Parse_TitleAndContentNamesReconcileWithMinorOcrNoise_NoMismatchFlagged()
+    {
+        OcrLine[] lines =
+        [
+            L("Watar Flask", 171, 0), // single-char OCR noise in the title only
+            L("Description", 164, 17),
+            L("Water Flask", 62, 48),
+            L("Quest", 63, 64),
+            L("Class: ALL", 61, 79),
+            L("Race: ALL", 61, 96),
+        ];
+
+        ParsedItem item = ItemParser.Parse(lines);
+        Assert.False(item.TitleContentNameMismatch);
+        Assert.Equal("Water Flask", item.Name);
+    }
+
+    [Fact]
+    public void Parse_TitleTruncatedByPartialOcclusion_MismatchFlagged()
+    {
+        // Reproduces the plan's documented residual Locate gap: a small occluder truncates only the title bar,
+        // geometry reports clean bounds, and Parse's title-vs-content reconciliation must be what catches it.
+        OcrLine[] lines =
+        [
+            L("s Russet Bracer +6 (Augmented)", 96, 0),
+            L("Description", 170, 18),
+            L("Lustrous Russet Bracer +6", 62, 49),
+            L("No Trade", 61, 64),
+            L("Class: WAR", 61, 78),
+            L("Race: ALL", 60, 95),
+        ];
+
+        ParsedItem item = ItemParser.Parse(lines);
+        Assert.True(item.TitleContentNameMismatch);
+        Assert.Contains(item.Warnings, w => w.Contains("possible partial occlusion"));
+    }
+
+    [Fact]
+    public void Parse_ConsumableWithNoSlotOrExaltations_LeavesSlotNull()
+    {
+        OcrLine[] lines =
+        [
+            L("Water Flask", 171, 0),
+            L("Description", 164, 17),
+            L("Water Flask", 62, 48),
+            L("Quest", 63, 64),
+            L("Class: ALL", 61, 79),
+            L("Race: ALL", 61, 96),
+            L("Size:", 11, 128),
+            L("SMALL", 80, 123),
+            L("Weight:", 10, 143),
+            L("0.4", 105, 143),
+            L("Modified", 37, 192),
+            L("Value: 1 silver", 11, 216),
+        ];
+
+        ParsedItem item = ItemParser.Parse(lines);
+        Assert.Null(item.Slot);
+        Assert.Equal("1 silver", item.MerchantValue);
+        Assert.Empty(item.ExaltationSlots);
+    }
+
+    // --- Golden tests against real samples (see ItemWindowLocatorTests for the skip-if-missing rationale) ---
+
+    private async Task<(CapturedImage Image, IOcrEngine Engine)?> Load(string fileName)
+    {
+        string path = Path.Combine(RepoPaths.SamplesDirectory, fileName);
+        if (!File.Exists(path))
+        {
+            _output.WriteLine($"Skipping: {path} not present (samples/ is gitignored, personal data).");
+            return null;
+        }
+        return (await ImageFile.LoadAsync(path), new RapidOcrEngine());
+    }
+
+    [Fact]
+    public async Task Parse_ThreeAdjacentWindows_AllThreeParseWithCorrectNamesAndForeignExaltations()
+    {
+        if (await Load("screen capture 3 item windows.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Assert.All(windows, w => Assert.False(w.PossiblyOccluded));
+
+            var items = windows.Select(w => ItemParser.Parse(w.Lines)).ToList();
+            foreach (var item in items)
+                _output.WriteLine($"{item.Name} +{item.Level} mismatch={item.TitleContentNameMismatch}");
+
+            ParsedItem bracer = items.Single(i => i.Name.Contains("Lustrous"));
+            Assert.Equal(6, bracer.Level);
+            Assert.False(bracer.TitleContentNameMismatch);
+            Assert.True(ItemParser.IsForeignExaltation(
+                bracer.ExaltationSlots.Single(e => e.Kind == ExaltationKind.Focus), bracer.Name));
+
+            ParsedItem bloodmoon = items.Single(i => i.Name.Contains("Bloodmoon"));
+            Assert.Equal(10, bloodmoon.Level);
+            // Bloodmoon's own Focus Exaltation is itself ("Bloodmoon") — native, not foreign.
+            Assert.False(ItemParser.IsForeignExaltation(
+                bloodmoon.ExaltationSlots.Single(e => e.Kind == ExaltationKind.Focus), bloodmoon.Name));
+            // Its Click/Proc exaltations are genuinely foreign items.
+            Assert.True(ItemParser.IsForeignExaltation(
+                bloodmoon.ExaltationSlots.Single(e => e.Kind == ExaltationKind.Click), bloodmoon.Name));
+        }
+    }
+
+    [Fact]
+    public async Task Parse_SimpleConsumable_ExtractsNameFlagsAndMerchantValue()
+    {
+        if (await Load("simple 1 item.jpg") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Assert.Single(windows);
+
+            ParsedItem item = ItemParser.Parse(windows[0].Lines);
+            Assert.Equal("Water Flask", item.Name);
+            Assert.Equal(0, item.Level);
+            Assert.False(item.TitleContentNameMismatch);
+            Assert.Contains("Quest", item.Flags);
+            Assert.Equal("1 silver", item.MerchantValue);
+        }
+    }
+
+    [Fact]
+    public async Task Parse_PartialTitleOcclusionSample_MismatchFlaggedDespiteCleanBounds()
+    {
+        if (await Load("1 item occluded by another.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            LocatedWindow window = Assert.Single(windows);
+
+            // The documented residual gap: WindowBoundsFinder reports this clean (a partial occluder isn't a
+            // large enough share of any single edge to break consensus) — Parse's name reconciliation is the
+            // only thing that catches it.
+            Assert.False(window.PossiblyOccluded);
+
+            ParsedItem item = ItemParser.Parse(window.Lines);
+            Assert.True(item.TitleContentNameMismatch);
+        }
+    }
+}

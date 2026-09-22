@@ -33,12 +33,14 @@ The full design rationale, wiki research findings, and milestone plan live in
 
 - `src/EQLWikiAssistant.Core` (`net10.0`, no Windows APIs) — wiki-agnostic domain models (`Item` etc.), shared
   pipeline abstractions (`IEntityKind` and friends), the portable ports `IOcrEngine` + `CapturedImage`/`Rect`/
-  `OcrLine`/`OcrWord` (`Core.Ocr`), **`ItemWindowLocator`/`WindowBoundsFinder`** (`Core.Locate` — finds each item
-  window's real pixel bounds in a full screenshot by tracing its border, not by clustering text; see "Locating
-  item windows" below), and `EditDistance` (`Core.Text` — fuzzy string matching, used by locate and destined for
-  the future field-label lexicon and exaltation name checks). Anything here must stay portable and free of
-  MediaWiki syntax knowledge — see "Wiki mapping layer" below. Interfaces the pipeline depends on live here even
-  though their real implementations are Windows-only, since `Core` can't reference the Windows-only projects.
+  `OcrLine`/`OcrWord` and `FieldLabelLexicon` (`Core.Ocr`), **`ItemWindowLocator`/`WindowBoundsFinder`**
+  (`Core.Locate` — finds each item window's real pixel bounds in a full screenshot by tracing its border, not by
+  clustering text; see "Locating item windows" below), **`ItemParser`/`ParsedItem`** (`Core.Items` — turns a
+  located window's OCR lines into item data; see "Parsing item windows" below), and `EditDistance` (`Core.Text` —
+  fuzzy string matching, used by locate, the field-label lexicon, and the exaltation name/title-reconciliation
+  checks). Anything here must stay portable and free of MediaWiki syntax knowledge — see "Wiki mapping layer"
+  below. Interfaces the pipeline depends on live here even though their real implementations are Windows-only,
+  since `Core` can't reference the Windows-only projects.
 - `src/EQLWikiAssistant.Capture` (`net10.0-windows10.0.19041.0`) — `GlobalHotKey` (Win32 `RegisterHotKey`, its own
   message-only window/thread, no UI-framework dependency), `WindowFinder` (find a window by title), `WindowCapturer`
   (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device).
@@ -53,16 +55,17 @@ The full design rationale, wiki research findings, and milestone plan live in
 - `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: capture trigger, review/diff screen,
   settings/mapping editor, ledger view.
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
-- `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`
-  (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a screenshot file from
-  disk into a `CapturedImage` (the real app only ever captures a live window, never reads a file — this exists
-  for tests/tooling), `TestSupport.RepoPaths` for finding `samples/` reliably from a test/tool's output
-  directory, and `TestSupport.DebugDraw` for drawing debug rectangle overlays; `OcrSpike` iterates on OCR
-  accuracy against real sample screenshots (crop, upscale, `--engine windows|rapid`, dump recognized
-  lines+bounding boxes); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list windows,
-  capture one to a PNG, test-fire a hotkey); `LocateSpike` runs whole-screenshot OCR + `ItemWindowLocator` and can
-  `--save` a debug overlay (green/red by `PossiblyOccluded`) for eyeballing results. Keep using these — don't
-  recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
+- `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
+  `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
+  screenshot file from disk into a `CapturedImage` (the real app only ever captures a live window, never reads a
+  file — this exists for tests/tooling), `TestSupport.RepoPaths` for finding `samples/` reliably from a
+  test/tool's output directory, and `TestSupport.DebugDraw` for drawing debug rectangle overlays; `OcrSpike`
+  iterates on OCR accuracy against real sample screenshots (crop, upscale, `--engine windows|rapid`, dump
+  recognized lines+bounding boxes); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
+  windows, capture one to a PNG, test-fire a hotkey); `LocateSpike` runs whole-screenshot OCR + `ItemWindowLocator`
+  and can `--save` a debug overlay (green/red by `PossiblyOccluded`) for eyeballing results; `ParseSpike` runs the
+  full Locate -> Parse pipeline and dumps every parsed field per window. Keep using these — don't recreate ad hoc
+  versions — when tuning parse logic or debugging capture/locate.
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
   `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
   only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
@@ -152,6 +155,52 @@ set is very likely to silently reintroduce a bug this history already found and 
   (including genuinely cascaded/overlapping windows), a tooltip adjacent to real windows (fully excluded even
   though it visually overlaps one), and both real occluded-window samples (one correctly caught by geometry, the
   other being the documented gap above).
+
+**Parsing item windows (`ItemParser`, `Core.Items`; `FieldLabelLexicon`, `Core.Ocr`).** Turns a clean
+`LocatedWindow.Lines` list into a `ParsedItem`. Ground truth came from real `LocateSpike` dumps against four
+structurally different real windows (armor with a foreign exaltation, a weapon with both a native and foreign
+exaltations plus three effect types, a quest item, and a plain consumable with no slot/exaltations at all) — see
+the plan's milestone 2 writeup for the verbatim captures. Real windows follow a consistent line order (title bar
+name -> Description[/Lore] tab -> content-area name repeated -> unlabeled comma-separated flags -> `Class:` ->
+`Race:` -> an optional bare-word slot with **no "Slot:" label in-game**, unlike the wiki's own statsblock
+convention -> UI chrome -> a two-column stat block -> "Modified" chrome (the name a third time) -> optional
+exaltation rows -> optional effect rows -> optional merchant value), so the header is parsed positionally and the
+body by pattern-matching each row, since the body's actual field set varies a lot by item type (a weapon shows
+`Base Dmg`/`Delay`/`Skill`/`Ratio` where armor shows `AC`/resists).
+- **A real OCR-layout quirk the row-reconstruction logic depends on**: unlike almost every other label:value line
+  (which comes back as one self-contained `OcrLine`, e.g. `"Class: WAR CLR PAL..."`), the classic two-column stat
+  block (Size/Weight/AC/stats/resists/etc.) is recognized as *separate* fragments for a label and its value even
+  on the same row — apparently because the game renders the value in a visually distinct box. `ItemParser` groups
+  lines into rows by Y-proximity first (8px tolerance, same reasoning as `WindowBoundsFinder`'s consensus
+  tolerances), then pairs fragments within a row generically (self-contained "Label: Value", or a bare
+  "Label:"/"Label." fragment immediately followed by a separate value fragment — including two such pairs on one
+  row, e.g. `Size:` `SMALL` `AC:` `15`) rather than assuming either shape specifically.
+- **`FieldLabelLexicon`** is deliberately the small, fixed vocabulary the milestone 1 writeup scoped it to: it
+  fixes only the confirmed recurring corruption (`Ornamentation`->`Omamentation`, `Worn Exaltation`->
+  `Wom`/`Womn Exaltation`) before a label is matched to a stat field or an exaltation/effect kind. It only
+  contains full labels as they actually appear in-game (e.g. `"Worn Exaltation"`, not a bare `"Worn"` — there's
+  no bare "Worn" field), so don't add bare-word entries without a real line that needs one.
+- **Required occlusion safety net, implemented and verified against the real gap.**
+  `ParsedItem.TitleContentNameMismatch` fuzzy-compares the title-bar name against the content-area name
+  (threshold scaled to name length, tight enough that ordinary single-character OCR noise doesn't trip it, loose
+  enough that a truncated title reliably does). Verified against the actual sample that exposed the gap
+  (`1 item occluded by another.png`): `WindowBoundsFinder` reports `PossiblyOccluded=False` there (the occluder —
+  actually a second, overlapping window whose own text bled into the crop — isn't a large-enough share of any
+  edge to break consensus), and OCR reads the title as `"Lustrou s Russet Bracer +6 (Augmented) ? x"` against a
+  clean content-area name of `"Lustrous Russet Bracer +6"` — `ItemParser.Parse` still correctly sets
+  `TitleContentNameMismatch=true` on that real capture. A caller must treat a set flag as "don't trust this
+  capture," not as advisory.
+- **Native-vs-foreign exaltation check** (`ItemParser.IsForeignExaltation`, fuzzy `EditDistance` against the
+  item's own parsed base name) is verified against real data, not just a plausible design: on the real 3-window
+  sample, Bloodmoon's own `Focus Exaltation: Bloodmoon (Exaltation)` is correctly identified as native (the
+  "removable native exaltation" case from the Augmentations section above), while its Click/Proc exaltations
+  (different items) and Lustrous Russet Bracer's Focus exaltation are all correctly flagged foreign.
+- **Known, accepted v1 simplification**: effect sub-line modifiers (`Cast Time: 4.0 seconds`, `Cooldown: 240
+  seconds`) aren't associated back to the specific effect line above them — they land in the generic `Stats` bag
+  like any other label/value line. Revisit only if something downstream ends up needing that grouping.
+- `tools/ParseSpike` (mirrors `OcrSpike`/`LocateSpike`) runs the full Locate -> Parse pipeline against a real
+  screenshot and dumps every parsed field per window (including a `[FOREIGN]` marker on foreign exaltations) —
+  use this, don't recreate an ad hoc version, when tuning parser rules against new samples.
 
 **Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.**
 `RapidOcrOptions.Default.ImgResize` (1024) downsamples any larger image before detection; at a real 2560x1440
