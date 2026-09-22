@@ -41,9 +41,10 @@ The full design rationale, wiki research findings, and milestone plan live in
   (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device).
   **Read the `[GeneratedComInterface]` note below before touching `Interop/`** — it documents a real, confirmed
   runtime failure mode, not a style preference.
-- `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — `WindowsOcrEngine : IOcrEngine`, wrapping
-  `Windows.Media.Ocr`. Kept swappable (via the `Core`-side interface) in case accuracy requires Tesseract/ONNX
-  instead — see the milestone 1 findings below on where it currently falls short.
+- `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — two `IOcrEngine` implementations: **`RapidOcrEngine`
+  (the default) wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline), and `WindowsOcrEngine`
+  wrapping `Windows.Media.Ocr`, kept as a fallback/comparison option. See "OCR engine choice" below — this wasn't
+  arbitrary, Windows OCR was tried first and replaced after real testing showed it meaningfully less accurate.
 - `src/EQLWikiAssistant.Wiki` (`net10.0`) — MediaWiki API client (bot-password auth), wikitext parsing/rendering,
   the local icon file cache, and the checked-items ledger.
 - `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: capture trigger, review/diff screen,
@@ -53,10 +54,15 @@ The full design rationale, wiki research findings, and milestone plan live in
   dev-only, not shipped) — `TestSupport.ImageFile` loads a screenshot file from disk into a `CapturedImage` (the
   real app only ever captures a live window, never reads a file — this exists for tests/tooling), plus
   `TestSupport.RepoPaths` for finding `samples/` reliably from a test/tool's output directory; `OcrSpike` is a CLI
-  for iterating on OCR/locate accuracy against real sample screenshots (crop, upscale, run `WindowsOcrEngine`, dump
-  recognized lines+bounding boxes); `CaptureSpike` is a CLI for `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
-  windows, capture one to a PNG, test-fire a hotkey). Keep using these — don't recreate ad hoc versions — when
-  tuning locate logic or debugging capture.
+  for iterating on OCR/locate accuracy against real sample screenshots (crop, upscale, `--engine windows|rapid`,
+  dump recognized lines+bounding boxes); `CaptureSpike` is a CLI for `WindowFinder`/`WindowCapturer`/`GlobalHotKey`
+  (list windows, capture one to a PNG, test-fire a hotkey). Keep using these — don't recreate ad hoc versions —
+  when tuning locate logic or debugging capture.
+  **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
+  `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
+  only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
+  failed at runtime with a missing-model-file error until given its own direct reference). `EQLWikiAssistant.App`
+  will need the same treatment in milestone 2/5 — verify with a real run.
 
 Note: WinRT namespaces like `Windows.Media.Ocr` and `Windows.Graphics.Capture` are only projected on a Windows-SDK-
 versioned TFM (`net10.0-windows10.0.19041.0`), not plain `net10.0-windows` — every project that touches them must
@@ -124,16 +130,27 @@ equipped/traded, but some items are natively `No Trade` with no `Attunable` stat
 disambiguate these, so a flag mismatch here may need the user's judgment rather than being auto-corrected — same
 "user can override/cancel" pattern as the exaltation case, no separate pipeline behavior.
 
-**OCR is lossy in specific, known ways — the milestone 2 parser must compensate, not trust it verbatim.** Confirmed
-against real screenshots via `tools/OcrSpike` (see the plan's milestone 1 writeup for full detail): always upscale
-crops before recognition (`CapturedImage.Resize`, 3x+); different scales drop different fields, so a missing
-expected value means "OCR uncertain," not "absent from the game" — surface it for user confirmation rather than
-silently accepting emptiness. `rn`->`m` and `ti`->`b` are consistent, scale-independent misreads on label words
-(`Ornamentation`, `Worn`, `Description`, `Exaltation`) — fix via a small fixed-vocabulary lexicon with edit-distance
-correction, not by tuning OCR further. Payload text (item/exaltation names) can also take single-character hits, so
-the native-vs-foreign exaltation name check and any wiki-page-title lookup by OCR'd name must use fuzzy/edit-distance
-comparison, never exact equality. The item name usually appears twice (title bar + content) — reconcile both rather
-than trusting one.
+**OCR engine choice: `RapidOcrEngine`, not `WindowsOcrEngine` — this was tested, not assumed.** Windows OCR was the
+original default; testing against real item windows (`tools/OcrSpike`) found it unreliable on the game's ~9-11px
+UI text even after upscaling (dropped numeric values, `rn`->`m`/`ti`->`b` misreads on labels, occasional
+single-character corruption in payload text like item/exaltation names). Ruled out JPEG compression as the cause
+(reproduced identically against a live, lossless capture). Tried `RapidOcrNet` (PaddleOCR PP-OCRv5 via ONNX) next
+and it was dramatically better on the *same* crops **at native resolution, with no upscaling** — nearly everything
+came back correct, including roman numerals and payload text Windows OCR had corrupted; upscaling it actually made
+results slightly worse. Full before/after comparison is in the plan's milestone 1 writeup — read it before
+second-guessing the engine choice or reverting to Windows OCR.
+
+**OCR is still not perfect — the milestone 2 parser must not trust it blindly, just with lighter mitigations than
+originally planned.** With `RapidOcrEngine` at native res: `Ornamentation` -> `Omamentation` and `Worn` ->
+`Wom`/`Womn` (an `rn`-ish confusion) persisted across every test regardless of engine or scale — treat it as a
+genuinely hard case for this exact font/pixel-size, not something to keep chasing. A small lexicon/edit-distance
+correction covering just the handful of known field labels handles it. Also keep: fuzzy/edit-distance comparison
+(not exact equality) for the native-vs-foreign exaltation name check and any wiki-page-title lookup by OCR'd name
+— cheap insurance, and an isolated dropped digit was seen even with the better engine; and "a field the parser
+expects but doesn't find is 'OCR uncertain,' not 'absent from the game'" — ask the user rather than assume. Drop:
+the mandatory upscale-before-recognition step and any multi-scale-pass plan — not needed for `RapidOcrEngine`, and
+upscaling measurably hurt it in testing. Construct `RapidOcrEngine` once and reuse it (it loads 3 ONNX models in
+its constructor) rather than per-capture.
 
 ## Wiki reference (eqlwiki.com)
 
@@ -158,8 +175,8 @@ than trusting one.
 ## Commands
 
 No dependencies beyond the .NET SDK (net10.0 / net10.0-windows10.0.19041.0 targets — see Solution layout above).
-Windows OCR also needs a language pack installed (Settings -> Time & Language -> Language -> Optical character
-recognition).
+RapidOCR's models are bundled with its NuGet package, nothing to install. `WindowsOcrEngine` (fallback only) needs
+an OCR language pack (Settings -> Time & Language -> Language -> Optical character recognition).
 
 ```powershell
 dotnet build                                                    # build everything
@@ -167,8 +184,8 @@ dotnet test                                                     # run all tests
 dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test class
 dotnet run --project src/EQLWikiAssistant.App                   # run the WPF app
 
-# OCR/locate tuning against a real sample screenshot:
-dotnet run --project tools/OcrSpike -- "samples/some item.jpg" --crop x,y,w,h --scale 3.0 --save out.png
+# OCR/locate tuning against a real sample screenshot (engine defaults to windows; pass --engine rapid):
+dotnet run --project tools/OcrSpike -- "samples/some item.jpg" --crop x,y,w,h --engine rapid --save out.png
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).

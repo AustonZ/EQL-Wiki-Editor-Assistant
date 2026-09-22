@@ -2,21 +2,23 @@ using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.TestSupport;
 
-// Milestone 1 spike tool: run the real WindowsOcrEngine against a real screenshot (optionally cropped and
-// upscaled) and dump what it recognizes, so we can judge accuracy by eye before building the locate/parse
-// logic.
+// Milestone 1 spike tool: run a real IOcrEngine (RapidOcrEngine by default, or WindowsOcrEngine for comparison)
+// against a real screenshot (optionally cropped and upscaled) and dump what it recognizes, so we can judge
+// accuracy by eye before building the locate/parse logic.
 //
 // Usage:
-//   OcrSpike <imagePath> [--crop x,y,w,h] [--scale factor] [--save pngPath]
+//   OcrSpike <imagePath> [--crop x,y,w,h] [--scale factor] [--save pngPath] [--engine windows|rapid]
 //
 // --crop restricts OCR to a region of the image (original-resolution coordinates).
 // --scale bilinearly upscales (applied after crop) before OCR — game UI text is small, this matters a lot.
 // --save writes the (cropped+scaled) image actually fed to OCR, so the region/scale can be eyeballed.
+// --engine picks the IOcrEngine to run: "rapid" (default, RapidOCR/PP-OCRv5) or "windows" (Windows.Media.Ocr).
 
 string? imagePath = null;
 Rect? crop = null;
 double scale = 1.0;
 string? savePath = null;
+string engineName = "rapid";
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -32,6 +34,9 @@ for (int i = 0; i < args.Length; i++)
         case "--save":
             savePath = args[++i];
             break;
+        case "--engine":
+            engineName = args[++i];
+            break;
         default:
             imagePath = args[i];
             break;
@@ -40,7 +45,7 @@ for (int i = 0; i < args.Length; i++)
 
 if (imagePath is null)
 {
-    Console.Error.WriteLine("usage: OcrSpike <imagePath> [--crop x,y,w,h] [--scale factor] [--save pngPath]");
+    Console.Error.WriteLine("usage: OcrSpike <imagePath> [--crop x,y,w,h] [--scale factor] [--save pngPath] [--engine windows|rapid]");
     return 1;
 }
 
@@ -66,14 +71,26 @@ if (savePath is not null)
     Console.WriteLine($"Saved to {savePath}");
 }
 
-IOcrEngine engine = new WindowsOcrEngine();
-IReadOnlyList<OcrLine> lines = await engine.RecognizeAsync(image);
-
-Console.WriteLine();
-Console.WriteLine($"--- {lines.Count} line(s) recognized ---");
-foreach (OcrLine line in lines)
+IOcrEngine engine = engineName switch
 {
-    Console.WriteLine($"[{line.BoundingBox.X,4},{line.BoundingBox.Y,4} {line.BoundingBox.Width,4}x{line.BoundingBox.Height,3}] {line.Text}");
-}
+    "windows" => new WindowsOcrEngine(),
+    "rapid" => new RapidOcrEngine(),
+    _ => throw new ArgumentException($"Unknown engine '{engineName}' (expected windows|rapid)"),
+};
+try
+{
+    IReadOnlyList<OcrLine> lines = await engine.RecognizeAsync(image);
 
-return 0;
+    Console.WriteLine();
+    Console.WriteLine($"--- engine={engineName}, {lines.Count} line(s) recognized ---");
+    foreach (OcrLine line in lines)
+    {
+        Console.WriteLine($"[{line.BoundingBox.X,4},{line.BoundingBox.Y,4} {line.BoundingBox.Width,4}x{line.BoundingBox.Height,3}] {line.Text}");
+    }
+
+    return 0;
+}
+finally
+{
+    (engine as IDisposable)?.Dispose();
+}
