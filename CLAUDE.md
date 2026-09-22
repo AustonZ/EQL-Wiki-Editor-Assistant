@@ -32,10 +32,13 @@ The full design rationale, wiki research findings, and milestone plan live in
 ## Solution layout
 
 - `src/EQLWikiAssistant.Core` (`net10.0`, no Windows APIs) — wiki-agnostic domain models (`Item` etc.), shared
-  pipeline abstractions (`IEntityKind` and friends), **and the portable ports** `IOcrEngine` + `CapturedImage`/
-  `Rect`/`OcrLine`/`OcrWord` (`Core.Ocr` namespace). Anything here must stay portable and free of MediaWiki syntax
-  knowledge — see "Wiki mapping layer" below. Interfaces the pipeline depends on live here even though their real
-  implementations are Windows-only, since `Core` can't reference the Windows-only projects.
+  pipeline abstractions (`IEntityKind` and friends), the portable ports `IOcrEngine` + `CapturedImage`/`Rect`/
+  `OcrLine`/`OcrWord` (`Core.Ocr`), **`ItemWindowLocator`** (`Core.Locate` — groups a screenshot's OCR lines into
+  per-window clusters; see "Locating item windows" below), and `EditDistance` (`Core.Text` — fuzzy string
+  matching, used by locate and destined for the future field-label lexicon and exaltation name checks). Anything
+  here must stay portable and free of MediaWiki syntax knowledge — see "Wiki mapping layer" below. Interfaces the
+  pipeline depends on live here even though their real implementations are Windows-only, since `Core` can't
+  reference the Windows-only projects.
 - `src/EQLWikiAssistant.Capture` (`net10.0-windows10.0.19041.0`) — `GlobalHotKey` (Win32 `RegisterHotKey`, its own
   message-only window/thread, no UI-framework dependency), `WindowFinder` (find a window by title), `WindowCapturer`
   (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device).
@@ -50,14 +53,16 @@ The full design rationale, wiki research findings, and milestone plan live in
 - `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: capture trigger, review/diff screen,
   settings/mapping editor, ledger view.
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
-- `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike` (`net10.0-windows10.0.19041.0`,
-  dev-only, not shipped) — `TestSupport.ImageFile` loads a screenshot file from disk into a `CapturedImage` (the
-  real app only ever captures a live window, never reads a file — this exists for tests/tooling), plus
-  `TestSupport.RepoPaths` for finding `samples/` reliably from a test/tool's output directory; `OcrSpike` is a CLI
-  for iterating on OCR/locate accuracy against real sample screenshots (crop, upscale, `--engine windows|rapid`,
-  dump recognized lines+bounding boxes); `CaptureSpike` is a CLI for `WindowFinder`/`WindowCapturer`/`GlobalHotKey`
-  (list windows, capture one to a PNG, test-fire a hotkey). Keep using these — don't recreate ad hoc versions —
-  when tuning locate logic or debugging capture.
+- `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`
+  (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a screenshot file from
+  disk into a `CapturedImage` (the real app only ever captures a live window, never reads a file — this exists
+  for tests/tooling), `TestSupport.RepoPaths` for finding `samples/` reliably from a test/tool's output
+  directory, and `TestSupport.DebugDraw` for drawing debug rectangle overlays; `OcrSpike` iterates on OCR
+  accuracy against real sample screenshots (crop, upscale, `--engine windows|rapid`, dump recognized
+  lines+bounding boxes); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list windows,
+  capture one to a PNG, test-fire a hotkey); `LocateSpike` runs whole-screenshot OCR + `ItemWindowLocator` and can
+  `--save` a debug overlay (green/red by `PossiblyOccluded`) for eyeballing results. Keep using these — don't
+  recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
   `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
   only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
@@ -106,7 +111,41 @@ downloaded at most once into a local on-disk cache before any icon comparison.
 
 **Multi-window / occlusion handling.** A single screenshot may contain more than one item detail window; all of
 them must be located and processed. A partially obscured window must be detected and surfaced to the user as a
-warning rather than silently processed as if complete.
+warning rather than silently processed as if complete. Implemented as `ItemWindowLocator.PossiblyOccluded` (no
+title-bar line found above the window's `Description` anchor) — a real but **unvalidated** heuristic, since no
+genuinely occluded sample exists yet (see the plan's "Needed from the user"). Don't treat it as more trustworthy
+than that without testing it against a real occluded window first.
+
+**Locating item windows (`ItemWindowLocator`, `Core.Locate`).** Run OCR on the *whole* screenshot (see "Full-frame
+OCR" below), then cluster its lines into per-window groups — no pixel-level text detection of our own is needed,
+RapidOCR's detector already finds everything, locate just groups it correctly. Two simpler approaches were tried
+and failed for specific, informative reasons (full writeup in the plan's milestone 2 section — read it before
+reimplementing this from scratch, the failure modes are the actual design constraint):
+- Pure bounding-box-gap clustering bridges across *different*, merely-nearby UI panels on a busy real screenshot
+  (character sheet, buffs, inventory grid all densely packed).
+- Adding a pixel "dark bridge" check (window interiors are near-black, ~RGB(16,16,16); real gaps are a distinctly
+  lighter color, ~RGB(150+,120+,70+) — a wide, reliable margin) fixes that, but *two different item windows*
+  sitting close together are both dark UI too, so pure darkness still can't tell "same window" from "next one over."
+- What works: each `Description` tab line seeds one window; unclaimed lines join the nearest anchor whose (a)
+  fixed, anchor-relative size envelope contains them (this — not cluster-relative growth — is what actually caps
+  runaway spread into a neighbor) and (b) dark-pixel bridge reaches them from an already-claimed line.
+- A real bug worth remembering if this code gets touched: sampling the "bridge" between two boxes that already
+  touch/overlap (common for adjacent text rows) can land the sample *inside* one box's own text glyph — a bright
+  pixel, falsely read as "not dark," wrongly splitting two lines that belong together. Fix was to compute the
+  actual gap rectangle (never sample inside either box) and skip the check entirely when boxes already touch.
+- Validated against 6 real screenshots (`tools/LocateSpike`, golden tests in `Tests/Locate/`): single windows,
+  3 adjacent windows (correctly separated, no cross-contamination), and a tooltip sitting against two real
+  windows (tooltip fully excluded even though it visually overlaps one). `LocatedWindow.Bounds` is the union of
+  its lines' boxes, not pixel-exact chrome — fine for grouping, but add a margin if pixels are ever cropped from it.
+
+**Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.**
+`RapidOcrOptions.Default.ImgResize` (1024) downsamples any larger image before detection; at a real 2560x1440
+screenshot that shrinks our ~9-11px UI text below a usable threshold (confirmed: default settings found 33
+garbled lines and zero `Description` tokens on a real screenshot with 3 real item windows). Fixed inside
+`RapidOcrEngine` itself: `ImgResize = Math.Max(1024, Math.Max(image.Width, image.Height))` — the 1024 floor keeps
+small per-window crops (milestone 1's use case) behaving identically to before; the dynamic ceiling fixes
+full-frame recognition (361 lines, all real `Description` anchors found, on the same screenshot post-fix). Costs
+~4s for a full frame — fine for a hotkey-triggered, non-realtime action, but don't be surprised by it.
 
 **Item leveling (`+X`) — v1 only processes `+0`.** Items (and spells) can be leveled up in-game (`Robe of the Ishva
 +2`); the wiki only stores level-0 data. The `+X` suffix is always stripped before using the name to key the ledger
@@ -197,8 +236,11 @@ dotnet test                                                     # run all tests
 dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test class
 dotnet run --project src/EQLWikiAssistant.App                   # run the WPF app
 
-# OCR/locate tuning against a real sample screenshot (engine defaults to windows; pass --engine rapid):
-dotnet run --project tools/OcrSpike -- "samples/some item.jpg" --crop x,y,w,h --engine rapid --save out.png
+# OCR tuning against a real sample screenshot (engine defaults to rapid; pass --engine windows to compare):
+dotnet run --project tools/OcrSpike -- "samples/some item.jpg" --crop x,y,w,h --save out.png
+
+# Locate tuning against a real full screenshot:
+dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --save out.png
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).
