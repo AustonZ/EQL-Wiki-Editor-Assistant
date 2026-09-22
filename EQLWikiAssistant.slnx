@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EQLWikiAssistant.App/EQLWikiAssistant.App.csproj" />
+    <Project Path="src/EQLWikiAssistant.Capture/EQLWikiAssistant.Capture.csproj" />
+    <Project Path="src/EQLWikiAssistant.Core/EQLWikiAssistant.Core.csproj" />
+    <Project Path="src/EQLWikiAssistant.Ocr/EQLWikiAssistant.Ocr.csproj" />
+    <Project Path="src/EQLWikiAssistant.Wiki/EQLWikiAssistant.Wiki.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EQLWikiAssistant.Tests/EQLWikiAssistant.Tests.csproj" />
+  </Folder>
+</Solution>
