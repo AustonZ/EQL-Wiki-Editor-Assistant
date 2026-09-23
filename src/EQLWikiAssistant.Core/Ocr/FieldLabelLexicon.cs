@@ -24,6 +24,7 @@ public static class FieldLabelLexicon
         "Base Dmg", "Delay", "Skill", "Dmg Bon", "Ratio", "Range",
         "Value",
         "Focus Effect", "Click Effect", "Combat Effect", "Proc Effect", "Charge Effect",
+        "Container", "Type",
         "Cast Time", "Cooldown", "Required Level", "Charges",
     ];
 
@@ -49,6 +50,12 @@ public static class FieldLabelLexicon
 
         return best is not null && bestDistance <= ToleranceFor(best) ? best : candidate;
     }
+
+    /// <summary>True if <paramref name="text"/> corrects to a label this lexicon knows. Used to recognize a
+    /// label whose trailing ':' OCR dropped — a documented, unpredictable quirk of this engine on this UI — which
+    /// would otherwise leave the label and its value stranded as two unparsed fragments.</summary>
+    public static bool IsKnownLabel(string text) =>
+        KnownLabels.Contains(Correct(text), StringComparer.OrdinalIgnoreCase);
 
     /// <summary>True if <paramref name="text"/>'s prefix (of the same length as <paramref name="label"/>) is a
     /// close match for <paramref name="label"/> — used to recognize a known label at the start of a line without

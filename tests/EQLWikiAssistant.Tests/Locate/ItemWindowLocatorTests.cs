@@ -93,9 +93,7 @@ public class ItemWindowLocatorTests
 
             // "Fairy-Hide Mantle +1" is a hover tooltip (no title bar, no Description tab — see the plan's
             // window-vs-tooltip rule) sitting right next to these windows; it must never appear as a window or
-            // leak into one's content. (The Tenderizer window is a known hard case here — it sits with zero
-            // gap against an unrelated Bank window, so it's expected to come back PossiblyOccluded; only
-            // Fishbone Earring is asserted clean.)
+            // leak into one's content.
             string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
             Assert.All(texts, t => Assert.DoesNotContain("Fairy-Hide Mantle", t));
             Assert.All(texts, t => Assert.DoesNotContain("Guardian Spirit", t)); // the tooltip's own click effect
@@ -103,6 +101,15 @@ public class ItemWindowLocatorTests
             LocatedWindow? fishbone = windows.FirstOrDefault(w => w.Lines.Any(x => x.Text.Contains("Fishbone Earring")));
             Assert.NotNull(fishbone);
             Assert.False(fishbone!.PossiblyOccluded);
+
+            // The Tenderizer sits with zero gap against an unrelated Bank window. That used to be unresolvable —
+            // there was no brightness difference to find an edge in — and was accepted as a conservative false
+            // negative. Tracing the window's own content outline resolves it, because the outline is drawn by the
+            // window rather than being a contrast accident between it and whatever it happens to sit against.
+            LocatedWindow? tenderizer = windows.FirstOrDefault(w => w.Lines.Any(x => x.Text.Contains("Tenderizer")));
+            Assert.NotNull(tenderizer);
+            Assert.False(tenderizer!.PossiblyOccluded);
+            Assert.DoesNotContain(tenderizer.Lines, x => x.Text.Contains("Fishbone"));
         }
     }
 

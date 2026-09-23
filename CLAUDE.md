@@ -63,9 +63,11 @@ The full design rationale, wiki research findings, and milestone plan live in
   iterates on OCR accuracy against real sample screenshots (crop, upscale, `--engine windows|rapid`, dump
   recognized lines+bounding boxes); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
   windows, capture one to a PNG, test-fire a hotkey); `LocateSpike` runs whole-screenshot OCR + `ItemWindowLocator`
-  and can `--save` a debug overlay (green/red by `PossiblyOccluded`) for eyeballing results; `ParseSpike` runs the
-  full Locate -> Parse pipeline and dumps every parsed field per window. Keep using these — don't recreate ad hoc
-  versions — when tuning parse logic or debugging capture/locate.
+  and can `--save` a debug overlay (green/red by `PossiblyOccluded`) for eyeballing results, or
+  `--probe x,y,dx,dy,count` to dump raw pixel RGB along a ray — that's how the window-chrome colour profile in
+  "Locating item windows" was measured, so use it rather than guessing before changing anything in
+  `WindowBoundsFinder`; `ParseSpike` runs the full Locate -> Parse pipeline and dumps every parsed field per
+  window. Keep using these — don't recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
   `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
   only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
@@ -115,46 +117,63 @@ downloaded at most once into a local on-disk cache before any icon comparison.
 **Multi-window / occlusion handling.** A single screenshot may contain more than one item detail window; all of
 them must be located and processed. A partially obscured window must be detected and surfaced to the user as a
 warning rather than silently processed as if complete. Implemented as `ItemWindowLocator`/`WindowBoundsFinder`
-(`Core.Locate`), validated against real occluded samples — see "Locating item windows" below for the design and
-its one documented residual gap, which **Parse is required to close** with a second, content-level check.
+(`Core.Locate`), validated against real occluded samples — see "Locating item windows" below for the design.
+Parse adds a second, content-level check (reconciling the title-bar name against the content-area name) as
+defence in depth.
 
 **Locating item windows (`ItemWindowLocator` + `WindowBoundsFinder`, `Core.Locate`).** Run OCR on the *whole*
-screenshot (see "Full-frame OCR" below) to find each window's `Description` tab, then trace that window's real
-*pixel* bounds outward from the tab — this is **not** OCR-line clustering; that was the first design and it was
-explicitly replaced (by the user's direction, after real occluded samples broke it) once testing showed
-text-proximity clustering cannot reliably tell "this window's own content" from "a different, adjacent dark
-window" when the two are genuinely adjacent with no lighter gap between them — which is exactly what real
-occlusion looks like. **Before touching this code, read the plan's milestone 2 section in full** — the failed
-attempts, every threshold here, and the residual gap were all arrived at empirically against real screenshots,
-not derived on paper, and re-tuning in isolation without retesting against `tools/LocateSpike`'s full real-sample
-set is very likely to silently reintroduce a bug this history already found and fixed once.
-- The border itself isn't a distinctly-colored line (checked directly, including by zooming into real
-  screenshots) — it's the sharp edge of the near-black interior (~RGB(16,16,16)) against the tan game world
-  (~RGB(150-170,120-140,70-90)) or a different UI panel.
-- A single ray per edge doesn't work: a window's own bright text (title, tab label, stat lines) stops a naive
-  scan almost immediately, but tolerating brightness to get past that also risks tolerating straight through a
-  genuine gap into a different window. The fix: every edge (top/bottom/left/right) is found by probing several
-  rows/columns and taking the *largest same-value cluster* (~40% threshold, deliberately not a plain majority —
-  a wide title can legitimately claim more probes than the true edge), where each probe tolerates a short bright
-  run (skip one glyph/line of text) but stops at a sustained one (~26px+, a real exit).
-- Consensus alone can't catch an occluding panel that's adjacent along an *entire* side (every probe agrees on
-  the same wrong, oversized answer) — caught instead by hard sanity ceilings on the final width/height (600 /
-  700px, over the largest real window measured, ~550x655).
-- **Known, accepted residual gap**: a real sample has another window covering only ~20% of this window's own
-  title ("Lustrous " of "Lustrous Russet Bracer +6") — too small a minority to break consensus, so bounds come
-  back clean while the crop's own title text is truncated (reads `"s Russet Bracer +6 (Augmented)"`). Geometry
-  cannot close this. **Parse must reconcile the title-bar name against the content-area name** (every real item
-  window repeats its own name a few lines into the content) and treat a mismatch as suspect. Never treat "bounds
-  found" as "definitely not occluded."
-- Some genuinely hard cases are left as false negatives (conservatively reported occluded) rather than chased
-  further, per the user's framing — that's the safe failure direction. E.g. one real sample has an item window
-  sitting with *zero* gap directly against an unrelated NPC bank window; there's no pixel signal left to tell
-  them apart, so it's correctly-if-conservatively reported as unresolved rather than guessed at.
-- Validated against 7 real screenshots (`tools/LocateSpike --save` draws a debug overlay, green/red by
-  `PossiblyOccluded`; golden tests in `Tests/Locate/`): single windows, multiple different multi-window layouts
-  (including genuinely cascaded/overlapping windows), a tooltip adjacent to real windows (fully excluded even
-  though it visually overlaps one), and both real occluded-window samples (one correctly caught by geometry, the
-  other being the documented gap above).
+screenshot (see "Full-frame OCR" below) to find each window's `Description` tab, then trace the window's **own
+content-area outline** — the thin neutral-grey line the game draws around the tab contents — outward from that
+anchor. **Before touching this code, read the plan's milestone 2 section in full**: two earlier designs failed,
+every constant here was measured against real screenshots rather than derived, and re-tuning in isolation without
+retesting `tools/LocateSpike` against the full real-sample set is very likely to reintroduce a bug this history
+already found and fixed.
+- **Trace the grey outline, not a brightness transition.** Two superseded designs: (1) clustering OCR lines by
+  text proximity, which can't tell a window's own content from an adjacent window's; (2) tracing the edge of the
+  near-black interior — "scan outward until it stops being dark" — which silently assumed whatever is *outside*
+  the window is brighter than it. Often it isn't, and then those scans tunnelled straight through the real edge:
+  the player's own 3D character model standing behind a window measures ~33-75, and an adjacent dark UI panel
+  measures about the same as the interior. The outline is drawn by the window itself, so it doesn't depend on
+  what's behind it — which is the whole point.
+- **Measured colour profile** (via `tools/LocateSpike --probe x,y,dx,dy,count`, which dumps raw pixel RGB along a
+  ray — use it before changing any constant): interior `R=G=B≈16` (10-25 with JPEG noise); content outline a 1px
+  neutral grey line at **50-62**, essentially constant along its length; the outer window frame just beyond it at
+  **0-8**, i.e. *darker* than the interior; world background 150-170; text up to 255.
+- **Brightness alone can't identify the outline** — anti-aliased text edges and the character model both land in
+  the same 50-62 band. What separates them is that the outline is a long uniform straight line, so every
+  candidate is confirmed by requiring a long run of same-brightness line pixels *perpendicular* to the scan
+  direction (a glyph edge spans a few px; a stat value-box outline a few tens). That run check is also what
+  implements "if the border is broken, treat it as occluded".
+- **The outer frame is tested on the _minimum_ channel, not the maximum.** Requiring frame just beyond a
+  candidate is what separates the content area's real boundary from the internal divider rules the window also
+  draws (identical grey lines, but with more window beyond them). JPEG bleed from a bright neighbour lifts
+  individual channels of that thin frame unevenly — against a red element below one real window it reads
+  `(11,0,0)` then `(34,0,0)`, which a max-channel test rejects — but never lifts all three, so the minimum stays
+  at 0 while the interior's neutral grey keeps a minimum of ~16.
+- **Both tab states must work.** When `Description` is the *active* tab it merges into the content area, so there
+  is no chrome line below the label. When it's *inactive* (the Lore tab is selected) it's drawn as its own raised
+  box, so a short stack of chrome lines sits below it and all of them must be stepped past — stopping between
+  them makes the content area's top outline itself look like the window's bottom on the next downward scan.
+- **The top edge is deliberately different**: there is no grey line at the window's outer top (the title bar is
+  pure black and simply meets the world), and the title bar has to stay in the crop for Parse's title-vs-content
+  name check, so the top alone keeps the older brightness-transition scan. It has been unanimous on every real
+  sample; the edges the dark-neighbour problem actually broke are left/right/bottom.
+- Multi-probe consensus (largest same-value cluster, ~40% threshold rather than a plain majority) and the
+  absolute size ceilings (600x700) are retained from the previous design, and still do real work: consensus is
+  how a partly-covered edge shows up as disagreement, and the ceilings catch an occluder adjacent along an
+  *entire* side, where every probe agrees on the same wrong answer.
+- Validated against all 15 real screenshots (`tools/LocateSpike --save` draws a debug overlay, green/red by
+  `PossiblyOccluded`; golden tests in `Tests/Locate/`). Traced widths are now consistently ~394-404px — the
+  window's true content width — where the previous design returned 414-546px because it was running past the real
+  edge into neighbouring UI. Two cases the previous design could not handle now resolve correctly: an item window
+  sitting with *zero* gap against an unrelated NPC bank window, and a window with the Lore tab active and the
+  player's character model behind it.
+- **Corrections to earlier notes in this file, since the claims were load-bearing and are now disproven**: the
+  border *is* a distinctly-coloured line (the earlier "it isn't, it's just the edge of the dark interior" was
+  wrong); and the "known residual gap" about a window whose title was ~20% occluded never existed — that sample's
+  title was fully readable, and the garbled title was an artifact of the old tracer running 137px past the real
+  left edge into the neighbouring window. Parse's title-vs-content reconciliation is still implemented and still
+  worth keeping as defence in depth, but it is no longer propping up a known geometry hole.
 
 **Parsing item windows (`ItemParser`, `Core.Items`; `FieldLabelLexicon`, `Core.Ocr`).** Turns a clean
 `LocatedWindow.Lines` list into a `ParsedItem`. Ground truth came from real `LocateSpike` dumps against four
@@ -180,16 +199,14 @@ body by pattern-matching each row, since the body's actual field set varies a lo
   `Wom`/`Womn Exaltation`) before a label is matched to a stat field or an exaltation/effect kind. It only
   contains full labels as they actually appear in-game (e.g. `"Worn Exaltation"`, not a bare `"Worn"` — there's
   no bare "Worn" field), so don't add bare-word entries without a real line that needs one.
-- **Required occlusion safety net, implemented and verified against the real gap.**
-  `ParsedItem.TitleContentNameMismatch` fuzzy-compares the title-bar name against the content-area name
-  (threshold scaled to name length, tight enough that ordinary single-character OCR noise doesn't trip it, loose
-  enough that a truncated title reliably does). Verified against the actual sample that exposed the gap
-  (`1 item occluded by another.png`): `WindowBoundsFinder` reports `PossiblyOccluded=False` there (the occluder —
-  actually a second, overlapping window whose own text bled into the crop — isn't a large-enough share of any
-  edge to break consensus), and OCR reads the title as `"Lustrou s Russet Bracer +6 (Augmented) ? x"` against a
-  clean content-area name of `"Lustrous Russet Bracer +6"` — `ItemParser.Parse` still correctly sets
-  `TitleContentNameMismatch=true` on that real capture. A caller must treat a set flag as "don't trust this
-  capture," not as advisory.
+- **Occlusion safety net (defence in depth).** `ParsedItem.TitleContentNameMismatch` fuzzy-compares the
+  title-bar name against the content-area name (threshold scaled to name length: tight enough that a truncated
+  title trips it, loose enough that ordinary single-character OCR noise doesn't). A caller must treat a set flag
+  as "don't trust this capture", not as advisory. It no longer covers a known geometry hole — the sample that
+  supposedly proved one turned out to be a bounds bug, now fixed (see "Locating item windows") — but it still
+  earns its place: on the 4-window sample it correctly rejects a Bank/Tradeskill panel that OCR'd a literal
+  "Description" and got picked up as a false-positive window, catching it via a title/content name mismatch plus
+  a pile of "expected row not found" warnings.
 - **Native-vs-foreign exaltation check** (`ItemParser.IsForeignExaltation`, fuzzy `EditDistance` against the
   item's own parsed base name) is verified against real data, not just a plausible design: on the real 3-window
   sample, Bloodmoon's own `Focus Exaltation: Bloodmoon (Exaltation)` is correctly identified as native (the
@@ -305,6 +322,13 @@ dotnet run --project tools/OcrSpike -- "samples/some item.jpg" --crop x,y,w,h --
 
 # Locate tuning against a real full screenshot:
 dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --save out.png
+
+# Measure the window chrome's actual pixel colours before touching WindowBoundsFinder's thresholds
+# (here: 60 pixels rightward from 1490,500, to cross a window's right-hand outline):
+dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --probe 1490,500,1,0,60
+
+# Full Locate -> Parse pipeline, dumping every parsed field per window:
+dotnet run --project tools/ParseSpike -- "samples/some screenshot.png"
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).

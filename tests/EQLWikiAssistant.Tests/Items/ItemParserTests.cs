@@ -380,32 +380,33 @@ public class ItemParserTests
     }
 
     [Fact]
-    public async Task Parse_PartialOcclusionSample_ContaminationSurfacedEvenWithoutNameMismatch()
+    public async Task Parse_WindowDirectlyAgainstAnotherWindow_IsIsolatedWithNoBleedIn()
     {
         if (await Load("1 item occluded by another.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
             LocatedWindow window = Assert.Single(windows);
-
-            // The documented residual gap: WindowBoundsFinder reports this clean (a partial occluder isn't a
-            // large enough share of any single edge to break consensus).
             Assert.False(window.PossiblyOccluded);
 
-            ParsedItem item = ItemParser.Parse(window.Lines);
+            // This sample is the one that drove the switch to tracing the content outline. The item window here
+            // sits directly on top of an unrelated "Fish Rolls" window, and the previous brightness-transition
+            // tracer ran ~137px past the real left edge into it, so the neighbour's own Class:/Race:/Size:/
+            // Weight:/Value: rows were parsed as if they belonged to this item. (It also produced a nonsense
+            // title, which is where the since-retired "partial title occlusion" note came from — the title was
+            // never occluded, the bounds were just wrong.) Tracing the outline isolates the window exactly.
+            Assert.InRange(window.Bounds.Width, 380, 430);
 
-            // NOTE: on this actual sample, the adjacent overlapping window's own text bled into the *stat block*
-            // (a second Class:/Race:/Size:/Weight: pair, plus unparsed fragments of its name and chrome), not
-            // badly enough into the title bar to trip TitleContentNameMismatch (title OCR'd as "Lustrou s Russet
-            // Bracer +6", only one edit off from the clean content name "Lustrous Russet Bracer" — ordinary OCR
-            // noise, not the severe truncation the CLAUDE.md gap writeup describes; see
-            // Parse_TitleTruncatedByPartialOcclusion_MismatchFlagged above for a synthetic reproduction of that
-            // severe case, which the mismatch check does catch). So this specific real capture is NOT currently
-            // caught by name reconciliation — but the contamination is still visible via warnings/duplicate
-            // fields, which is what this test asserts instead. Flagged to the user as an open question: whether
-            // a secondary "too many unparsed lines"-style signal is worth adding.
+            ParsedItem item = ItemParser.Parse(window.Lines);
+            Assert.Equal("Lustrous Russet Bracer", item.Name);
+            Assert.Equal(6, item.Level);
             Assert.False(item.TitleContentNameMismatch);
-            Assert.True(item.Warnings.Count > 3, "Expected several unparsed/contaminated lines from the bleed-in.");
+            Assert.Empty(item.Warnings);
+
+            // Nothing from the neighbouring window may appear, and each labelled field may appear exactly once.
+            Assert.DoesNotContain(window.Lines, x => x.Text.Contains("Fish Rolls"));
+            Assert.Single(item.Stats, kv => kv.Key == "Size");
+            Assert.Single(item.Stats, kv => kv.Key == "Weight");
         }
     }
 }

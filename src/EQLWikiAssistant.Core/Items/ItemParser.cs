@@ -323,7 +323,11 @@ public static class ItemParser
                 continue;
             }
 
-            bool bareLabel = text.EndsWith(':') || text.EndsWith('.');
+            // A label fragment normally keeps its ':' (or an OCR'd '.'), but this engine drops that colon
+            // unpredictably on this UI, which would otherwise strand the label and its value as two unparsed
+            // fragments — so a fragment that corrects to a known field label counts as a label either way.
+            string labelText = text.TrimEnd(':', '.').Trim();
+            bool bareLabel = text.EndsWith(':') || text.EndsWith('.') || FieldLabelLexicon.IsKnownLabel(labelText);
             if (bareLabel && i + 1 < row.Count)
             {
                 string nextText = row[i + 1].Text.Trim();
@@ -334,8 +338,7 @@ public static class ItemParser
                 bool nextLooksLikeValue = nextText.Length > 0 && !nextText.EndsWith(':') && !nextText.EndsWith('.');
                 if (nextLooksLikeValue)
                 {
-                    string label = FieldLabelLexicon.Correct(text.TrimEnd(':', '.').Trim());
-                    stats.Add(new KeyValuePair<string, string>(label, nextText));
+                    stats.Add(new KeyValuePair<string, string>(FieldLabelLexicon.Correct(labelText), nextText));
                     i += 2;
                     continue;
                 }
