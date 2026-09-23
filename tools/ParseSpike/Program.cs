@@ -47,7 +47,11 @@ foreach (LocatedWindow window in windows)
         Console.WriteLine($"    {ex.Kind}: {ex.Name ?? "empty"} {(ex.Name is not null && ItemParser.IsForeignExaltation(ex, item.Name) ? "[FOREIGN]" : "")}");
     Console.WriteLine("  Effects:");
     foreach (var fx in item.Effects)
+    {
         Console.WriteLine($"    {fx.Kind} Effect: {fx.Description}");
+        foreach (var mod in fx.Modifiers)
+            Console.WriteLine($"      {mod.Key}: {mod.Value}");
+    }
     Console.WriteLine($"  MerchantValue: {item.MerchantValue ?? "(none)"}");
     if (item.Warnings.Count > 0)
     {

@@ -34,6 +34,22 @@ namespace EQLWikiAssistant.Core.Locate;
 /// the parser MUST additionally reconcile the title-bar name against the content-area name (every real item
 /// window repeats its own name a few lines into the content — see the plan) and treat a mismatch as suspect.
 /// Do not treat "bounds found" as "definitely not occluded" when writing that code.
+///
+/// **Known hard case: the player's own character model, not just another UI panel, can create the same
+/// dark-on-dark adjacency problem.** A real capture (an item window with the Lore tab active, floating over open
+/// terrain with no other UI overlapping it) still fails bottom-edge consensus: most probes scanning downward
+/// tunnel straight through the window's own bottom border into the player's 3D character model standing just
+/// behind/below the window in world space, because the model's dark gray tone is close enough to the window's
+/// near-black interior to never register a sustained bright run within <c>MaxScanDistance</c> — so those probes
+/// return null (no exit found at all) rather than a wrong-but-confident value, and only the few probe columns
+/// that miss the character body (landing on clearly bright ground) succeed. This is the same category of
+/// genuinely-hard, correctly-conservative false negative already documented above for two adjacent dark UI
+/// panels — just triggered by world geometry instead of another window — and is left unresolved for the same
+/// reason: there's no reliable pixel signal here to tell "window interior" apart from "something else dark
+/// behind/below it" without a stronger signal than raw darkness (e.g. explicitly tracking the window's own thin
+/// border line color, which existing probes currently tolerate as brief noise rather than treat as a positive
+/// edge signal). Revisit only with real evidence this is common enough in practice to justify the added
+/// complexity and re-validate against the full real-sample set if so.
 /// </summary>
 public static class WindowBoundsFinder
 {
@@ -68,11 +84,18 @@ public static class WindowBoundsFinder
     public static Rect? TryFindBounds(CapturedImage image, Rect anchorBox)
     {
         int cx = anchorBox.X + anchorBox.Width / 2;
-        // Not anchorBox's own vertical center: "Description" is rendered as bright (active-tab yellow) text,
-        // so sampling inside its own tight OCR box risks landing on a letter's own bright pixels rather than
-        // the dark background around it. A few px below the text sits in the tab's dark interior instead.
-        int safeRowY = anchorBox.Bottom + 4;
-        if (!IsDark(image, cx, safeRowY)) return null;
+        // Not anchorBox's own vertical center: "Description" is rendered as bright text (active-tab yellow, or
+        // plain white when a different tab — e.g. Lore — is the one actually selected), so sampling inside its
+        // own tight OCR box risks landing on a letter's own bright pixels rather than the dark background around
+        // it. A few px below the text normally sits in the tab's dark interior instead — but when Description is
+        // the *inactive* tab, real captures show it's drawn inside a thin bordered box whose bottom edge can sit
+        // right at that fixed offset (confirmed real: a capture with Lore selected had this border line land
+        // almost exactly on Bottom+4, failing the dark check immediately even though the window itself was
+        // completely unoccluded). Scan down for the first genuinely dark row instead of trusting a fixed offset,
+        // so this tolerates that border whether or not it's present.
+        int? foundSafeRowY = FindFirstDarkRowBelow(image, cx, anchorBox.Bottom + 2, maxProbe: 20);
+        if (foundSafeRowY is null) return null;
+        int safeRowY = foundSafeRowY.Value;
 
         // Top/bottom: probe columns in a safe, anchor-relative range (not yet dependent on knowing left/right).
         if (!TryConsensusVerticalEdge(image, cx - SafeHorizontalProbeHalfWidth, cx + SafeHorizontalProbeHalfWidth, safeRowY, dy: -1, out int top))
@@ -190,5 +213,20 @@ public static class WindowBoundsFinder
         int i = (y * image.Width + x) * 4;
         byte b = image.Pixels[i], g = image.Pixels[i + 1], r = image.Pixels[i + 2];
         return Math.Max(r, Math.Max(g, b)) <= DarkPixelMaxChannel;
+    }
+
+    /// <summary>Scans straight down from (x, startY) for the first dark pixel, returning null if none is found
+    /// within <paramref name="maxProbe"/> rows. Used to find a safe interior sample point below the anchor
+    /// without assuming a fixed offset always clears whatever chrome (a tab's own border box, if inactive) sits
+    /// just below the anchor text.</summary>
+    private static int? FindFirstDarkRowBelow(CapturedImage image, int x, int startY, int maxProbe)
+    {
+        for (int dy = 0; dy <= maxProbe; dy++)
+        {
+            int y = startY + dy;
+            if (y < 0 || y >= image.Height) return null;
+            if (IsDark(image, x, y)) return y;
+        }
+        return null;
     }
 }

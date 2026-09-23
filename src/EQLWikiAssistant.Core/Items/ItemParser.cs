@@ -38,6 +38,11 @@ public static class ItemParser
     private static readonly string[] EffectLabels =
         ["Focus Effect", "Click Effect", "Combat Effect", "Proc Effect", "Charge Effect"];
 
+    // Sub-lines that describe the effect immediately above them, not a standalone item stat — confirmed by real
+    // captures (Bladestopper, Bloodmoon, Crystal Mask) to always sit directly between their own effect line and
+    // the next row that isn't one of these, so "attach to the most recently seen effect" is reliable.
+    private static readonly string[] EffectModifierLabels = ["Cast Time", "Cooldown", "Required Level", "Charges"];
+
     public static ParsedItem Parse(IReadOnlyList<OcrLine> lines)
     {
         var warnings = new List<string>();
@@ -99,7 +104,7 @@ public static class ItemParser
         // --- Body: pattern-matched, any order/mix, since it varies a lot by item type ---
         var stats = new List<KeyValuePair<string, string>>();
         var exaltations = new List<ExaltationSlot>();
-        var effects = new List<EffectEntry>();
+        var effectBuilders = new List<(string Kind, string Description, List<KeyValuePair<string, string>> Modifiers)>();
         string? merchantValue = null;
 
         for (; i < rows.Count; i++)
@@ -117,7 +122,7 @@ public static class ItemParser
 
             if (row.Count == 1 && FieldLabelLexicon.TryMatchPrefixLabel(joined, EffectLabels, out string fxLabel, out string fxValue))
             {
-                effects.Add(new EffectEntry(fxLabel.Replace(" Effect", ""), fxValue));
+                effectBuilders.Add((fxLabel.Replace(" Effect", ""), fxValue, []));
                 continue;
             }
 
@@ -127,8 +132,18 @@ public static class ItemParser
                 continue;
             }
 
+            if (row.Count == 1 && effectBuilders.Count > 0 &&
+                TryParseSelfContainedLabelValue(joined, out string modLabel, out string modValue) &&
+                EffectModifierLabels.Contains(modLabel))
+            {
+                effectBuilders[^1].Modifiers.Add(new KeyValuePair<string, string>(modLabel, modValue));
+                continue;
+            }
+
             ParseStatRow(row, stats, warnings);
         }
+
+        var effects = effectBuilders.Select(e => new EffectEntry(e.Kind, e.Description, e.Modifiers)).ToList();
 
         return new ParsedItem(
             contentName, level, nameMismatch,
@@ -249,6 +264,22 @@ public static class ItemParser
         return false;
     }
 
+    /// <summary>Splits a single self-contained "Label: Value" fragment (e.g. "Cast Time: 4.0 seconds"), applying
+    /// label correction. Shared by <see cref="ParseStatRow"/> and the effect-modifier attachment check.</summary>
+    private static bool TryParseSelfContainedLabelValue(string text, out string label, out string value)
+    {
+        int colonIdx = text.IndexOf(':');
+        if (colonIdx > 0 && colonIdx < text.Length - 1)
+        {
+            label = FieldLabelLexicon.Correct(text[..colonIdx].Trim());
+            value = text[(colonIdx + 1)..].Trim();
+            return true;
+        }
+        label = "";
+        value = "";
+        return false;
+    }
+
     private static ExaltationSlot ParseExaltation(string label, string value)
     {
         ExaltationKind kind = label switch
@@ -278,12 +309,9 @@ public static class ItemParser
         while (i < row.Count)
         {
             string text = row[i].Text.Trim();
-            int colonIdx = text.IndexOf(':');
-            if (colonIdx > 0 && colonIdx < text.Length - 1)
+            if (TryParseSelfContainedLabelValue(text, out string selfLabel, out string selfValue))
             {
-                string label = FieldLabelLexicon.Correct(text[..colonIdx].Trim());
-                string value = text[(colonIdx + 1)..].Trim();
-                stats.Add(new KeyValuePair<string, string>(label, value));
+                stats.Add(new KeyValuePair<string, string>(selfLabel, selfValue));
                 i++;
                 continue;
             }

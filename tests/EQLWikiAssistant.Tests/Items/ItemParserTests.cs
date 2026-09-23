@@ -125,6 +125,95 @@ public class ItemParserTests
         Assert.Equal("Reagent Conservation II", effect.Description);
     }
 
+    // Verbatim real capture of "Bladestopper +7" — two effects (Focus, Click), where Cast Time/Required
+    // Level/Cooldown belong specifically to the Click Effect (they follow it, not the Focus Effect above it).
+    // Also has "SV. Void:" with no adjacent value at all (a real OCR-dropped value, not a grouping bug) and OCR
+    // noise "? x" trailing the title's "(Augmented)" (from a nearby checkbox icon).
+    private static readonly OcrLine[] BladestopperLines =
+    [
+        L("Bladestopper +7 (Augmented)", 125, 0),
+        L("? x", 378, 0),
+        L("Description", 170, 18),
+        L("Bladestopper +7", 61, 48),
+        L("Lore Equipped, No Trade, Placeable", 62, 66),
+        L("ClasS: WAR CLR PAL RNG SHD BRD ROG SHM", 63, 82),
+        L("Race: ALL", 63, 97),
+        L("Secondary", 62, 113),
+        L("Merge", 20, 143),
+        L("Place", 74, 142),
+        L("Tier 7", 117, 139),
+        L("61/128", 160, 139),
+        L("Item", 26, 158),
+        L("Item", 76, 157),
+        L("This item can be upgraded.", 116, 162),
+        L("Size:", 11, 193),
+        L("MEDIUM", 74, 193),
+        L("AC:", 141, 193),
+        L("43", 227, 192),
+        L("Weight.", 12, 208),
+        L("2.4", 105, 209),
+        L("HP:", 140, 208),
+        L("87", 228, 209),
+        L("Type:", 11, 224),
+        L("Shield", 88, 224),
+        L("Stamina:", 12, 257),
+        L("26", 89, 257),
+        L("SV. Void:", 141, 257),
+        L("Modified", 37, 290),
+        L("Bladestopper +7", 129, 290),
+        L("Omamentation: empty", 41, 320),
+        L("Focus Exaltation: Idol of the Underking (Exaltation)", 41, 342),
+        L("Click Exaltation: Bladestopper (Exaltation)", 41, 365),
+        L("Womn Exaltation: empty", 40, 387),
+        L("Proc Exaltation: empty", 40, 411),
+        L("Focus Effect Improved Healing III", 12, 437),
+        L("Click Effect: Rune IV (Must Equip)", 13, 449),
+        L("Cast Time: Instant", 24, 465),
+        L("Required Level: 40", 24, 477),
+        L("Cooldown: 600 seconds", 24, 493),
+    ];
+
+    [Fact]
+    public void Parse_RealBladestopperCapture_TitleTrailingOcrNoiseDoesNotCorruptNameOrLevel()
+    {
+        // Regression: an earlier version required "+X" to be the literal end of the title string, so the real
+        // "? x" noise after "(Augmented)" corrupted the whole name and hid the level (came back as +0).
+        ParsedItem item = ItemParser.Parse(BladestopperLines);
+
+        Assert.Equal("Bladestopper", item.Name);
+        Assert.Equal(7, item.Level);
+        Assert.False(item.TitleContentNameMismatch);
+    }
+
+    [Fact]
+    public void Parse_RealBladestopperCapture_EffectModifiersAttachToTheCorrectEffectNotStats()
+    {
+        ParsedItem item = ItemParser.Parse(BladestopperLines);
+
+        EffectEntry focusEffect = item.Effects.Single(e => e.Kind == "Focus");
+        Assert.Empty(focusEffect.Modifiers);
+
+        EffectEntry clickEffect = item.Effects.Single(e => e.Kind == "Click");
+        var modifiers = clickEffect.Modifiers.ToDictionary(m => m.Key, m => m.Value);
+        Assert.Equal("Instant", modifiers["Cast Time"]);
+        Assert.Equal("40", modifiers["Required Level"]);
+        Assert.Equal("600 seconds", modifiers["Cooldown"]);
+
+        // These must NOT also appear in the generic stats bag.
+        Assert.DoesNotContain(item.Stats, kv => kv.Key is "Cast Time" or "Required Level" or "Cooldown");
+    }
+
+    [Fact]
+    public void Parse_RealBladestopperCapture_OrphanedLabelWithDroppedValueIsWarnedNotMispaired()
+    {
+        ParsedItem item = ItemParser.Parse(BladestopperLines);
+
+        // "SV. Void:" has no adjacent value fragment in the real capture (OCR dropped it) — must be flagged,
+        // never silently paired with an unrelated neighboring label/value.
+        Assert.DoesNotContain(item.Stats, kv => kv.Key == "SV. Void");
+        Assert.Contains(item.Warnings, w => w.Contains("SV. Void"));
+    }
+
     [Fact]
     public void IsForeignExaltation_NameMatchesItemBaseName_IsNative()
     {
