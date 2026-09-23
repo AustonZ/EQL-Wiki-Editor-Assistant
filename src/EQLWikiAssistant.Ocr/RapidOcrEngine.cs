@@ -5,9 +5,11 @@ using SkiaSharp;
 namespace EQLWikiAssistant.Ocr;
 
 /// <summary>
-/// IOcrEngine backed by RapidOCR (PaddleOCR PP-OCRv5 models via ONNX Runtime) — fully local, no network calls,
-/// models are bundled with the NuGet package. Evaluated as an alternative to WindowsOcrEngine specifically for
-/// accuracy on the game's small (~9-11px) UI text; see the plan's milestone 1 writeup for the comparison.
+/// The <see cref="IOcrEngine"/>: RapidOCR (PaddleOCR PP-OCRv5 models via ONNX Runtime) — fully local, no network
+/// calls, models bundled with the NuGet package. Chosen over the OS-provided Windows.Media.Ocr engine on measured
+/// accuracy against the game's small (~9-11px) UI text; see the plan's milestone 1 writeup for that comparison
+/// and read it before reaching for another engine. Feed it **native-resolution** crops — upscaling measurably
+/// hurt it in testing.
 /// </summary>
 public sealed class RapidOcrEngine : IOcrEngine, IDisposable
 {

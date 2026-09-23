@@ -47,9 +47,9 @@ The full design rationale, wiki research findings, and milestone plan live in
   **Read the `[GeneratedComInterface]` note below before touching `Interop/`** — it documents a real, confirmed
   runtime failure mode, not a style preference.
 - `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — two `IOcrEngine` implementations: **`RapidOcrEngine`
-  (the default) wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline), and `WindowsOcrEngine`
-  wrapping `Windows.Media.Ocr`, kept as a fallback/comparison option. See "OCR engine choice" below — this wasn't
-  arbitrary, Windows OCR was tried first and replaced after real testing showed it meaningfully less accurate.
+  wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline). See "OCR engine choice" below — this
+  wasn't arbitrary: the OS-provided `Windows.Media.Ocr` was tried first and replaced after real testing showed it
+  meaningfully less accurate, then removed outright once it had no remaining use.
 - `src/EQLWikiAssistant.Wiki` (`net10.0`) — MediaWiki API client (bot-password auth), wikitext parsing/rendering,
   the local icon file cache, and the checked-items ledger.
 - `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: capture trigger, review/diff screen,
@@ -60,8 +60,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   screenshot file from disk into a `CapturedImage` (the real app only ever captures a live window, never reads a
   file — this exists for tests/tooling), `TestSupport.RepoPaths` for finding `samples/` reliably from a
   test/tool's output directory, and `TestSupport.DebugDraw` for drawing debug rectangle overlays; `OcrSpike`
-  iterates on OCR accuracy against real sample screenshots (crop, upscale, `--engine windows|rapid`, dump
-  recognized lines+bounding boxes); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
+  iterates on OCR accuracy against real sample screenshots (`--crop`, `--scale`, `--save`, dump recognized
+  lines+bounding boxes); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
   windows, capture one to a PNG, test-fire a hotkey); `LocateSpike` runs whole-screenshot OCR + `ItemWindowLocator`
   and can `--save` a debug overlay (green/red by `PossiblyOccluded`) for eyeballing results, or
   `--probe x,y,dx,dy,count` to dump raw pixel RGB along a ray — that's how the window-chrome colour profile in
@@ -274,15 +274,21 @@ equipped/traded, but some items are natively `No Trade` with no `Attunable` stat
 disambiguate these, so a flag mismatch here may need the user's judgment rather than being auto-corrected — same
 "user can override/cancel" pattern as the exaltation case, no separate pipeline behavior.
 
-**OCR engine choice: `RapidOcrEngine`, not `WindowsOcrEngine` — this was tested, not assumed.** Windows OCR was the
-original default; testing against real item windows (`tools/OcrSpike`) found it unreliable on the game's ~9-11px
-UI text even after upscaling (dropped numeric values, `rn`->`m`/`ti`->`b` misreads on labels, occasional
-single-character corruption in payload text like item/exaltation names). Ruled out JPEG compression as the cause
-(reproduced identically against a live, lossless capture). Tried `RapidOcrNet` (PaddleOCR PP-OCRv5 via ONNX) next
-and it was dramatically better on the *same* crops **at native resolution, with no upscaling** — nearly everything
-came back correct, including roman numerals and payload text Windows OCR had corrupted; upscaling it actually made
-results slightly worse. Full before/after comparison is in the plan's milestone 1 writeup — read it before
-second-guessing the engine choice or reverting to Windows OCR.
+**OCR engine choice: RapidOCR — this was tested, not assumed, and the alternative has been deleted.** The
+OS-provided `Windows.Media.Ocr` was the original default; testing against real item windows (`tools/OcrSpike`)
+found it unreliable on the game's ~9-11px UI text even after upscaling (dropped numeric values, `rn`->`m`/
+`ti`->`b` misreads on labels, occasional single-character corruption in payload text like item/exaltation names).
+Ruled out JPEG compression as the cause (reproduced identically against a live, lossless capture). Tried
+`RapidOcrNet` (PaddleOCR PP-OCRv5 via ONNX) next and it was dramatically better on the *same* crops **at native
+resolution, with no upscaling** — nearly everything came back correct, including roman numerals and payload text
+Windows OCR had corrupted; upscaling it actually made results slightly worse. Full before/after comparison is in
+the plan's milestone 1 writeup — read that before reaching for a different engine.
+
+`WindowsOcrEngine` was kept for a while as a fallback/comparison, then **removed** once it was clear it had no
+remaining use: it needs an OS language pack the user must install, needs 3x upscaling to be usable at all, and
+still misreads on clean lossless captures (it read `Race: ALL` as `Race: Al I` on a current sample). Two engine
+implementations to maintain wasn't worth that. `IOcrEngine` stays — `Core` can't reference the Windows-only `Ocr`
+project, so the port is needed for layering regardless, and it keeps the engine swappable.
 
 **OCR is still not perfect — the milestone 2 parser must not trust it blindly, just with lighter mitigations than
 originally planned.** With `RapidOcrEngine` at native res: `Ornamentation` -> `Omamentation` and `Worn` ->
@@ -332,8 +338,8 @@ vocabulary) and testable on plain strings without an image/OCR round-trip. Start
 ## Commands
 
 No dependencies beyond the .NET SDK (net10.0 / net10.0-windows10.0.19041.0 targets — see Solution layout above).
-RapidOCR's models are bundled with its NuGet package, nothing to install. `WindowsOcrEngine` (fallback only) needs
-an OCR language pack (Settings -> Time & Language -> Language -> Optical character recognition).
+RapidOCR's models are bundled with its NuGet package, so there is nothing to install and no OS OCR language pack
+to configure.
 
 ```powershell
 dotnet build                                                    # build everything
@@ -341,8 +347,8 @@ dotnet test                                                     # run all tests
 dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test class
 dotnet run --project src/EQLWikiAssistant.App                   # run the WPF app
 
-# OCR tuning against a real sample screenshot (engine defaults to rapid; pass --engine windows to compare):
-dotnet run --project tools/OcrSpike -- "samples/some item.jpg" --crop x,y,w,h --save out.png
+# OCR tuning against a real sample screenshot (feed it native resolution — upscaling hurts this engine):
+dotnet run --project tools/OcrSpike -- "samples/some screenshot.png" --crop x,y,w,h --save out.png
 
 # Locate tuning against a real full screenshot:
 dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --save out.png

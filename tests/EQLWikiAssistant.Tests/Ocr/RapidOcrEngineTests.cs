@@ -6,9 +6,15 @@ using Xunit.Abstractions;
 namespace EQLWikiAssistant.Tests.Ocr;
 
 /// <summary>
-/// Golden tests for the production-default OCR engine (see the plan's milestone 1 writeup for why RapidOCR
-/// replaced WindowsOcrEngine as the default). Same gitignored-samples/ tolerance as WindowsOcrEngineTests.
-/// Deliberately does NOT upscale before recognition — testing showed that helps Windows OCR but not RapidOCR.
+/// Golden tests for the OCR engine (see the plan's milestone 1 writeup for why RapidOCR was chosen over the
+/// OS-provided Windows.Media.Ocr engine, which has since been removed entirely).
+///
+/// These read from <c>samples/</c>, which is gitignored because the captures are real game screenshots and may
+/// contain private information (character and player names, chat). So a test that can't find its sample logs a
+/// skip and returns rather than failing — that keeps the suite green on a fresh clone, at the cost of silently
+/// losing coverage, which is why sample filenames are asserted-on constants rather than globs.
+///
+/// Deliberately does NOT upscale before recognition — testing showed upscaling measurably hurts this engine.
 /// </summary>
 public class RapidOcrEngineTests
 {
@@ -41,8 +47,8 @@ public class RapidOcrEngineTests
         string allText = string.Join('\n', lines.Select(l => l.Text));
         _output.WriteLine(allText);
 
-        // The classes of field WindowsOcrEngine dropped or corrupted at this same resolution (see the plan's
-        // milestone 1 writeup): the "+X" level suffix, numeric stat values, and decimals.
+        // The classes of field the since-removed Windows.Media.Ocr engine dropped or corrupted at this same
+        // resolution (see the plan's milestone 1 writeup): "+X" level suffixes, numeric stat values, decimals.
         Assert.Contains("Khyldom the Blood Drinker +1", allText);
         Assert.Contains("Base Dmg:", allText);
         Assert.Contains("39", allText);

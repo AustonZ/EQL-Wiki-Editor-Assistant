@@ -7,7 +7,7 @@ using Xunit.Abstractions;
 namespace EQLWikiAssistant.Tests.Locate;
 
 /// <summary>
-/// Golden tests against real, full screenshots in the gitignored samples/ folder — see WindowsOcrEngineTests for
+/// Golden tests against real, full screenshots in the gitignored samples/ folder — see RapidOcrEngineTests for
 /// the skip-if-missing rationale. These exercise the real pipeline end to end (whole-frame OCR to find anchors,
 /// content-outline tracing for bounds, a second crop+OCR pass for content), which is what actually matters here.
 ///
