@@ -200,19 +200,26 @@ public static class ItemParser
     private static IEnumerable<string> SplitList(string text, char separator = ',') =>
         text.Split(separator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-    /// <summary>Extracts the name and "+X" level, tolerant of trailing OCR noise after either — a title bar
-    /// occasionally picks up a stray "? x"-ish fragment from a nearby checkbox/lock icon (confirmed on a real
-    /// capture), which broke an earlier version of this that required "+X" to be the literal end of the string.
-    /// Finds the level suffix anywhere in the (parenthetical-stripped) text rather than anchoring to the end, so
-    /// trailing junk is simply ignored rather than corrupting the whole name or hiding the level entirely.</summary>
+    /// <summary>Extracts the name and "+X" level, tolerant of trailing OCR noise from a nearby title-bar
+    /// checkbox/close icon — confirmed real on multiple captures, reading as "? x" (or similar) after the name,
+    /// with or without a "+X"/"(Augmented)" present to anchor on (a plain, non-augmented level-0 item's title has
+    /// neither, so the noise strip can't only run relative to those). Stripped unconditionally before the level
+    /// search, so trailing junk never corrupts the name or hides the level.</summary>
     private static (string Name, int Level) ExtractNameLevel(string raw)
     {
-        string s = StripParentheticalSuffix(raw.Trim(), "Augmented");
+        string s = StripTrailingIconNoise(StripParentheticalSuffix(raw.Trim(), "Augmented"));
         Match m = Regex.Match(s, @"\+(?<level>\d+)\b");
         if (m.Success && int.TryParse(m.Groups["level"].Value, out int lvl))
-            return (s[..m.Index].Trim(), lvl);
+            return (StripTrailingIconNoise(s[..m.Index]).Trim(), lvl);
         return (s.Trim(), 0);
     }
+
+    /// <summary>Strips a trailing title-bar checkbox/close-icon OCR artifact that is never part of the actual
+    /// name — confirmed real as "?" followed by a close-button glyph, which OCR'd as the Unicode multiplication
+    /// sign "×" (U+00D7), not the ASCII letter 'x' — easy to conflate by eye in a terminal, which is exactly what
+    /// broke an earlier version of this pattern.</summary>
+    private static string StripTrailingIconNoise(string s) =>
+        Regex.Replace(s, @"\s*\?+\s*[x×]?\s*$", "", RegexOptions.IgnoreCase).TrimEnd();
 
     /// <summary>Strips a "(Word)" span if the parenthesized text closely matches <paramref name="word"/> — used
     /// for both "(Augmented)" on titles and "(Exaltation)" on exaltation slot values, tolerant of OCR noise

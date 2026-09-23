@@ -53,4 +53,19 @@ public class FieldLabelLexiconTests
 
         Assert.False(matched);
     }
+
+    [Fact]
+    public void TryMatchPrefixLabel_LeadingOcrJunkBeforeLabel_DoesNotCorruptRemainder()
+    {
+        // Regression: a real capture had OCR add a stray leading '.' before "Class:" (".Class: WAR PAL RNG SHD
+        // ROG"). The fuzzy prefix match still succeeds (within edit-distance tolerance), but slicing the
+        // remainder at a fixed `label.Length` offset then landed mid-label, leaving "s: WAR PAL..." instead of
+        // "WAR PAL...". Must find the real separator instead of trusting a fixed-length cut.
+        bool matched = FieldLabelLexicon.TryMatchPrefixLabel(
+            ".Class: WAR PAL RNG SHD ROG", ["Class"], out string label, out string remainder);
+
+        Assert.True(matched);
+        Assert.Equal("Class", label);
+        Assert.Equal("WAR PAL RNG SHD ROG", remainder);
+    }
 }

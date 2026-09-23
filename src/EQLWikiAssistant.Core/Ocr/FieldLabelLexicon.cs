@@ -89,10 +89,23 @@ public static class FieldLabelLexicon
         }
 
         matchedLabel = best;
-        string rest = t.Length > best.Length ? t[best.Length..] : "";
-        rest = rest.TrimStart();
-        if (rest.StartsWith(':') || rest.StartsWith('.')) rest = rest[1..].TrimStart();
-        remainder = rest;
+
+        // Find the real label/value separator near the expected boundary rather than assuming the label
+        // occupies exactly best.Length characters — a stray leading OCR character (confirmed real: ".Class:"
+        // instead of "Class:") still matches fuzzily but shifts where the label actually ends in the text, so
+        // slicing at a fixed offset previously corrupted the remainder (e.g. "s: WAR PAL..." instead of
+        // "WAR PAL..."). Search a small window straddling the expected boundary (not from index 0 — a leading
+        // junk character like that stray '.' is itself a candidate separator, and would otherwise be found
+        // first) for the actual ':'/'.' and cut there; fall back to the fixed-length slice when there's no
+        // separator nearby at all (e.g. effect lines, which sometimes have no colon —
+        // "Focus Effect Reagent Conservation II").
+        int searchStart = Math.Max(0, best.Length - 2);
+        int searchEnd = Math.Min(t.Length, best.Length + 3);
+        int sepIdx = searchEnd > searchStart ? t[searchStart..searchEnd].IndexOfAny([':', '.']) : -1;
+        string rest = sepIdx >= 0
+            ? t[(searchStart + sepIdx + 1)..]
+            : (t.Length > best.Length ? t[best.Length..] : "");
+        remainder = rest.TrimStart();
         return true;
     }
 

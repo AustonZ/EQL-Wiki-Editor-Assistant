@@ -128,11 +128,13 @@ public class ItemParserTests
     // Verbatim real capture of "Bladestopper +7" — two effects (Focus, Click), where Cast Time/Required
     // Level/Cooldown belong specifically to the Click Effect (they follow it, not the Focus Effect above it).
     // Also has "SV. Void:" with no adjacent value at all (a real OCR-dropped value, not a grouping bug) and OCR
-    // noise "? x" trailing the title's "(Augmented)" (from a nearby checkbox icon).
+    // noise "? ×" trailing the title's "(Augmented)" from a nearby checkbox/close icon — confirmed real as the
+    // Unicode multiplication sign U+00D7, NOT the ASCII letter 'x' (they're easy to conflate by eye; an earlier
+    // version of this fixture used ASCII 'x' and so didn't actually exercise the real bug).
     private static readonly OcrLine[] BladestopperLines =
     [
         L("Bladestopper +7 (Augmented)", 125, 0),
-        L("? x", 378, 0),
+        L("? ×", 378, 0),
         L("Description", 170, 18),
         L("Bladestopper +7", 61, 48),
         L("Lore Equipped, No Trade, Placeable", 62, 66),
@@ -177,11 +179,36 @@ public class ItemParserTests
     public void Parse_RealBladestopperCapture_TitleTrailingOcrNoiseDoesNotCorruptNameOrLevel()
     {
         // Regression: an earlier version required "+X" to be the literal end of the title string, so the real
-        // "? x" noise after "(Augmented)" corrupted the whole name and hid the level (came back as +0).
+        // "? ×" noise after "(Augmented)" corrupted the whole name and hid the level (came back as +0).
         ParsedItem item = ItemParser.Parse(BladestopperLines);
 
         Assert.Equal("Bladestopper", item.Name);
         Assert.Equal(7, item.Level);
+        Assert.False(item.TitleContentNameMismatch);
+    }
+
+    [Fact]
+    public void Parse_RealCapture_TitleNoiseWithNoLevelOrAugmentedAnchor_StillStripped()
+    {
+        // Regression: verbatim real capture of "Drake-Hide Mask" (a +0, non-augmented item — no "+X" and no
+        // "(Augmented)" for the noise-strip to anchor on). An earlier version only stripped this trailing
+        // checkbox/close-icon noise relative to those tokens, so a plain level-0 title like this one passed
+        // through with the junk still attached, corrupting the name and wrongly flagging a name mismatch against
+        // the (clean) content-area name.
+        OcrLine[] lines =
+        [
+            L("Drake-Hide Mask", 211, 0),
+            L("? ×", 428, 0),
+            L("Description", 221, 19),
+            L("Drake-Hide Mask", 114, 51),
+            L("Lore Equipped, No Trade", 113, 67),
+            L("Class: DRU", 113, 80),
+            L("Race: ALL", 113, 96),
+        ];
+
+        ParsedItem item = ItemParser.Parse(lines);
+        Assert.Equal("Drake-Hide Mask", item.Name);
+        Assert.Equal(0, item.Level);
         Assert.False(item.TitleContentNameMismatch);
     }
 
