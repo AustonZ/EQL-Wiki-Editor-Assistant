@@ -138,7 +138,10 @@ already found and fixed.
 - **Measured colour profile** (via `tools/LocateSpike --probe x,y,dx,dy,count`, which dumps raw pixel RGB along a
   ray — use it before changing any constant): interior `R=G=B≈16` (10-25 with JPEG noise); content outline a 1px
   neutral grey line at **50-62**, essentially constant along its length; the outer window frame just beyond it at
-  **0-8**, i.e. *darker* than the interior; world background 150-170; text up to 255.
+  **0-8**, i.e. *darker* than the interior; title bar the same **0**; world background 150-170; text up to 255.
+  Verified identical on lossless Graphics Capture frames and on saved screenshots, so the capture path doesn't
+  shift these. `EQLWIKI_LOCATE_DIAG=1` additionally prints what every individual probe answered, which is how the
+  agreement thresholds were set — use both rather than guessing.
 - **Brightness alone can't identify the outline** — anti-aliased text edges and the character model both land in
   the same 50-62 band. What separates them is that the outline is a long uniform straight line, so every
   candidate is confirmed by requiring a long run of same-brightness line pixels *perpendicular* to the scan
@@ -154,20 +157,41 @@ already found and fixed.
   is no chrome line below the label. When it's *inactive* (the Lore tab is selected) it's drawn as its own raised
   box, so a short stack of chrome lines sits below it and all of them must be stepped past — stopping between
   them makes the content area's top outline itself look like the window's bottom on the next downward scan.
-- **The top edge is deliberately different**: there is no grey line at the window's outer top (the title bar is
-  pure black and simply meets the world), and the title bar has to stay in the crop for Parse's title-vs-content
-  name check, so the top alone keeps the older brightness-transition scan. It has been unanimous on every real
-  sample; the edges the dark-neighbour problem actually broke are left/right/bottom.
-- Multi-probe consensus (largest same-value cluster, ~40% threshold rather than a plain majority) and the
-  absolute size ceilings (600x700) are retained from the previous design, and still do real work: consensus is
-  how a partly-covered edge shows up as disagreement, and the ceilings catch an occluder adjacent along an
-  *entire* side, where every probe agrees on the same wrong answer.
-- Validated against all 15 real screenshots (`tools/LocateSpike --save` draws a debug overlay, green/red by
-  `PossiblyOccluded`; golden tests in `Tests/Locate/`). Traced widths are now consistently ~394-404px — the
-  window's true content width — where the previous design returned 414-546px because it was running past the real
-  edge into neighbouring UI. Two cases the previous design could not handle now resolve correctly: an item window
-  sitting with *zero* gap against an unrelated NPC bank window, and a window with the Lore tab active and the
-  player's character model behind it.
+- **The top edge traces a different piece of chrome**: there is no grey outline at the window's outer top, and
+  the title bar must stay in the crop for Parse's title-vs-content name check, so the top is traced from the
+  **title bar's own pure-black band** — its topmost row is the window's outer top. This also began as a
+  brightness scan and failed identically to the side edges: with other dark UI directly above a window, there is
+  no bright run to stop at and the scan ran to its limit, failing the window outright.
+  - That band's black is tested on the **maximum** channel, unlike the frame. The active tab's label is yellow,
+    `(191,191,4)`, whose *minimum* channel is 4 — a minimum-channel test reads bright yellow text as black and
+    latches the top edge onto the tab label.
+  - Inside the band, tolerate a short run of *any* non-black rather than only bright rows: the title's glyphs are
+    anti-aliased (one real stroke reads 192, 115, 77, 38 down a column), so a "black or bright, else stop" test
+    stops on the glyph's own soft edge and cuts the title bar out of the crop.
+- **Both tab states must work.** When `Description` is the *active* tab it merges into the content area, so there
+  is no chrome line below the label. When it's *inactive* (the Lore tab is selected) it's drawn as its own raised
+  box, so a stack of chrome lines sits below it and all must be stepped past — stopping between them makes the
+  content area's top outline look like the window's bottom. The step-in point also has to land on an actual
+  interior row, not a fixed offset: a real Lore capture starts its first line of text 4px below the outline, so
+  a fixed clearance lands inside a glyph and every interior test downstream fails.
+- **Probe agreement cannot decide occlusion; rectangle closure does.** Measured across the set, a clean window's
+  edge agreement (64-100%) overlaps a genuinely part-covered edge's (55-67%), so no threshold separates them —
+  strict enough to reject the covered edge also rejects a clean window touching a neighbour or sitting at the
+  screen edge. So agreement stays permissive and the traced rectangle is instead required to **close**: the
+  outline must be present at the corners, not just where probes crossed it. A covered edge's consensus lands on
+  the *occluding* window's outline, and this window's own bottom outline doesn't reach that corner. Without this,
+  a partly-covered window came back confidently 587px wide, silently merged with its neighbour.
+- The absolute size ceilings (600x700) are retained and still catch an occluder adjacent along an *entire* side,
+  where every probe agrees on the same wrong answer.
+- Validated against all 16 real screenshots (`tools/LocateSpike --save` draws a debug overlay, green/red by
+  `PossiblyOccluded`; golden tests in `Tests/Locate/`). Traced widths are consistently 388-404px — the window's
+  true content width — where the previous design returned 414-587px because it ran past the real edge into
+  neighbouring UI. Cases that now resolve and previously could not: windows flush against the inventory/bank
+  panels, windows at all four screen edges, a window with the Lore tab active, and touching windows.
+- **Known limitation**: if another window's own black chrome butts directly against this one's title bar, the top
+  trace can run into the neighbour's title bar. That happens on one real sample (`06c`), and Parse's
+  title-vs-content name check catches it — the crop's title reads as the neighbour's item, so the capture is
+  flagged untrustworthy rather than silently mis-parsed.
 - **Corrections to earlier notes in this file, since the claims were load-bearing and are now disproven**: the
   border *is* a distinctly-coloured line (the earlier "it isn't, it's just the edge of the dark interior" was
   wrong); and the "known residual gap" about a window whose title was ~20% occluded never existed — that sample's
@@ -332,3 +356,17 @@ dotnet run --project tools/ParseSpike -- "samples/some screenshot.png"
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).
+
+**The sample set is captured through the tool's own capture path**, not saved screenshots — lossless PNG via
+Windows Graphics Capture, the same code the app uses, so the pixel values `WindowBoundsFinder` depends on are the
+ones it will really see:
+
+```powershell
+dotnet run --project tools/CaptureSpike -- list EverQuest        # find the exact window title once
+dotnet run --project tools/CaptureSpike -- capture "<title>" "samples/NN-description.png"
+```
+
+Arrange the game, alt-tab to a terminal, then capture — Graphics Capture reads an unfocused window fine. Samples
+are named `NN-description.png` (with a sub-letter for variants of one scenario, e.g. `06a`/`06b`), and the golden
+tests reference those names directly, so renaming one means updating the tests. Current coverage is the geometry
+and negative cases; item-type, exaltation and eligibility captures are still to come.

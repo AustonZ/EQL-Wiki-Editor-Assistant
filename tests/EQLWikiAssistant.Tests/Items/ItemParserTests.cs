@@ -332,81 +332,90 @@ public class ItemParserTests
     }
 
     [Fact]
-    public async Task Parse_ThreeAdjacentWindows_AllThreeParseWithCorrectNamesAndForeignExaltations()
+    public async Task Parse_ThreeSeparateWindows_AllParseWithTheirOwnNames()
     {
-        if (await Load("screen capture 3 item windows.png") is not { } l) return;
+        if (await Load("07-three-distinct-items.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
             Assert.All(windows, w => Assert.False(w.PossiblyOccluded));
 
             var items = windows.Select(w => ItemParser.Parse(w.Lines)).ToList();
-            foreach (var item in items)
+            foreach (ParsedItem item in items)
                 _output.WriteLine($"{item.Name} +{item.Level} mismatch={item.TitleContentNameMismatch}");
 
-            ParsedItem bracer = items.Single(i => i.Name.Contains("Lustrous"));
-            Assert.Equal(6, bracer.Level);
-            Assert.False(bracer.TitleContentNameMismatch);
-            Assert.True(ItemParser.IsForeignExaltation(
-                bracer.ExaltationSlots.Single(e => e.Kind == ExaltationKind.Focus), bracer.Name));
-
-            ParsedItem bloodmoon = items.Single(i => i.Name.Contains("Bloodmoon"));
-            Assert.Equal(10, bloodmoon.Level);
-            // Bloodmoon's own Focus Exaltation is itself ("Bloodmoon") — native, not foreign.
-            Assert.False(ItemParser.IsForeignExaltation(
-                bloodmoon.ExaltationSlots.Single(e => e.Kind == ExaltationKind.Focus), bloodmoon.Name));
-            // Its Click/Proc exaltations are genuinely foreign items.
-            Assert.True(ItemParser.IsForeignExaltation(
-                bloodmoon.ExaltationSlots.Single(e => e.Kind == ExaltationKind.Click), bloodmoon.Name));
+            Assert.Equal(3, items.Count);
+            Assert.All(items, i => Assert.False(i.TitleContentNameMismatch));
+            Assert.Single(items, i => i.Name == "Rod of the Protecting Winds");
+            Assert.Single(items, i => i.Name == "Glassy Gauntlets");
+            Assert.Single(items, i => i.Name == "Fruit");
         }
     }
 
     [Fact]
     public async Task Parse_SimpleConsumable_ExtractsNameFlagsAndMerchantValue()
     {
-        if (await Load("simple 1 item.jpg") is not { } l) return;
+        if (await Load("03-single-item-noisy-background.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
-            Assert.Single(windows);
+            LocatedWindow window = Assert.Single(windows);
 
-            ParsedItem item = ItemParser.Parse(windows[0].Lines);
+            ParsedItem item = ItemParser.Parse(window.Lines);
             Assert.Equal("Water Flask", item.Name);
             Assert.Equal(0, item.Level);
             Assert.False(item.TitleContentNameMismatch);
             Assert.Contains("Quest", item.Flags);
             Assert.Equal("1 silver", item.MerchantValue);
+            Assert.Null(item.Slot); // a consumable has no slot row at all
+            Assert.Empty(item.Warnings);
         }
     }
 
     [Fact]
-    public async Task Parse_WindowDirectlyAgainstAnotherWindow_IsIsolatedWithNoBleedIn()
+    public async Task Parse_LeveledItem_ExtractsBaseNameAndLevel()
     {
-        if (await Load("1 item occluded by another.png") is not { } l) return;
+        if (await Load("11-one-item-over-health-bar.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            LocatedWindow window = Assert.Single(windows);
+
+            ParsedItem item = ItemParser.Parse(window.Lines);
+
+            // The "+X" suffix is stripped from the name and kept separately — v1 only fully processes +0 items,
+            // so the eligibility step needs the level, and the ledger/wiki lookup needs the base name.
+            Assert.Equal("Crimson Ring of the Djinni", item.Name);
+            Assert.Equal(6, item.Level);
+            Assert.False(item.TitleContentNameMismatch);
+            Assert.Equal("Fingers", item.Slot);
+            Assert.Contains(item.Stats, kv => kv.Key == "AC" && kv.Value == "14");
+        }
+    }
+
+    [Fact]
+    public async Task Parse_WindowFlushAgainstOtherUi_IsIsolatedWithNoBleedIn()
+    {
+        if (await Load("04-single-item-over-bags-flush-with-inventory.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
             LocatedWindow window = Assert.Single(windows);
             Assert.False(window.PossiblyOccluded);
 
-            // This sample is the one that drove the switch to tracing the content outline. The item window here
-            // sits directly on top of an unrelated "Fish Rolls" window, and the previous brightness-transition
-            // tracer ran ~137px past the real left edge into it, so the neighbour's own Class:/Race:/Size:/
-            // Weight:/Value: rows were parsed as if they belonged to this item. (It also produced a nonsense
-            // title, which is where the since-retired "partial title occlusion" note came from — the title was
-            // never occluded, the bounds were just wrong.) Tracing the outline isolates the window exactly.
+            // This window is edge-to-edge with the inventory panel and has other dark UI directly above its
+            // title bar. An earlier tracer ran past the real edge into neighbouring windows entirely (one sample
+            // was traced 137px too far, parsing the neighbour's Class/Race/Size/Weight as this item's), so the
+            // width bound and the single-occurrence field checks below are what catch that class of bug.
             Assert.InRange(window.Bounds.Width, 380, 430);
 
             ParsedItem item = ItemParser.Parse(window.Lines);
-            Assert.Equal("Lustrous Russet Bracer", item.Name);
-            Assert.Equal(6, item.Level);
+            Assert.Equal("Dark Cloak of the Sky", item.Name);
             Assert.False(item.TitleContentNameMismatch);
-            Assert.Empty(item.Warnings);
-
-            // Nothing from the neighbouring window may appear, and each labelled field may appear exactly once.
-            Assert.DoesNotContain(window.Lines, x => x.Text.Contains("Fish Rolls"));
+            Assert.Equal("Back", item.Slot);
             Assert.Single(item.Stats, kv => kv.Key == "Size");
             Assert.Single(item.Stats, kv => kv.Key == "Weight");
+            Assert.Single(item.Classes);
         }
     }
 }

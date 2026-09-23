@@ -24,9 +24,9 @@ public class RapidOcrEngineTests
     }
 
     [Fact]
-    public async Task RecognizeAsync_BladestopperWindow_RecognizesFieldsWindowsOcrGotWrong()
+    public async Task RecognizeAsync_WeaponWindow_RecognizesFieldsWindowsOcrGotWrong()
     {
-        string path = Path.Combine(RepoPaths.SamplesDirectory, "bladstopper +7 with exaltations.jpg");
+        string path = Path.Combine(RepoPaths.SamplesDirectory, "08a-hover-tooltip-next-to-same-item-window.png");
         if (!File.Exists(path))
         {
             _output.WriteLine($"Skipping: {path} not present (samples/ is gitignored, personal data).");
@@ -34,20 +34,20 @@ public class RapidOcrEngineTests
         }
 
         CapturedImage image = await ImageFile.LoadAsync(path);
-        image = image.Crop(new Rect(700, 410, 420, 550)); // native resolution — no upscale, see class doc
+        image = image.Crop(new Rect(1085, 434, 404, 502)); // native resolution — no upscale, see class doc
 
         using RapidOcrEngine engine = new();
         IReadOnlyList<OcrLine> lines = await engine.RecognizeAsync(image);
         string allText = string.Join('\n', lines.Select(l => l.Text));
         _output.WriteLine(allText);
 
-        // Fields WindowsOcrEngine dropped or corrupted at this same resolution (see plan milestone 1):
-        // the +7 level suffix, AC/Weight/HP/Stamina numeric values, and the roman-numeral effect ranks.
-        Assert.Contains("Bladestopper +7", allText);
-        Assert.Contains("AC:", allText);
-        Assert.Contains("43", allText);
-        Assert.Contains("2.4", allText);
-        Assert.Contains("Improved Healing III", allText);
-        Assert.Contains("Rune IV", allText);
+        // The classes of field WindowsOcrEngine dropped or corrupted at this same resolution (see the plan's
+        // milestone 1 writeup): the "+X" level suffix, numeric stat values, and decimals.
+        Assert.Contains("Khyldom the Blood Drinker +1", allText);
+        Assert.Contains("Base Dmg:", allText);
+        Assert.Contains("39", allText);
+        Assert.Contains("0.907", allText);
+        Assert.Contains("2H Slashing", allText);
+        Assert.Contains("Siphon", allText);
     }
 }

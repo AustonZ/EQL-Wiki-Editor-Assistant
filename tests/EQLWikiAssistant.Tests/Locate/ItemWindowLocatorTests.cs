@@ -7,17 +7,29 @@ using Xunit.Abstractions;
 namespace EQLWikiAssistant.Tests.Locate;
 
 /// <summary>
-/// Golden tests against real, full (uncropped) screenshots in the gitignored samples/ folder — see
-/// WindowsOcrEngineTests for the skip-if-missing rationale. These exercise the real pipeline end to end
-/// (whole-frame OCR to find anchors, pixel border tracing for bounds, a second crop+OCR pass for content) since
-/// that's what actually matters here — see the plan's milestone 2 writeup for why an OCR-line-clustering
-/// approach was tried first and replaced with this one.
+/// Golden tests against real, full screenshots in the gitignored samples/ folder — see WindowsOcrEngineTests for
+/// the skip-if-missing rationale. These exercise the real pipeline end to end (whole-frame OCR to find anchors,
+/// content-outline tracing for bounds, a second crop+OCR pass for content), which is what actually matters here.
+///
+/// The sample set is captured through the tool's own lossless Windows Graphics Capture path (tools/CaptureSpike),
+/// not saved screenshots, so the pixel values these thresholds depend on are the ones the app will really see.
+/// Each case below is a geometry scenario that broke at least one earlier design — see the plan's milestone 2
+/// writeup, and don't delete one without reading why it exists.
 /// </summary>
 public class ItemWindowLocatorTests
 {
     private readonly ITestOutputHelper _output;
 
     public ItemWindowLocatorTests(ITestOutputHelper output) => _output = output;
+
+    /// <summary>A correctly traced window is the content area's own width — real captures measure 388-404px.
+    /// An earlier design returned 414-587px because it ran past the real edge into neighbouring UI, so this is
+    /// the assertion that catches that whole class of bug.</summary>
+    private static void AssertPlausibleSingleWindowSize(LocatedWindow window)
+    {
+        Assert.InRange(window.Bounds.Width, 380, 430);
+        Assert.InRange(window.Bounds.Height, 200, 700);
+    }
 
     private async Task<(CapturedImage Image, IOcrEngine Engine)?> Load(string fileName)
     {
@@ -30,102 +42,183 @@ public class ItemWindowLocatorTests
         return (await ImageFile.LoadAsync(path), new RapidOcrEngine());
     }
 
-    [Fact]
-    public async Task LocateAsync_SingleWindowScreenshot_FindsExactlyOneCleanWindow()
+    private void Dump(IReadOnlyList<LocatedWindow> windows)
     {
-        if (await Load("simple 1 item.jpg") is not { } l) return;
+        foreach (LocatedWindow w in windows)
+            _output.WriteLine($"{w.Bounds} occluded={w.PossiblyOccluded} HasLoreTab={w.HasLoreTab}\n  " +
+                string.Join("\n  ", w.Lines.Select(x => x.Text)));
+    }
+
+    [Fact]
+    public async Task LocateAsync_SingleWindow_FindsExactlyOneCleanWindow()
+    {
+        if (await Load("01-single-weapon-lvl0-tradeable-pink-background.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Dump(windows);
 
-            Assert.Single(windows);
-            LocatedWindow window = windows[0];
-            string allText = string.Join('\n', window.Lines.Select(x => x.Text));
-            _output.WriteLine(allText);
-
+            LocatedWindow window = Assert.Single(windows);
             Assert.False(window.PossiblyOccluded);
-            Assert.Contains("Water Flask", allText);
+            AssertPlausibleSingleWindowSize(window);
+            Assert.Contains("Sheer Blade", string.Join('\n', window.Lines.Select(x => x.Text)));
             Assert.False(window.HasLoreTab);
         }
     }
 
     [Fact]
-    public async Task LocateAsync_ThreeAdjacentWindows_SeparatesAllThreeCleanly()
+    public async Task LocateAsync_LoreTabActive_StillTracesTheWindow()
     {
-        if (await Load("screen capture 3 item windows.png") is not { } l) return;
+        // With the Lore tab selected, "Description" is the *inactive* tab and is drawn as its own raised box, so
+        // a stack of chrome lines sits between the anchor and the content area. Both earlier designs failed this
+        // outright: one couldn't find a dark sample point below the anchor at all, the other stopped between the
+        // two chrome lines and then read the content area's own top outline as the window's bottom.
+        if (await Load("02b-single-belt-with-lore-lore-tab-pink-background.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
-            foreach (var w in windows)
-                _output.WriteLine($"{w.Bounds} occluded={w.PossiblyOccluded} HasLoreTab={w.HasLoreTab}\n  " +
-                    string.Join("\n  ", w.Lines.Select(x => x.Text)));
+            Dump(windows);
+
+            LocatedWindow window = Assert.Single(windows);
+            Assert.False(window.PossiblyOccluded);
+            AssertPlausibleSingleWindowSize(window);
+            Assert.True(window.HasLoreTab);
+            Assert.Contains("Pegasus", string.Join('\n', window.Lines.Select(x => x.Text)));
+        }
+    }
+
+    [Theory]
+    [InlineData("04-single-item-over-bags-flush-with-inventory.png", "Dark Cloak")]
+    [InlineData("05-single-item-flush-with-bags.png", "Spit")]
+    [InlineData("09-one-item-plus-full-bank-interface.png", "Toolbox")]
+    public async Task LocateAsync_WindowFlushAgainstDarkUi_IsStillTraced(string sample, string expectedName)
+    {
+        // The case that killed the brightness-transition design: the window is edge-to-edge with other dark game
+        // UI, so there is no brightness change at its border in any direction to scan for. The window's own
+        // outline and title-bar band are drawn regardless of what's behind them.
+        if (await Load(sample) is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Dump(windows);
+
+            LocatedWindow window = Assert.Single(windows);
+            Assert.False(window.PossiblyOccluded);
+            AssertPlausibleSingleWindowSize(window);
+            Assert.Contains(expectedName, string.Join('\n', window.Lines.Select(x => x.Text)));
+        }
+    }
+
+    [Fact]
+    public async Task LocateAsync_TwoWindowsTouching_SeparatesThemWithoutBleed()
+    {
+        if (await Load("06-two-items-touching.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Dump(windows);
+
+            Assert.Equal(2, windows.Count);
+            Assert.All(windows, w => Assert.False(w.PossiblyOccluded));
+            Assert.All(windows, AssertPlausibleSingleWindowSize);
+
+            string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
+            string prayers = Assert.Single(texts, t => t.Contains("Prayers of Life"));
+            string bracers = Assert.Single(texts, t => t.Contains("Hero Bracers"));
+            Assert.DoesNotContain("Hero Bracers", prayers);
+            Assert.DoesNotContain("Prayers of Life", bracers);
+        }
+    }
+
+    [Fact]
+    public async Task LocateAsync_WindowPartlyCoveredByAnother_IsReportedOccluded()
+    {
+        // The covering window is fully visible and must trace cleanly; the one underneath has an edge hidden
+        // beneath it and must NOT come back with confident bounds. Probe agreement alone can't tell these apart
+        // (a covered edge scores about the same as a clean window touching a neighbour) — what rejects it is
+        // that the traced rectangle doesn't close, because the covered window's own outline never reaches the
+        // corner the consensus picked. Before that check it came back 587px wide, silently merged with its
+        // neighbour.
+        if (await Load("06a-two-items-overlapping.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Dump(windows);
+
+            Assert.Equal(2, windows.Count);
+
+            LocatedWindow covered = Assert.Single(windows, w => w.PossiblyOccluded);
+            Assert.Empty(covered.Lines);
+
+            LocatedWindow onTop = Assert.Single(windows, w => !w.PossiblyOccluded);
+            AssertPlausibleSingleWindowSize(onTop);
+        }
+    }
+
+    [Fact]
+    public async Task LocateAsync_ThreeSeparateWindows_SeparatesAllThreeCleanly()
+    {
+        if (await Load("07-three-distinct-items.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Dump(windows);
 
             Assert.Equal(3, windows.Count);
             Assert.All(windows, w => Assert.False(w.PossiblyOccluded));
-
-            // Every window's own bounds should be a plausible single-window size (catches cross-contamination
-            // with a neighbor or the surrounding HUD, the original failure mode this design replaced).
-            Assert.All(windows, w => Assert.True(w.Bounds.Width < 650 && w.Bounds.Height < 750,
-                $"Window bounds {w.Bounds} look too large for a single item window."));
+            Assert.All(windows, AssertPlausibleSingleWindowSize);
 
             string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
-            Assert.Contains(texts, t => t.Contains("Slime Blood of Cazic-Thule"));
-            Assert.Contains(texts, t => t.Contains("Lustrous Russet Bracer"));
-            Assert.Contains(texts, t => t.Contains("Bloodmoon"));
+            string rod = Assert.Single(texts, t => t.Contains("Rod of the Protecting Winds"));
+            Assert.Single(texts, t => t.Contains("Glassy Gauntlets"));
+            Assert.Single(texts, t => t.Contains("Fruit"));
 
-            // Bloodmoon is the one with a Lore tab; no cross-contamination between windows' own item names.
-            Assert.Single(windows, w => w.HasLoreTab);
-            string bloodmoonText = texts.Single(t => t.Contains("Bloodmoon"));
-            Assert.DoesNotContain("Slime Blood", bloodmoonText);
-            Assert.DoesNotContain("Lustrous Russet", bloodmoonText);
+            // No cross-contamination between neighbouring windows' content.
+            Assert.DoesNotContain("Glassy Gauntlets", rod);
         }
     }
 
     [Fact]
-    public async Task LocateAsync_TooltipNextToRealWindows_ExcludesTheTooltip()
+    public async Task LocateAsync_TooltipNextToWindow_ExcludesTheTooltip()
     {
-        if (await Load("2 items plus a tooltip.jpg") is not { } l) return;
+        // A hover tooltip has no title bar and no Description tab (see the plan's window-vs-tooltip rule), so it
+        // must never be picked up as a window or leak into a real one's content.
+        if (await Load("08b-hover-tooltip-next-to-different-item-window.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
-            foreach (var w in windows)
-                _output.WriteLine($"{w.Bounds} occluded={w.PossiblyOccluded}\n  " + string.Join("\n  ", w.Lines.Select(x => x.Text)));
+            Dump(windows);
 
-            // "Fairy-Hide Mantle +1" is a hover tooltip (no title bar, no Description tab — see the plan's
-            // window-vs-tooltip rule) sitting right next to these windows; it must never appear as a window or
-            // leak into one's content.
-            string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
-            Assert.All(texts, t => Assert.DoesNotContain("Fairy-Hide Mantle", t));
-            Assert.All(texts, t => Assert.DoesNotContain("Guardian Spirit", t)); // the tooltip's own click effect
+            LocatedWindow window = Assert.Single(windows);
+            Assert.False(window.PossiblyOccluded);
+            AssertPlausibleSingleWindowSize(window);
 
-            LocatedWindow? fishbone = windows.FirstOrDefault(w => w.Lines.Any(x => x.Text.Contains("Fishbone Earring")));
-            Assert.NotNull(fishbone);
-            Assert.False(fishbone!.PossiblyOccluded);
-
-            // The Tenderizer sits with zero gap against an unrelated Bank window. That used to be unresolvable —
-            // there was no brightness difference to find an edge in — and was accepted as a conservative false
-            // negative. Tracing the window's own content outline resolves it, because the outline is drawn by the
-            // window rather than being a contrast accident between it and whatever it happens to sit against.
-            LocatedWindow? tenderizer = windows.FirstOrDefault(w => w.Lines.Any(x => x.Text.Contains("Tenderizer")));
-            Assert.NotNull(tenderizer);
-            Assert.False(tenderizer!.PossiblyOccluded);
-            Assert.DoesNotContain(tenderizer.Lines, x => x.Text.Contains("Fishbone"));
+            string text = string.Join('\n', window.Lines.Select(x => x.Text));
+            Assert.Contains("Khyldom the Blood Drinker", text);
+            Assert.DoesNotContain("Dark Cloak", text); // the tooltip's own item
         }
     }
 
     [Fact]
-    public async Task LocateAsync_WindowObscuredByBagPanels_IsReportedOccludedWithNoData()
+    public async Task LocateAsync_WindowsAgainstScreenEdges_AreAllTraced()
     {
-        if (await Load("single item occluded by bag windows.png") is not { } l) return;
+        // Four windows pushed against the top, left, right and bottom edges of the game window, where a scan can
+        // run out of image before it finds anything.
+        if (await Load("10-four-items-against-screen-edges-and-ui-background.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
-            foreach (var w in windows)
-                _output.WriteLine($"{w.Bounds} occluded={w.PossiblyOccluded}, {w.Lines.Count} line(s)");
+            Dump(windows);
 
-            Assert.Single(windows);
-            Assert.True(windows[0].PossiblyOccluded);
-            Assert.Empty(windows[0].Lines);
+            Assert.Equal(4, windows.Count);
+            Assert.All(windows, w => Assert.False(w.PossiblyOccluded));
+            Assert.All(windows, AssertPlausibleSingleWindowSize);
+
+            string[] texts = windows.Select(w => string.Join('\n', w.Lines.Select(x => x.Text))).ToArray();
+            Assert.Single(texts, t => t.Contains("Karana's Tear"));
+            Assert.Single(texts, t => t.Contains("Earthshaker"));
+            Assert.Single(texts, t => t.Contains("Treasure Hunter's Satchel"));
+            Assert.Single(texts, t => t.Contains("Pegasus-Hide Belt"));
         }
     }
 }

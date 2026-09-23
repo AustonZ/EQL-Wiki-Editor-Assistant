@@ -33,14 +33,17 @@ namespace EQLWikiAssistant.Core.Locate;
 /// brightness line pixels perpendicular to the scan direction. That check is also what implements "if the border
 /// is broken at any point, treat it as occluded": something drawn over part of an edge breaks the run.
 ///
-/// **The top edge is deliberately different.** There is no grey line at the window's outer top — the title bar is
-/// pure black and simply meets the world — and the parser needs the title bar inside the crop (it reconciles the
-/// title-bar name against the content-area name). So the top alone keeps the older brightness-transition scan,
-/// which has been unanimous across every real sample; the edges that the dark-neighbour problem actually broke
-/// (left/right/bottom) are the ones now traced from the outline.
+/// **The top edge uses a different piece of the window's chrome.** There is no grey outline at the window's outer
+/// top, and the parser needs the title bar inside the crop (it reconciles the title-bar name against the
+/// content-area name), so the top is traced from the *title bar's own pure-black band* instead — see
+/// <see cref="ScanToWindowTop"/>. This also started as a brightness scan ("stop at a sustained bright run") and
+/// failed for exactly the same reason as the side edges: with another dark UI panel directly above a window, no
+/// bright run exists and the scan ran to its limit, failing the window outright.
 ///
 /// Every threshold here was measured against real screenshots, not derived on paper. Re-tune only with
-/// <c>tools/LocateSpike</c> against the full real-sample set.
+/// <c>tools/LocateSpike</c> against the full real-sample set — <c>--probe</c> for raw pixel values, and
+/// <c>EQLWIKI_LOCATE_DIAG=1</c> to print what every individual probe answered, which is how the agreement
+/// thresholds below were set.
 /// </summary>
 public static class WindowBoundsFinder
 {
@@ -68,14 +71,34 @@ public static class WindowBoundsFinder
     private const int FrameMinRun = 2;
     private const int FrameSearchDistance = 25;
 
-    // --- Top edge only: the original brightness-transition scan (see the class doc for why) ---
-    private const int DarkPixelMaxChannel = 90;     // "not yet out of the window" for the upward scan
-    private const int SustainedBrightRunThreshold = 26; // shorter bright runs are the window's own text
+    // --- Top edge: trace the title bar's own black band (see the class doc) ---
+    // Above the content area sits the title bar: a band of pure black carrying the window's title text as bright
+    // glyphs. Its topmost row is the window's outer top edge. Measured identically on every real capture.
+    private const int TitleBarSearchDistance = 60;  // content interior up to the black band
+    private const int TitleBarMaxHeight = 60;       // sanity cap on how far the band may run
+    // Consecutive non-black rows tolerated inside the band. The title's own glyphs interrupt a column, and
+    // anti-aliasing means they are *not* simply "bright": a real capture reads 192, 115, 77, 38 down one stroke.
+    // So the exit test can't be "black or bright, else stop" — that stops on the anti-aliased edge of the title
+    // text itself, a few px into the band, cutting the title bar out of the crop. Tolerating a short run of
+    // anything non-black and stopping only at a sustained one handles glyphs of either kind. A real title glyph
+    // interrupts ~6 rows; the whole band is only ~16 tall, so this can't swallow much.
+    private const int TitleBarGapMaxRun = 14;
 
     private const int MaxScanDistance = 700;
     private const int ProbeCount = 11;
     private const int AgreementTolerancePx = 6;
-    private const double MinAgreementFraction = 0.4;
+
+    // Two agreement thresholds, because the two signals are not equally clean — measured across the real sample
+    // set with EQLWIKI_LOCATE_DIAG=1, which prints every probe's answer:
+    //  - Outline-traced edges score 64-100% on clean windows and 55-67% on the one genuinely part-covered edge
+    //    in the set. Those overlap, so **agreement alone cannot decide occlusion** — a threshold strict enough
+    //    to reject the covered edge (0.7) also rejects a legitimately clean window touching a neighbour and one
+    //    sitting at the screen edge. So this stays permissive and <see cref="IsRectangleClosed"/> does the real
+    //    work of rejecting a partly-covered window.
+    //  - The title-bar scan is legitimately noisier (a probe column running down a letter of the title breaks
+    //    early), scoring 64-82% on clean windows.
+    private const double MinOutlineAgreementFraction = 0.45;
+    private const double MinTopAgreementFraction = 0.4;
     private const int SafeHorizontalProbeHalfWidth = 100;
 
     // Sanity ceilings, generous over the largest real window measured (~550x655). These catch the case where an
@@ -100,13 +123,14 @@ public static class WindowBoundsFinder
         if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4, cx, dx: -1, out int left)) return null;
         if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4, cx, dx: 1, out int right)) return null;
 
-        if (!TryConsensusBrightnessTop(image, cx - SafeHorizontalProbeHalfWidth, cx + SafeHorizontalProbeHalfWidth,
+        if (!TryConsensusWindowTop(image, cx - SafeHorizontalProbeHalfWidth, cx + SafeHorizontalProbeHalfWidth,
                 interiorY, out int top))
             return null;
 
         int width = right - left, height = bottom - top;
         if (width < 50 || height < 50) return null;
         if (width > MaxPlausibleWidth || height > MaxPlausibleHeight) return null;
+        if (!IsRectangleClosed(image, left, right, bottom, interiorY)) return null;
 
         return new Rect(left, top, width + 1, height + 1);
     }
@@ -126,6 +150,7 @@ public static class WindowBoundsFinder
     {
         const int chromeSearchDistance = 40;
         const int clearanceBelowChrome = 4;
+        const int interiorSearchDistance = 24;
 
         int? lastLine = null;
         int y = anchorBottom;
@@ -139,7 +164,16 @@ public static class WindowBoundsFinder
             y = line;
         }
 
-        return (lastLine ?? anchorBottom) + clearanceBelowChrome;
+        // A fixed clearance isn't enough on its own: the content's first line of text can start within a few px
+        // of the outline (a real Lore-tab capture has it 4px below), so the clearance lands inside a glyph and
+        // every interior test downstream fails. Step down to the first row that's actually interior.
+        int candidate = (lastLine ?? anchorBottom) + clearanceBelowChrome;
+        for (int i = 0; i < interiorSearchDistance; i++)
+        {
+            if (candidate + i >= image.Height) break;
+            if (IsInterior(image, cx, candidate + i)) return candidate + i;
+        }
+        return candidate;
     }
 
     /// <summary>Probes ProbeCount columns and returns the consensus Y of the first confirmed outline each one
@@ -153,7 +187,7 @@ public static class WindowBoundsFinder
             if (x < 0 || x >= image.Width || !IsInterior(image, x, fromY)) continue;
             if (ScanForOutline(image, x, fromY + dy, dx: 0, dy, MaxScanDistance, requireFrameBeyond: true) is { } v) found.Add(v);
         }
-        return TryGetConsensus(found, out consensus);
+        return TryGetConsensus(found, MinOutlineAgreementFraction, out consensus);
     }
 
     /// <summary>Probes ProbeCount rows spread through the content area and returns the consensus X of the first
@@ -167,7 +201,7 @@ public static class WindowBoundsFinder
             if (y < 0 || y >= image.Height || !IsInterior(image, fromX, y)) continue;
             if (ScanForOutline(image, fromX + dx, y, dx, dy: 0, MaxScanDistance, requireFrameBeyond: true) is { } v) found.Add(v);
         }
-        return TryGetConsensus(found, out consensus);
+        return TryGetConsensus(found, MinOutlineAgreementFraction, out consensus);
     }
 
     /// <summary>Steps outward looking for the first pixel that looks like the outline and is confirmed by
@@ -198,7 +232,7 @@ public static class WindowBoundsFinder
             int nx = x + dx * step, ny = y + dy * step;
             if (nx < 0 || nx >= image.Width || ny < 0 || ny >= image.Height) return false;
 
-            if (MinChannel(image, nx, ny) <= FrameMaxMinChannel)
+            if (IsFrameBlack(image, nx, ny))
             {
                 if (++run >= FrameMinRun) return true;
             }
@@ -206,6 +240,46 @@ public static class WindowBoundsFinder
             {
                 run = 0;
             }
+        }
+        return false;
+    }
+
+    /// <summary>Confirms the traced edges actually form a closed rectangle, by checking the outline is present at
+    /// the corners rather than only where the probes happened to cross it.
+    ///
+    /// This is what rejects a partly-covered window, and it does the job that probe agreement can't: on the real
+    /// sample set, a clean window's edge agreement (64-100%) overlaps a covered edge's (55-67%), so no threshold
+    /// separates them. Closure does, because a covered edge's consensus lands on the *occluding* window's
+    /// outline — and this window's own bottom outline then doesn't reach that corner, since the neighbour's
+    /// interior is there instead. Geometry that can't close is exactly "the border is broken somewhere".</summary>
+    private static bool IsRectangleClosed(CapturedImage image, int left, int right, int bottom, int interiorY)
+    {
+        const int cornerInset = 10;
+        const int tolerance = 3;
+
+        // The bottom outline must span the full traced width …
+        if (!HasOutlinePixelNear(image, left + cornerInset, bottom, dx: 0, dy: 1, tolerance)) return false;
+        if (!HasOutlinePixelNear(image, right - cornerInset, bottom, dx: 0, dy: 1, tolerance)) return false;
+
+        // … and both side outlines must run the height of the content area, not just where a probe crossed them.
+        foreach (int y in new[] { interiorY + cornerInset, bottom - cornerInset })
+        {
+            if (!HasOutlinePixelNear(image, left, y, dx: 1, dy: 0, tolerance)) return false;
+            if (!HasOutlinePixelNear(image, right, y, dx: 1, dy: 0, tolerance)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>True if an outline pixel sits within <paramref name="tolerance"/> of (x,y) along (dx,dy) — the
+    /// slack absorbs the averaging in <see cref="TryGetConsensus"/>, which can land an edge a pixel or two off
+    /// the actual line.</summary>
+    private static bool HasOutlinePixelNear(CapturedImage image, int x, int y, int dx, int dy, int tolerance)
+    {
+        for (int d = -tolerance; d <= tolerance; d++)
+        {
+            int nx = x + dx * d, ny = y + dy * d;
+            if (nx < 0 || nx >= image.Width || ny < 0 || ny >= image.Height) continue;
+            if (IsOutlinePixel(image, nx, ny)) return true;
         }
         return false;
     }
@@ -237,46 +311,57 @@ public static class WindowBoundsFinder
         return total >= LineVerifyHalfRun && (double)matches / total >= LineVerifyMinMatch;
     }
 
-    /// <summary>The window's outer top edge has no outline to trace (the title bar is pure black and simply meets
-    /// the world), and the title bar has to stay in the crop for the parser's title-vs-content name check, so
-    /// this edge keeps the original scan: step upward tolerating the window's own text and stop at a sustained
-    /// bright run.</summary>
-    private static bool TryConsensusBrightnessTop(CapturedImage image, int xRangeStart, int xRangeEnd, int fromY, out int consensus)
+    /// <summary>Probes ProbeCount columns and returns the consensus Y of the window's outer top.</summary>
+    private static bool TryConsensusWindowTop(CapturedImage image, int xRangeStart, int xRangeEnd, int fromY, out int consensus)
     {
         var found = new List<int>();
         for (int i = 0; i < ProbeCount; i++)
         {
             int x = xRangeStart + (xRangeEnd - xRangeStart) * i / Math.Max(1, ProbeCount - 1);
-            if (x < 0 || x >= image.Width || !IsDarkish(image, x, fromY)) continue;
-            if (ScanToBrightness(image, x, fromY, dy: -1, MaxScanDistance) is { } v) found.Add(v);
+            if (x < 0 || x >= image.Width) continue;
+            if (ScanToWindowTop(image, x, fromY) is { } v) found.Add(v);
         }
-        return TryGetConsensus(found, out consensus);
+        return TryGetConsensus(found, MinTopAgreementFraction, out consensus);
     }
 
-    /// <summary>Steps vertically, tolerating brief bright runs (a line of the window's own text) but stopping at
-    /// a sustained one, and returns the last confirmed in-window coordinate.</summary>
-    private static int? ScanToBrightness(CapturedImage image, int x, int y, int dy, int maxSteps)
+    /// <summary>Walks up from the content area into the title bar's black band and returns its topmost row — the
+    /// window's outer top edge.
+    ///
+    /// This replaced an upward brightness scan that stopped at "a sustained bright run", which silently assumed
+    /// whatever sits above the window is brighter than it. Real captures break that: with another dark UI panel
+    /// directly above, the scan found no bright run at all and ran to its limit, failing the whole window. Here
+    /// the black band belongs to the window, so it works regardless of what's above — the exit condition is
+    /// leaving the band, not finding brightness.
+    ///
+    /// Bright rows *inside* the band are the title's own glyphs and are tolerated; the scan stops at the first
+    /// row that is neither black nor bright (e.g. the ~16 grey of an adjacent panel). Tolerating brightness is
+    /// safe because only black rows move the answer, so overshooting into a bright background changes nothing.
+    /// The one narrow case this can't resolve is another window's *own* black chrome butting directly against
+    /// this one's, which consensus and the size ceilings are left to catch.</summary>
+    private static int? ScanToWindowTop(CapturedImage image, int x, int fromY)
     {
-        if (!IsDarkish(image, x, y)) return null;
-        int lastDarkY = y;
-        int brightRun = 0;
-
-        for (int step = 1; step <= maxSteps; step++)
+        int y = fromY;
+        int searched = 0;
+        while (!IsPureBlack(image, x, y))
         {
-            int ny = y + dy * step;
-            if (ny < 0 || ny >= image.Height) return lastDarkY;
+            if (++searched > TitleBarSearchDistance || --y < 0) return null;
+        }
 
-            if (IsDarkish(image, x, ny))
+        int lastBlack = y;
+        int gapRun = 0;
+        while (--y >= 0 && lastBlack - y <= TitleBarMaxHeight)
+        {
+            if (IsPureBlack(image, x, y))
             {
-                brightRun = 0;
-                lastDarkY = ny;
+                lastBlack = y;
+                gapRun = 0;
             }
-            else if (++brightRun >= SustainedBrightRunThreshold)
+            else if (++gapRun > TitleBarGapMaxRun)
             {
-                return lastDarkY;
+                break; // a sustained non-black run — we've left the band, and the window
             }
         }
-        return null;
+        return lastBlack;
     }
 
     /// <summary>The largest same-value cluster (within tolerance), if at least MinAgreementFraction of the
@@ -284,10 +369,12 @@ public static class WindowBoundsFinder
     /// Plurality rather than median: a wide title or a partly-covered edge can split the probes into groups, and
     /// the median would side with whichever happens to sit mid-list rather than the correct one. The threshold is
     /// deliberately under 50% because on a busy real window even the correct cluster can be a minority.</summary>
-    private static bool TryGetConsensus(List<int> values, out int consensus)
+    private static bool TryGetConsensus(List<int> values, double minAgreementFraction, out int consensus)
     {
         consensus = 0;
         if (values.Count == 0) return false;
+        if (Environment.GetEnvironmentVariable("EQLWIKI_LOCATE_DIAG") == "1")
+            Console.Error.WriteLine($"DIAG consensus over [{string.Join(",", values)}]");
 
         int bestCount = 0, bestValue = values[0];
         foreach (int candidate in values)
@@ -296,7 +383,7 @@ public static class WindowBoundsFinder
             if (count > bestCount) { bestCount = count; bestValue = candidate; }
         }
 
-        if ((double)bestCount / values.Count < MinAgreementFraction) return false;
+        if ((double)bestCount / values.Count < minAgreementFraction) return false;
 
         consensus = (int)Math.Round(values.Where(v => Math.Abs(v - bestValue) <= AgreementTolerancePx).Average());
         return true;
@@ -316,7 +403,16 @@ public static class WindowBoundsFinder
 
     private static bool IsInterior(CapturedImage image, int x, int y) => MaxChannel(image, x, y) <= InteriorMaxChannel;
 
-    private static bool IsDarkish(CapturedImage image, int x, int y) => MaxChannel(image, x, y) <= DarkPixelMaxChannel;
+    /// <summary>The window's outer frame, tested on the minimum channel so channel bleed from a bright neighbour
+    /// doesn't hide it — see <see cref="FrameMaxMinChannel"/>.</summary>
+    private static bool IsFrameBlack(CapturedImage image, int x, int y) => MinChannel(image, x, y) <= FrameMaxMinChannel;
+
+    /// <summary>Genuinely black, tested on the *maximum* channel. The title bar band needs this stricter test
+    /// rather than <see cref="IsFrameBlack"/>: the active tab's label is yellow, `(191,191,4)`, whose minimum
+    /// channel is 4 — so a minimum-channel test reads bright yellow text as black and latches the top edge onto
+    /// the tab label instead of the title bar.</summary>
+    private static bool IsPureBlack(CapturedImage image, int x, int y) => MaxChannel(image, x, y) <= FrameMaxMinChannel;
+
 
     private static bool IsOutlinePixel(CapturedImage image, int x, int y)
     {
