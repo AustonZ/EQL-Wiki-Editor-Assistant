@@ -10,20 +10,20 @@ public class ItemComparerTests
     private static ParsedItem Item(
         string name = "Widget",
         int level = 0,
-        string? slot = "Ear",
+        IReadOnlyList<string>? slots = null,
         IReadOnlyList<KeyValuePair<string, string>>? stats = null,
         IReadOnlyList<string>? warnings = null) =>
         new(name, level, TitleContentNameMismatch: false,
-            Flags: [], Classes: [], Races: [], Slot: slot,
+            Flags: [], Classes: [], Races: [], Slots: slots ?? ["Ear"],
             Stats: stats ?? [], ExaltationSlots: [], Effects: [],
             MerchantValue: null, Warnings: warnings ?? []);
 
     private static ExpectedWindow Expected(
         string name = "Widget",
         int level = 0,
-        string? slot = "Ear",
+        List<string>? slots = null,
         List<ExpectedField>? stats = null) =>
-        new() { Name = name, Level = level, Slot = slot, Stats = stats ?? [] };
+        new() { Name = name, Level = level, Slots = slots ?? ["Ear"], Stats = stats ?? [] };
 
     private static FieldResult Field(IReadOnlyList<FieldResult> results, string field) =>
         results.Single(r => r.Field == field);
@@ -161,7 +161,7 @@ public class ItemComparerTests
                     [
                         new ExpectedWindow
                         {
-                            Name = "Widget", Level = 3, Slot = "Ear",
+                            Name = "Widget", Level = 3, Slots = ["Ear"],
                             Flags = ["No Trade"], Classes = ["WAR"], Races = ["ALL"],
                             Stats = [new ExpectedField { Label = "AC", Value = "15" }],
                             Exaltations = [new ExpectedExaltation { Kind = "Focus", Name = null }],

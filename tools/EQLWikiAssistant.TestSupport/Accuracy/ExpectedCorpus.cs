@@ -85,7 +85,10 @@ public sealed class ExpectedWindow
     public List<string> Flags { get; set; } = [];
     public List<string> Classes { get; set; } = [];
     public List<string> Races { get; set; } = [];
-    public string? Slot { get; set; }
+
+    /// <summary>Every slot the item fits — "Primary Secondary" and "Range Ammo" are common, and rarer pairings
+    /// exist. Empty for items with no slot at all.</summary>
+    public List<string> Slots { get; set; } = [];
     public List<ExpectedField> Stats { get; set; } = [];
     public List<ExpectedExaltation> Exaltations { get; set; } = [];
     public List<ExpectedEffect> Effects { get; set; } = [];

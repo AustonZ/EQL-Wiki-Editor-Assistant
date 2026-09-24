@@ -101,7 +101,7 @@ public static class CorpusRunner
                 Flags = [.. item.Flags],
                 Classes = [.. item.Classes],
                 Races = [.. item.Races],
-                Slot = item.Slot,
+                Slots = [.. item.Slots],
                 MerchantValue = item.MerchantValue,
                 WarningCount = item.Warnings.Count,
                 Stats = [.. item.Stats.Select(s => new ExpectedField { Label = s.Key, Value = s.Value })],

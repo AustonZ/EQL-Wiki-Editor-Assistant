@@ -56,7 +56,6 @@ public static class ItemComparer
 
         results.Add(Scalar("name", expected.Name, actual.Name, flagged));
         results.Add(Scalar("level", expected.Level.ToString(), actual.Level.ToString(), flagged));
-        results.Add(Scalar("slot", expected.Slot, actual.Slot, flagged));
         results.Add(Scalar("merchantValue", expected.MerchantValue, actual.MerchantValue, flagged));
         results.Add(Scalar("titleContentNameMismatch",
             expected.TitleContentNameMismatch.ToString(), actual.TitleContentNameMismatch.ToString(), flagged));
@@ -64,6 +63,7 @@ public static class ItemComparer
         results.AddRange(CompareList("flags", expected.Flags, actual.Flags, flagged));
         results.AddRange(CompareList("classes", expected.Classes, actual.Classes, flagged));
         results.AddRange(CompareList("races", expected.Races, actual.Races, flagged));
+        results.AddRange(CompareList("slots", expected.Slots, actual.Slots, flagged));
 
         results.AddRange(CompareList(
             "stats",

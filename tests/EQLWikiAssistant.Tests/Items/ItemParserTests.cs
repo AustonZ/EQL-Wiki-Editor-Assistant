@@ -77,7 +77,7 @@ public class ItemParserTests
         Assert.Contains("WAR", item.Classes);
         Assert.Contains("BER", item.Classes);
         Assert.Contains("ALL", item.Races);
-        Assert.Equal("Wrist", item.Slot);
+        Assert.Equal(["Wrist"], item.Slots);
     }
 
     [Fact]
@@ -293,7 +293,7 @@ public class ItemParserTests
         Assert.Contains("WAR", item.Classes);
         Assert.Contains("BER", item.Classes); // from the wrapped row
         Assert.Equal(["ALL"], item.Races);
-        Assert.Equal("Range Ammo", item.Slot); // mixed case, so never mistaken for a class continuation
+        Assert.Equal(["Range", "Ammo"], item.Slots); // mixed case, so never mistaken for a class continuation
     }
 
     [Theory]
@@ -416,7 +416,7 @@ public class ItemParserTests
         ];
 
         ParsedItem item = ItemParser.Parse(lines);
-        Assert.Null(item.Slot);
+        Assert.Empty(item.Slots);
         Assert.Equal("1 silver", item.MerchantValue);
         Assert.Empty(item.ExaltationSlots);
     }
@@ -470,7 +470,7 @@ public class ItemParserTests
             Assert.False(item.TitleContentNameMismatch);
             Assert.Contains("Quest", item.Flags);
             Assert.Equal("1 silver", item.MerchantValue);
-            Assert.Null(item.Slot); // a consumable has no slot row at all
+            Assert.Empty(item.Slots); // a consumable has no slot row at all
             Assert.Empty(item.Warnings);
         }
     }
@@ -491,7 +491,7 @@ public class ItemParserTests
             Assert.Equal("Crimson Ring of the Djinni", item.Name);
             Assert.Equal(6, item.Level);
             Assert.False(item.TitleContentNameMismatch);
-            Assert.Equal("Fingers", item.Slot);
+            Assert.Equal(["Fingers"], item.Slots);
             Assert.Contains(item.Stats, kv => kv.Key == "AC" && kv.Value == "14");
         }
     }
@@ -515,7 +515,7 @@ public class ItemParserTests
             ParsedItem item = ItemParser.Parse(window.Lines);
             Assert.Equal("Dark Cloak of the Sky", item.Name);
             Assert.False(item.TitleContentNameMismatch);
-            Assert.Equal("Back", item.Slot);
+            Assert.Equal(["Back"], item.Slots);
             Assert.Single(item.Stats, kv => kv.Key == "Size");
             Assert.Single(item.Stats, kv => kv.Key == "Weight");
             Assert.Single(item.Classes);

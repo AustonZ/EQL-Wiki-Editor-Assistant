@@ -10,8 +10,9 @@ namespace EQLWikiAssistant.Core.Items;
 /// consumable, augmented and non-augmented, with and without a Lore tab) — see the plan's milestone 2 writeup.
 ///
 /// Real item windows follow a consistent line order: title bar name -&gt; Description[/Lore] tab -&gt; content-area
-/// name (repeated) -&gt; flags (comma-separated, unlabeled) -&gt; Class: -&gt; Race: -&gt; an optional bare-word slot
-/// (no "Slot:" label in-game, unlike the wiki's own statsblock convention) -&gt; UI chrome (Merge/Place/Item/Item/
+/// name (repeated) -&gt; flags (comma-separated, unlabeled) -&gt; Class: -&gt; Race: -&gt; an optional slot row, one or
+/// more slots space-separated, with no "Slot:" label in-game unlike the wiki's own statsblock convention
+/// (e.g. "Ear", "Primary Secondary", "Range Ammo") -&gt; UI chrome (Merge/Place/Item/Item/
 /// Tier.../upgrade text) -&gt; a two-column stat block -&gt; a "Modified" chrome row (with the name a third time) -&gt;
 /// optional exaltation slot rows -&gt; optional effect rows -&gt; optional merchant value row. This parser processes
 /// the header positionally (fixed order) and the body by pattern-matching each row, rather than assuming a fixed
@@ -53,7 +54,7 @@ public static class ItemParser
         if (rows.Count == 0)
         {
             warnings.Add("No OCR lines to parse.");
-            return new ParsedItem("", 0, TitleContentNameMismatch: true, [], [], [], null, [], [], [], null, warnings);
+            return new ParsedItem("", 0, TitleContentNameMismatch: true, [], [], [], [], [], [], [], null, warnings);
         }
 
         // --- Header: fixed order ---
@@ -110,9 +111,11 @@ public static class ItemParser
             warnings.Add("Expected a \"Race:\" row; none found where expected.");
         }
 
-        string? slot = null;
+        // One unlabeled row, space-separated, listing every slot the item fits: "Ear", "Primary Secondary",
+        // "Range Ammo", and rarer pairings like Secondary/Back or Chest/Waist. Empty for items with no slot.
+        var slots = new List<string>();
         if (i < rows.Count && LooksLikeBareSlotRow(rows[i]))
-            slot = JoinRow(rows[i++]).Trim();
+            slots.AddRange(SplitList(JoinRow(rows[i++]), ' '));
 
         // --- Body: pattern-matched, any order/mix, since it varies a lot by item type ---
         var stats = new List<KeyValuePair<string, string>>();
@@ -160,7 +163,7 @@ public static class ItemParser
 
         return new ParsedItem(
             contentName, level, nameMismatch,
-            flags, classes, races, slot,
+            flags, classes, races, slots,
             stats, exaltations, effects, merchantValue, warnings);
     }
 

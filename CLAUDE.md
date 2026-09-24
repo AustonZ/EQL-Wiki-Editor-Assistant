@@ -212,7 +212,7 @@ structurally different real windows (armor with a foreign exaltation, a weapon w
 exaltations plus three effect types, a quest item, and a plain consumable with no slot/exaltations at all) — see
 the plan's milestone 2 writeup for the verbatim captures. Real windows follow a consistent line order (title bar
 name -> Description[/Lore] tab -> content-area name repeated -> unlabeled comma-separated flags -> `Class:` ->
-`Race:` -> an optional bare-word slot with **no "Slot:" label in-game**, unlike the wiki's own statsblock
+`Race:` -> an optional bare-word slot row with **no "Slot:" label in-game**, unlike the wiki's own statsblock
 convention -> UI chrome -> a two-column stat block -> "Modified" chrome (the name a third time) -> optional
 exaltation rows -> optional effect rows -> optional merchant value), so the header is parsed positionally and the
 body by pattern-matching each row, since the body's actual field set varies a lot by item type (a weapon shows
@@ -230,6 +230,10 @@ body by pattern-matching each row, since the body's actual field set varies a lo
   truncated class list, empty races, and the continuation consumed as the item's *slot*. Continuation rows are
   absorbed into the list above them; class/race codes are short and ALL-CAPS, which is what distinguishes them
   from the bare slot row that can also follow (slots read `Range Ammo`, `Primary Secondary`, `Ear` — mixed case).
+- **`Slots` is a list, not a string.** An item can be equippable in several slots, and the game lists them
+  space-separated on that one unlabeled row: `Primary Secondary` and `Range Ammo` are common, and odder pairings
+  exist (a shield usable in Secondary *or* Back; an item usable in Chest *or* Waist). Empty for items with no slot
+  at all — consumables, containers, tradeskill materials, which are ~30% of the corpus.
 - **Effect kinds seen in real captures**: Focus, Click, Combat, Proc, Charge, **Worn**, **Consumable**. The last
   two only turned up once a broad slot/category sample set existed, so treat the list as "what's been observed",
   not "what exists" — an unrecognized `X Effect` line degrades to an unparsed-line warning, which is the signal

@@ -10,6 +10,11 @@ namespace EQLWikiAssistant.Core.Items;
 /// <see cref="Stats"/> is an intentionally open, ordered label/value bag (reading order top-to-bottom,
 /// left-to-right) for everything not given its own field — new field = one parser rule, no model change, per the
 /// plan's "extensible field bag" design.
+///
+/// <see cref="Slots"/> is a list because an item can be equippable in more than one slot: weapons commonly show
+/// "Primary Secondary" or "Range Ammo", and odder combinations exist (a shield usable in Secondary or Back, an
+/// item usable in Chest or Waist). The game separates them with spaces on a single unlabeled row. Empty for items
+/// with no slot at all, such as consumables and containers.
 /// </summary>
 public sealed record ParsedItem(
     string Name,
@@ -18,7 +23,7 @@ public sealed record ParsedItem(
     IReadOnlyList<string> Flags,
     IReadOnlyList<string> Classes,
     IReadOnlyList<string> Races,
-    string? Slot,
+    IReadOnlyList<string> Slots,
     IReadOnlyList<KeyValuePair<string, string>> Stats,
     IReadOnlyList<ExaltationSlot> ExaltationSlots,
     IReadOnlyList<EffectEntry> Effects,

@@ -38,7 +38,7 @@ foreach (LocatedWindow window in windows)
     Console.WriteLine($"  Flags: {string.Join(", ", item.Flags)}");
     Console.WriteLine($"  Classes: {string.Join(" ", item.Classes)}");
     Console.WriteLine($"  Races: {string.Join(" ", item.Races)}");
-    Console.WriteLine($"  Slot: {item.Slot ?? "(none)"}");
+    Console.WriteLine($"  Slots: {(item.Slots.Count == 0 ? "(none)" : string.Join(" ", item.Slots))}");
     Console.WriteLine("  Stats:");
     foreach (var kv in item.Stats)
         Console.WriteLine($"    {kv.Key}: {kv.Value}");
