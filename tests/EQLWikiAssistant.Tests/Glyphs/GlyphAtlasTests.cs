@@ -120,9 +120,9 @@ public class GlyphAtlasTests
     {
         GlyphAtlas atlas = GlyphAtlas.Bundled;
 
-        // 88 characters typed on the sheet, 87 distinct shapes: 'l' and 'I' are the same bare vertical bar.
-        Assert.Equal(87, atlas.Entries.Count);
-        Assert.Equal(88, atlas.Entries.Sum(e => e.Labels.Count));
+        // 90 characters typed on the sheet, 89 distinct shapes: 'l' and 'I' are the same bare vertical bar.
+        Assert.Equal(89, atlas.Entries.Count);
+        Assert.Equal(90, atlas.Entries.Sum(e => e.Labels.Count));
 
         AtlasEntry ambiguous = Assert.Single(atlas.Ambiguous);
         Assert.Equal(["l", "I"], ambiguous.Labels);
@@ -131,20 +131,26 @@ public class GlyphAtlasTests
             Assert.Contains(atlas.Entries, e => e.Labels.Contains(expected.ToString()));
 
         // Characters the item windows actually use, beyond letters and digits.
-        foreach (char expected in ":.,%+-/()`")
+        foreach (char expected in ":.,%+-/()")
             Assert.Contains(atlas.Entries, e => e.Labels.Contains(expected.ToString()));
     }
 
-    /// <summary>The sheet the atlas was built from has a backtick but no apostrophe, and real item names use
-    /// both ("Kilva's Skin of Flame" against "Kavruul`s Mystic Pouch"). Pinned as a known gap so it is visible
-    /// rather than showing up as an unreadable character mid-name; delete this test when the sheet is recaptured
-    /// with the missing quote characters.</summary>
+    /// <summary>Both quote styles occur in real item names and mean different characters — "Kilva's Skin of
+    /// Flame" carries an apostrophe where "Kavruul`s Mystic Pouch" carries a grave accent. They must be distinct
+    /// atlas entries: collapsing them would make the reader emit a plausible wrong character into a wiki edit,
+    /// which is precisely what RapidOCR did (it read every grave as an apostrophe).</summary>
     [Fact]
-    public void BundledAtlas_KnownGap_HasNoQuoteCharacters()
+    public void BundledAtlas_ApostropheAndGrave_AreDistinctShapes()
     {
         GlyphAtlas atlas = GlyphAtlas.Bundled;
-        Assert.DoesNotContain(atlas.Entries, e => e.Labels.Contains("'"));
-        Assert.DoesNotContain(atlas.Entries, e => e.Labels.Contains("\""));
+
+        AtlasEntry apostrophe = Assert.Single(atlas.Entries, e => e.Labels.Contains("'"));
+        AtlasEntry grave = Assert.Single(atlas.Entries, e => e.Labels.Contains("`"));
+
+        Assert.Single(apostrophe.Labels);
+        Assert.Single(grave.Labels);
+        Assert.NotEqual(apostrophe.Bitmap, grave.Bitmap);
+        Assert.Contains(atlas.Entries, e => e.Labels.Contains("\""));
     }
 
     private static GlyphBox Glyph(int x) => new(new GlyphBitmap(1, 2, [6, 6]), x, 0, 0);

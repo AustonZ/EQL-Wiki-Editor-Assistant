@@ -125,8 +125,8 @@ static string[] SheetRows() =>
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     "1234567890-=",
     "!@#$%^&*()_+",
-    ",./\\;`",
-    "<>?|:~",
+    ",./\\;`'",
+    "<>?|:~\"",
 ];
 
 static int Atlas(CapturedImage image, Rect region, string[] args)

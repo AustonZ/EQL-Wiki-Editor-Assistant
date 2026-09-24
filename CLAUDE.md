@@ -350,14 +350,15 @@ builds the labelled atlas, `verify` reads a real region back.
 - **Atlas labelling is positional, not a manual pass.** The Notes Window sheet spells known strings with every
   character space-separated, so `GlyphAtlas.FromLabelledBands` labels by position and **refuses** if any row's
   glyph count disagrees — a miscount would shift every later label and bake wrong characters in.
-- **Result: 88 characters, 87 distinct shapes.** The single collision is `l` = `I`, both a bare 2x9 bar with no
+- **Result: 90 characters, 89 distinct shapes.** The single collision is `l` = `I`, both a bare 2x9 bar with no
   serif or crossbar. That is irreducible at the glyph level: the atlas records both labels and leaves the choice
   to context. Guessing one would be a silent substitution, which is the failure this engine exists to remove.
 - The atlas is an **embedded resource** of `Core` (`GlyphAtlas.Bundled`), not a file beside the executable —
   contrast the RapidOCR models, whose loose-file dependency has already caused a real runtime failure twice.
-- **Known gap: the sheet has a backtick but no `'` or `"`.** Both quote styles occur in real item names
-  (`Kilva's Skin of Flame` against `Kavruul`s Mystic Pouch`), and an apostrophe currently reads as nothing.
-  Needs one more Notes Window line captured; `GlyphAtlasTests` pins the gap so it stays visible.
+- **The apostrophe and the grave accent are distinct entries, and both occur in real item names** — `Kilva's Skin
+  of Flame` against `Kavruul`s Mystic Pouch`. RapidOCR read every grave as an apostrophe; glyph matching keeps
+  them apart, which a test pins. The sheet originally had only the grave, so both quote characters were added to
+  it in a second capture — if the sheet is ever recaptured, it must keep them.
 - **Still open (stage 3)**: bands that merge with window chrome (the item icon, divider rules, the tier bar)
   break calibration for that band, so the `Class:` and title-bar rows read with gaps while every clean text row
   reads perfectly — including `Ornamentation` (not `Omamentation`), `Worn Exaltation` (not `Wom`) and
@@ -547,7 +548,7 @@ dotnet run --project tools/GlyphSpike -- verify "samples/some screenshot.png" 77
 
 # Regenerate the atlas from the in-game Notes Window glyph sheet (the region must cover exactly its six
 # character rows, in order — the builder refuses on a glyph-count mismatch):
-dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,810,570,100 \
+dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,794,570,100 \
   --out src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
 ```
 
