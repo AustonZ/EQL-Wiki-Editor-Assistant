@@ -3067,7 +3067,7 @@
           "effects": [
             {
               "kind": "Focus",
-              "name": "Bumning Affliction III",
+              "name": "Burning Affliction III",
               "conditions": [],
               "modifiers": []
             }
@@ -3239,7 +3239,7 @@
           "effects": [
             {
               "kind": "Focus",
-              "name": "Bumning Affliction III",
+              "name": "Burning Affliction III",
               "conditions": [],
               "modifiers": []
             }

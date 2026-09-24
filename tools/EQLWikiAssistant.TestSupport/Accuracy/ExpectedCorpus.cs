@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -40,6 +41,13 @@ public sealed class ExpectedCorpus
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         Converters = { new JsonStringEnumConverter() },
+
+        // Ground truth is hand-reviewed against screenshots, so it has to stay readable and diff cleanly. The
+        // default encoder escapes '+', '\'' and other HTML-sensitive characters, turning "Accuracy: +2.5%" into
+        // "\u002B2.5%" and "Kilva's" into "Kilva\u0027s" — which churns the whole file whenever it is
+        // regenerated and makes a reviewer decode escapes to check a value. Nothing here is ever emitted into
+        // HTML; it is a local file read back by this same tool.
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public static ExpectedCorpus Load(string path) =>

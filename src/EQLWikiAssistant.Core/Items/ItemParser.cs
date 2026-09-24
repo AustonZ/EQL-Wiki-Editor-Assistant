@@ -44,7 +44,8 @@ public static class ItemParser
     // Sub-lines that describe the effect immediately above them, not a standalone item stat — confirmed by real
     // captures (Bladestopper, Bloodmoon, Crystal Mask) to always sit directly between their own effect line and
     // the next row that isn't one of these, so "attach to the most recently seen effect" is reliable.
-    private static readonly string[] EffectModifierLabels = ["Cast Time", "Cooldown", "Required Level", "Charges"];
+    private static readonly string[] EffectModifierLabels =
+        ["Cast Time", "Cooldown", "Cooldown Group", "Required Level", "Charges"];
 
     public static ParsedItem Parse(IReadOnlyList<OcrLine> lines, ItemWindowTab activeTab = ItemWindowTab.Description)
     {
@@ -134,21 +135,21 @@ public static class ItemParser
 
             if (IsChromeRow(row, joined)) continue;
 
-            if (row.Count == 1 && FieldLabelLexicon.TryMatchPrefixLabel(joined, ExaltationLabels, out string exLabel, out string exValue))
+            if (TryMatchRowLabel(row, ExaltationLabels, out string exLabel, out string exValue))
             {
                 exaltations.Add(ParseExaltation(exLabel, exValue));
                 continue;
             }
 
-            if (row.Count == 1 && FieldLabelLexicon.TryMatchPrefixLabel(joined, EffectLabels, out string fxLabel, out string fxValue))
+            if (TryMatchRowLabel(row, EffectLabels, out string fxLabel, out string fxValue))
             {
                 effectBuilders.Add((fxLabel.Replace(" Effect", ""), fxValue, []));
                 continue;
             }
 
-            if (row.Count == 1 && FieldLabelLexicon.StartsWithLabel(joined, "Value"))
+            if (TryMatchRowLabel(row, ["Value"], out _, out string merchant))
             {
-                merchantValue = ValueAfterLabel(joined, "Value");
+                merchantValue = merchant;
                 continue;
             }
 
@@ -217,7 +218,10 @@ public static class ItemParser
                 conditions.Insert(0, inner);
         }
 
-        return new EffectEntry(kind, text, conditions, modifiers);
+        // OCR sometimes detects an effect's trailing parenthetical as its own fragment and leaves the open paren
+        // behind with the name ("Click Effect Careless Lightning (" + "(Can Equip)"). The peel above consumes the
+        // real parenthetical and can't match this orphan, so drop it — no real effect name ends in an open paren.
+        return new EffectEntry(kind, text.TrimEnd(' ', '('), conditions, modifiers);
     }
 
     /// <summary>True if a filled exaltation slot's name does NOT match the item's own base name — a foreign
@@ -266,6 +270,42 @@ public static class ItemParser
         row.Count > 0 && row.All(l =>
             EditDistance.IsCloseMatch(l.Text.Trim(), "Description", maxDistance: 3) ||
             EditDistance.IsCloseMatch(l.Text.Trim(), "Lore", maxDistance: 1));
+
+    /// <summary>Finds one of <paramref name="candidateLabels"/> anywhere in a row and returns the text following
+    /// it, tolerating the ways OCR fragments a row that is visually one line.
+    ///
+    /// Matching only a single-fragment row (what this used to do) missed three shapes that are all real, and each
+    /// one fell through to the generic stat pairing — which recorded an exaltation or an effect as an ordinary
+    /// *stat* and dropped it from its own list entirely:
+    /// <list type="bullet">
+    /// <item>a label split from its value, with the separator duplicated across the break:
+    /// <c>"Click Exaltation:"</c> + <c>": Earthshaker's Mantle (Exaltation)"</c>;</item>
+    /// <item>an effect's trailing parenthetical detected as its own fragment, leaving a dangling open paren
+    /// behind: <c>"Click Effect Careless Lightning ("</c> + <c>"(Can Equip)"</c>;</item>
+    /// <item>the exaltation slot's own icon recognized as a stray fragment *before* the label:
+    /// <c>"0"</c> + <c>"Click Exaltation: Bladestopper (Exaltation)"</c>.</item>
+    /// </list>
+    /// Scanning from each fragment in turn covers leading junk and rejoins a split label with its value without
+    /// assuming either shape. These labels are long and specific, so a stat value is not going to fuzzy-match one.
+    /// </summary>
+    private static bool TryMatchRowLabel(
+        List<OcrLine> row, IReadOnlyList<string> candidateLabels, out string label, out string value)
+    {
+        for (int k = 0; k < row.Count; k++)
+        {
+            string text = JoinRow(row.GetRange(k, row.Count - k));
+            if (!FieldLabelLexicon.TryMatchPrefixLabel(text, candidateLabels, out label, out value)) continue;
+
+            // The lexicon strips one separator after the label; a value carried on its own fragment can start
+            // with a second one (the "Click Exaltation:" + ": Earthshaker's..." case above).
+            value = value.TrimStart(':', '.', ' ');
+            return true;
+        }
+
+        label = "";
+        value = "";
+        return false;
+    }
 
     private static bool RowStartsWithLabel(List<OcrLine> row, string label) =>
         FieldLabelLexicon.TryMatchPrefixLabel(JoinRow(row), [label], out _, out _);

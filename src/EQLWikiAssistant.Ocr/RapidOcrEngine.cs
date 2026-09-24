@@ -15,10 +15,21 @@ public sealed class RapidOcrEngine : IOcrEngine, IDisposable
 {
     private readonly RapidOcr _ocr;
 
+    // RapidOcrNet's parameterless InitModels() resolves "models/v5/..." against the *current working directory*,
+    // which is only ever right by accident: `dotnet run --project tools/...` sets it to the project folder, not
+    // the output folder, so every spike tool failed with "Detector model file does not exist" even though the
+    // .onnx files sat next to the binary. Resolve them against the assembly's own directory instead, which is
+    // where the package copies them.
+    private static readonly string ModelDirectory = Path.Combine(AppContext.BaseDirectory, "models", "v5");
+
     public RapidOcrEngine()
     {
         _ocr = new RapidOcr();
-        _ocr.InitModels();
+        _ocr.InitModels(
+            Path.Combine(ModelDirectory, "ch_PP-OCRv5_mobile_det.onnx"),
+            Path.Combine(ModelDirectory, "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx"),
+            Path.Combine(ModelDirectory, "latin_PP-OCRv5_rec_mobile_infer.onnx"),
+            Path.Combine(ModelDirectory, "ppocrv5_latin_dict.txt"));
     }
 
     public Task<IReadOnlyList<OcrLine>> RecognizeAsync(CapturedImage image, CancellationToken cancellationToken = default)

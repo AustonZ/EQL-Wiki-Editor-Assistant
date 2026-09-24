@@ -281,6 +281,21 @@ item's own name again for others.
   sample, Bloodmoon's own `Focus Exaltation: Bloodmoon (Exaltation)` is correctly identified as native (the
   "removable native exaltation" case from the Augmentations section above), while its Click/Proc exaltations
   (different items) and Lustrous Russet Bracer's Focus exaltation are all correctly flagged foreign.
+- **An exaltation or effect row is matched across a whole row, not only a single-fragment one.** Requiring
+  `row.Count == 1` (what this used to do) silently demoted the row to an ordinary *stat* whenever OCR fragmented
+  it, which dropped the exaltation or effect from its own list entirely. All three shapes are real, measured on
+  the corpus:
+  - the label split from its value, with the separator duplicated across the break — `"Click Exaltation:"` +
+    `": Earthshaker's Mantle (Exaltation)"` (so a second leading `:` has to be trimmed off the value);
+  - the effect's trailing parenthetical detected as its own fragment, leaving a dangling open paren behind —
+    `"Click Effect Careless Lightning ("` + `"(Can Equip)"` (so `BuildEffect` trims a trailing `(` after peeling
+    the real parenthetical);
+  - the exaltation slot's own **icon** recognized as a stray fragment *before* the label — `"0"` +
+    `"Click Exaltation: Bladestopper (Exaltation)"`.
+  `TryMatchRowLabel` scans from each fragment in turn, which covers leading junk and rejoins a split label with
+  its value without assuming either shape. Safe because these labels are long and specific — a stat value won't
+  fuzzy-match "Focus Exaltation". This is also why 08a and 08b disagreed on the *same* item window: identical
+  pixels, but OCR happened to split the Combat Effect line in one and not the other.
 - **A punctuation-only junk row shifts the whole positional header.** The window's own chrome occasionally reads
   as text — a real capture had the tab-bar corner, clipped at the crop's left edge, recognized as `()` on its own
   row between the tab row and the content-area name, which made the name parse as `()` and pushed the real name
@@ -330,8 +345,20 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline at the time of writing: **43 samples, 101 windows (1 correctly occluded), 2072 correct fields, 24
-  missing, 0 wrong, 0 silent-wrong, 29 warnings.** The 24 missing are the known dropped-digit issue above.
+- Baseline against the **verified** corpus (all 43 samples checked against the screenshots by the user,
+  2026-09-24): **101 windows (1 correctly occluded), 2058 correct fields, 24 missing, 15 wrong (13 of them
+  silent), 0 structural, 24 warnings.** These numbers only became meaningful at verification: an unverified entry
+  records whatever the pipeline produced, so it scores correct by construction and the gates read 0 for the wrong
+  reason. Every remaining failure is glyph-level, not a parser defect: the dropped-digit issue above, plus the
+  `rn`->`m` cluster in payload names, a roman numeral losing a stroke (`III`->`II`), a grave accent read as an
+  apostrophe, and an item icon recognized as a stray letter joining the flags row. That is why
+  `CorpusAccuracyTests` now **ratchets** `silent-wrong` instead of asserting 0 — driving all three counts to 0 is
+  what the glyph-matching engine is for, and until then a ratchet still fails the build on a *parser* regression.
+- **Verified ground truth can still be wrong, and a wrong entry hides a real error.** One entry kept an OCR
+  artifact through review (`Bumning Affliction III` — the `rn`->`m` cluster; corrected to `Burning` only after
+  reading the pixels at 6x). While it stood, the window that reproduced that same artifact scored as *correct*.
+  Fixing one word moved `silent-wrong` from 12 to 13. When a ground-truth value looks like a known OCR
+  corruption, check it against the image (`OcrSpike --crop ... --scale 6 --save`) rather than trusting the review.
 
 **Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.**
 `RapidOcrOptions.Default.ImgResize` (1024) downsamples any larger image before detection; at a real 2560x1440
@@ -341,6 +368,14 @@ garbled lines and zero `Description` tokens on a real screenshot with 3 real ite
 small per-window crops (milestone 1's use case) behaving identically to before; the dynamic ceiling fixes
 full-frame recognition (361 lines, all real `Description` anchors found, on the same screenshot post-fix). Costs
 ~4s for a full frame — fine for a hotkey-triggered, non-realtime action, but don't be surprised by it.
+
+**Model files resolve against the assembly directory, not the working directory.** `RapidOcr.InitModels()` with
+no arguments looks for `models/v5/*.onnx` relative to the *current* directory, which made every documented
+`dotnet run --project tools/...` command fail with "Detector model file does not exist" — `dotnet run` sets the
+working directory to the project folder, while the models are copied next to the binary. `RapidOcrEngine` now
+passes explicit paths built from `AppContext.BaseDirectory`. This is separate from (and in addition to) the
+direct-`PackageReference` requirement noted in the solution layout: one controls whether the files are *copied*,
+this controls whether they're *found*.
 
 **Item leveling (`+X`) — v1 only processes `+0`.** Items (and spells) can be leveled up in-game (`Robe of the Ishva
 +2`); the wiki only stores level-0 data. The `+X` suffix is always stripped before using the name to key the ledger

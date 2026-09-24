@@ -26,7 +26,7 @@ public static class FieldLabelLexicon
         "Focus Effect", "Click Effect", "Combat Effect", "Proc Effect", "Charge Effect",
         "Worn Effect", "Consumable Effect",
         "Container", "Type", "Accuracy", "Mana Regen",
-        "Cast Time", "Cooldown", "Required Level", "Charges",
+        "Cast Time", "Cooldown", "Cooldown Group", "Required Level", "Charges",
     ];
 
     /// <summary>Corrects an OCR'd field-label token to its closest known label, if one is close enough; returns
