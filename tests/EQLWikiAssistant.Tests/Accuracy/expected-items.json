@@ -4,11 +4,11 @@
   "samples": [
     {
       "file": "01-single-weapon-lvl0-tradeable-pink-background.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Tamished Sheer Blade",
+          "name": "Tarnished Sheer Blade",
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [
@@ -73,7 +73,7 @@
     },
     {
       "file": "02a-single-item-with-lore-description-active.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -109,7 +109,7 @@
     },
     {
       "file": "02b-single-item-with-lore-lore-active.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -130,7 +130,7 @@
     },
     {
       "file": "03-single-item-noisy-background.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -166,7 +166,7 @@
     },
     {
       "file": "04-single-item-over-bags-flush-with-inventory.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -205,19 +205,19 @@
             },
             {
               "label": "Strength",
-              "value": "?TODO"
+              "value": "7"
             },
             {
               "label": "Wisdom",
-              "value": "?TODO"
+              "value": "7"
             },
             {
               "label": "Agility",
-              "value": "?TODO"
+              "value": "7"
             },
             {
               "label": "Dexterity",
-              "value": "?TODO"
+              "value": "7"
             }
           ],
           "exaltations": [],
@@ -246,7 +246,7 @@
     },
     {
       "file": "05-single-item-flush-with-bags.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -292,7 +292,7 @@
     },
     {
       "file": "06-two-items-touching.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -399,7 +399,7 @@
     },
     {
       "file": "06a-two-items-overlapping.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": true,
@@ -446,7 +446,7 @@
     },
     {
       "file": "06b-two-items-overlapping-aligned.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -505,7 +505,7 @@
     },
     {
       "file": "06c-two-items-overlapping-tab-text-covered.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -564,7 +564,7 @@
     },
     {
       "file": "07-three-distinct-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -700,11 +700,11 @@
             },
             {
               "label": "SV. Magic",
-              "value": "?TODO"
+              "value": "1"
             },
             {
               "label": "SV. Fire",
-              "value": "?TODO"
+              "value": "1"
             }
           ],
           "exaltations": [
@@ -747,11 +747,11 @@
     },
     {
       "file": "08a-hover-tooltip-next-to-same-item-window.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Khyldom the Blood Drinker",
+          "name": "Khyldorn the Blood Drinker",
           "level": 1,
           "titleContentNameMismatch": false,
           "flags": [
@@ -775,7 +775,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B2.5%"
+              "value": "+2.5%"
             },
             {
               "label": "Base Dmg",
@@ -811,7 +811,7 @@
             },
             {
               "label": "SV. Void",
-              "value": "?TODO"
+              "value": "1"
             }
           ],
           "exaltations": [
@@ -841,11 +841,11 @@
     },
     {
       "file": "08b-hover-tooltip-next-to-different-item-window.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Khyldom the Blood Drinker",
+          "name": "Khyldorn the Blood Drinker",
           "level": 1,
           "titleContentNameMismatch": false,
           "flags": [
@@ -869,7 +869,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B2.5%"
+              "value": "+2.5%"
             },
             {
               "label": "Base Dmg",
@@ -904,12 +904,8 @@
               "value": "8"
             },
             {
-              "label": "Combat Effect",
-              "value": "Siphon ("
-            },
-            {
               "label": "SV. Void",
-              "value": "?TODO"
+              "value": "1"
             }
           ],
           "exaltations": [
@@ -920,14 +916,26 @@
               "kind": "Focus"
             }
           ],
-          "effects": [],
+          "effects": [
+            {
+              "kind": "Combat",
+              "name": "Siphon",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "50"
+                }
+              ]
+            }
+          ],
           "warningCount": 2
         }
       ]
     },
     {
       "file": "09-one-item-plus-full-bank-interface.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -973,11 +981,11 @@
     },
     {
       "file": "10-four-items-against-screen-edges-and-ui-background.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Karana\u0027s Tear",
+          "name": "Karana's Tear",
           "level": 1,
           "titleContentNameMismatch": false,
           "flags": [
@@ -1046,7 +1054,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B10%"
+              "value": "+10%"
             },
             {
               "label": "Base Dmg",
@@ -1125,7 +1133,7 @@
         },
         {
           "occluded": false,
-          "name": "Treasure Hunter\u0027s Satchel",
+          "name": "Treasure Hunter`s Satchel",
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [],
@@ -1223,7 +1231,7 @@
     },
     {
       "file": "11-one-item-over-health-bar.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -1298,11 +1306,11 @@
     },
     {
       "file": "12a-3-ear-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Karana\u0027s Tear",
+          "name": "Karana's Tear",
           "level": 5,
           "titleContentNameMismatch": false,
           "flags": [
@@ -1488,25 +1496,35 @@
             {
               "label": "Dexterity",
               "value": "8"
-            },
-            {
-              "label": "Cast Time",
-              "value": "12.0 seconds"
-            },
-            {
-              "label": "Required Level",
-              "value": "45"
             }
           ],
           "exaltations": [],
-          "effects": [],
+          "effects": [
+            {
+              "kind": "Click",
+              "name": "Careless Lightning",
+              "conditions": [
+                "Can Equip"
+              ],
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "12.0 seconds"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "45"
+                }
+              ]
+            }
+          ],
           "warningCount": 2
         }
       ]
     },
     {
       "file": "12b-3-head-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -1717,7 +1735,7 @@
     },
     {
       "file": "12c-3-face-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -1815,7 +1833,7 @@
             },
             {
               "kind": "Worn",
-              "name": "Tobrin\u0027s Mystical Eyepatch"
+              "name": "Tobrin's Mystical Eyepatch"
             },
             {
               "kind": "Proc"
@@ -1925,7 +1943,7 @@
         },
         {
           "occluded": false,
-          "name": "Tobrin\u0027s Mystical Eyepatch",
+          "name": "Tobrin's Mystical Eyepatch",
           "level": 6,
           "titleContentNameMismatch": false,
           "flags": [
@@ -1974,7 +1992,7 @@
             },
             {
               "kind": "Worn",
-              "name": "Tobrin\u0027s Mystical Eyepatch"
+              "name": "Tobrin's Mystical Eyepatch"
             },
             {
               "kind": "Proc"
@@ -1994,7 +2012,7 @@
     },
     {
       "file": "12d-3-chest-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -2232,7 +2250,7 @@
     },
     {
       "file": "12e-3-neck-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -2304,10 +2322,6 @@
             {
               "label": "SV. Void",
               "value": "6"
-            },
-            {
-              "label": "Cooldown Group",
-              "value": "50"
             }
           ],
           "exaltations": [
@@ -2346,6 +2360,10 @@
                 {
                   "label": "Cooldown",
                   "value": "1 seconds"
+                },
+                {
+                  "label": "Cooldown Group",
+                  "value": "50"
                 }
               ]
             },
@@ -2473,11 +2491,11 @@
             },
             {
               "label": "SV. Void",
-              "value": "?TODO"
+              "value": "4"
             },
             {
               "label": "Mana Regen",
-              "value": "?TODO"
+              "value": "6"
             }
           ],
           "exaltations": [
@@ -2504,7 +2522,7 @@
     },
     {
       "file": "12f-3-arms-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -2551,7 +2569,7 @@
             },
             {
               "label": "SV. Void",
-              "value": "?TODO"
+              "value": "6"
             }
           ],
           "exaltations": [
@@ -2696,11 +2714,11 @@
             },
             {
               "label": "Strength",
-              "value": "?TODO"
+              "value": "7"
             },
             {
               "label": "Charisma",
-              "value": "?TODO"
+              "value": "7"
             }
           ],
           "exaltations": [
@@ -2721,7 +2739,7 @@
     },
     {
       "file": "12g-3-back-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -2807,7 +2825,7 @@
           "effects": [
             {
               "kind": "Focus",
-              "name": "Improved Damage II",
+              "name": "Improved Damage III",
               "conditions": [],
               "modifiers": []
             },
@@ -2868,19 +2886,19 @@
             },
             {
               "label": "Strength",
-              "value": "?TODO"
+              "value": "7"
             },
             {
               "label": "Wisdom",
-              "value": "?TODO"
+              "value": "7"
             },
             {
               "label": "Agility",
-              "value": "?TODO"
+              "value": "7"
             },
             {
               "label": "Dexterity",
-              "value": "?TODO"
+              "value": "7"
             }
           ],
           "exaltations": [],
@@ -2953,7 +2971,7 @@
             },
             {
               "label": "Dexterity",
-              "value": "?TODO"
+              "value": "8"
             }
           ],
           "exaltations": [
@@ -2971,7 +2989,7 @@
     },
     {
       "file": "12h-3-waist-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -3058,7 +3076,7 @@
         },
         {
           "occluded": false,
-          "name": "Skinner\u0027s Belt",
+          "name": "Skinner's Belt",
           "level": 6,
           "titleContentNameMismatch": false,
           "flags": [
@@ -3221,7 +3239,7 @@
           "effects": [
             {
               "kind": "Focus",
-              "name": "Bumning Affliction II",
+              "name": "Bumning Affliction III",
               "conditions": [],
               "modifiers": []
             }
@@ -3232,11 +3250,11 @@
     },
     {
       "file": "12i-3-shoulders-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Earthshaker\u0027s Mantle",
+          "name": "Earthshaker's Mantle",
           "level": 6,
           "titleContentNameMismatch": false,
           "flags": [
@@ -3286,17 +3304,17 @@
               "value": "14"
             },
             {
-              "label": "Click Exaltation",
-              "value": ": Earthshaker\u0027s Mantle (Exaltation)"
-            },
-            {
               "label": "SV. Void",
-              "value": "?TODO"
+              "value": "6"
             }
           ],
           "exaltations": [
             {
               "kind": "Focus"
+            },
+            {
+              "kind": "Click",
+              "name": "Earthshaker's Mantle"
             },
             {
               "kind": "Worn"
@@ -3493,7 +3511,7 @@
     },
     {
       "file": "12j-3-wrist-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -3752,7 +3770,7 @@
     },
     {
       "file": "12k-3-legs-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -3967,11 +3985,11 @@
     },
     {
       "file": "12l-3-fingers-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Engineer\u0027s Ring",
+          "name": "Engineer's Ring",
           "level": 10,
           "titleContentNameMismatch": false,
           "flags": [
@@ -4135,11 +4153,11 @@
             },
             {
               "label": "Intelligence",
-              "value": "?TODO"
+              "value": "12"
             },
             {
               "label": "Wisdom",
-              "value": "?TODO"
+              "value": "12"
             }
           ],
           "exaltations": [
@@ -4165,7 +4183,7 @@
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [
-            "o No Trade",
+            "No Trade",
             "Quest"
           ],
           "classes": [
@@ -4210,7 +4228,7 @@
     },
     {
       "file": "12m-3-feet-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -4348,7 +4366,7 @@
             },
             {
               "label": "SV. Void",
-              "value": "?TODO"
+              "value": "1"
             }
           ],
           "exaltations": [
@@ -4406,7 +4424,7 @@
             },
             {
               "label": "AC",
-              "value": "?TODO"
+              "value": "9"
             }
           ],
           "exaltations": [
@@ -4441,7 +4459,7 @@
     },
     {
       "file": "12n-3-primary-only-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -4469,7 +4487,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B25%"
+              "value": "+25%"
             },
             {
               "label": "Base Dmg",
@@ -4517,7 +4535,7 @@
             },
             {
               "kind": "Proc",
-              "name": "Khyldom the Blood Drinker"
+              "name": "Khyldorn the Blood Drinker"
             }
           ],
           "effects": [
@@ -4560,7 +4578,7 @@
         },
         {
           "occluded": false,
-          "name": "Bumt Sheer Blade",
+          "name": "Burnt Sheer Blade",
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [
@@ -4618,7 +4636,7 @@
           "effects": [
             {
               "kind": "Combat",
-              "name": "Bum",
+              "name": "Burn",
               "conditions": [],
               "modifiers": [
                 {
@@ -4657,7 +4675,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B10%"
+              "value": "+10%"
             },
             {
               "label": "Base Dmg",
@@ -4734,7 +4752,7 @@
     },
     {
       "file": "12o-3-secondary-only-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -4788,12 +4806,8 @@
               "value": "26"
             },
             {
-              "label": "Click Exaltation",
-              "value": "Bladestopper (Exaltation)"
-            },
-            {
               "label": "SV. Void",
-              "value": "?TODO"
+              "value": "7"
             }
           ],
           "exaltations": [
@@ -4803,6 +4817,10 @@
             {
               "kind": "Focus",
               "name": "Idol of the Underking"
+            },
+            {
+              "kind": "Click",
+              "name": "Bladestopper"
             },
             {
               "kind": "Worn"
@@ -4844,7 +4862,7 @@
         },
         {
           "occluded": false,
-          "name": "Arydryidriyom",
+          "name": "Arydryidriyorn",
           "level": 5,
           "titleContentNameMismatch": false,
           "flags": [
@@ -4880,7 +4898,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B12.5%"
+              "value": "+12.5%"
             },
             {
               "label": "Delay",
@@ -4909,10 +4927,6 @@
             {
               "label": "Wisdom",
               "value": "13"
-            },
-            {
-              "label": "Click Exaltation",
-              "value": "Bladestopper (Exaltation)"
             }
           ],
           "exaltations": [
@@ -4921,6 +4935,10 @@
             },
             {
               "kind": "Focus"
+            },
+            {
+              "kind": "Click",
+              "name": "Bladestopper"
             },
             {
               "kind": "Worn"
@@ -5040,11 +5058,11 @@
     },
     {
       "file": "12p-3-primary-or-secondary-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Tamnished Sheer Blade",
+          "name": "Tarnished Sheer Blade",
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [
@@ -5137,7 +5155,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B14.5%"
+              "value": "+14.5%"
             },
             {
               "label": "Base Dmg",
@@ -5219,7 +5237,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B17.1%"
+              "value": "+17.1%"
             },
             {
               "label": "Base Dmg",
@@ -5286,7 +5304,7 @@
     },
     {
       "file": "12q-3-range-only-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -5450,7 +5468,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B15.4%"
+              "value": "+15.4%"
             },
             {
               "label": "Delay",
@@ -5544,7 +5562,7 @@
     },
     {
       "file": "12r-3-ammo-only-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -5710,7 +5728,7 @@
     },
     {
       "file": "12s-3-range-or-ammo-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -5750,7 +5768,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B13.6%"
+              "value": "+13.6%"
             },
             {
               "label": "Base Dmg",
@@ -5832,7 +5850,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B18.3%"
+              "value": "+18.3%"
             },
             {
               "label": "Base Dmg",
@@ -5907,7 +5925,7 @@
             },
             {
               "label": "Accuracy",
-              "value": "\u002B25%"
+              "value": "+25%"
             },
             {
               "label": "Base Dmg",
@@ -5955,11 +5973,11 @@
     },
     {
       "file": "12t-3-containers.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
-          "name": "Kavruul\u0027s Mystic Pouch",
+          "name": "Kavruul`s Mystic Pouch",
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [],
@@ -6093,7 +6111,7 @@
     },
     {
       "file": "12u-3-food-or-drink.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -6185,7 +6203,7 @@
     },
     {
       "file": "12v-3-misc-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -6223,7 +6241,7 @@
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [
-            "m Quest"
+            "Quest"
           ],
           "classes": [
             "ALL"
@@ -6281,7 +6299,7 @@
     },
     {
       "file": "12w-3-charged-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -6424,7 +6442,7 @@
     },
     {
       "file": "12x-3-consumable-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -6468,7 +6486,7 @@
         },
         {
           "occluded": false,
-          "name": "Kilva\u0027s Skin of Flame",
+          "name": "Kilva's Skin of Flame",
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [],
@@ -6493,7 +6511,7 @@
           "effects": [
             {
               "kind": "Consumable",
-              "name": "Kilva\u0027s Skin of Flame",
+              "name": "Kilva's Skin of Flame",
               "conditions": [],
               "modifiers": [
                 {
@@ -6550,7 +6568,7 @@
     },
     {
       "file": "12y-3-more-misc-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -6640,7 +6658,7 @@
     },
     {
       "file": "12z-3-special-eql-items.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -6743,7 +6761,7 @@
     },
     {
       "file": "notepad-with-all-glyphs.png",
-      "verified": false,
+      "verified": true,
       "windows": []
     }
   ]
