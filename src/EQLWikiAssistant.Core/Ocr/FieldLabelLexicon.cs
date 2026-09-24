@@ -24,7 +24,8 @@ public static class FieldLabelLexicon
         "Base Dmg", "Delay", "Skill", "Dmg Bon", "Ratio", "Range",
         "Value",
         "Focus Effect", "Click Effect", "Combat Effect", "Proc Effect", "Charge Effect",
-        "Container", "Type",
+        "Worn Effect", "Consumable Effect",
+        "Container", "Type", "Accuracy", "Mana Regen",
         "Cast Time", "Cooldown", "Required Level", "Charges",
     ];
 

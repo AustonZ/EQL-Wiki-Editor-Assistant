@@ -168,6 +168,12 @@ already found and fixed.
   - Inside the band, tolerate a short run of *any* non-black rather than only bright rows: the title's glyphs are
     anti-aliased (one real stroke reads 192, 115, 77, 38 down a column), so a "black or bright, else stop" test
     stops on the glyph's own soft edge and cuts the title bar out of the crop.
+  - A real band measures ~16px, so a **much taller band means it has merged with adjacent black chrome** (another
+    window's title bar, another dark panel) and that probe returns nothing rather than a wrong answer, leaving
+    consensus to the columns that didn't merge. Measure that cap from the band's *start*, not from the last black
+    row found — measuring from the latter lets a continuous band drag the limit along and never trip. Without
+    this, a window sitting under another dark panel had 8 of 11 probes walk ~200px up into it and agree with each
+    other, failing only later via the overall height ceiling: 13 of 26 real captures lost a readable window.
 - **Both tab states must work.** When `Description` is the *active* tab it merges into the content area, so there
   is no chrome line below the label. When it's *inactive* (the Lore tab is selected) it's drawn as its own raised
   box, so a stack of chrome lines sits below it and all must be stepped past — stopping between them makes the
@@ -218,6 +224,18 @@ body by pattern-matching each row, since the body's actual field set varies a lo
   tolerances), then pairs fragments within a row generically (self-contained "Label: Value", or a bare
   "Label:"/"Label." fragment immediately followed by a separate value fragment — including two such pairs on one
   row, e.g. `Size:` `SMALL` `AC:` `15`) rather than assuming either shape specifically.
+- **A long `Class:` list wraps onto a second, unlabeled row** (real capture: `Class: WAR RNG SHD MNK BRD ROG NEC
+  WIZ MAG` then `ENC BST BER`). Because the header is parsed positionally, that shifted everything by one row —
+  truncated class list, empty races, and the continuation consumed as the item's *slot*. Continuation rows are
+  absorbed into the list above them; class/race codes are short and ALL-CAPS, which is what distinguishes them
+  from the bare slot row that can also follow (slots read `Range Ammo`, `Primary Secondary`, `Ear` — mixed case).
+- **Effect kinds seen in real captures**: Focus, Click, Combat, Proc, Charge, **Worn**, **Consumable**. The last
+  two only turned up once a broad slot/category sample set existed, so treat the list as "what's been observed",
+  not "what exists" — an unrecognized `X Effect` line degrades to an unparsed-line warning, which is the signal
+  to add it.
+- **OCR renders the label separator as `.` often enough to matter** (`Accuracy. +13.6%`, `Container. CLOSED.`,
+  and `Weight.`/`Dexterity.` as bare labels). Splitting on `.` unconditionally would cut decimal values in half,
+  so it only applies when the text before the dot is a label the lexicon knows.
 - **`FieldLabelLexicon`** is deliberately the small, fixed vocabulary the milestone 1 writeup scoped it to: it
   fixes only the confirmed recurring corruption (`Ornamentation`->`Omamentation`, `Worn Exaltation`->
   `Wom`/`Womn Exaltation`) before a label is matched to a stat field or an exaltation/effect kind. It only
@@ -239,6 +257,18 @@ body by pattern-matching each row, since the body's actual field set varies a lo
 - **Known, accepted v1 simplification**: effect sub-line modifiers (`Cast Time: 4.0 seconds`, `Cooldown: 240
   seconds`) aren't associated back to the specific effect line above them — they land in the generic `Stats` bag
   like any other label/value line. Revisit only if something downstream ends up needing that grouping.
+- **Open issue — OCR drops isolated stat digits, and it's the dominant remaining data gap.** Measured over 99
+  real item windows: ~20 stat values are lost, so roughly 1 item in 5 is missing at least one stat. The parser
+  surfaces each as an orphaned-label warning rather than guessing (never silently drop the field), but that's a
+  manual-review cost, not a fix. Confirmed it is genuinely the OCR and not the capture or the parser: the digits
+  are plainly present in the pixels (a window showing four `7`s returns no `7` fragment at all), while `AC: 6`
+  and `HP: 55` in the same window read fine.
+  - **A targeted re-OCR of just the value cell at 4x recovers most of them** (3 of 4 on the test case, vs 0 at
+    native resolution). Note this is the *opposite* of the general "upscaling hurts RapidOCR" finding, which was
+    measured on full window crops — for a tiny isolated-digit region, upscaling clearly helps.
+  - Watch out when investigating: the lower stat block (`Strength`/`Wisdom`/…) puts its values in a **different
+    column** from the upper two-column block (`Size`/`AC`/`Weight`/`HP`). Probing the wrong column reads as "the
+    value isn't there at all" and sent this investigation down a false path once.
 - `tools/ParseSpike` (mirrors `OcrSpike`/`LocateSpike`) runs the full Locate -> Parse pipeline against a real
   screenshot and dumps every parsed field per window (including a `[FOREIGN]` marker on foreign exaltations) —
   use this, don't recreate an ad hoc version, when tuning parser rules against new samples.

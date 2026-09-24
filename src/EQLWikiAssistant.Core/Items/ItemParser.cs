@@ -36,7 +36,8 @@ public static class ItemParser
     private static readonly string[] ExaltationLabels =
         ["Ornamentation", "Focus Exaltation", "Click Exaltation", "Worn Exaltation", "Proc Exaltation"];
     private static readonly string[] EffectLabels =
-        ["Focus Effect", "Click Effect", "Combat Effect", "Proc Effect", "Charge Effect"];
+        ["Focus Effect", "Click Effect", "Combat Effect", "Proc Effect", "Charge Effect",
+         "Worn Effect", "Consumable Effect"];
 
     // Sub-lines that describe the effect immediately above them, not a standalone item stat — confirmed by real
     // captures (Bladestopper, Bloodmoon, Crystal Mask) to always sit directly between their own effect line and
@@ -87,15 +88,27 @@ public static class ItemParser
 
         var classes = new List<string>();
         if (i < rows.Count && RowStartsWithLabel(rows[i], "Class"))
+        {
             classes.AddRange(SplitList(ValueAfterLabel(JoinRow(rows[i++]), "Class"), ' '));
+            while (i < rows.Count && LooksLikeCodeListContinuation(rows[i]))
+                classes.AddRange(SplitList(JoinRow(rows[i++]), ' '));
+        }
         else
+        {
             warnings.Add("Expected a \"Class:\" row; none found where expected.");
+        }
 
         var races = new List<string>();
         if (i < rows.Count && RowStartsWithLabel(rows[i], "Race"))
+        {
             races.AddRange(SplitList(ValueAfterLabel(JoinRow(rows[i++]), "Race"), ' '));
+            while (i < rows.Count && LooksLikeCodeListContinuation(rows[i]))
+                races.AddRange(SplitList(JoinRow(rows[i++]), ' '));
+        }
         else
+        {
             warnings.Add("Expected a \"Race:\" row; none found where expected.");
+        }
 
         string? slot = null;
         if (i < rows.Count && LooksLikeBareSlotRow(rows[i]))
@@ -249,6 +262,24 @@ public static class ItemParser
         return EditDistance.IsCloseMatch(titleName, contentName, threshold);
     }
 
+    /// <summary>True if a row is an unlabeled continuation of the `Class:`/`Race:` list above it. A long class
+    /// list wraps onto a second row with no label of its own (a real capture: `Class: WAR RNG SHD MNK BRD ROG NEC
+    /// WIZ MAG` then `ENC BST BER`), which otherwise threw the whole positional header out by one row — the class
+    /// list came back truncated, races empty, and the continuation was consumed as the item's slot.
+    ///
+    /// Class and race codes are short and ALL-CAPS, which is what separates a continuation from the bare slot row
+    /// that can also follow (slots read `Range Ammo`, `Primary Secondary`, `Ear` — always mixed case).</summary>
+    private static bool LooksLikeCodeListContinuation(List<OcrLine> row)
+    {
+        if (row.Count != 1) return false;
+        string text = row[0].Text.Trim();
+        if (text.Length == 0 || text.Contains(':')) return false;
+
+        string[] tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return tokens.Length > 0
+            && tokens.All(t => t.Length <= 4 && t.All(char.IsLetterOrDigit) && t == t.ToUpperInvariant());
+    }
+
     private static bool LooksLikeBareSlotRow(List<OcrLine> row)
     {
         if (row.Count != 1) return false;
@@ -282,6 +313,22 @@ public static class ItemParser
             value = text[(colonIdx + 1)..].Trim();
             return true;
         }
+
+        // OCR also renders the separator as '.' on this UI (real captures: "Accuracy. +13.6%",
+        // "Container. CLOSED."). Splitting on '.' unconditionally would cut decimals in half, so this only
+        // applies when the text before the dot is a label the lexicon actually knows.
+        int dotIdx = text.IndexOf('.');
+        if (dotIdx > 0 && dotIdx < text.Length - 1)
+        {
+            string candidate = text[..dotIdx].Trim();
+            if (FieldLabelLexicon.IsKnownLabel(candidate))
+            {
+                label = FieldLabelLexicon.Correct(candidate);
+                value = text[(dotIdx + 1)..].Trim();
+                return true;
+            }
+        }
+
         label = "";
         value = "";
         return false;

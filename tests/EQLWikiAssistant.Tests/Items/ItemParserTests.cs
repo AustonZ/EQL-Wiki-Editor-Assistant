@@ -242,6 +242,81 @@ public class ItemParserTests
     }
 
     [Fact]
+    public void Parse_LongClassListWrappingToASecondRow_AbsorbsTheContinuation()
+    {
+        // Verbatim from a real capture: a class list too long for one row wraps onto an unlabeled second row.
+        // That shifted the whole positional header by one — the class list came back truncated, races empty, and
+        // the continuation row was consumed as the item's slot.
+        OcrLine[] lines =
+        [
+            L("Turmoil Warts +5", 155, 0),
+            L("Description", 163, 17),
+            L("Turmoil Warts +5", 59, 50),
+            L("Attunable, Quest, Placeable", 56, 65),
+            L("Class: WAR RNG SHD MNK BRD ROG NEC WIZ MAG", 56, 81),
+            L("ENC BST BER", 56, 97),
+            L("Race: ALL", 54, 111),
+            L("Range Ammo", 56, 129),
+        ];
+
+        ParsedItem item = ItemParser.Parse(lines);
+
+        Assert.Equal(12, item.Classes.Count);
+        Assert.Contains("WAR", item.Classes);
+        Assert.Contains("BER", item.Classes); // from the wrapped row
+        Assert.Equal(["ALL"], item.Races);
+        Assert.Equal("Range Ammo", item.Slot); // mixed case, so never mistaken for a class continuation
+    }
+
+    [Theory]
+    [InlineData("Worn Effect Enduring Breath", "Worn", "Enduring Breath")]
+    [InlineData("Consumable Effect Flurry", "Consumable", "Flurry")]
+    [InlineData("Charge Effect Word of Healing", "Charge", "Word of Healing")]
+    public void Parse_EffectKind_IsRecognized(string effectLine, string expectedKind, string expectedDescription)
+    {
+        OcrLine[] lines =
+        [
+            L("Some Item", 100, 0),
+            L("Description", 160, 17),
+            L("Some Item", 60, 50),
+            L("No Trade", 60, 65),
+            L("Class: ALL", 60, 80),
+            L("Race: ALL", 60, 96),
+            L(effectLine, 10, 200),
+        ];
+
+        EffectEntry effect = Assert.Single(ItemParser.Parse(lines).Effects);
+        Assert.Equal(expectedKind, effect.Kind);
+        Assert.Equal(expectedDescription, effect.Description);
+    }
+
+    [Fact]
+    public void Parse_LabelSeparatedByDotInsteadOfColon_IsStillPaired()
+    {
+        // OCR renders the separator as '.' on this UI often enough to matter ("Accuracy. +13.6%",
+        // "Container. CLOSED."). Splitting on '.' unconditionally would cut decimal values in half, so it only
+        // applies when the text before the dot is a label the lexicon knows — asserted by the Ratio case below,
+        // where the value itself contains a dot.
+        OcrLine[] lines =
+        [
+            L("Some Item", 100, 0),
+            L("Description", 160, 17),
+            L("Some Item", 60, 50),
+            L("No Trade", 60, 65),
+            L("Class: ALL", 60, 80),
+            L("Race: ALL", 60, 96),
+            L("Accuracy. +13.6%", 135, 159),
+            L("Container. CLOSED.", 10, 180),
+            L("Ratio: 0.542", 255, 200),
+        ];
+
+        var stats = ItemParser.Parse(lines).Stats.ToDictionary(kv => kv.Key, kv => kv.Value);
+        Assert.Equal("+13.6%", stats["Accuracy"]);
+        Assert.Equal("CLOSED.", stats["Container"]);
+        Assert.Equal("0.542", stats["Ratio"]); // the decimal survives, not cut at its own dot
+    }
+
+    [Fact]
     public void IsForeignExaltation_NameMatchesItemBaseName_IsNative()
     {
         var native = new ExaltationSlot(ExaltationKind.Focus, "Bloodmoon");

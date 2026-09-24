@@ -75,7 +75,14 @@ public static class WindowBoundsFinder
     // Above the content area sits the title bar: a band of pure black carrying the window's title text as bright
     // glyphs. Its topmost row is the window's outer top edge. Measured identically on every real capture.
     private const int TitleBarSearchDistance = 60;  // content interior up to the black band
-    private const int TitleBarMaxHeight = 60;       // sanity cap on how far the band may run
+    private const int TitleBarMaxHeight = 60;       // sanity cap on how far the walk may run
+    // A real title bar's black band measures ~16px on every capture. A band much taller has merged with adjacent
+    // black chrome (another window's title bar, another dark panel), and there is then nothing marking where
+    // *this* window starts — so such a probe returns nothing rather than a wrong answer, leaving consensus to the
+    // columns that didn't merge. Without this, a window sitting under another dark panel had 8 of 11 probes walk
+    // ~200px up into it, agree with each other, and only fail later via the overall height ceiling — losing a
+    // perfectly readable window.
+    private const int TitleBarMaxBandHeight = 32;
     // Consecutive non-black rows tolerated inside the band. The title's own glyphs interrupt a column, and
     // anti-aliasing means they are *not* simply "bright": a real capture reads 192, 115, 77, 38 down one stroke.
     // So the exit test can't be "black or bright, else stop" — that stops on the anti-aliased edge of the title
@@ -347,12 +354,16 @@ public static class WindowBoundsFinder
             if (++searched > TitleBarSearchDistance || --y < 0) return null;
         }
 
+        int bandStart = y;
         int lastBlack = y;
         int gapRun = 0;
-        while (--y >= 0 && lastBlack - y <= TitleBarMaxHeight)
+        while (--y >= 0 && bandStart - y <= TitleBarMaxHeight)
         {
             if (IsPureBlack(image, x, y))
             {
+                // Measured against the band's start, not the last black row found — measuring against the latter
+                // means a continuous band drags the limit along with it and never trips.
+                if (bandStart - y > TitleBarMaxBandHeight) return null;
                 lastBlack = y;
                 gapRun = 0;
             }
