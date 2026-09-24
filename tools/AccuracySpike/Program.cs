@@ -1,3 +1,5 @@
+using EQLWikiAssistant.Core.Ocr;
+using EQLWikiAssistant.Core.Glyphs;
 using System.Diagnostics;
 using EQLWikiAssistant.Core.Items;
 using EQLWikiAssistant.Ocr;
@@ -39,7 +41,14 @@ if (only is not null)
 Console.WriteLine($"Running {files.Count} sample(s)...");
 var stopwatch = Stopwatch.StartNew();
 
-using var engine = new RapidOcrEngine();
+// --rapid scores the old configuration (RapidOCR for both passes), which is what makes this an A/B rather than
+// just a new number: the same corpus, the same ground truth, only the window-crop engine swapped.
+using var rapid = new RapidOcrEngine();
+IOcrEngine engine = args.Contains("--rapid")
+    ? rapid
+    : new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+Console.WriteLine($"  window-crop engine: {(args.Contains("--rapid") ? "RapidOCR" : "glyph atlas")}");
+
 var samples = new List<CorpusSample>();
 foreach (string file in files)
 {
@@ -69,6 +78,64 @@ if (bootstrap)
     Console.WriteLine($"  {candidate.Samples.Count} sample(s), {candidate.TodoCount} field(s) marked {ExpectedCorpus.TodoMarker} for you to fill in.");
     Console.WriteLine("  Review it against the screenshots, replace every ?TODO, set \"verified\": true, then copy to:");
     Console.WriteLine($"  {RepoPaths.ExpectedItemsFile}");
+    return 0;
+}
+
+if (args.Contains("--adopt-reading-order"))
+{
+    // Ground truth was bootstrapped from RapidOCR, whose line order is its own detection sequence rather than
+    // the window's reading order — the user verified the *values*, never the order. The glyph reader emits true
+    // reading order (confirmed against pixels: a stat row's left column then its right), and the plan makes
+    // order part of the contract because it is how the wikitext gets laid back out. So the recorded order is a
+    // latent defect, and this fixes it.
+    //
+    // The guard is what makes that safe rather than "editing the test until it passes": a window is rewritten
+    // only when its stats are the *same multiset* in both, so this can reorder entries and can never add,
+    // remove or alter a value. Anything else is reported and left alone.
+    ExpectedCorpus truth = ExpectedCorpus.Load(expectedPath);
+    var actualByFile = samples.ToDictionary(s => s.File, StringComparer.OrdinalIgnoreCase);
+    var rewritten = new List<string>();
+    var refused = new List<string>();
+
+    static string Multiset(IEnumerable<string> values) => string.Join('|', values.OrderBy(v => v, StringComparer.Ordinal));
+
+    foreach (ExpectedSample want in truth.Samples)
+    {
+        if (!actualByFile.TryGetValue(want.File, out CorpusSample? got)) continue;
+        if (want.Windows.Count != got.Items.Count) continue;
+
+        for (int i = 0; i < want.Windows.Count; i++)
+        {
+            ParsedItem? item = got.Items[i];
+            if (item is null) continue;
+
+            List<ExpectedField> recorded = want.Windows[i].Stats;
+            var actual = item.Stats.Select(s => new ExpectedField { Label = s.Key, Value = s.Value }).ToList();
+
+            string before = string.Join('|', recorded.Select(s => $"{s.Label}={s.Value}"));
+            string after = string.Join('|', actual.Select(s => $"{s.Label}={s.Value}"));
+            if (before == after) continue;
+
+            if (Multiset(recorded.Select(s => $"{s.Label}={s.Value}")) != Multiset(actual.Select(s => $"{s.Label}={s.Value}")))
+            {
+                refused.Add($"{want.File} window {i}");
+                continue;
+            }
+
+            want.Windows[i].Stats = actual;
+            rewritten.Add($"{want.File} window {i}");
+        }
+    }
+
+    await truth.SaveAsync(expectedPath);
+    Console.WriteLine();
+    Console.WriteLine($"Reordered stats in {rewritten.Count} window(s); values unchanged:");
+    foreach (string entry in rewritten) Console.WriteLine($"  {entry}");
+    if (refused.Count > 0)
+    {
+        Console.WriteLine($"Left alone ({refused.Count}) — these differ by more than order, so they are real failures:");
+        foreach (string entry in refused) Console.WriteLine($"  {entry}");
+    }
     return 0;
 }
 

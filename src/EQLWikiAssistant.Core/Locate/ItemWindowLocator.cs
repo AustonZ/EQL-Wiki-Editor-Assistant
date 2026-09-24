@@ -24,7 +24,7 @@ public static class ItemWindowLocator
     public static async Task<IReadOnlyList<LocatedWindow>> LocateAsync(
         CapturedImage image, IOcrEngine ocrEngine, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<OcrLine> wholeImageLines = await ocrEngine.RecognizeAsync(image, cancellationToken);
+        IReadOnlyList<OcrLine> wholeImageLines = await ocrEngine.RecognizeAsync(image, OcrIntent.FullFrame, cancellationToken);
         List<OcrLine> anchors = wholeImageLines.Where(l => IsDescriptionTab(l.Text)).ToList();
 
         var windows = new List<LocatedWindow>();
@@ -41,7 +41,7 @@ public static class ItemWindowLocator
             }
 
             CapturedImage crop = image.Crop(bounds.Value);
-            IReadOnlyList<OcrLine> lines = await ocrEngine.RecognizeAsync(crop, cancellationToken);
+            IReadOnlyList<OcrLine> lines = await ocrEngine.RecognizeAsync(crop, OcrIntent.WindowCrop, cancellationToken);
             OcrLine? loreTab = lines.FirstOrDefault(l => IsLoreTabLabel(l.Text));
             ItemWindowTab activeTab = loreTab is not null && IsActiveTabLabel(crop, loreTab.BoundingBox)
                 ? ItemWindowTab.Lore

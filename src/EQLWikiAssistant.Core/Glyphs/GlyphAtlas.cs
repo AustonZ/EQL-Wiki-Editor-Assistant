@@ -5,9 +5,14 @@ namespace EQLWikiAssistant.Core.Glyphs;
 /// <summary>One labelled glyph shape. <see cref="Labels"/> is a list because two characters can be genuinely
 /// pixel-identical in this font — measured, not hypothetical: lowercase 'l' and uppercase 'I' are both a bare
 /// 2x9 vertical bar with no serif or crossbar to separate them.</summary>
-public sealed record AtlasEntry(IReadOnlyList<string> Labels, int BaselineOffset, GlyphBitmap Bitmap)
+public sealed record AtlasEntry(IReadOnlyList<string> Labels, int BaselineOffset, GlyphBitmap Bitmap, int Advance = 0)
 {
     public bool IsAmbiguous => Labels.Count > 1;
+
+    /// <summary>Whether this glyph's cell width is known. Advances are learned from real text rather than from
+    /// the sheet (whose characters are all space-separated by design), so a glyph that never appeared immediately
+    /// before another one has none — in which case the reader falls back to a gap threshold.</summary>
+    public bool HasAdvance => Advance > 0;
 }
 
 /// <summary>
@@ -67,19 +72,41 @@ public sealed class GlyphAtlas
     /// manual pass — and the count check below is what makes that safe: if a band's glyph count doesn't match the
     /// string it should spell, the segmentation is wrong and every label after that point would be silently
     /// shifted, which is far worse than refusing.</summary>
+    /// <summary>Finds the sheet's character rows among everything else segmented from the screenshot: the run of
+    /// consecutive bands whose glyph counts match <paramref name="expectedRows"/> exactly.
+    ///
+    /// This exists so the builder doesn't have to be handed precise pixel coordinates. The sheet is typed into an
+    /// in-game window that cannot be reopened in the same place twice, and the next capture will be for a new or
+    /// differently-sized font rather than a redo of this one, so a hardcoded region would be wrong every time it
+    /// mattered. Matching on the count sequence is specific enough to be safe — a run of bands holding 26, 26, 12,
+    /// 12, 7 and 7 glyphs is not something the rest of a screenshot produces by accident — and it still refuses
+    /// rather than guessing if nothing matches.</summary>
+    public static int FindSheetStart(IReadOnlyList<TextBand> bands, IReadOnlyList<string> expectedRows)
+    {
+        for (int start = 0; start + expectedRows.Count <= bands.Count; start++)
+        {
+            bool matches = true;
+            for (int row = 0; row < expectedRows.Count && matches; row++)
+                matches = bands[start + row].Glyphs.Count() == expectedRows[row].Length;
+            if (matches) return start;
+        }
+        return -1;
+    }
+
     public static GlyphAtlas FromLabelledBands(IReadOnlyList<TextBand> bands, IReadOnlyList<string> expectedRows)
     {
-        if (bands.Count != expectedRows.Count)
-            throw new ArgumentException($"{bands.Count} band(s) segmented but {expectedRows.Count} row(s) expected.");
+        int start = FindSheetStart(bands, expectedRows);
+        if (start < 0)
+            throw new ArgumentException(
+                $"No run of {expectedRows.Count} consecutive bands has the expected glyph counts " +
+                $"[{string.Join(", ", expectedRows.Select(r => r.Length))}]. Segmented: " +
+                $"[{string.Join(", ", bands.Select(b => b.Glyphs.Count()))}].");
 
         var byShape = new Dictionary<(GlyphBitmap, int), List<string>>();
-        for (int row = 0; row < bands.Count; row++)
+        for (int row = 0; row < expectedRows.Count; row++)
         {
-            List<GlyphBox> glyphs = [.. bands[row].Glyphs.OrderBy(g => g.X)];
+            List<GlyphBox> glyphs = [.. bands[start + row].Glyphs.OrderBy(g => g.X)];
             string expected = expectedRows[row];
-            if (glyphs.Count != expected.Length)
-                throw new ArgumentException(
-                    $"Row {row} (\"{expected}\") expects {expected.Length} glyph(s) but {glyphs.Count} were segmented.");
 
             for (int i = 0; i < glyphs.Count; i++)
             {
@@ -98,12 +125,13 @@ public sealed class GlyphAtlas
     {
         var sb = new StringBuilder();
         sb.AppendLine($"# EQL UI glyph atlas, format {FormatVersion}");
-        sb.AppendLine("# labels<TAB>baselineOffset<TAB>width<TAB>height<TAB>levels (one ramp level 0-6 per pixel, row-major)");
+        sb.AppendLine("# labels<TAB>baselineOffset<TAB>width<TAB>height<TAB>levels<TAB>advance");
+        sb.AppendLine("# levels is one ramp level 0-6 per pixel, row-major. advance is the glyph's cell width, 0 if unknown.");
         sb.AppendLine("# Multiple labels on one line means those characters are pixel-identical in this font.");
         foreach (AtlasEntry entry in Entries)
             sb.AppendLine(string.Join('\t',
                 string.Concat(entry.Labels), entry.BaselineOffset,
-                entry.Bitmap.Width, entry.Bitmap.Height, entry.Bitmap.Encode()));
+                entry.Bitmap.Width, entry.Bitmap.Height, entry.Bitmap.Encode(), entry.Advance));
         return sb.ToString();
     }
 
@@ -120,13 +148,14 @@ public sealed class GlyphAtlas
             // the '#' entry on load, and the only symptom was one unreadable character in an otherwise perfect
             // round-trip. Comment text deliberately contains no tabs.
             string[] parts = trimmed.Split('\t');
-            if (parts.Length != 5) continue;
+            if (parts.Length is not (5 or 6)) continue;
 
             IReadOnlyList<string> labels = [.. parts[0].Select(c => c.ToString())];
             entries.Add(new AtlasEntry(
                 labels,
                 int.Parse(parts[1]),
-                GlyphBitmap.Decode(int.Parse(parts[2]), int.Parse(parts[3]), parts[4])));
+                GlyphBitmap.Decode(int.Parse(parts[2]), int.Parse(parts[3]), parts[4]),
+                parts.Length == 6 ? int.Parse(parts[5]) : 0));
         }
         return new GlyphAtlas(entries);
     }

@@ -46,7 +46,7 @@ The full design rationale, wiki research findings, and milestone plan live in
   (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device).
   **Read the `[GeneratedComInterface]` note below before touching `Interop/`** — it documents a real, confirmed
   runtime failure mode, not a style preference.
-- `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — the `IOcrEngine` implementation: **`RapidOcrEngine`
+- `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — the general-OCR `IOcrEngine`: **`RapidOcrEngine`
   wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline). See "OCR engine choice" below — this
   wasn't arbitrary: the OS-provided `Windows.Media.Ocr` was tried first and replaced after real testing showed it
   meaningfully less accurate, then removed outright once it had no remaining use.
@@ -68,7 +68,9 @@ The full design rationale, wiki research findings, and milestone plan live in
   "Locating item windows" was measured, so use it rather than guessing before changing anything in
   `WindowBoundsFinder`; `ParseSpike` runs the full Locate -> Parse pipeline and dumps every parsed field per
   window; `AccuracySpike` scores that pipeline against tracked ground truth (see "Measuring extraction accuracy");
-  `GlyphSpike` measures raw pixels, segments text and builds/verifies the UI font atlas (see "Glyph matching").
+  `GlyphSpike` measures raw pixels, builds/verifies the UI font atlas and reads a region through the real glyph
+  engine (see "Glyph matching"). `ParseSpike` and `AccuracySpike` both take `--rapid` to run the superseded
+  RapidOCR-everywhere configuration for comparison.
   Keep using these — don't recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
   `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
@@ -303,18 +305,12 @@ item's own name again for others.
   row into the flags field. Rows with no letters or digits at all are dropped before parsing. Note the safer fix
   is dropping junk, *not* identifying the name row by similarity to the title — that would quietly defeat the
   title-vs-content occlusion check, whose whole job is to notice when those two genuinely differ.
-- **Open issue — OCR drops isolated stat digits, and it's the dominant remaining data gap.** Measured over 100
-  real item windows: ~24 stat values are lost, so roughly 1 item in 5 is missing at least one stat. The parser
-  surfaces each as an orphaned-label warning rather than guessing (never silently drop the field), but that's a
-  manual-review cost, not a fix. Confirmed it is genuinely the OCR and not the capture or the parser: the digits
-  are plainly present in the pixels (a window showing four `7`s returns no `7` fragment at all), while `AC: 6`
-  and `HP: 55` in the same window read fine.
-  - **A targeted re-OCR of just the value cell at 4x recovers most of them** (3 of 4 on the test case, vs 0 at
-    native resolution). Note this is the *opposite* of the general "upscaling hurts RapidOCR" finding, which was
-    measured on full window crops — for a tiny isolated-digit region, upscaling clearly helps.
-  - Watch out when investigating: the lower stat block (`Strength`/`Wisdom`/…) puts its values in a **different
-    column** from the upper two-column block (`Size`/`AC`/`Weight`/`HP`). Probing the wrong column reads as "the
-    value isn't there at all" and sent this investigation down a false path once.
+- **Closed: RapidOCR dropped isolated stat digits, and it was the dominant data gap.** Measured over 100 real
+  item windows it lost ~24 stat values — roughly 1 item in 5 missing at least one stat — with the digits plainly
+  present in the pixels (a window showing four `7`s returned no `7` fragment at all) while `AC: 6` and `HP: 55`
+  in the same window read fine. Glyph matching reads all of them; the count is now 0. Kept here because it is the
+  clearest illustration of *why* the window-crop pass stopped using a general recognizer: the failure was not
+  tuning, it was the wrong tool.
 - `tools/ParseSpike` (mirrors `OcrSpike`/`LocateSpike`) runs the full Locate -> Parse pipeline against a real
   screenshot and dumps every parsed field per window (including a `[FOREIGN]` marker on foreign exaltations) —
   use this, don't recreate an ad hoc version, when tuning parser rules against new samples.
@@ -359,10 +355,57 @@ builds the labelled atlas, `verify` reads a real region back.
   of Flame` against `Kavruul`s Mystic Pouch`. RapidOCR read every grave as an apostrophe; glyph matching keeps
   them apart, which a test pins. The sheet originally had only the grave, so both quote characters were added to
   it in a second capture — if the sheet is ever recaptured, it must keep them.
-- **Still open (stage 3)**: bands that merge with window chrome (the item icon, divider rules, the tier bar)
-  break calibration for that band, so the `Class:` and title-bar rows read with gaps while every clean text row
-  reads perfectly — including `Ornamentation` (not `Omamentation`), `Worn Exaltation` (not `Wom`) and
-  `SV. Void: 7`, the isolated digit RapidOCR drops entirely.
+- **Reading a window is `GlyphReader`, and every candidate calibrates itself.** The obvious design — segment into
+  text bands, measure each band's background and peak, match within it — was built first and fails: a band that
+  merges with the item icon, a divider rule or the tier bar takes its calibration from the chrome, and the whole
+  row becomes unreadable (measured on one real window, clean text bands are 9-13px tall while merged ones run to
+  22, 40, 44 and 65px). Instead a candidate solves both unknowns from its own pixels — background from the
+  glyph's level-0 pixels, peak from the brightest level its bitmap uses — after which every remaining pixel has
+  exactly one permitted intensity. Chrome does not satisfy that, and text reads identically on the content area's
+  16-grey, the title bar's black, or beside a bright icon.
+  - **Background comes from the glyph's own interior, not a ring around it.** The game draws divider rules flush
+    under a line of text: a rule at intensity 50 sits one pixel below the 'p' descenders of a real "Bladestopper",
+    so a uniform-ring requirement drops exactly those glyphs and the word reads "Bladesto" + "er". Only shapes
+    with no level-0 pixels at all (the bare `l`/`I` bar, `-`, `|`) use the ring, and for those it must be strict —
+    relaxing it let the window's own frame read as a column of `|` and `!`.
+  - **A minimum contrast of 64 is required, because self-calibration has a degenerate solution.** A flat-coloured
+    scroll-bar arrow solves to background 149 and peak 150, and with a one-unit span every ramp level rounds to
+    the same intensity so the whole bitmap "matches". Real text spans 192 at the narrowest.
+  - **Search is anchored on each glyph's brightest pixel**, not swept over every position: a full sweep measured
+    11.8s for one window against 0.5s anchored, and cannot find anything the anchored search misses. Note this
+    only helps where ink is sparse — on a *full screenshot* the 3D world sits at 150-170 so nearly every pixel is
+    ink, which is why advances are learned inside located windows rather than whole frames.
+- **Spaces are decided by the glyph's cell width, never by the pixel gap.** Two adjacent '1's (4px of ink on a
+  6px cell) sit 3 background columns apart with no space between them — exactly as far as a space puts some other
+  pairs. A gap threshold of 3 turned every "11" into "1 1"; 4 merged hundreds of real spaces instead. Bucketing
+  all ~26,000 adjacent pairs by how far past the preceding cell the next glyph starts is cleanly bimodal with
+  **nothing at 2** (`0: 23641, 1: 217 | 3: 2650, 4: 93, ...`), which is the separation a gap rule never had.
+  - Advances are learned by `GlyphSpike advances` from real windows, because the sheet the atlas is built from
+    spaces every character out by design and so cannot show them. 67 of 89 shapes get one; the rest are
+    characters item windows never use and fall back to the gap.
+  - A learned cell wider than the ink plus a real side bearing (measured: 0 or 1 for all but two glyphs) means
+    the glyph is *always* followed by a space, so the measurement contains one. `:` and the class codes are like
+    this. Left alone, the too-wide cell then suppresses the very spaces that produced it — "Class: RNG" read as
+    "Class:RNG", which merged "Time: Instant" into one word and let the `l`/`I` rule resolve it "lnstant". Such a
+    cell is clamped to the ink width; clamping to ink+1 instead leaves `Z` landing in the empty bucket and
+    "WIZ MAG" merges.
+- **`l` versus `I` is the one place the reader chooses rather than reports.** They are the same pixels, so
+  "don't guess" would mean emitting both and corrupting every word containing either. It resolves from the word:
+  initial means `I` (this UI is Title Case), otherwise it follows the word's other letters, and a word of nothing
+  but bars is `I` (a roman numeral). A human reading the screen does the same. Anything it gets wrong is a *name*,
+  where fuzzy wiki lookup is the existing backstop — never a digit, which is guessed at nowhere.
+- **A fragment with no letter or digit is chrome and is dropped.** The title bar's decorations match `.` and `_`
+  exactly, and since the parser joins a row's fragments, that turned a title of "Spit" into `_ . Spit .. .. . . .`
+  — enough to trip the title-vs-content occlusion check and condemn a good capture.
+- **Output shape deliberately mirrors `RapidOcrEngine`'s**, so `ItemParser` needed no change to switch engines: a
+  row is split into separate `OcrLine`s at the stat block's *column* gap (measured 19-67px against 4-5px between
+  words), because emitting "Size: MEDIUM   AC: 43" as one string makes the parser read the value as
+  "MEDIUM AC: 43". Baselines within 2px are one visual row, since the two stat columns are not always rendered on
+  exactly the same baseline and grouping on the exact value emitted the right column before the left.
+- **Result on the verified corpus: every field exact.** 2094 correct, 0 wrong, 0 missing, 0 extra, 0 silent-wrong,
+  0 structural, 0 warnings — against RapidOCR's 13 silent-wrong, 24 missing and 24 warnings on the same corpus
+  and the same ground truth. `AccuracySpike --rapid` and `ParseSpike --rapid` still run the old configuration for
+  comparison.
 
 **Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to OCR
 settings or parser rules must be judged by a number, not by eyeballing warning counts — 18 tunable OCR parameters
@@ -392,14 +435,19 @@ invisible that way by definition.
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
 - Baseline against the **verified** corpus (all 43 samples checked against the screenshots by the user,
-  2026-09-24): **101 windows (1 correctly occluded), 2058 correct fields, 24 missing, 15 wrong (13 of them
-  silent), 0 structural, 24 warnings.** These numbers only became meaningful at verification: an unverified entry
-  records whatever the pipeline produced, so it scores correct by construction and the gates read 0 for the wrong
-  reason. Every remaining failure is glyph-level, not a parser defect: the dropped-digit issue above, plus the
-  `rn`->`m` cluster in payload names, a roman numeral losing a stroke (`III`->`II`), a grave accent read as an
-  apostrophe, and an item icon recognized as a stray letter joining the flags row. That is why
-  `CorpusAccuracyTests` now **ratchets** `silent-wrong` instead of asserting 0 — driving all three counts to 0 is
-  what the glyph-matching engine is for, and until then a ratchet still fails the build on a *parser* regression.
+  2026-09-24): **101 windows (1 correctly occluded), 2094 correct fields, and 0 for every error count —
+  structural, silent-wrong, wrong, missing, extra and parser warnings alike.** All three ratchets in
+  `CorpusAccuracyTests` are therefore 0 and must stay there; a regression is now a real defect rather than a
+  known gap being re-measured. Under the previous configuration (RapidOCR reading window crops) the same corpus
+  and the same ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them a
+  glyph-level failure that exact template matching removed outright. `AccuracySpike --rapid` still scores the old
+  configuration, so the comparison stays reproducible.
+- **Ground-truth ordering was a latent defect, fixed once and mechanically.** The bootstrap recorded RapidOCR's
+  *detection* order, which is not the window's reading order; the user verified values, never order, and the plan
+  makes order part of the contract because it is how the wikitext gets laid back out. 9 windows were reordered by
+  `AccuracySpike --adopt-reading-order`, which rewrites a window only when its stats are the **same multiset** in
+  both — so it can reorder entries and can never add, remove or alter a value, and it reports anything it refuses.
+  Reach for it only when an engine change moves reading order legitimately, never to make a failing value pass.
 - **Verified ground truth can still be wrong, and a wrong entry hides a real error.** One entry kept an OCR
   artifact through review (`Bumning Affliction III` — the `rn`->`m` cluster; corrected to `Burning` only after
   reading the pixels at 6x). While it stood, the window that reproduced that same artifact scored as *correct*.
@@ -540,16 +588,17 @@ dotnet run --project tools/AccuracySpike -- --bootstrap  # regenerate ground tru
 $env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracyTests"
 
 # Glyph matching: read a region's raw pixel intensities (the --probe of this work; measure before tuning),
-# then segment it, then read it back with the atlas:
+# then read it back through the real engine:
 dotnet run --project tools/GlyphSpike -- dump "samples/some screenshot.png" 864,373,12,12 [--raw]
-dotnet run --project tools/GlyphSpike -- segment "samples/some screenshot.png" 774,279,388,522
-dotnet run --project tools/GlyphSpike -- verify "samples/some screenshot.png" 774,279,388,522 \
-  --atlas src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
+dotnet run --project tools/GlyphSpike -- read "samples/some screenshot.png" 774,279,388,522
 
-# Regenerate the atlas from the in-game Notes Window glyph sheet (the region must cover exactly its six
-# character rows, in order — the builder refuses on a glyph-count mismatch):
-dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,794,570,100 \
+# Regenerate the atlas from the in-game Notes Window glyph sheet. The region only has to *contain* the character
+# rows as consecutive bands — it is matched by glyph-count sequence, not by coordinates, because the sheet can
+# never be reopened in the same place twice. Update SheetRows() in GlyphSpike if the sheet's contents change.
+# Then relearn cell widths from real windows: the sheet spaces every character out, so it cannot show them.
+dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,700,570,250 \
   --out src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
+dotnet run --project tools/GlyphSpike -- advances "samples/any screenshot.png"   # updates the atlas in place
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).

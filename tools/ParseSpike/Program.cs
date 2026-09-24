@@ -1,3 +1,4 @@
+using EQLWikiAssistant.Core.Glyphs;
 using EQLWikiAssistant.Core.Items;
 using EQLWikiAssistant.Core.Locate;
 using EQLWikiAssistant.Core.Ocr;
@@ -19,7 +20,13 @@ if (args.Length < 1)
 CapturedImage image = await ImageFile.LoadAsync(args[0]);
 Console.WriteLine($"Loaded {args[0]} ({image.Width}x{image.Height})");
 
-using var engine = new RapidOcrEngine();
+// The shipping configuration reads window crops with the glyph atlas and keeps RapidOCR for the full-frame
+// locate pass; --rapid falls back to RapidOCR for both, to compare against the old behaviour.
+using var rapid = new RapidOcrEngine();
+IOcrEngine engine = args.Contains("--rapid")
+    ? rapid
+    : new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+
 IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, engine);
 Console.WriteLine($"Located {windows.Count} window(s):");
 

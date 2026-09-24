@@ -806,12 +806,12 @@
               "value": "11"
             },
             {
-              "label": "Intelligence",
-              "value": "8"
-            },
-            {
               "label": "SV. Void",
               "value": "1"
+            },
+            {
+              "label": "Intelligence",
+              "value": "8"
             }
           ],
           "exaltations": [
@@ -900,12 +900,12 @@
               "value": "11"
             },
             {
-              "label": "Intelligence",
-              "value": "8"
-            },
-            {
               "label": "SV. Void",
               "value": "1"
+            },
+            {
+              "label": "Intelligence",
+              "value": "8"
             }
           ],
           "exaltations": [
@@ -2482,19 +2482,19 @@
               "value": "0.1"
             },
             {
-              "label": "HP Regen",
-              "value": "6"
-            },
-            {
-              "label": "End Regen",
-              "value": "6"
-            },
-            {
               "label": "SV. Void",
               "value": "4"
             },
             {
+              "label": "HP Regen",
+              "value": "6"
+            },
+            {
               "label": "Mana Regen",
+              "value": "6"
+            },
+            {
+              "label": "End Regen",
               "value": "6"
             }
           ],
@@ -2564,12 +2564,12 @@
               "value": "16"
             },
             {
-              "label": "Dexterity",
-              "value": "12"
-            },
-            {
               "label": "SV. Void",
               "value": "6"
+            },
+            {
+              "label": "Dexterity",
+              "value": "12"
             }
           ],
           "exaltations": [
@@ -2701,6 +2701,10 @@
               "value": "18"
             },
             {
+              "label": "Strength",
+              "value": "7"
+            },
+            {
               "label": "SV. Cold",
               "value": "9"
             },
@@ -2711,10 +2715,6 @@
             {
               "label": "SV. Void",
               "value": "2"
-            },
-            {
-              "label": "Strength",
-              "value": "7"
             },
             {
               "label": "Charisma",
@@ -2962,16 +2962,16 @@
               "value": "2.9"
             },
             {
+              "label": "Dexterity",
+              "value": "8"
+            },
+            {
               "label": "SV. Cold",
               "value": "42"
             },
             {
               "label": "SV. Void",
               "value": "2"
-            },
-            {
-              "label": "Dexterity",
-              "value": "8"
             }
           ],
           "exaltations": [
@@ -4148,15 +4148,15 @@
               "value": "7"
             },
             {
-              "label": "Charisma",
-              "value": "12"
-            },
-            {
               "label": "Intelligence",
               "value": "12"
             },
             {
               "label": "Wisdom",
+              "value": "12"
+            },
+            {
+              "label": "Charisma",
               "value": "12"
             }
           ],
@@ -4361,12 +4361,12 @@
               "value": "2"
             },
             {
-              "label": "Wisdom",
-              "value": "2"
-            },
-            {
               "label": "SV. Void",
               "value": "1"
+            },
+            {
+              "label": "Wisdom",
+              "value": "2"
             }
           ],
           "exaltations": [
@@ -4403,6 +4403,10 @@
               "value": "MEDIUM"
             },
             {
+              "label": "AC",
+              "value": "9"
+            },
+            {
               "label": "Weight",
               "value": "1.6"
             },
@@ -4421,10 +4425,6 @@
             {
               "label": "SV. Void",
               "value": "4"
-            },
-            {
-              "label": "AC",
-              "value": "9"
             }
           ],
           "exaltations": [

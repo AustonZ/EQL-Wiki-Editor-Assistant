@@ -1,5 +1,8 @@
+using EQLWikiAssistant.Core.Locate;
+using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.Core.Glyphs;
 using EQLWikiAssistant.Core.Ocr;
+using EQLWikiAssistant.TestSupport.Accuracy;
 using EQLWikiAssistant.TestSupport;
 
 // Milestone 2d / stage 2 spike tool: the measuring instrument and atlas builder for the glyph-matching work, in
@@ -33,6 +36,8 @@ switch (command)
     case "cluster": return Cluster(image, region, args[1]);
     case "atlas": return Atlas(image, region, args);
     case "verify": return Verify(image, region, args);
+    case "read": return ReadRegion(image, region, args);
+    case "advances": return await Advances(args);
     default:
         Console.Error.WriteLine($"unknown command '{command}'");
         return 1;
@@ -134,8 +139,6 @@ static int Atlas(CapturedImage image, Rect region, string[] args)
     SegmentResult result = GlyphSegmenter.Segment(image, region);
     PrintHeader(args[1], image, region, result);
 
-    if (result.OffRampPixels > 0) return 1;
-
     GlyphAtlas atlas;
     try
     {
@@ -144,7 +147,8 @@ static int Atlas(CapturedImage image, Rect region, string[] args)
     catch (ArgumentException ex)
     {
         Console.Error.WriteLine($"  !! {ex.Message}");
-        Console.Error.WriteLine("  The region must cover exactly the sheet's character rows, in order, and nothing else.");
+        Console.Error.WriteLine("  The region must contain the sheet's character rows as consecutive bands, in order;");
+        Console.Error.WriteLine("  it does not have to be tight around them. Update SheetRows() if the sheet changed.");
         return 1;
     }
 
@@ -272,6 +276,94 @@ static ValueTuple<int, int, int> Rank(AtlasEntry entry) => (entry.Bitmap.Width, 
 static bool IsInkAt(CapturedImage image, int background, int x, int y) =>
     x >= 0 && y >= 0 && x < image.Width && y < image.Height
     && GlyphRamp.Intensity(image.Pixels, image.Width, image.Height, x, y) > background + GlyphRamp.InkThreshold;
+
+/// <summary>Runs the real <see cref="GlyphReader"/> over a region and prints the lines it produces — the same
+/// output <c>GlyphOcrEngine</c> hands to <c>ItemParser</c>, so this is the eyeball check for the engine itself
+/// (as against `verify`, which exists to measure atlas coverage).</summary>
+static int ReadRegion(CapturedImage image, Rect region, string[] args)
+{
+    int atlasIndex = Array.IndexOf(args, "--atlas");
+    GlyphAtlas atlas = atlasIndex >= 0 && atlasIndex + 1 < args.Length
+        ? GlyphAtlas.Parse(File.ReadAllText(args[atlasIndex + 1]))
+        : GlyphAtlas.Bundled;
+
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    IReadOnlyList<OcrLine> lines = GlyphReader.Read(image, region, atlas);
+    stopwatch.Stop();
+
+    Console.WriteLine($"{args[1]} region {region.X},{region.Y} {region.Width}x{region.Height}");
+    Console.WriteLine($"  {lines.Count} line(s) in {stopwatch.ElapsedMilliseconds}ms");
+    Console.WriteLine();
+    foreach (OcrLine line in lines)
+        Console.WriteLine($"  [{line.BoundingBox.X,4},{line.BoundingBox.Y,4}] {line.Text}");
+    return 0;
+}
+
+/// <summary>Learns glyph cell widths from every sample in the corpus and writes them back into the atlas.
+///
+/// Separate from `atlas` because the two need different sources: shapes come from the Notes Window sheet, whose
+/// characters are all space-separated and therefore show no advances at all, while advances can only be seen in
+/// ordinary text where glyphs sit side by side. Run `atlas` first, then this.</summary>
+static async Task<int> Advances(string[] args)
+{
+    int atlasIndex = Array.IndexOf(args, "--atlas");
+    string atlasPath = atlasIndex >= 0 && atlasIndex + 1 < args.Length
+        ? args[atlasIndex + 1]
+        : "src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas";
+    GlyphAtlas atlas = GlyphAtlas.Parse(File.ReadAllText(atlasPath));
+
+    IReadOnlyList<string> files = CorpusRunner.EnumerateSampleFiles();
+    if (files.Count == 0)
+    {
+        Console.Error.WriteLine("  no samples/ on disk — advances can only be learned from real text");
+        return 1;
+    }
+
+    // Learned inside *located windows*, not whole screenshots. A screenshot's 3D world sits at intensity 150-170,
+    // so on a full frame essentially every pixel counts as ink and the reader's ink-anchored search degenerates
+    // into a full sweep — measured at minutes per image, hours for the corpus, and full of world-texture noise.
+    using var ocr = new RapidOcrEngine();
+    var advances = new Dictionary<string, int>();
+    var observations = new List<(string Label, int Distance)>();
+    foreach (string file in files)
+    {
+        CapturedImage sample = await ImageFile.LoadAsync(file);
+        IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(sample, ocr);
+        foreach (LocatedWindow window in windows.Where(w => !w.PossiblyOccluded))
+            GlyphReader.LearnAdvances(sample, window.Bounds, atlas, advances, observations);
+
+        Console.WriteLine($"  {Path.GetFileName(file),-56} {windows.Count} window(s), {advances.Count} glyph(s) known");
+    }
+
+    var updated = new GlyphAtlas([.. atlas.Entries.Select(e =>
+        advances.TryGetValue(string.Concat(e.Labels), out int advance)
+            ? e with { Advance = GlyphReader.ClampAdvance(advance, e.Bitmap.Width) }
+            : e)]);
+
+    // The histogram that sets MinSpaceAdvance. Every adjacent pair is bucketed by how far past the preceding
+    // glyph's cell the next one starts: 0 means tightly packed (no space) and a space shows as a separate,
+    // higher cluster. A threshold is only safe if the two clusters don't touch — which is exactly what a bare
+    // pixel-gap rule failed to give, so this is the check that the advance model actually separates them.
+    var cells = updated.Entries.Where(e => e.HasAdvance)
+        .ToDictionary(e => string.Concat(e.Labels), e => e.Advance);
+    var histogram = new SortedDictionary<int, int>();
+    foreach ((string label, int distance) in observations)
+        if (cells.TryGetValue(label, out int advance))
+            histogram[distance - advance] = histogram.GetValueOrDefault(distance - advance) + 1;
+
+    Console.WriteLine("  distance beyond the preceding glyph's cell:");
+    foreach ((int beyond, int count) in histogram)
+        Console.WriteLine($"    {beyond,3}: {count,5}");
+
+    int known = updated.Entries.Count(e => e.HasAdvance);
+    Console.WriteLine($"  {known}/{updated.Entries.Count} shape(s) have a learned advance");
+    foreach (AtlasEntry entry in updated.Entries.Where(e => !e.HasAdvance))
+        Console.WriteLine($"    no advance for '{string.Concat(entry.Labels)}' (falls back to the gap threshold)");
+
+    File.WriteAllText(atlasPath, updated.Save());
+    Console.WriteLine($"  wrote {atlasPath}");
+    return 0;
+}
 
 static void PrintHeader(string path, CapturedImage image, Rect region, SegmentResult result)
 {

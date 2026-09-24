@@ -32,7 +32,8 @@ public sealed class RapidOcrEngine : IOcrEngine, IDisposable
             Path.Combine(ModelDirectory, "ppocrv5_latin_dict.txt"));
     }
 
-    public Task<IReadOnlyList<OcrLine>> RecognizeAsync(CapturedImage image, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<OcrLine>> RecognizeAsync(
+        CapturedImage image, OcrIntent intent = OcrIntent.FullFrame, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
         cancellationToken.ThrowIfCancellationRequested();

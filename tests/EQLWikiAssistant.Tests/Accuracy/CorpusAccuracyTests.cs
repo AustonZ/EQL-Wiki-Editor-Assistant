@@ -1,3 +1,4 @@
+using EQLWikiAssistant.Core.Glyphs;
 using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.TestSupport;
 using EQLWikiAssistant.TestSupport.Accuracy;
@@ -18,22 +19,16 @@ namespace EQLWikiAssistant.Tests.Accuracy;
 /// </summary>
 public class CorpusAccuracyTests
 {
-    // Ratchets. Lower these in the same commit as any improvement that earns it; they exist so a regression is a
-    // failing test rather than a number someone notices later. They may only ever go down.
+    // Ratchets. They may only ever go down. All three are now 0 and must stay there: the glyph-matching engine
+    // reads the corpus exactly, so any regression is a real defect rather than a known gap being re-measured.
     //
-    // These were 0/0 while the corpus was unverified, which meant nothing — an unverified entry records whatever
-    // the pipeline produced, so everything scored correct by construction. Once the user verified all 43 samples
-    // against the screenshots, the real numbers appeared. Every one of them is a *glyph-level* OCR failure, not a
-    // parser defect:
-    //   - missing: isolated stat digits the RapidOCR detector never finds (the documented dominant gap);
-    //   - wrong/silent-wrong: the "rn"->"m" cluster in payload names (Tarnished->Tamished, Burn->Bum), a roman
-    //     numeral losing a stroke (III->II), a grave accent read as an apostrophe, and an item icon recognized as
-    //     a stray letter joining the flags row.
-    // Driving all three to 0 is exactly what the glyph-matching engine (plan stages 2-3) is for; they are ratchets
-    // rather than 0 so that a *parser* regression still fails the build in the meantime.
-    private const int MaxMissingFields = 24;
-    private const int MaxWrongFields = 15;
-    private const int MaxSilentWrongFields = 13;
+    // They were non-zero under RapidOCR — 24 missing, 15 wrong, 13 silently wrong — and every one of those was a
+    // glyph-level failure: isolated stat digits the detector never found, the "rn"->"m" cluster in payload names,
+    // a roman numeral losing a stroke, a grave accent read as an apostrophe, an item icon read as a stray letter.
+    // Exact template matching against the UI font removed the class outright rather than mitigating it.
+    private const int MaxMissingFields = 0;
+    private const int MaxWrongFields = 0;
+    private const int MaxSilentWrongFields = 0;
 
     private readonly ITestOutputHelper _output;
     public CorpusAccuracyTests(ITestOutputHelper output) => _output = output;
@@ -59,7 +54,9 @@ public class CorpusAccuracyTests
             return;
         }
 
-        using var engine = new RapidOcrEngine();
+        // The shipping configuration: RapidOCR finds the windows, the glyph atlas reads inside them.
+        using var rapid = new RapidOcrEngine();
+        var engine = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
         var samples = new List<CorpusSample>();
         foreach (string file in files)
             samples.Add(await CorpusRunner.RunAsync(file, engine));
