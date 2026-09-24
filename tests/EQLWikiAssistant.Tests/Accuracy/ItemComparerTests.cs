@@ -16,7 +16,7 @@ public class ItemComparerTests
         new(name, level, TitleContentNameMismatch: false,
             Flags: [], Classes: [], Races: [], Slots: slots ?? ["Ear"],
             Stats: stats ?? [], ExaltationSlots: [], Effects: [],
-            MerchantValue: null, Warnings: warnings ?? []);
+            MerchantValue: null, Lore: null, Warnings: warnings ?? []);
 
     private static ExpectedWindow Expected(
         string name = "Widget",
@@ -169,7 +169,7 @@ public class ItemComparerTests
                             [
                                 new ExpectedEffect
                                 {
-                                    Kind = "Click", Description = "Rune IV",
+                                    Kind = "Click", Name = "Rune IV", Conditions = ["Must Equip"],
                                     Modifiers = [new ExpectedField { Label = "Cast Time", Value = "Instant" }],
                                 },
                             ],

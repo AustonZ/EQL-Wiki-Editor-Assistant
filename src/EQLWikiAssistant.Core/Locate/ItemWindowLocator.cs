@@ -42,8 +42,12 @@ public static class ItemWindowLocator
 
             CapturedImage crop = image.Crop(bounds.Value);
             IReadOnlyList<OcrLine> lines = await ocrEngine.RecognizeAsync(crop, cancellationToken);
-            bool hasLoreTab = lines.Any(l => IsLoreTabLabel(l.Text));
-            windows.Add(new LocatedWindow(bounds.Value, lines, hasLoreTab, PossiblyOccluded: false));
+            OcrLine? loreTab = lines.FirstOrDefault(l => IsLoreTabLabel(l.Text));
+            ItemWindowTab activeTab = loreTab is not null && IsActiveTabLabel(crop, loreTab.BoundingBox)
+                ? ItemWindowTab.Lore
+                : ItemWindowTab.Description;
+
+            windows.Add(new LocatedWindow(bounds.Value, lines, loreTab is not null, PossiblyOccluded: false, activeTab));
         }
 
         return windows.OrderBy(w => w.Bounds.Y).ThenBy(w => w.Bounds.X).ToList();
@@ -58,4 +62,31 @@ public static class ItemWindowLocator
     /// on flag text like "Lore Equipped, No Trade".</summary>
     private static bool IsLoreTabLabel(string text) =>
         EditDistance.IsCloseMatch(text.Trim(), "Lore", maxDistance: 1);
+
+    /// <summary>True if a tab label is drawn in the active-tab colour. The game renders the selected tab's text
+    /// yellow (measured: 191,191,4 / 159,159,6 / 255,255,0 — red≈green with blue near zero) and unselected tabs
+    /// in neutral white/grey, so this is a direct pixel read rather than an inference.
+    ///
+    /// It lives here rather than in the parser because it is a question about pixels, and Locate is the layer
+    /// holding the image — the parser only ever sees recognized text, which carries no colour at all.</summary>
+    private static bool IsActiveTabLabel(CapturedImage crop, Rect labelBox)
+    {
+        const int GlyphMinChannel = 100;  // ignore the near-black background around the glyphs
+        const int YellowBlueMaxRatio = 3; // blue is a small fraction of red on the yellow; equal on white
+
+        int yellow = 0, neutral = 0;
+        for (int y = Math.Max(0, labelBox.Y); y < Math.Min(crop.Height, labelBox.Bottom); y++)
+        {
+            for (int x = Math.Max(0, labelBox.X); x < Math.Min(crop.Width, labelBox.Right); x++)
+            {
+                int i = (y * crop.Width + x) * 4;
+                int b = crop.Pixels[i], g = crop.Pixels[i + 1], r = crop.Pixels[i + 2];
+                if (Math.Max(r, g) < GlyphMinChannel) continue;
+
+                if (b * YellowBlueMaxRatio < r) yellow++;
+                else neutral++;
+            }
+        }
+        return yellow > neutral;
+    }
 }

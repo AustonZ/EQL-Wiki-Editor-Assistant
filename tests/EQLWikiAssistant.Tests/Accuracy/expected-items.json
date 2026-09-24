@@ -72,55 +72,33 @@
       ]
     },
     {
-      "file": "02a-single-belt-with-lore-description-tab-pink-background.png",
+      "file": "02a-single-item-with-lore-description-active.png",
       "verified": false,
       "windows": [
         {
           "occluded": false,
-          "name": "Pegasus-Hide Belt",
+          "name": "Chilled Tundra Root",
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [
-            "Lore Equipped",
             "No Trade"
           ],
           "classes": [
-            "SHD"
+            "RNG",
+            "DRU"
           ],
           "races": [
             "ALL"
           ],
-          "slots": [
-            "Waist"
-          ],
+          "slots": [],
           "stats": [
             {
               "label": "Size",
-              "value": "SMALL"
-            },
-            {
-              "label": "AC",
-              "value": "8"
+              "value": "TINY"
             },
             {
               "label": "Weight",
-              "value": "1.0"
-            },
-            {
-              "label": "Haste",
-              "value": "41%"
-            },
-            {
-              "label": "Strength",
-              "value": "6"
-            },
-            {
-              "label": "Intelligence",
-              "value": "6"
-            },
-            {
-              "label": "Agility",
-              "value": "6"
+              "value": "0.1"
             }
           ],
           "exaltations": [],
@@ -130,12 +108,12 @@
       ]
     },
     {
-      "file": "02b-single-belt-with-lore-lore-tab-pink-background.png",
+      "file": "02b-single-item-with-lore-lore-active.png",
       "verified": false,
       "windows": [
         {
           "occluded": false,
-          "name": "Pegasus Hide Belt",
+          "name": "Chilled Tundra Root",
           "level": 0,
           "titleContentNameMismatch": false,
           "flags": [],
@@ -145,7 +123,8 @@
           "stats": [],
           "exaltations": [],
           "effects": [],
-          "warningCount": 2
+          "lore": "Root frozen rock hard by the tundra",
+          "warningCount": 0
         }
       ]
     },
@@ -245,7 +224,10 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Haste (Can Equip)",
+              "name": "Haste",
+              "conditions": [
+                "Can Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -339,7 +321,8 @@
           "effects": [
             {
               "kind": "Charge",
-              "description": "Word of Healing",
+              "name": "Word of Healing",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -525,15 +508,55 @@
       "verified": false,
       "windows": [
         {
-          "occluded": true,
+          "occluded": false,
+          "name": "Obtenebrate Mithril Guard",
           "level": 0,
           "titleContentNameMismatch": false,
-          "flags": [],
-          "classes": [],
-          "races": [],
-          "slots": [],
-          "stats": [],
-          "exaltations": [],
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Secondary"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "35"
+            },
+            {
+              "label": "Weight",
+              "value": "6.0"
+            },
+            {
+              "label": "Type",
+              "value": "Shield"
+            },
+            {
+              "label": "Strength",
+              "value": "15"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "15"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
           "effects": [],
           "warningCount": 0
         }
@@ -616,7 +639,10 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Rune III (Must Equip)",
+              "name": "Rune III",
+              "conditions": [
+                "Must Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -799,8 +825,14 @@
           "effects": [
             {
               "kind": "Combat",
-              "description": "Siphon (Req Level 50)",
-              "modifiers": []
+              "name": "Siphon",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "50"
+                }
+              ]
             }
           ],
           "warningCount": 1
@@ -1078,8 +1110,14 @@
           "effects": [
             {
               "kind": "Combat",
-              "description": "Earthquake (Req Level 45)",
-              "modifiers": []
+              "name": "Earthquake",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "45"
+                }
+              ]
             }
           ],
           "merchantValue": "33 platinum 3 gold 3 silver 3 copper",
@@ -1397,7 +1435,8 @@
           "effects": [
             {
               "kind": "Worn",
-              "description": "Enduring Breath",
+              "name": "Enduring Breath",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -1540,7 +1579,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Mana Preservation II",
+              "name": "Mana Preservation II",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -1784,7 +1824,8 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Illusion: Dark Elf",
+              "name": "Illusion: Dark Elf",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -1794,7 +1835,8 @@
             },
             {
               "kind": "Worn",
-              "description": "See Invisible",
+              "name": "See Invisible",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -1941,7 +1983,8 @@
           "effects": [
             {
               "kind": "Worn",
-              "description": "See Invisible",
+              "name": "See Invisible",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -2030,7 +2073,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Spell Haste II",
+              "name": "Spell Haste II",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -2286,12 +2330,14 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Affliction Haste II",
+              "name": "Affliction Haste II",
+              "conditions": [],
               "modifiers": []
             },
             {
               "kind": "Click",
-              "description": "Illusion: Skeleton",
+              "name": "Illusion: Skeleton",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -2305,7 +2351,8 @@
             },
             {
               "kind": "Worn",
-              "description": "Ultravision",
+              "name": "Ultravision",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -2367,7 +2414,10 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Alter Plane: Sky (Must Equip)",
+              "name": "Alter Plane: Sky",
+              "conditions": [
+                "Must Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -2757,12 +2807,16 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Improved Damage II",
+              "name": "Improved Damage II",
+              "conditions": [],
               "modifiers": []
             },
             {
               "kind": "Click",
-              "description": "Cure Disease (Must Equip)",
+              "name": "Cure Disease",
+              "conditions": [
+                "Must Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -2833,7 +2887,10 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Haste (Can Equip)",
+              "name": "Haste",
+              "conditions": [
+                "Can Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -2992,7 +3049,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Bumning Affliction III",
+              "name": "Bumning Affliction III",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -3163,7 +3221,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Bumning Affliction II",
+              "name": "Bumning Affliction II",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -3249,7 +3308,10 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Earthquake (Must Equip)",
+              "name": "Earthquake",
+              "conditions": [
+                "Must Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -3516,7 +3578,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Affliction Efficiency II",
+              "name": "Affliction Efficiency II",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -3606,7 +3669,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Reagent Conservation III",
+              "name": "Reagent Conservation III",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -4007,7 +4071,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Extended Range II",
+              "name": "Extended Range II",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -4134,7 +4199,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Summoning Haste I",
+              "name": "Summoning Haste I",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -4228,7 +4294,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Enhancement Haste II",
+              "name": "Enhancement Haste II",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -4363,7 +4430,8 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Enhancement Haste II",
+              "name": "Enhancement Haste II",
+              "conditions": [],
               "modifiers": []
             }
           ],
@@ -4455,12 +4523,16 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Improved Vampirism III",
+              "name": "Improved Vampirism III",
+              "conditions": [],
               "modifiers": []
             },
             {
               "kind": "Click",
-              "description": "Pillage Enchantment (Must Equip)",
+              "name": "Pillage Enchantment",
+              "conditions": [
+                "Must Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -4474,8 +4546,14 @@
             },
             {
               "kind": "Combat",
-              "description": "Siphon (Req Level 50)",
-              "modifiers": []
+              "name": "Siphon",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "50"
+                }
+              ]
             }
           ],
           "warningCount": 0
@@ -4540,8 +4618,14 @@
           "effects": [
             {
               "kind": "Combat",
-              "description": "Bum (Req Level 10)",
-              "modifiers": []
+              "name": "Bum",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "10"
+                }
+              ]
             }
           ],
           "warningCount": 0
@@ -4622,12 +4706,16 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Servant of Earth",
+              "name": "Servant of Earth",
+              "conditions": [],
               "modifiers": []
             },
             {
               "kind": "Click",
-              "description": "Reclaim Energy (Can Equip)",
+              "name": "Reclaim Energy",
+              "conditions": [
+                "Can Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -4726,12 +4814,16 @@
           "effects": [
             {
               "kind": "Focus",
-              "description": "Improved Healing /II",
+              "name": "Improved Healing III",
+              "conditions": [],
               "modifiers": []
             },
             {
               "kind": "Click",
-              "description": "Rune IV (Must Equip)",
+              "name": "Rune IV",
+              "conditions": [
+                "Must Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -4841,7 +4933,10 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Rune IV (Must Equip)",
+              "name": "Rune IV",
+              "conditions": [
+                "Must Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -4859,8 +4954,14 @@
             },
             {
               "kind": "Combat",
-              "description": "Ykesha (Req Level 37)",
-              "modifiers": []
+              "name": "Ykesha",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "37"
+                }
+              ]
             }
           ],
           "warningCount": 1
@@ -5406,7 +5507,10 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Firestrike (Must Equip)",
+              "name": "Firestrike",
+              "conditions": [
+                "Must Equip"
+              ],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -5424,8 +5528,14 @@
             },
             {
               "kind": "Combat",
-              "description": "Whirlwind (Req Level 50)",
-              "modifiers": []
+              "name": "Whirlwind",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "50"
+                }
+              ]
             }
           ],
           "warningCount": 0
@@ -6200,7 +6310,8 @@
           "effects": [
             {
               "kind": "Charge",
-              "description": "Word of Healing",
+              "name": "Word of Healing",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -6257,7 +6368,8 @@
           "effects": [
             {
               "kind": "Charge",
-              "description": "Restore Sight",
+              "name": "Restore Sight",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -6295,7 +6407,8 @@
           "effects": [
             {
               "kind": "Charge",
-              "description": "Allure",
+              "name": "Allure",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -6340,7 +6453,8 @@
           "effects": [
             {
               "kind": "Consumable",
-              "description": "Accuracy",
+              "name": "Accuracy",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -6379,7 +6493,8 @@
           "effects": [
             {
               "kind": "Consumable",
-              "description": "Kilva\u0027s Skin of Flame",
+              "name": "Kilva\u0027s Skin of Flame",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -6418,7 +6533,8 @@
           "effects": [
             {
               "kind": "Consumable",
-              "description": "Flurry",
+              "name": "Flurry",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",
@@ -6555,7 +6671,8 @@
           "effects": [
             {
               "kind": "Click",
-              "description": "Study Potential",
+              "name": "Study Potential",
+              "conditions": [],
               "modifiers": [
                 {
                   "label": "Cast Time",

@@ -33,8 +33,9 @@ foreach (LocatedWindow window in windows)
         continue;
     }
 
-    ParsedItem item = ItemParser.Parse(window.Lines);
-    Console.WriteLine($"  Name: {item.Name}  Level: +{item.Level}  TitleContentNameMismatch: {item.TitleContentNameMismatch}");
+    ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+    Console.WriteLine($"  Name: {item.Name}  Level: +{item.Level}  Tab: {window.ActiveTab}  TitleContentNameMismatch: {item.TitleContentNameMismatch}");
+    if (item.Lore is not null) Console.WriteLine($"  Lore: {item.Lore}");
     Console.WriteLine($"  Flags: {string.Join(", ", item.Flags)}");
     Console.WriteLine($"  Classes: {string.Join(" ", item.Classes)}");
     Console.WriteLine($"  Races: {string.Join(" ", item.Races)}");
@@ -48,7 +49,8 @@ foreach (LocatedWindow window in windows)
     Console.WriteLine("  Effects:");
     foreach (var fx in item.Effects)
     {
-        Console.WriteLine($"    {fx.Kind} Effect: {fx.Description}");
+        string conditions = fx.Conditions.Count == 0 ? "" : $"  conditions: {string.Join(", ", fx.Conditions)}";
+        Console.WriteLine($"    {fx.Kind} Effect: {fx.Name}{conditions}");
         foreach (var mod in fx.Modifiers)
             Console.WriteLine($"      {mod.Key}: {mod.Value}");
     }

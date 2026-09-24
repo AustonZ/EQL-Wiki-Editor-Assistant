@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using EQLWikiAssistant.Core.Locate;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Core.Text;
 
@@ -45,7 +46,7 @@ public static class ItemParser
     // the next row that isn't one of these, so "attach to the most recently seen effect" is reliable.
     private static readonly string[] EffectModifierLabels = ["Cast Time", "Cooldown", "Required Level", "Charges"];
 
-    public static ParsedItem Parse(IReadOnlyList<OcrLine> lines)
+    public static ParsedItem Parse(IReadOnlyList<OcrLine> lines, ItemWindowTab activeTab = ItemWindowTab.Description)
     {
         var warnings = new List<string>();
         List<List<OcrLine>> rows = GroupIntoRows(lines).Where(HasAnyAlphanumeric).ToList();
@@ -54,15 +55,18 @@ public static class ItemParser
         if (rows.Count == 0)
         {
             warnings.Add("No OCR lines to parse.");
-            return new ParsedItem("", 0, TitleContentNameMismatch: true, [], [], [], [], [], [], [], null, warnings);
+            return new ParsedItem("", 0, TitleContentNameMismatch: true, [], [], [], [], [], [], [], null, null, warnings);
         }
 
         // --- Header: fixed order ---
         string titleRaw = JoinRow(rows[i++]);
-        (string titleName, _) = ExtractNameLevel(titleRaw);
+        (string titleName, int titleLevel) = ExtractNameLevel(titleRaw);
 
         if (i < rows.Count && RowLooksLikeTabLabels(rows[i])) i++;
         else warnings.Add("Expected a Description/Lore tab row after the title; none found where expected.");
+
+        if (activeTab == ItemWindowTab.Lore)
+            return ParseLoreView(rows, i, titleName, titleLevel, warnings);
 
         string contentName = "";
         int level = 0;
@@ -159,12 +163,61 @@ public static class ItemParser
             ParseStatRow(row, stats, warnings);
         }
 
-        var effects = effectBuilders.Select(e => new EffectEntry(e.Kind, e.Description, e.Modifiers)).ToList();
+        var effects = effectBuilders
+            .Select(e => BuildEffect(e.Kind, e.Description, e.Modifiers))
+            .ToList();
 
         return new ParsedItem(
             contentName, level, nameMismatch,
             flags, classes, races, slots,
-            stats, exaltations, effects, merchantValue, warnings);
+            stats, exaltations, effects, merchantValue, Lore: null, warnings);
+    }
+
+    /// <summary>The Lore tab is a different view of the same window, not a variant of the Description layout:
+    /// there is no repeated content-area name and no stat block, just the lore prose. So the item's name can only
+    /// come from the title bar here, and with nothing to reconcile it against, the title-vs-content occlusion
+    /// check simply doesn't apply.</summary>
+    private static ParsedItem ParseLoreView(List<List<OcrLine>> rows, int i, string titleName, int titleLevel, List<string> warnings)
+    {
+        // Everything below the tab row is lore. Joined with spaces because the game wraps a long lore string
+        // across rows purely to fit the window — the breaks aren't part of the text.
+        string lore = string.Join(' ', rows.Skip(i).Select(JoinRow)).Trim();
+        if (lore.Length == 0) warnings.Add("Lore tab is active but no lore text was found below it.");
+
+        return new ParsedItem(
+            titleName, titleLevel, TitleContentNameMismatch: false,
+            Flags: [], Classes: [], Races: [], Slots: [],
+            Stats: [], ExaltationSlots: [], Effects: [],
+            MerchantValue: null, Lore: lore.Length == 0 ? null : lore, Warnings: warnings);
+    }
+
+    /// <summary>Splits an effect's raw text into its name and its parenthesised qualifiers, and normalizes the
+    /// two ways a required level reaches us into one. See <see cref="EffectEntry"/>.</summary>
+    private static EffectEntry BuildEffect(string kind, string rawDescription, List<KeyValuePair<string, string>> modifiers)
+    {
+        string text = rawDescription.Trim();
+        var conditions = new List<string>();
+
+        // Qualifiers are always trailing parentheticals, so peel them off the end until none remain.
+        while (true)
+        {
+            int open = text.LastIndexOf('(');
+            if (open < 0) break;
+
+            int close = text.IndexOf(')', open);
+            string inner = (close < 0 ? text[(open + 1)..] : text[(open + 1)..close]).Trim();
+            string remainder = text[..open].TrimEnd();
+            if (inner.Length == 0 || remainder.Length == 0) break;
+
+            text = remainder;
+            Match level = Regex.Match(inner, @"^Req(?:uired)?\.?\s*Level\s*:?\s*(?<level>\d+)$", RegexOptions.IgnoreCase);
+            if (level.Success)
+                modifiers.Insert(0, new KeyValuePair<string, string>("Required Level", level.Groups["level"].Value));
+            else
+                conditions.Insert(0, inner);
+        }
+
+        return new EffectEntry(kind, text, conditions, modifiers);
     }
 
     /// <summary>True if a filled exaltation slot's name does NOT match the item's own base name — a foreign

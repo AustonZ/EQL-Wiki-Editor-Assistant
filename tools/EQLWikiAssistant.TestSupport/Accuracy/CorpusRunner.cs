@@ -36,7 +36,7 @@ public static class CorpusRunner
         IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, engine, cancellationToken);
 
         var items = windows
-            .Select(w => w.PossiblyOccluded ? null : ItemParser.Parse(w.Lines))
+            .Select(w => w.PossiblyOccluded ? null : ItemParser.Parse(w.Lines, w.ActiveTab))
             .ToList();
 
         return new CorpusSample(Path.GetFileName(path), windows, items);
@@ -103,13 +103,15 @@ public static class CorpusRunner
                 Races = [.. item.Races],
                 Slots = [.. item.Slots],
                 MerchantValue = item.MerchantValue,
+                Lore = item.Lore,
                 WarningCount = item.Warnings.Count,
                 Stats = [.. item.Stats.Select(s => new ExpectedField { Label = s.Key, Value = s.Value })],
                 Exaltations = [.. item.ExaltationSlots.Select(e => new ExpectedExaltation { Kind = e.Kind.ToString(), Name = e.Name })],
                 Effects = [.. item.Effects.Select(e => new ExpectedEffect
                 {
                     Kind = e.Kind,
-                    Description = e.Description,
+                    Name = e.Name,
+                    Conditions = [.. e.Conditions],
                     Modifiers = [.. e.Modifiers.Select(m => new ExpectedField { Label = m.Key, Value = m.Value })],
                 })],
             };

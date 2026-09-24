@@ -122,7 +122,8 @@ public class ItemParserTests
         EffectEntry effect = Assert.Single(item.Effects);
 
         Assert.Equal("Focus", effect.Kind);
-        Assert.Equal("Reagent Conservation II", effect.Description);
+        Assert.Equal("Reagent Conservation II", effect.Name);
+        Assert.Empty(effect.Conditions);
     }
 
     // Verbatim real capture of "Bladestopper +7" — two effects (Focus, Click), where Cast Time/Required
@@ -300,7 +301,7 @@ public class ItemParserTests
     [InlineData("Worn Effect Enduring Breath", "Worn", "Enduring Breath")]
     [InlineData("Consumable Effect Flurry", "Consumable", "Flurry")]
     [InlineData("Charge Effect Word of Healing", "Charge", "Word of Healing")]
-    public void Parse_EffectKind_IsRecognized(string effectLine, string expectedKind, string expectedDescription)
+    public void Parse_EffectKind_IsRecognized(string effectLine, string expectedKind, string expectedName)
     {
         OcrLine[] lines =
         [
@@ -315,7 +316,100 @@ public class ItemParserTests
 
         EffectEntry effect = Assert.Single(ItemParser.Parse(lines).Effects);
         Assert.Equal(expectedKind, effect.Kind);
-        Assert.Equal(expectedDescription, effect.Description);
+        Assert.Equal(expectedName, effect.Name);
+    }
+
+    [Fact]
+    public void Parse_LoreTabActive_TakesNameFromTitleBarAndCapturesTheLore()
+    {
+        // Verbatim from a real capture. The Lore view is a different layout, not a variant of the Description
+        // one: no repeated content-area name, no stat block. So the name can only come from the title bar, and
+        // there is nothing to reconcile it against.
+        OcrLine[] lines =
+        [
+            L("Chilled Tundra Root", 139, 0),
+            L("Description", 63, 17),
+            L("Lore", 270, 18),
+            L("Root frozen rock hard by the tundra", 0, 41),
+        ];
+
+        ParsedItem item = ItemParser.Parse(lines, ItemWindowTab.Lore);
+
+        Assert.Equal("Chilled Tundra Root", item.Name);
+        Assert.Equal("Root frozen rock hard by the tundra", item.Lore);
+        Assert.False(item.TitleContentNameMismatch);
+        Assert.Empty(item.Stats);
+        Assert.Empty(item.Classes);
+        Assert.Empty(item.Warnings);
+    }
+
+    [Fact]
+    public void Parse_LoreTabActive_JoinsLoreWrappedAcrossRows()
+    {
+        // A long lore string wraps purely to fit the window, so the breaks aren't part of the text.
+        OcrLine[] lines =
+        [
+            L("Some Item", 139, 0),
+            L("Description", 63, 17),
+            L("Lore", 270, 18),
+            L("A blade forged in the deeps, said to have", 0, 41),
+            L("drunk deeply of its maker's own regrets.", 0, 57),
+        ];
+
+        ParsedItem item = ItemParser.Parse(lines, ItemWindowTab.Lore);
+
+        Assert.Equal("A blade forged in the deeps, said to have drunk deeply of its maker's own regrets.", item.Lore);
+    }
+
+    [Fact]
+    public void Parse_DescriptionTab_LeavesLoreUnset()
+    {
+        Assert.Null(ItemParser.Parse(LustrousBracerLines).Lore);
+    }
+
+    [Theory]
+    // A click effect carries its required level on its own sub-line below …
+    [InlineData("Click Effect: Rune IV (Must Equip)", "Rune IV", "Must Equip")]
+    [InlineData("Click Effect Haste (Can Equip)", "Haste", "Can Equip")]
+    public void Parse_EffectConditions_AreSeparatedFromTheName(string effectLine, string expectedName, string expectedCondition)
+    {
+        OcrLine[] lines =
+        [
+            L("Some Item", 100, 0), L("Description", 160, 17), L("Some Item", 60, 50),
+            L("No Trade", 60, 65), L("Class: ALL", 60, 80), L("Race: ALL", 60, 96),
+            L(effectLine, 10, 200),
+        ];
+
+        EffectEntry effect = Assert.Single(ItemParser.Parse(lines).Effects);
+        Assert.Equal(expectedName, effect.Name);
+        Assert.Equal([expectedCondition], effect.Conditions);
+    }
+
+    [Fact]
+    public void Parse_RequiredLevel_IsNormalizedAcrossBothFormsTheGameUses()
+    {
+        // … while a proc/combat effect folds it into the parenthetical instead. Both must end up in the same
+        // place, so a consumer never has to know which style the game happened to use for a given effect.
+        OcrLine[] lines =
+        [
+            L("Some Item", 100, 0), L("Description", 160, 17), L("Some Item", 60, 50),
+            L("No Trade", 60, 65), L("Class: ALL", 60, 80), L("Race: ALL", 60, 96),
+            L("Click Effect: Rune IV (Must Equip)", 10, 200),
+            L("Required Level: 40", 24, 216),
+            L("Combat Effect: Ykesha (Req Level 37)", 10, 240),
+        ];
+
+        var effects = ItemParser.Parse(lines).Effects;
+
+        EffectEntry click = effects.Single(e => e.Kind == "Click");
+        Assert.Equal("Rune IV", click.Name);
+        Assert.Equal(["Must Equip"], click.Conditions);
+        Assert.Contains(click.Modifiers, m => m.Key == "Required Level" && m.Value == "40");
+
+        EffectEntry combat = effects.Single(e => e.Kind == "Combat");
+        Assert.Equal("Ykesha", combat.Name);
+        Assert.Empty(combat.Conditions); // hoisted out of the parenthetical, not left as a condition
+        Assert.Contains(combat.Modifiers, m => m.Key == "Required Level" && m.Value == "37");
     }
 
     [Fact]

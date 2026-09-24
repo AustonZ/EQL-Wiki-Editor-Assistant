@@ -57,6 +57,7 @@ public static class ItemComparer
         results.Add(Scalar("name", expected.Name, actual.Name, flagged));
         results.Add(Scalar("level", expected.Level.ToString(), actual.Level.ToString(), flagged));
         results.Add(Scalar("merchantValue", expected.MerchantValue, actual.MerchantValue, flagged));
+        results.Add(Scalar("lore", expected.Lore, actual.Lore, flagged));
         results.Add(Scalar("titleContentNameMismatch",
             expected.TitleContentNameMismatch.ToString(), actual.TitleContentNameMismatch.ToString(), flagged));
 
@@ -87,14 +88,20 @@ public static class ItemComparer
     }
 
     private static string DescribeEffect(ExpectedEffect e) =>
-        e.Modifiers.Count == 0
-            ? $"{e.Kind}={e.Description}"
-            : $"{e.Kind}={e.Description} [{string.Join("; ", e.Modifiers.Select(m => $"{m.Label}={m.Value}"))}]";
+        Describe(e.Kind, e.Name, e.Conditions, e.Modifiers.Select(m => $"{m.Label}={m.Value}"));
 
     private static string DescribeEffect(EffectEntry e) =>
-        e.Modifiers.Count == 0
-            ? $"{e.Kind}={e.Description}"
-            : $"{e.Kind}={e.Description} [{string.Join("; ", e.Modifiers.Select(m => $"{m.Key}={m.Value}"))}]";
+        Describe(e.Kind, e.Name, e.Conditions, e.Modifiers.Select(m => $"{m.Key}={m.Value}"));
+
+    private static string Describe(string kind, string name, IEnumerable<string> conditions, IEnumerable<string> modifiers)
+    {
+        string text = $"{kind}={name}";
+        string conditionText = string.Join("; ", conditions);
+        if (conditionText.Length > 0) text += $" ({conditionText})";
+        string modifierText = string.Join("; ", modifiers);
+        if (modifierText.Length > 0) text += $" [{modifierText}]";
+        return text;
+    }
 
     private static FieldResult Scalar(string field, string? expected, string? actual, bool flagged)
     {

@@ -73,7 +73,7 @@ public class ItemWindowLocatorTests
         // a stack of chrome lines sits between the anchor and the content area. Both earlier designs failed this
         // outright: one couldn't find a dark sample point below the anchor at all, the other stopped between the
         // two chrome lines and then read the content area's own top outline as the window's bottom.
-        if (await Load("02b-single-belt-with-lore-lore-tab-pink-background.png") is not { } l) return;
+        if (await Load("02b-single-item-with-lore-lore-active.png") is not { } l) return;
         using (l.Engine as IDisposable)
         {
             IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
@@ -83,7 +83,49 @@ public class ItemWindowLocatorTests
             Assert.False(window.PossiblyOccluded);
             AssertPlausibleSingleWindowSize(window);
             Assert.True(window.HasLoreTab);
-            Assert.Contains("Pegasus", string.Join('\n', window.Lines.Select(x => x.Text)));
+
+            // Which tab is *showing* is read from the label's colour (the selected one is yellow), because the
+            // two tabs lay their contents out completely differently and the parser has to be told which it is
+            // looking at. Text alone can't say — OCR carries no colour.
+            Assert.Equal(ItemWindowTab.Lore, window.ActiveTab);
+        }
+    }
+
+    [Fact]
+    public async Task LocateAsync_DescriptionTabActive_ReportsDescriptionEvenWhenALoreTabExists()
+    {
+        // Same item as the test above, captured with the other tab selected — so HasLoreTab is true in both, and
+        // only ActiveTab distinguishes them.
+        if (await Load("02a-single-item-with-lore-description-active.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Dump(windows);
+
+            LocatedWindow window = Assert.Single(windows);
+            Assert.True(window.HasLoreTab);
+            Assert.Equal(ItemWindowTab.Description, window.ActiveTab);
+        }
+    }
+
+    [Fact]
+    public async Task LocateAsync_WindowOverlappingAnother_StillTracesTheFullyVisibleOne()
+    {
+        // The front window is completely visible and must parse; only the one underneath is unreadable, and its
+        // Description tab is covered so it is never even anchored. This regressed once: the two windows' title
+        // bars sit ~7px apart, and a rule that tolerated any short non-black run while walking the title bar
+        // bridged that gap into the neighbour's chrome, overran the band-height cap, and reported the visible
+        // window as occluded.
+        if (await Load("06c-two-items-overlapping-tab-text-covered.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Dump(windows);
+
+            LocatedWindow window = Assert.Single(windows);
+            Assert.False(window.PossiblyOccluded);
+            AssertPlausibleSingleWindowSize(window);
+            Assert.Contains("Obtenebrate", string.Join('\n', window.Lines.Select(x => x.Text)));
         }
     }
 

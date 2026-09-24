@@ -94,6 +94,10 @@ public sealed class ExpectedWindow
     public List<ExpectedEffect> Effects { get; set; } = [];
     public string? MerchantValue { get; set; }
 
+    /// <summary>Set only for a capture of the Lore tab, which is a different view with no stat block. Item lore
+    /// is public game data and is one of the fields this tool writes to the wiki.</summary>
+    public string? Lore { get; set; }
+
     /// <summary>Count only — see the type doc for why the text itself is deliberately not stored.</summary>
     public int WarningCount { get; set; }
 
@@ -121,6 +125,13 @@ public sealed class ExpectedExaltation
 public sealed class ExpectedEffect
 {
     public string Kind { get; set; } = "";
-    public string Description { get; set; } = "";
+
+    /// <summary>The effect/spell name alone — what the game draws in magenta, and what a wiki lookup keys on.</summary>
+    public string Name { get; set; } = "";
+
+    /// <summary>Parenthesised qualifiers such as "Must Equip" / "Can Equip". A "(Req Level N)" is normalized into
+    /// <see cref="Modifiers"/> instead, so it matches the sub-line form other effect kinds use.</summary>
+    public List<string> Conditions { get; set; } = [];
+
     public List<ExpectedField> Modifiers { get; set; } = [];
 }

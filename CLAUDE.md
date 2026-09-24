@@ -154,10 +154,6 @@ already found and fixed.
   individual channels of that thin frame unevenly — against a red element below one real window it reads
   `(11,0,0)` then `(34,0,0)`, which a max-channel test rejects — but never lifts all three, so the minimum stays
   at 0 while the interior's neutral grey keeps a minimum of ~16.
-- **Both tab states must work.** When `Description` is the *active* tab it merges into the content area, so there
-  is no chrome line below the label. When it's *inactive* (the Lore tab is selected) it's drawn as its own raised
-  box, so a short stack of chrome lines sits below it and all of them must be stepped past — stopping between
-  them makes the content area's top outline itself look like the window's bottom on the next downward scan.
 - **The top edge traces a different piece of chrome**: there is no grey outline at the window's outer top, and
   the title bar must stay in the crop for Parse's title-vs-content name check, so the top is traced from the
   **title bar's own pure-black band** — its topmost row is the window's outer top. This also began as a
@@ -175,6 +171,11 @@ already found and fixed.
     row found — measuring from the latter lets a continuous band drag the limit along and never trip. Without
     this, a window sitting under another dark panel had 8 of 11 probes walk ~200px up into it and agree with each
     other, failing only later via the overall height ceiling: 13 of 26 real captures lost a readable window.
+  - **Stop at interior grey, but tolerate glyphs.** A title bar contains only its own black plus its text, so an
+    interior-grey pixel means the band has ended. Tolerating *any* short non-black run instead is not safe: with
+    one window overlapping another the two title bars can sit ~7px apart, which such a rule bridges into the
+    neighbour's chrome — that made a **fully visible** window report as occluded, because every probe then
+    overran the band-height cap. Glyph rows are bright and still tolerated; interior grey ends the band.
 - **Both tab states must work.** When `Description` is the *active* tab it merges into the content area, so there
   is no chrome line below the label. When it's *inactive* (the Lore tab is selected) it's drawn as its own raised
   box, so a stack of chrome lines sits below it and all must be stepped past — stopping between them makes the
@@ -190,15 +191,13 @@ already found and fixed.
   a partly-covered window came back confidently 587px wide, silently merged with its neighbour.
 - The absolute size ceilings (600x700) are retained and still catch an occluder adjacent along an *entire* side,
   where every probe agrees on the same wrong answer.
-- Validated against all 16 real screenshots (`tools/LocateSpike --save` draws a debug overlay, green/red by
-  `PossiblyOccluded`; golden tests in `Tests/Locate/`). Traced widths are consistently 388-404px — the window's
-  true content width — where the previous design returned 414-587px because it ran past the real edge into
-  neighbouring UI. Cases that now resolve and previously could not: windows flush against the inventory/bank
-  panels, windows at all four screen edges, a window with the Lore tab active, and touching windows.
-- **Known limitation**: if another window's own black chrome butts directly against this one's title bar, the top
-  trace can run into the neighbour's title bar. That happens on one real sample (`06c`), and Parse's
-  title-vs-content name check catches it — the crop's title reads as the neighbour's item, so the capture is
-  flagged untrustworthy rather than silently mis-parsed.
+- Validated against the full real-sample corpus (43 screenshots, 101 located windows, 1 correctly occluded;
+  `tools/LocateSpike --save` draws a debug overlay, green/red by `PossiblyOccluded`; golden tests in
+  `Tests/Locate/`). Traced widths are consistently 388-404px — the window's true content width — where the
+  previous design returned 414-587px because it ran past the real edge into neighbouring UI. Cases that now
+  resolve and previously could not: windows flush against the inventory/bank panels, windows at all four screen
+  edges, a window with the Lore tab active, touching windows, and one window overlapping another (`06c`, whose
+  front window is fully visible and now parses cleanly — see the interior-grey stop above).
 - **Corrections to earlier notes in this file, since the claims were load-bearing and are now disproven**: the
   border *is* a distinctly-coloured line (the earlier "it isn't, it's just the edge of the dark interior" was
   wrong); and the "known residual gap" about a window whose title was ~20% occluded never existed — that sample's
@@ -238,6 +237,29 @@ body by pattern-matching each row, since the body's actual field set varies a lo
   two only turned up once a broad slot/category sample set existed, so treat the list as "what's been observed",
   not "what exists" — an unrecognized `X Effect` line degrades to an unparsed-line warning, which is the signal
   to add it.
+- **An effect line is three separate things, not one string.** `EffectEntry` splits them: `Name` (the part the
+  game draws in magenta — the only part that identifies the effect, and what a wiki lookup keys on),
+  `Conditions` (trailing parentheticals like `Must Equip` / `Can Equip`), and `Modifiers` (the sub-lines that
+  follow it — `Cast Time`, `Cooldown`, `Required Level`).
+- **A required level reaches us two different ways, and is normalized to one.** Click effects put it on its own
+  sub-line (`Required Level: 40`); proc/combat effects fold it into the parenthetical (`Ykesha (Req Level 37)`).
+  Both land in `Modifiers` under `Required Level`, so nothing downstream has to know which style the game used
+  for a given effect. Only that one qualifier is hoisted out of the parentheses; anything else stays a condition.
+
+**The Lore tab is a different view, not a variant of the Description layout.** It has no repeated content-area
+name and no stat block — just the lore prose — so a Lore capture yields a `ParsedItem` with `Name` (from the
+title bar, the only place it appears there) and `Lore` set, and everything else empty. The two captures are
+combined by the two-capture lore flow. Lore content varies: genuinely descriptive prose for some items, just the
+item's own name again for others.
+- **Which tab is showing is read from the label's colour, in Locate, not inferred in the parser.** The selected
+  tab's text is yellow (measured `191,191,4` / `159,159,6` / `255,255,0` — red≈green, blue near zero), unselected
+  is neutral white. `LocatedWindow.ActiveTab` carries it. This is a question about pixels, and Locate is the layer
+  holding the image — OCR output carries no colour at all. Structural guesses ("no `Class:` row, so it must be
+  lore") were rejected: OCR does sometimes drop a `Class:`/`Race:` row, and that would silently reinterpret a
+  whole Description capture as lore.
+- `HasLoreTab` (the window *offers* a Lore tab — drives the two-capture flow) and `ActiveTab` (which one is on
+  screen) are different things; both captures of a lore-bearing item have `HasLoreTab = true`.
+- Lore wrapped across rows is joined with spaces — the game breaks it purely to fit the window.
 - **OCR renders the label separator as `.` often enough to matter** (`Accuracy. +13.6%`, `Container. CLOSED.`,
   and `Weight.`/`Dexterity.` as bare labels). Splitting on `.` unconditionally would cut decimal values in half,
   so it only applies when the text before the dot is a label the lexicon knows.
@@ -259,17 +281,14 @@ body by pattern-matching each row, since the body's actual field set varies a lo
   sample, Bloodmoon's own `Focus Exaltation: Bloodmoon (Exaltation)` is correctly identified as native (the
   "removable native exaltation" case from the Augmentations section above), while its Click/Proc exaltations
   (different items) and Lustrous Russet Bracer's Focus exaltation are all correctly flagged foreign.
-- **Known, accepted v1 simplification**: effect sub-line modifiers (`Cast Time: 4.0 seconds`, `Cooldown: 240
-  seconds`) aren't associated back to the specific effect line above them — they land in the generic `Stats` bag
-  like any other label/value line. Revisit only if something downstream ends up needing that grouping.
 - **A punctuation-only junk row shifts the whole positional header.** The window's own chrome occasionally reads
   as text — a real capture had the tab-bar corner, clipped at the crop's left edge, recognized as `()` on its own
   row between the tab row and the content-area name, which made the name parse as `()` and pushed the real name
   row into the flags field. Rows with no letters or digits at all are dropped before parsing. Note the safer fix
   is dropping junk, *not* identifying the name row by similarity to the title — that would quietly defeat the
   title-vs-content occlusion check, whose whole job is to notice when those two genuinely differ.
-- **Open issue — OCR drops isolated stat digits, and it's the dominant remaining data gap.** Measured over 99
-  real item windows: ~20 stat values are lost, so roughly 1 item in 5 is missing at least one stat. The parser
+- **Open issue — OCR drops isolated stat digits, and it's the dominant remaining data gap.** Measured over 100
+  real item windows: ~24 stat values are lost, so roughly 1 item in 5 is missing at least one stat. The parser
   surfaces each as an orphaned-label warning rather than guessing (never silently drop the field), but that's a
   manual-review cost, not a fix. Confirmed it is genuinely the OCR and not the capture or the parser: the digits
   are plainly present in the pixels (a window showing four `7`s returns no `7` fragment at all), while `AC: 6`
@@ -311,8 +330,8 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline at the time of writing: **43 samples, 101 windows (2 correctly occluded), 1983 correct fields, 24
-  missing, 0 wrong, 0 silent-wrong, 31 warnings.** The 24 missing are the known dropped-digit issue below.
+- Baseline at the time of writing: **43 samples, 101 windows (1 correctly occluded), 2072 correct fields, 24
+  missing, 0 wrong, 0 silent-wrong, 29 warnings.** The 24 missing are the known dropped-digit issue above.
 
 **Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.**
 `RapidOcrOptions.Default.ImgResize` (1024) downsamples any larger image before detection; at a real 2560x1440

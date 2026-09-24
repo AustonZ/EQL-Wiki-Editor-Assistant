@@ -83,12 +83,10 @@ public static class WindowBoundsFinder
     // ~200px up into it, agree with each other, and only fail later via the overall height ceiling — losing a
     // perfectly readable window.
     private const int TitleBarMaxBandHeight = 32;
-    // Consecutive non-black rows tolerated inside the band. The title's own glyphs interrupt a column, and
-    // anti-aliasing means they are *not* simply "bright": a real capture reads 192, 115, 77, 38 down one stroke.
-    // So the exit test can't be "black or bright, else stop" — that stops on the anti-aliased edge of the title
-    // text itself, a few px into the band, cutting the title bar out of the crop. Tolerating a short run of
-    // anything non-black and stopping only at a sustained one handles glyphs of either kind. A real title glyph
-    // interrupts ~6 rows; the whole band is only ~16 tall, so this can't swallow much.
+    // Consecutive glyph rows tolerated inside the band. The title's own glyphs interrupt a column, and
+    // anti-aliasing means they are *not* simply "bright": a real capture reads 192, 115, 77, 38 down one stroke,
+    // so the exit test can't be "black or bright, else stop" — that stops on a glyph's soft edge a few px in and
+    // cuts the title bar out of the crop. A real glyph interrupts ~6 rows.
     private const int TitleBarGapMaxRun = 14;
 
     private const int MaxScanDistance = 700;
@@ -367,9 +365,18 @@ public static class WindowBoundsFinder
                 lastBlack = y;
                 gapRun = 0;
             }
+            else if (IsInterior(image, x, y))
+            {
+                // Interior grey. A title bar is only ever its own black plus its glyphs, so this is the window's
+                // content/border below the band — we've left it. This distinction matters: with one window
+                // overlapping another, the two title bars can sit only ~7px apart, which a plain "tolerate any
+                // short non-black run" rule bridges straight into the neighbour's chrome. That made a fully
+                // visible window come back as occluded because every probe then overran the height cap.
+                break;
+            }
             else if (++gapRun > TitleBarGapMaxRun)
             {
-                break; // a sustained non-black run — we've left the band, and the window
+                break; // a sustained bright run — past the top of the band into whatever is outside
             }
         }
         return lastBlack;
