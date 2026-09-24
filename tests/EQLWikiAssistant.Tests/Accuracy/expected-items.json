@@ -1,0 +1,6454 @@
+{
+  "version": 1,
+  "note": "Ground truth for the gitignored samples/ corpus. Item-window fields only - public game data, the same data this tool publishes to the wiki. Never whole-frame OCR text, never anything outside a window crop, no coordinates, and warning counts rather than verbatim warning strings. See ExpectedCorpus.cs.",
+  "samples": [
+    {
+      "file": "01-single-weapon-lvl0-tradeable-pink-background.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Tamished Sheer Blade",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary Secondary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "6"
+            },
+            {
+              "label": "Weight",
+              "value": "8.5"
+            },
+            {
+              "label": "Delay",
+              "value": "33"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "16"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.182"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "2 gold 4 silver 8 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "02a-single-belt-with-lore-description-tab-pink-background.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Pegasus-Hide Belt",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Waist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "8"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            },
+            {
+              "label": "Haste",
+              "value": "41%"
+            },
+            {
+              "label": "Strength",
+              "value": "6"
+            },
+            {
+              "label": "Intelligence",
+              "value": "6"
+            },
+            {
+              "label": "Agility",
+              "value": "6"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "02b-single-belt-with-lore-lore-tab-pink-background.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Pegasus Hide Belt",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 2
+        }
+      ]
+    },
+    {
+      "file": "03-single-item-noisy-background.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Water Flask",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 silver",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "04-single-item-over-bags-flush-with-inventory.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Dark Cloak of the Sky",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "RNG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Back",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "6"
+            },
+            {
+              "label": "Weight",
+              "value": "5.0"
+            },
+            {
+              "label": "HP",
+              "value": "55"
+            },
+            {
+              "label": "Strength",
+              "value": "?TODO"
+            },
+            {
+              "label": "Wisdom",
+              "value": "?TODO"
+            },
+            {
+              "label": "Agility",
+              "value": "?TODO"
+            },
+            {
+              "label": "Dexterity",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Haste (Can Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "40"
+                }
+              ]
+            }
+          ],
+          "warningCount": 4
+        }
+      ]
+    },
+    {
+      "file": "05-single-item-flush-with-bags.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Spit",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "3.0"
+            },
+            {
+              "label": "Capacity",
+              "value": "6"
+            },
+            {
+              "label": "Size Cap",
+              "value": "GIANT"
+            },
+            {
+              "label": "Container",
+              "value": "CLOSED."
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 gold 9 silver",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "06-two-items-touching.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Prayers of Life",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Charge",
+              "description": "Word of Healing",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                }
+              ]
+            }
+          ],
+          "merchantValue": "22 platinum 8 gold 5 silver 7 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Hero Bracers",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "MNK",
+            "BRD",
+            "ROG",
+            "BST",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Wrist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "9"
+            },
+            {
+              "label": "Weight",
+              "value": "4.0"
+            },
+            {
+              "label": "Strength",
+              "value": "10"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "5"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "5"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "06a-two-items-overlapping.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Vegetables",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.6"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "absolutely nothing",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "06b-two-items-overlapping-aligned.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Obtenebrate Mithril Guard",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Secondary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "35"
+            },
+            {
+              "label": "Weight",
+              "value": "6.0"
+            },
+            {
+              "label": "Type",
+              "value": "Shield"
+            },
+            {
+              "label": "Strength",
+              "value": "15"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "15"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "06c-two-items-overlapping-tab-text-covered.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "07-three-distinct-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Rod of the Protecting Winds",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "AC",
+              "value": "10"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "35"
+            },
+            {
+              "label": "Weight",
+              "value": "5.0"
+            },
+            {
+              "label": "Mana",
+              "value": "75"
+            },
+            {
+              "label": "Delay",
+              "value": "45"
+            },
+            {
+              "label": "Skill",
+              "value": "2H Blunt"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "30"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.778"
+            },
+            {
+              "label": "Intelligence",
+              "value": "15"
+            },
+            {
+              "label": "Charisma",
+              "value": "15"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Rune III (Must Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "45"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "180 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Glassy Gauntlets",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Hands",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "6"
+            },
+            {
+              "label": "Weight",
+              "value": "3.5"
+            },
+            {
+              "label": "End",
+              "value": "5"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "?TODO"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "warningCount": 2
+        },
+        {
+          "occluded": false,
+          "name": "Fruit",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.8"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "absolutely nothing",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "08a-hover-tooltip-next-to-same-item-window.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Khyldom the Blood Drinker",
+          "level": 1,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "GIANT"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B2.5%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "39"
+            },
+            {
+              "label": "Weight",
+              "value": "7.3"
+            },
+            {
+              "label": "Delay",
+              "value": "43"
+            },
+            {
+              "label": "Skill",
+              "value": "2H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "29"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.907"
+            },
+            {
+              "label": "Strength",
+              "value": "11"
+            },
+            {
+              "label": "Intelligence",
+              "value": "8"
+            },
+            {
+              "label": "SV. Void",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Combat",
+              "description": "Siphon (Req Level 50)",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 1
+        }
+      ]
+    },
+    {
+      "file": "08b-hover-tooltip-next-to-different-item-window.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Khyldom the Blood Drinker",
+          "level": 1,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "GIANT"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B2.5%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "39"
+            },
+            {
+              "label": "Weight",
+              "value": "7.3"
+            },
+            {
+              "label": "Delay",
+              "value": "43"
+            },
+            {
+              "label": "Skill",
+              "value": "2H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "29"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.907"
+            },
+            {
+              "label": "Strength",
+              "value": "11"
+            },
+            {
+              "label": "Intelligence",
+              "value": "8"
+            },
+            {
+              "label": "Combat Effect",
+              "value": "Siphon ("
+            },
+            {
+              "label": "SV. Void",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            }
+          ],
+          "effects": [],
+          "warningCount": 2
+        }
+      ]
+    },
+    {
+      "file": "09-one-item-plus-full-bank-interface.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Toolbox",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "3.0"
+            },
+            {
+              "label": "Capacity",
+              "value": "8"
+            },
+            {
+              "label": "Size Cap",
+              "value": "GIANT"
+            },
+            {
+              "label": "Container",
+              "value": "CLOSED."
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 gold",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "10-four-items-against-screen-edges-and-ui-background.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Karana\u0027s Tear",
+          "level": 1,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Ear",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Stamina",
+              "value": "6"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "1 platinum 5 silver 8 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Earthshaker",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "GIANT"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B10%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "51"
+            },
+            {
+              "label": "Weight",
+              "value": "10.3"
+            },
+            {
+              "label": "Delay",
+              "value": "70"
+            },
+            {
+              "label": "Skill",
+              "value": "2H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "35"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.729"
+            },
+            {
+              "label": "Strength",
+              "value": "10"
+            },
+            {
+              "label": "SV. Void",
+              "value": "4"
+            },
+            {
+              "label": "Stamina",
+              "value": "10"
+            },
+            {
+              "label": "Dexterity",
+              "value": "-1"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc",
+              "name": "Earthshaker"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Combat",
+              "description": "Earthquake (Req Level 45)",
+              "modifiers": []
+            }
+          ],
+          "merchantValue": "33 platinum 3 gold 3 silver 3 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Treasure Hunter\u0027s Satchel",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Weight Red",
+              "value": "100"
+            },
+            {
+              "label": "Capacity",
+              "value": "10"
+            },
+            {
+              "label": "Size Cap",
+              "value": "GIANT"
+            },
+            {
+              "label": "Container",
+              "value": "CLOSED."
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "142 platinum 8 gold 5 silver 7 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Pegasus-Hide Belt",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Waist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "8"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            },
+            {
+              "label": "Haste",
+              "value": "41%"
+            },
+            {
+              "label": "Strength",
+              "value": "6"
+            },
+            {
+              "label": "Intelligence",
+              "value": "6"
+            },
+            {
+              "label": "Agility",
+              "value": "6"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "11-one-item-over-health-bar.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Crimson Ring of the Djinni",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Fingers",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "AC",
+              "value": "14"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Strength",
+              "value": "13"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "11"
+            },
+            {
+              "label": "Intelligence",
+              "value": "11"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            },
+            {
+              "label": "Dexterity",
+              "value": "13"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12a-3-ear-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Karana\u0027s Tear",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Ear",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Stamina",
+              "value": "10"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Earring of Bashing",
+          "level": 7,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "SHD",
+            "SHM",
+            "BST",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Ear",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "AC",
+              "value": "12"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Strength",
+              "value": "15"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "12"
+            },
+            {
+              "label": "Wisdom",
+              "value": "15"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "12"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "12"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "12"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "12"
+            },
+            {
+              "label": "SV. Void",
+              "value": "7"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn",
+              "name": "Fishbone Earring"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Worn",
+              "description": "Enduring Breath",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Thunderforged Earring",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "RNG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Ear",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "AC",
+              "value": "8"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Mana",
+              "value": "25"
+            },
+            {
+              "label": "Wisdom",
+              "value": "8"
+            },
+            {
+              "label": "Agility",
+              "value": "8"
+            },
+            {
+              "label": "Dexterity",
+              "value": "8"
+            },
+            {
+              "label": "Cast Time",
+              "value": "12.0 seconds"
+            },
+            {
+              "label": "Required Level",
+              "value": "45"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 2
+        }
+      ]
+    },
+    {
+      "file": "12b-3-head-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Hammerhead Helm",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Head",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "19"
+            },
+            {
+              "label": "Weight",
+              "value": "2.2"
+            },
+            {
+              "label": "Strength",
+              "value": "12"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Stamina",
+              "value": "12"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Mane Attraction"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Mana Preservation II",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Platinum Blue Diamond Tiara",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Head",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Mana",
+              "value": "25"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "8"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "8"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "8"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "8"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "8"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "350 platinum",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Skull-Shaped Barbute",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "SHD",
+            "BRD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Head",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "20"
+            },
+            {
+              "label": "Weight",
+              "value": "2.5"
+            },
+            {
+              "label": "HP",
+              "value": "54"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "15"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12c-3-face-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Darkbrood Mask",
+          "level": 7,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "SHD",
+            "ROG",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Face",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "14"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Mana",
+              "value": "86"
+            },
+            {
+              "label": "Strength",
+              "value": "12"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "12"
+            },
+            {
+              "label": "Intelligence",
+              "value": "12"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "12"
+            },
+            {
+              "label": "Wisdom",
+              "value": "12"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "12"
+            },
+            {
+              "label": "Agility",
+              "value": "12"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "12"
+            },
+            {
+              "label": "Charisma",
+              "value": "12"
+            },
+            {
+              "label": "SV. Void",
+              "value": "7"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click",
+              "name": "Guise of the Deceiver"
+            },
+            {
+              "kind": "Worn",
+              "name": "Tobrin\u0027s Mystical Eyepatch"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Illusion: Dark Elf",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "6.0 seconds"
+                }
+              ]
+            },
+            {
+              "kind": "Worn",
+              "description": "See Invisible",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Triumphant Mask",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "DRU",
+            "BRD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Face",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "14"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Strength",
+              "value": "11"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "28"
+            },
+            {
+              "label": "Wisdom",
+              "value": "11"
+            },
+            {
+              "label": "SV. Void",
+              "value": "4"
+            },
+            {
+              "label": "Agility",
+              "value": "11"
+            },
+            {
+              "label": "Charisma",
+              "value": "11"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Tobrin\u0027s Mystical Eyepatch",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Face",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Intelligence",
+              "value": "24"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            },
+            {
+              "label": "Wisdom",
+              "value": "24"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn",
+              "name": "Tobrin\u0027s Mystical Eyepatch"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Worn",
+              "description": "See Invisible",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12d-3-chest-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Lustrous Russet Breastplate",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG",
+            "SHM",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Chest",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "AC",
+              "value": "39"
+            },
+            {
+              "label": "Weight",
+              "value": "4.2"
+            },
+            {
+              "label": "Strength",
+              "value": "22"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Stamina",
+              "value": "22"
+            },
+            {
+              "label": "Dexterity",
+              "value": "22"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Mithril-Runed Tunic"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Spell Haste II",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Indicolite Breastplate",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "WAR"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Chest",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "AC",
+              "value": "57"
+            },
+            {
+              "label": "Weight",
+              "value": "3.2"
+            },
+            {
+              "label": "Strength",
+              "value": "24"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            },
+            {
+              "label": "Stamina",
+              "value": "24"
+            },
+            {
+              "label": "Dexterity",
+              "value": "24"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Loam Encrusted Robe",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Chest",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "15"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Mana",
+              "value": "134"
+            },
+            {
+              "label": "Intelligence",
+              "value": "11"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "16"
+            },
+            {
+              "label": "Agility",
+              "value": "16"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            },
+            {
+              "label": "Dexterity",
+              "value": "16"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12e-3-neck-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Bloodstar Pendant",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Neck",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "AC",
+              "value": "11"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Strength",
+              "value": "15"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "11"
+            },
+            {
+              "label": "Intelligence",
+              "value": "15"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "11"
+            },
+            {
+              "label": "Wisdom",
+              "value": "15"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "11"
+            },
+            {
+              "label": "Charisma",
+              "value": "15"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "11"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "11"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            },
+            {
+              "label": "Cooldown Group",
+              "value": "50"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus",
+              "name": "Chrysoberyl Talisman"
+            },
+            {
+              "kind": "Click",
+              "name": "Amulet of Necropotence"
+            },
+            {
+              "kind": "Worn",
+              "name": "Amulet of the Sphinx Eye"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Affliction Haste II",
+              "modifiers": []
+            },
+            {
+              "kind": "Click",
+              "description": "Illusion: Skeleton",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "1 seconds"
+                }
+              ]
+            },
+            {
+              "kind": "Worn",
+              "description": "Ultravision",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Amulet of the Void",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WIZ"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Neck",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "AC",
+              "value": "4"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Mana",
+              "value": "50"
+            },
+            {
+              "label": "Intelligence",
+              "value": "5"
+            },
+            {
+              "label": "Agility",
+              "value": "5"
+            },
+            {
+              "label": "Dexterity",
+              "value": "5"
+            },
+            {
+              "label": "Charisma",
+              "value": "5"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Alter Plane: Sky (Must Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "45"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "120 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Talisman of Kejaar Kerrath",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Neck",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "HP Regen",
+              "value": "6"
+            },
+            {
+              "label": "End Regen",
+              "value": "6"
+            },
+            {
+              "label": "SV. Void",
+              "value": "?TODO"
+            },
+            {
+              "label": "Mana Regen",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 2
+        }
+      ]
+    },
+    {
+      "file": "12f-3-arms-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Golden Efreeti Vambraces",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Arms",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "20"
+            },
+            {
+              "label": "Weight",
+              "value": "2.0"
+            },
+            {
+              "label": "End",
+              "value": "33"
+            },
+            {
+              "label": "Stamina",
+              "value": "16"
+            },
+            {
+              "label": "Dexterity",
+              "value": "12"
+            },
+            {
+              "label": "SV. Void",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 1
+        },
+        {
+          "occluded": false,
+          "name": "Lustrous Russet Vambraces",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG",
+            "SHM",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Arms",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "18"
+            },
+            {
+              "label": "Weight",
+              "value": "3.1"
+            },
+            {
+              "label": "Strength",
+              "value": "13"
+            },
+            {
+              "label": "SV. Void",
+              "value": "4"
+            },
+            {
+              "label": "Dexterity",
+              "value": "9"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Shiverback-Hide Armbands",
+          "level": 2,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "MNK"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Arms",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "7"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "End",
+              "value": "18"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "9"
+            },
+            {
+              "label": "Stamina",
+              "value": "11"
+            },
+            {
+              "label": "SV. Void",
+              "value": "2"
+            },
+            {
+              "label": "Strength",
+              "value": "?TODO"
+            },
+            {
+              "label": "Charisma",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            }
+          ],
+          "effects": [],
+          "warningCount": 2
+        }
+      ]
+    },
+    {
+      "file": "12g-3-back-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Cloak of Scales",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "SHD",
+            "MNK",
+            "SHM",
+            "NEC",
+            "BST"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Back",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "22"
+            },
+            {
+              "label": "Weight",
+              "value": "0.6"
+            },
+            {
+              "label": "HP",
+              "value": "75"
+            },
+            {
+              "label": "Mana",
+              "value": "75"
+            },
+            {
+              "label": "End",
+              "value": "75"
+            },
+            {
+              "label": "Strength",
+              "value": "15"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Intelligence",
+              "value": "15"
+            },
+            {
+              "label": "Wisdom",
+              "value": "15"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus",
+              "name": "White Dragonscale Cloak"
+            },
+            {
+              "kind": "Click",
+              "name": "Shield of the Immaculate"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Improved Damage II",
+              "modifiers": []
+            },
+            {
+              "kind": "Click",
+              "description": "Cure Disease (Must Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "6 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Dark Cloak of the Sky",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "RNG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Back",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "6"
+            },
+            {
+              "label": "Weight",
+              "value": "5.0"
+            },
+            {
+              "label": "HP",
+              "value": "55"
+            },
+            {
+              "label": "Strength",
+              "value": "?TODO"
+            },
+            {
+              "label": "Wisdom",
+              "value": "?TODO"
+            },
+            {
+              "label": "Agility",
+              "value": "?TODO"
+            },
+            {
+              "label": "Dexterity",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Haste (Can Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "40"
+                }
+              ]
+            }
+          ],
+          "warningCount": 4
+        },
+        {
+          "occluded": false,
+          "name": "Seahorse Scale Cloak",
+          "level": 2,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "MNK",
+            "BRD",
+            "ROG",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Back",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "AC",
+              "value": "10"
+            },
+            {
+              "label": "Weight",
+              "value": "2.9"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "42"
+            },
+            {
+              "label": "SV. Void",
+              "value": "2"
+            },
+            {
+              "label": "Dexterity",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            }
+          ],
+          "effects": [],
+          "warningCount": 1
+        }
+      ]
+    },
+    {
+      "file": "12h-3-waist-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Runed Bolster Belt",
+          "level": 10,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "CLR",
+            "DRU",
+            "BRD",
+            "SHM",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Waist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "15"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Haste",
+              "value": "41%"
+            },
+            {
+              "label": "Strength",
+              "value": "20"
+            },
+            {
+              "label": "SV. Void",
+              "value": "10"
+            },
+            {
+              "label": "Stamina",
+              "value": "20"
+            },
+            {
+              "label": "Dexterity",
+              "value": "20"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus",
+              "name": "Bone-Clasped Girdle"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Bumning Affliction III",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Skinner\u0027s Belt",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "SHD",
+            "SHM",
+            "BST",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Waist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "19"
+            },
+            {
+              "label": "Weight",
+              "value": "0.5"
+            },
+            {
+              "label": "HP",
+              "value": "32"
+            },
+            {
+              "label": "Mana",
+              "value": "32"
+            },
+            {
+              "label": "End",
+              "value": "32"
+            },
+            {
+              "label": "Strength",
+              "value": "24"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "32"
+            },
+            {
+              "label": "Wisdom",
+              "value": "24"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "32"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Bone-Clasped Girdle",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "CLR",
+            "DRU",
+            "BRD",
+            "SHM",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Waist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "9"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "HP",
+              "value": "116"
+            },
+            {
+              "label": "Mana",
+              "value": "116"
+            },
+            {
+              "label": "Strength",
+              "value": "12"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Stamina",
+              "value": "12"
+            },
+            {
+              "label": "Dexterity",
+              "value": "12"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus",
+              "name": "Bone-Clasped Girdle"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Bumning Affliction II",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12i-3-shoulders-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Earthshaker\u0027s Mantle",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "RNG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Shoulders",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "15"
+            },
+            {
+              "label": "Weight",
+              "value": "1.2"
+            },
+            {
+              "label": "Strength",
+              "value": "14"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "16"
+            },
+            {
+              "label": "Wisdom",
+              "value": "14"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "16"
+            },
+            {
+              "label": "Dexterity",
+              "value": "14"
+            },
+            {
+              "label": "Click Exaltation",
+              "value": ": Earthshaker\u0027s Mantle (Exaltation)"
+            },
+            {
+              "label": "SV. Void",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Earthquake (Must Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "45"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "180 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 1
+        },
+        {
+          "occluded": false,
+          "name": "Pauldrons of Power",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "CLR",
+            "PAL",
+            "SHD",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Shoulders",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "15"
+            },
+            {
+              "label": "Weight",
+              "value": "1.1"
+            },
+            {
+              "label": "HP",
+              "value": "45"
+            },
+            {
+              "label": "Mana",
+              "value": "45"
+            },
+            {
+              "label": "Strength",
+              "value": "14"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Intelligence",
+              "value": "14"
+            },
+            {
+              "label": "Wisdom",
+              "value": "14"
+            },
+            {
+              "label": "Charisma",
+              "value": "14"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Imbued Granite Spaulders",
+          "level": 2,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "MNK",
+            "BRD",
+            "ROG",
+            "SHM",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Shoulders",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "24"
+            },
+            {
+              "label": "Weight",
+              "value": "36.9"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "12"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "12"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "12"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "12"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "12"
+            },
+            {
+              "label": "SV. Void",
+              "value": "2"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12j-3-wrist-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Verishe Bracer of Dominance",
+          "level": 7,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Wrist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "13"
+            },
+            {
+              "label": "Weight",
+              "value": "1.2"
+            },
+            {
+              "label": "Strength",
+              "value": "10"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "13"
+            },
+            {
+              "label": "Stamina",
+              "value": "10"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "13"
+            },
+            {
+              "label": "Agility",
+              "value": "10"
+            },
+            {
+              "label": "SV. Void",
+              "value": "7"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Chipped Bone Bracelet"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Affliction Efficiency II",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Lustrous Russet Bracer",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG",
+            "SHM",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Wrist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "15"
+            },
+            {
+              "label": "Weight",
+              "value": "1.2"
+            },
+            {
+              "label": "Strength",
+              "value": "9"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "13"
+            },
+            {
+              "label": "Dexterity",
+              "value": "9"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "13"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "13"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Runed Mithril Bracer"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Reagent Conservation III",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Shimmering Bracer of Protection",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Wrist",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "10"
+            },
+            {
+              "label": "Weight",
+              "value": "2.5"
+            },
+            {
+              "label": "Strength",
+              "value": "9"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "8"
+            },
+            {
+              "label": "Wisdom",
+              "value": "2"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "8"
+            },
+            {
+              "label": "Dexterity",
+              "value": "3"
+            },
+            {
+              "label": "SV. Cold",
+              "value": "8"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "8"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "8"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12k-3-legs-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Lustrous Russet Greaves",
+          "level": 8,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG",
+            "SHM",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Legs",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "AC",
+              "value": "25"
+            },
+            {
+              "label": "Weight",
+              "value": "1.6"
+            },
+            {
+              "label": "Strength",
+              "value": "13"
+            },
+            {
+              "label": "SV. Void",
+              "value": "8"
+            },
+            {
+              "label": "Stamina",
+              "value": "13"
+            },
+            {
+              "label": "Agility",
+              "value": "13"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Golden Efreeti Greaves",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Legs",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "AC",
+              "value": "21"
+            },
+            {
+              "label": "Weight",
+              "value": "3.5"
+            },
+            {
+              "label": "Agility",
+              "value": "13"
+            },
+            {
+              "label": "SV. Void",
+              "value": "4"
+            },
+            {
+              "label": "Dexterity",
+              "value": "14"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Rune Etched Greaves",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "SHM"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Legs",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "AC",
+              "value": "21"
+            },
+            {
+              "label": "Weight",
+              "value": "3.0"
+            },
+            {
+              "label": "Strength",
+              "value": "10"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "12"
+            },
+            {
+              "label": "Wisdom",
+              "value": "10"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12l-3-fingers-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Engineer\u0027s Ring",
+          "level": 10,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "SHD",
+            "ROG",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Fingers",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "AC",
+              "value": "40"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "HP",
+              "value": "15"
+            },
+            {
+              "label": "Mana",
+              "value": "40"
+            },
+            {
+              "label": "End",
+              "value": "40"
+            },
+            {
+              "label": "Strength",
+              "value": "15"
+            },
+            {
+              "label": "SV. Void",
+              "value": "10"
+            },
+            {
+              "label": "Stamina",
+              "value": "15"
+            },
+            {
+              "label": "Intelligence",
+              "value": "15"
+            },
+            {
+              "label": "Wisdom",
+              "value": "15"
+            },
+            {
+              "label": "Agility",
+              "value": "15"
+            },
+            {
+              "label": "Dexterity",
+              "value": "15"
+            },
+            {
+              "label": "Charisma",
+              "value": "15"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus",
+              "name": "Moonstone Ring"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Extended Range II",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Ring of Pureblood",
+          "level": 7,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "CLR",
+            "PAL",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Fingers",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "AC",
+              "value": "10"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "HP",
+              "value": "51"
+            },
+            {
+              "label": "Mana",
+              "value": "51"
+            },
+            {
+              "label": "Strength",
+              "value": "12"
+            },
+            {
+              "label": "SV. Void",
+              "value": "7"
+            },
+            {
+              "label": "Charisma",
+              "value": "12"
+            },
+            {
+              "label": "Intelligence",
+              "value": "?TODO"
+            },
+            {
+              "label": "Wisdom",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 2
+        },
+        {
+          "occluded": false,
+          "name": "Adamantite Band",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "o No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Fingers",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "HP",
+              "value": "75"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "-10"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Summoning Haste I",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12m-3-feet-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Leatherfoot Sandals",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "DRU",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Feet",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "18"
+            },
+            {
+              "label": "Weight",
+              "value": "0.3"
+            },
+            {
+              "label": "Mana",
+              "value": "49"
+            },
+            {
+              "label": "Strength",
+              "value": "16"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "32"
+            },
+            {
+              "label": "Wisdom",
+              "value": "16"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            },
+            {
+              "label": "Agility",
+              "value": "16"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Golden Efreeti Boots"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Enhancement Haste II",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Frayed Silk Slippers",
+          "level": 1,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "CLR",
+            "DRU",
+            "SHM",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Feet",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "3"
+            },
+            {
+              "label": "Weight",
+              "value": "0.5"
+            },
+            {
+              "label": "Intelligence",
+              "value": "2"
+            },
+            {
+              "label": "Wisdom",
+              "value": "2"
+            },
+            {
+              "label": "SV. Void",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            }
+          ],
+          "effects": [],
+          "warningCount": 1
+        },
+        {
+          "occluded": false,
+          "name": "Golden Efreeti Boots",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Feet",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Weight",
+              "value": "1.6"
+            },
+            {
+              "label": "Intelligence",
+              "value": "13"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "5"
+            },
+            {
+              "label": "Wisdom",
+              "value": "13"
+            },
+            {
+              "label": "SV. Void",
+              "value": "4"
+            },
+            {
+              "label": "AC",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Golden Efreeti Boots"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Enhancement Haste II",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 1
+        }
+      ]
+    },
+    {
+      "file": "12n-3-primary-only-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Bloodmoon",
+          "level": 10,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B25%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "36"
+            },
+            {
+              "label": "Weight",
+              "value": "0.3"
+            },
+            {
+              "label": "Delay",
+              "value": "28"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "13"
+            },
+            {
+              "label": "Ratio",
+              "value": "1.286"
+            },
+            {
+              "label": "Strength",
+              "value": "20"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Bloodmoon"
+            },
+            {
+              "kind": "Click",
+              "name": "Golem Metal Wand"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc",
+              "name": "Khyldom the Blood Drinker"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Improved Vampirism III",
+              "modifiers": []
+            },
+            {
+              "kind": "Click",
+              "description": "Pillage Enchantment (Must Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "4.0 seconds"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "240 seconds"
+                }
+              ]
+            },
+            {
+              "kind": "Combat",
+              "description": "Siphon (Req Level 50)",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Bumt Sheer Blade",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "9"
+            },
+            {
+              "label": "Weight",
+              "value": "4.0"
+            },
+            {
+              "label": "Delay",
+              "value": "40"
+            },
+            {
+              "label": "Skill",
+              "value": "2H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "27"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.225"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Combat",
+              "description": "Bum (Req Level 10)",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Staff of Elemental Mastery: Earth",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Quest",
+            "Placeable"
+          ],
+          "classes": [
+            "MAG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B10%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "21"
+            },
+            {
+              "label": "Weight",
+              "value": "3.2"
+            },
+            {
+              "label": "Delay",
+              "value": "30"
+            },
+            {
+              "label": "Skill",
+              "value": "2H Blunt"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "20"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.7"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Staff of Elemental Mastery: Earth"
+            },
+            {
+              "kind": "Click",
+              "name": "Staff of Elemental Mastery: Earth"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Servant of Earth",
+              "modifiers": []
+            },
+            {
+              "kind": "Click",
+              "description": "Reclaim Energy (Can Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "40"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12o-3-secondary-only-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Bladestopper",
+          "level": 7,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG",
+            "SHM"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Secondary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "43"
+            },
+            {
+              "label": "Weight",
+              "value": "2.4"
+            },
+            {
+              "label": "HP",
+              "value": "87"
+            },
+            {
+              "label": "Type",
+              "value": "Shield"
+            },
+            {
+              "label": "Stamina",
+              "value": "26"
+            },
+            {
+              "label": "Click Exaltation",
+              "value": "Bladestopper (Exaltation)"
+            },
+            {
+              "label": "SV. Void",
+              "value": "?TODO"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Idol of the Underking"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "description": "Improved Healing /II",
+              "modifiers": []
+            },
+            {
+              "kind": "Click",
+              "description": "Rune IV (Must Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "40"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "600 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 2
+        },
+        {
+          "occluded": false,
+          "name": "Arydryidriyom",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "RNG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Secondary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "HP",
+              "value": "75"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "18"
+            },
+            {
+              "label": "Weight",
+              "value": "0.6"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B12.5%"
+            },
+            {
+              "label": "Delay",
+              "value": "21"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "10"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.857"
+            },
+            {
+              "label": "Strength",
+              "value": "13"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Wisdom",
+              "value": "13"
+            },
+            {
+              "label": "Click Exaltation",
+              "value": "Bladestopper (Exaltation)"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc",
+              "name": "Short Sword of the Ykesha"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Rune IV (Must Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "40"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "600 seconds"
+                }
+              ]
+            },
+            {
+              "kind": "Combat",
+              "description": "Ykesha (Req Level 37)",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 1
+        },
+        {
+          "occluded": false,
+          "name": "Crested Mistmoore Shield",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "DRU",
+            "BRD",
+            "ROG",
+            "SHM"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Secondary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "10"
+            },
+            {
+              "label": "Weight",
+              "value": "6.5"
+            },
+            {
+              "label": "Type",
+              "value": "Shield"
+            },
+            {
+              "label": "Dexterity",
+              "value": "6"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "10"
+            },
+            {
+              "label": "SV. Disease",
+              "value": "10"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "10"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "42 platinum 8 gold 5 silver 7 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12p-3-primary-or-secondary-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Tamnished Sheer Blade",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary Secondary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "6"
+            },
+            {
+              "label": "Weight",
+              "value": "8.5"
+            },
+            {
+              "label": "Delay",
+              "value": "33"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "16"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.182"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "2 gold 4 silver 8 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Blackened Alloy Longsword",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary Secondary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B14.5%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "15"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            },
+            {
+              "label": "Delay",
+              "value": "29"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "14"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.517"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "8"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Shimmering Ruby Stiletto",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "BRD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Primary Secondary",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B17.1%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "16"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Backstab Dmg",
+              "value": "13"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Piercing"
+            },
+            {
+              "label": "Delay",
+              "value": "30"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "15"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.533"
+            },
+            {
+              "label": "Dexterity",
+              "value": "8"
+            },
+            {
+              "label": "SV. Poison",
+              "value": "16"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12q-3-range-only-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Carved Elm Recurve Bow",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable",
+            "Quest",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Range",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "10"
+            },
+            {
+              "label": "Weight",
+              "value": "4.0"
+            },
+            {
+              "label": "Delay",
+              "value": "39"
+            },
+            {
+              "label": "Skill",
+              "value": "Archery"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.256"
+            },
+            {
+              "label": "Range",
+              "value": "75"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "2 platinum 5 silver 9 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Rough Hickory Recurve Bow",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable",
+            "Quest",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Range",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "8"
+            },
+            {
+              "label": "Weight",
+              "value": "4.0"
+            },
+            {
+              "label": "Delay",
+              "value": "42"
+            },
+            {
+              "label": "Skill",
+              "value": "Archery"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.19"
+            },
+            {
+              "label": "Range",
+              "value": "50"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "2 gold 3 silver 8 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Windstriker",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "RNG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Range",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "HP",
+              "value": "80"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "72"
+            },
+            {
+              "label": "Weight",
+              "value": "1.8"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B15.4%"
+            },
+            {
+              "label": "Delay",
+              "value": "60"
+            },
+            {
+              "label": "Skill",
+              "value": "Archery"
+            },
+            {
+              "label": "Ratio",
+              "value": "1.2"
+            },
+            {
+              "label": "Range",
+              "value": "260"
+            },
+            {
+              "label": "Strength",
+              "value": "11"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            },
+            {
+              "label": "Agility",
+              "value": "11"
+            },
+            {
+              "label": "Dexterity",
+              "value": "11"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click",
+              "name": "Rain Caller"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc",
+              "name": "Windstriker"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Firestrike (Must Equip)",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "40"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "120 seconds"
+                }
+              ]
+            },
+            {
+              "kind": "Combat",
+              "description": "Whirlwind (Req Level 50)",
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12r-3-ammo-only-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "CLASS 6 Steel Silver Tip Arrow",
+          "level": 7,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Ammo",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "13"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Range",
+              "value": "170"
+            },
+            {
+              "label": "Skill",
+              "value": "Archery"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "CLASS 1 Bone Point Arrow",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Ammo",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "2"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Range",
+              "value": "50"
+            },
+            {
+              "label": "Skill",
+              "value": "Archery"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 silver 6 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Gloomwater Arrow",
+          "level": 1,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable"
+          ],
+          "classes": [
+            "WAR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "ROG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Ammo",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "11"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Range",
+              "value": "160"
+            },
+            {
+              "label": "Skill",
+              "value": "Archery"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "2 platinum 3 gold 8 silver 1 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12s-3-range-or-ammo-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Turmoil Warts",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable",
+            "Quest",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "RNG",
+            "SHD",
+            "MNK",
+            "BRD",
+            "ROG",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC",
+            "BST",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Range Ammo",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B13.6%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "13"
+            },
+            {
+              "label": "Weight",
+              "value": "0.2"
+            },
+            {
+              "label": "Delay",
+              "value": "24"
+            },
+            {
+              "label": "Skill",
+              "value": "Throwing"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.542"
+            },
+            {
+              "label": "Range",
+              "value": "175"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "8 gold 5 silver 7 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Tiny Brass Shuriken",
+          "level": 7,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "RNG",
+            "SHD",
+            "MNK",
+            "BRD",
+            "ROG",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC",
+            "BST",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Range Ammo",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B18.3%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "3"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Delay",
+              "value": "20"
+            },
+            {
+              "label": "Skill",
+              "value": "Throwing"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.15"
+            },
+            {
+              "label": "Range",
+              "value": "190"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "1 silver",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Throwing Boulder",
+          "level": 10,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "SHD",
+            "ROG",
+            "BST",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Range Ammo",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "LARGE"
+            },
+            {
+              "label": "Accuracy",
+              "value": "\u002B25%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "36"
+            },
+            {
+              "label": "Weight",
+              "value": "2.6"
+            },
+            {
+              "label": "Delay",
+              "value": "35"
+            },
+            {
+              "label": "Skill",
+              "value": "Throwing"
+            },
+            {
+              "label": "Ratio",
+              "value": "1.029"
+            },
+            {
+              "label": "Range",
+              "value": "300"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12t-3-containers.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Kavruul\u0027s Mystic Pouch",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Weight Red",
+              "value": "100"
+            },
+            {
+              "label": "Capacity",
+              "value": "10"
+            },
+            {
+              "label": "Size Cap",
+              "value": "GIANT"
+            },
+            {
+              "label": "Container",
+              "value": "OPEN."
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "absolutely nothing",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Fleeting Quiver",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Weight Red",
+              "value": "60"
+            },
+            {
+              "label": "Capacity",
+              "value": "6"
+            },
+            {
+              "label": "Size Cap",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Items",
+              "value": "Arrows"
+            },
+            {
+              "label": "Container",
+              "value": "CLOSED."
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "93 platinum 3 gold 3 silver 3 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Spit",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "3.0"
+            },
+            {
+              "label": "Capacity",
+              "value": "6"
+            },
+            {
+              "label": "Size Cap",
+              "value": "GIANT"
+            },
+            {
+              "label": "Container",
+              "value": "CLOSED."
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 gold 9 silver",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12u-3-food-or-drink.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Fish Rolls",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "3 silver 2 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Water Flask",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 silver",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Vegetables",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.6"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "absolutely nothing",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12v-3-misc-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Spiderling Silk",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 silver 6 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Spiderling Legs",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "m Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "8 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Peridot",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "9 platinum 5 gold 2 silver 4 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12w-3-charged-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Prayers of Life",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Charge",
+              "description": "Word of Healing",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                }
+              ]
+            }
+          ],
+          "merchantValue": "22 platinum 8 gold 5 silver 7 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Nightmare Hide",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slot": "Back",
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "11"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Charge",
+              "description": "Restore Sight",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Puppet Strings",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.2"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Charge",
+              "description": "Allure",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                }
+              ]
+            }
+          ],
+          "merchantValue": "19 platinum 4 silver 8 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12x-3-consumable-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Greater Potion of Accuracy",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Consumable",
+              "description": "Accuracy",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "4.0 seconds"
+                }
+              ]
+            }
+          ],
+          "merchantValue": "9 gold 5 silver 2 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Kilva\u0027s Skin of Flame",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Consumable",
+              "description": "Kilva\u0027s Skin of Flame",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "10.0 seconds"
+                }
+              ]
+            }
+          ],
+          "merchantValue": "7 gold 1 silver 4 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Vial of Tamed Mercury",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Consumable",
+              "description": "Flurry",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "8.0 seconds"
+                }
+              ]
+            }
+          ],
+          "merchantValue": "9 gold 5 silver 2 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12y-3-more-misc-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Parchment of Flayed Skin",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "None"
+          ],
+          "races": [
+            "None"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "4 platinum 2 gold 8 silver 6 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Bag of Sea Salt",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.6"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 gold 4 silver 3 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Tiny Dagger",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 silver",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "12z-3-special-eql-items.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Primary Class Unlock Token",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Click",
+              "description": "Study Potential",
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "2.0 seconds"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "30 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Void-Touched Potential",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "No Storage",
+            "No Destroy"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Mote of Grand Potential",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "notepad-with-all-glyphs.png",
+      "verified": false,
+      "windows": []
+    }
+  ]
+}

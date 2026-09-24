@@ -1,0 +1,123 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace EQLWikiAssistant.TestSupport.Accuracy;
+
+/// <summary>
+/// Ground truth for the gitignored <c>samples/</c> corpus: what each screenshot's item windows *should* parse to.
+///
+/// **This file is tracked in git, so what may go in it is a hard rule, not a preference.** It holds only parsed
+/// item-window fields — item names, flags, class/race lists, slots, stats, effects, merchant values. That is
+/// public game data; it is literally the data this tool exists to publish to a public wiki. The private
+/// information risk in <c>samples/</c> is everything *outside* an item window (character and player names, guild
+/// tags, chat, zone), so:
+/// <list type="bullet">
+/// <item>Never serialize raw whole-frame OCR text, or any line the locator did not attribute to a window crop.
+/// A convenient "dump everything the engine saw" mode is exactly how chat text ends up in a tracked file.</item>
+/// <item>Never store pixel data or window coordinates.</item>
+/// <item>Store warning <b>counts</b>, not verbatim warning text — warnings quote the offending OCR fragment, and
+/// those strings are both in-scope-but-unnecessary and unstable across tuning, so they would churn every diff.</item>
+/// </list>
+/// </summary>
+public sealed class ExpectedCorpus
+{
+    /// <summary>Placeholder written by the bootstrap wherever the parser flagged a field, so a human has to read
+    /// the real value off the screenshot instead of the bootstrap silently freezing today's bug in as "correct".</summary>
+    public const string TodoMarker = "?TODO";
+
+    public const string FileNote =
+        "Ground truth for the gitignored samples/ corpus. Item-window fields only - public game data, the same " +
+        "data this tool publishes to the wiki. Never whole-frame OCR text, never anything outside a window crop, " +
+        "no coordinates, and warning counts rather than verbatim warning strings. See ExpectedCorpus.cs.";
+
+    public int Version { get; set; } = 1;
+    public string Note { get; set; } = FileNote;
+    public List<ExpectedSample> Samples { get; set; } = [];
+
+    private static readonly JsonSerializerOptions Json = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    public static ExpectedCorpus Load(string path) =>
+        JsonSerializer.Deserialize<ExpectedCorpus>(File.ReadAllText(path), Json)
+        ?? throw new InvalidDataException($"{path} did not deserialize to an ExpectedCorpus.");
+
+    public async Task SaveAsync(string path)
+    {
+        // Deterministic ordering so a re-bootstrap produces a reviewable diff rather than a reshuffle.
+        Samples = [.. Samples.OrderBy(s => s.File, StringComparer.Ordinal)];
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(this, Json));
+    }
+
+    public ExpectedSample? Find(string fileName) =>
+        Samples.FirstOrDefault(s => string.Equals(s.File, fileName, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Every field still awaiting a human reading. <c>--bootstrap</c> is not complete while any remain.</summary>
+    [JsonIgnore]
+    public int TodoCount => Samples.Sum(s => s.Windows.Sum(w => w.TodoCount));
+}
+
+public sealed class ExpectedSample
+{
+    public string File { get; set; } = "";
+
+    /// <summary>True once a human has compared this entry against the screenshot. Unverified samples are scored
+    /// but treated as advisory — they can't gate a build, because nobody has confirmed they're right.</summary>
+    public bool Verified { get; set; }
+
+    /// <summary>In the locator's own order (<c>OrderBy(Y).ThenBy(X)</c>), matched to actuals by index.</summary>
+    public List<ExpectedWindow> Windows { get; set; } = [];
+}
+
+public sealed class ExpectedWindow
+{
+    /// <summary>Expected to be reported <c>PossiblyOccluded</c> and therefore not parsed at all.</summary>
+    public bool Occluded { get; set; }
+
+    public string? Name { get; set; }
+    public int Level { get; set; }
+    public bool TitleContentNameMismatch { get; set; }
+    public List<string> Flags { get; set; } = [];
+    public List<string> Classes { get; set; } = [];
+    public List<string> Races { get; set; } = [];
+    public string? Slot { get; set; }
+    public List<ExpectedField> Stats { get; set; } = [];
+    public List<ExpectedExaltation> Exaltations { get; set; } = [];
+    public List<ExpectedEffect> Effects { get; set; } = [];
+    public string? MerchantValue { get; set; }
+
+    /// <summary>Count only — see the type doc for why the text itself is deliberately not stored.</summary>
+    public int WarningCount { get; set; }
+
+    [JsonIgnore]
+    public int TodoCount =>
+        Stats.Count(s => s.Value == ExpectedCorpus.TodoMarker)
+        + Effects.Sum(e => e.Modifiers.Count(m => m.Value == ExpectedCorpus.TodoMarker))
+        + (Name == ExpectedCorpus.TodoMarker ? 1 : 0);
+}
+
+public sealed class ExpectedField
+{
+    public string Label { get; set; } = "";
+    public string Value { get; set; } = "";
+}
+
+public sealed class ExpectedExaltation
+{
+    public string Kind { get; set; } = "";
+
+    /// <summary>Null for an empty slot.</summary>
+    public string? Name { get; set; }
+}
+
+public sealed class ExpectedEffect
+{
+    public string Kind { get; set; } = "";
+    public string Description { get; set; } = "";
+    public List<ExpectedField> Modifiers { get; set; } = [];
+}

@@ -12,6 +12,16 @@ public static class RepoPaths
     /// <summary>The gitignored samples/ folder of real screenshots (may not exist on a fresh clone).</summary>
     public static string SamplesDirectory => Path.Combine(Root, "samples");
 
+    /// <summary>Ground truth for the samples corpus. **Tracked in git** — it lives under tests/ rather than
+    /// beside the screenshots because samples/ is gitignored, so a sidecar file there would silently vanish on a
+    /// fresh clone and take the regression guard with it. See ExpectedCorpus for what may go in it.</summary>
+    public static string ExpectedItemsFile =>
+        Path.Combine(Root, "tests", "EQLWikiAssistant.Tests", "Accuracy", "expected-items.json");
+
+    /// <summary>Gitignored scratch space for harness output (candidate ground-truth files, cached crops, JSON
+    /// summaries) — anything derived from real screenshots and therefore not committable.</summary>
+    public static string LocalDataDirectory => Path.Combine(Root, ".local-data");
+
     private static string FindRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

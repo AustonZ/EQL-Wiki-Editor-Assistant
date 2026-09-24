@@ -67,7 +67,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   `--probe x,y,dx,dy,count` to dump raw pixel RGB along a ray — that's how the window-chrome colour profile in
   "Locating item windows" was measured, so use it rather than guessing before changing anything in
   `WindowBoundsFinder`; `ParseSpike` runs the full Locate -> Parse pipeline and dumps every parsed field per
-  window. Keep using these — don't recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
+  window; `AccuracySpike` scores that pipeline against tracked ground truth (see "Measuring extraction accuracy").
+  Keep using these — don't recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
   `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
   only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
@@ -279,6 +280,36 @@ body by pattern-matching each row, since the body's actual field set varies a lo
   screenshot and dumps every parsed field per window (including a `[FOREIGN]` marker on foreign exaltations) —
   use this, don't recreate an ad hoc version, when tuning parser rules against new samples.
 
+**Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to OCR
+settings or parser rules must be judged by a number, not by eyeballing warning counts — 18 tunable OCR parameters
+against ~100 item windows is unmeasurable by eye, and the failure that matters most (a *silently* wrong value) is
+invisible that way by definition.
+- Ground truth lives in `tests/EQLWikiAssistant.Tests/Accuracy/expected-items.json`, **tracked in git**. It holds
+  only parsed item-window fields — the same public game data this tool publishes to the wiki. The private-info
+  risk in `samples/` is everything *outside* a window, so the hard rule (documented in `ExpectedCorpus.cs`) is:
+  never whole-frame OCR text, never a line the locator didn't attribute to a window crop, no coordinates, and
+  warning **counts** rather than verbatim warning strings (those quote OCR fragments and churn with every tuning
+  change). It lives under `tests/` rather than beside the screenshots because `samples/` is gitignored — a sidecar
+  there would silently vanish on a fresh clone and take the regression guard with it.
+- `AccuracySpike --bootstrap` writes a candidate to `.local-data/` (never over the tracked file). Every field the
+  parser flagged is emitted as `?TODO` rather than as its absent value — that's what turns the known misses into
+  ground truth a human must supply, instead of freezing today's bugs in as "correct". `verified: false` until a
+  human has checked an entry against the screenshot.
+- **Scoring is exact string match, never fuzzy.** Fuzzy is right at *runtime* (`EditDistance`, for wiki page-title
+  lookup) and wrong for *measurement* — a tolerant comparer would score `Tarnished`->`Tamished` as a pass and hide
+  an entire error class.
+- Verdicts are cross-tabbed by *did the parser flag it?* The two hard gates are **`structural`** (window count
+  mismatch — a lost or invented window, reported as one loud failure rather than a cascade of field errors) and
+  **`silent-wrong`** (a wrong value on an item carrying no warning). Everything else is a manual-review cost;
+  `silent-wrong` is a wiki-corruption risk, and it is the number that must never move off zero.
+- Compare configurations **lexicographically**, not by a weighted score: a weighted total lets a tuner buy five
+  recovered digits with one corrupted value, which is exactly the trade this project must never make.
+- `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
+  corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
+  tests run always and need no samples.
+- Baseline at the time of writing: **43 samples, 101 windows (2 correctly occluded), 1983 correct fields, 24
+  missing, 0 wrong, 0 silent-wrong, 31 warnings.** The 24 missing are the known dropped-digit issue below.
+
 **Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.**
 `RapidOcrOptions.Default.ImgResize` (1024) downsamples any larger image before detection; at a real 2560x1440
 screenshot that shrinks our ~9-11px UI text below a usable threshold (confirmed: default settings found 33
@@ -395,6 +426,14 @@ dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --probe 
 
 # Full Locate -> Parse pipeline, dumping every parsed field per window:
 dotnet run --project tools/ParseSpike -- "samples/some screenshot.png"
+
+# Score the whole corpus against tracked ground truth (the number to judge any OCR/parser change by):
+dotnet run --project tools/AccuracySpike                 # summary
+dotnet run --project tools/AccuracySpike -- --diff       # plus every differing field
+dotnet run --project tools/AccuracySpike -- --bootstrap  # regenerate ground truth after a new capture batch
+
+# The corpus regression test (~3 min, opt-in so it can't get muted):
+$env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracyTests"
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).
