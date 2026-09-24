@@ -1,0 +1,21 @@
+
+<onlyinclude>{{Itempage
+|notes       = Sells to vendors for up to 49p7s3c. Buyback 807pp <br>
+This spell does not stack with [[Visions of Grandeur]] or [[Speed of the Shissar]] due to the Dex and Agi components (respectively).
+|itemname    = 10 Dose Greater Null Potion
+|lucy_img_ID = 692
+|statsblock  = 
+EXPENDABLE  Charges: 10<br>
+Effect:  [[Null Aura]] (Any Slot, Casting Time: 4.0)<br>
+WT: 0.4  Size: SMALL<br>
+Class: ALL<br>
+Race: ALL<br>
+|playercrafted = 
+
+* [[Alchemy]]
+Combine 10 [[Greater Null Potion]] in a [[Bearskin Potion Bag]]
+
+}}</onlyinclude>
+
+[[Category:Inventory Items]]
+[[Category:Player Crafted]]

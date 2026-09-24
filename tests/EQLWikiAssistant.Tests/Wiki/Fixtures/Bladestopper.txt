@@ -1,0 +1,36 @@
+
+<onlyinclude>{{Itempage
+|notes       =
+{{Item Lore Missing}}<br>
+This charged source of Rune is <s>valuable for increasing hate on all NPCs</s>, '''Hate reduced to 262 per charge''', for which the player is already aggroed. The effect is also used to buffer damage spikes by tanks as well.
+|itemname    = Bladestopper
+|lucy_img_ID = 606
+|statsblock  = 
+MAGIC ITEM  LORE ITEM  <br>
+Slot: SECONDARY<br>
+AC: 25<br>
+STA: +15  HP: +50<br>
+Effect:  [[Rune IV]] (Any Slot, Casting Time: Instant, Level 40)<br>
+Cooldown: 600 sec<br>
+WT: 7.3  Size: MEDIUM<br>
+Class: WAR CLR PAL RNG SHD BRD ROG SHM<br>
+Race: ALL<br>
+|dropsfrom = 
+
+[[Nagafen's Lair]]
+
+* [[Lord Nagafen]]
+
+}}</onlyinclude>
+
+[[Category:Bard Equipment]]
+[[Category:Cleric Equipment]]
+[[Category:Paladin Equipment]]
+[[Category:Ranger Equipment]]
+[[Category:Rogue Equipment]]
+[[Category:Shaman Equipment]]
+[[Category:Shadow Knight Equipment]]
+[[Category:Warrior Equipment]]
+[[Category:Secondary]]
+[[Category:Nagafen's Lair]]
+[[Category: Instant Click Equipment]]

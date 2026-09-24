@@ -50,8 +50,16 @@ The full design rationale, wiki research findings, and milestone plan live in
   wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline). See "OCR engine choice" below — this
   wasn't arbitrary: the OS-provided `Windows.Media.Ocr` was tried first and replaced after real testing showed it
   meaningfully less accurate, then removed outright once it had no remaining use.
-- `src/EQLWikiAssistant.Wiki` (`net10.0`) — MediaWiki API client (bot-password auth), wikitext parsing/rendering,
-  the local icon file cache, and the checked-items ledger.
+- `src/EQLWikiAssistant.Wiki` (`net10.0`) — **`MediaWikiClient`/`IMediaWikiClient`** (`Wiki.MediaWiki` — bot-password
+  auth, read-only fetch, conflict-guarded edit), **`ICredentialStore`/`WindowsCredentialStore`** (same namespace —
+  Windows Credential Manager), **`WikitextScanner`/`TemplateCall`/`ItemPageDocument`/`StatsBlock`**
+  (`Wiki.Wikitext` — locating a template's parameters by exact source span and editing one surgically; see
+  "Reading and editing wiki pages" below), the local icon file cache, and the checked-items ledger.
+  `WindowsCredentialStore` is the one Windows-only type in this otherwise portable assembly. That is deliberate:
+  it is plain Win32 P/Invoke (`advapi32`), which needs no WinRT projection and so no versioned TFM, unlike the
+  `Capture`/`Ocr` projects. It uses `[DllImport]` rather than `[LibraryImport]` because the latter's generator
+  emits unsafe code, and enabling `<AllowUnsafeBlocks>` across a domain assembly for four P/Invokes is the worse
+  trade — unrelated to the `[GeneratedComInterface]` rule below, which is about CsWinRT COM objects.
 - `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: capture trigger, review/diff screen,
   settings/mapping editor, ledger view.
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
@@ -69,8 +77,12 @@ The full design rationale, wiki research findings, and milestone plan live in
   `WindowBoundsFinder`; `ParseSpike` runs the full Locate -> Parse pipeline and dumps every parsed field per
   window; `AccuracySpike` scores that pipeline against tracked ground truth (see "Measuring extraction accuracy");
   `GlyphSpike` measures raw pixels, builds/verifies the UI font atlas and reads a region through the real glyph
-  engine (see "Glyph matching"). `ParseSpike` and `AccuracySpike` both take `--rapid` to run the superseded
-  RapidOCR-everywhere configuration for comparison.
+  engine (see "Glyph matching"); `WikiSpike` is the wiki-side equivalent — `fetch` dumps a real page and its
+  parsed fields, `roundtrip`/`grammar` validate the wikitext layer against a live sample of item pages (`grammar`
+  additionally prints the label and flag census that is the only thing which catches a *wrong* split, see
+  "Reading and editing wiki pages"), and `login`/`whoami`/`logout`/`edit` exercise the credential and write paths.
+  `ParseSpike` and `AccuracySpike` both take `--rapid` to run the superseded RapidOCR-everywhere configuration for
+  comparison.
   Keep using these — don't recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
   `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
@@ -97,6 +109,33 @@ wrong value and fails the same way (`E_NOINTERFACE` → `InvalidCastException`, 
 issue); and `Direct3D11CaptureFramePool.Create(...)` silently never raises `FrameArrived` without a `DispatcherQueue`
 pumped on the calling thread — use `CreateFreeThreaded(...)` instead (fine on this app's Windows 11 target).
 
+**Formatting is somebody else's edit — never ours** (user, 2026-09-24). The user wants a separate wiki-source
+prettifier eventually, possibly launched from this tool but always as its own edit: *"A single 'automatically
+reformatted' edit with no actual data changes is much easier to work with when reviewing diff history."* Two
+standing design consequences, both of which the current wikitext layer already satisfies:
+- **This tool never reformats incidentally.** No whitespace normalization, no re-rendering a block to tidy it, no
+  "while we're here" fixes. That is why the raw source is the source of truth (see "Reading and editing wiki
+  pages"), and it is a constraint to preserve, not an implementation detail that happened to fall out.
+- **Non-compliance is reported, not fixed.** The eventual flow flags "this page needs reformatting" in the UI and
+  the user runs the prettifier separately (expected to be the same component in a `check` mode). So parsing needs
+  to be able to *describe* what is off without changing it — which `StatsBlockLine` already does by keeping both
+  the verbatim text and the parse. Out of scope for now; don't build it, don't design against it.
+
+**The `statsblock`-to-real-template migration is expected, and both shapes must work** (user, 2026-09-24). The
+user intends to make a case to the other editors for promoting most of `statsblock`'s contents to explicit
+`Itempage` parameters. Until that lands — and afterwards too, unless a programmatic bulk pass converts every
+existing page — the tool has to read the legacy free-text form. Design implication for the mapping layer
+(milestone 6): a field's *location* is part of the mapping, not a constant. "AC lives in the statsblock" and "AC
+is `|ac=`" must both be expressible, so a wiki-side migration is a config change rather than a rewrite. Don't bake
+"stats come from statsblock" into anything above the mapping.
+
+**Template compliance is part of every edit** (user, 2026-09-24): *"one of my steps is always to ensure the item
+complies with the current official template."* So the edit the tool proposes is not only a data diff — it also
+brings the page in line with the current template. Confirmed examples: duplicate parameters get cleaned up (see
+"Reading and editing wiki pages" for the two real pages with two `|notes=`), and legacy flags are always discarded
+(see below). This is milestone 4 work and is distinct from the prettifier above: compliance changes *what the
+page says*, formatting changes only how it reads.
+
 **Wiki mapping layer.** The wiki's templates and conventions are expected to keep changing (it's a young wiki for
 a young game), so `Core` domain models must never encode MediaWiki syntax directly. A "wiki mapping" — versioned
 JSON stored in app-data, with built-in defaults — translates between the internal `Item` model and wikitext:
@@ -108,7 +147,108 @@ mapping, not shipping new code. There's a Settings window in the app for viewing
 **`statsblock` is free text, not template params.** Most item data (flags, slot, stats, resists, effects, class/race
 restrictions, etc.) lives in the `Itempage` template's `statsblock` parameter as `<br>`-joined lines
 (`STR: +8  WIS: +8<br>`), not as separate template arguments. Diffing means parsing this block line-by-line into
-fields and re-rendering it — not comparing template parameters directly.
+fields and comparing those — not comparing template parameters directly. **Note the plan said "and re-rendering
+it", and that half is wrong** — see "Reading and editing wiki pages" below for what measuring against real pages
+showed instead.
+
+**Reading and editing wiki pages (`Wiki.Wikitext`).** Measured against 662 real item pages fetched from
+eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar <n>` reproduces the measurement.
+- **The raw source is the source of truth; the parse exists only to compare.** `TemplateParameter` records each
+  value's exact byte span and an edit splices into it, so everything else in the page is preserved by construction
+  rather than by care. `StatsBlockLine` likewise keeps its verbatim source and renders by concatenation, so a
+  round trip is exactly identity. **This replaces the plan's "parse and re-render the block"**, which cannot meet
+  the repo's byte-for-byte constraint: real pages agree on the line grammar and disagree on nearly every
+  whitespace decision inside it (alignment padding, single vs double spaces between stats, `AC: 15 <br>` with a
+  stray space, blank lines mid-block), so re-rendering rewrites lines whose data never changed and turns a
+  one-value correction into an unreviewable whole-page diff. Verified as a test on every fixture and measured at
+  0 failures across all 662 live pages.
+- **Duplicate parameters are real, and the *last* one wins.** Two sampled pages carry two `|notes=`, an empty one
+  near the top and the real one further down; MediaWiki renders the last. Reading the first — which the code did
+  at first — meant reading a blank value off a page that visibly has content, and would then have "corrected" it.
+  `ItemPageDocument` still warns, because a duplicate is a page defect worth a human's attention.
+- **The wiki speaks two flag dialects, and the legacy one is discarded rather than translated** (user, 2026-09-24:
+  "EQL completely redid flags, so legacy flags should always be discarded"). Imported Project1999-era pages write
+  `MAGIC ITEM  LORE ITEM  NO DROP`; the game writes its own, current set. Discarding is not just the user's
+  preference, it is the only safe rule, because no faithful mapping exists: `MAGIC ITEM`, `TEMPORARY` and
+  `EXPENDABLE` have no modern counterpart at all, and classic `LORE ITEM` (carry only one) is a different property
+  from `Lore Equipped` (equip only one), so "translating" one would invent an equivalence. The flags line is
+  regenerated from the captured window, not reconciled with what the page had.
+  - **The flag vocabulary is open-ended, and flags are copied through blindly — do not build a known-flags list**
+    (user, 2026-09-24). Whatever the game displays is exactly what the wiki should say, *whether or not the tool
+    knows what it means*. The 101 verified windows happen to contain only `No Trade`, `Lore Equipped`,
+    `Placeable`, `Quest`, `Attunable`, `No Destroy` and `No Storage`, but that is a sample, not the vocabulary:
+    the user has separately encountered `No Pet`, `Heirloom` and `Free Storage` on rare items, the devs keep
+    adding more, and there is no way to enumerate the rest. So a flag the tool has never seen is **not** a warning
+    and **not** an unparsed field — it is ordinary data. Validating against a list would reject exactly the rare
+    items most worth recording. (This is also why glyph matching is the right reader here: it reads characters,
+    not words, so it has no vocabulary to be surprised by.)
+  - This retires an earlier note here that called flags "a translation problem, bigger than the plan assumed". It
+    is the opposite: replace-wholesale is simpler, and it makes the nine sampled pages whose legacy flags are
+    single-spaced (`MAGIC ITEM LORE ITEM NO TRADE`, which no separator rule can split without a vocabulary) a
+    non-issue — the grammar reports them as one unrecognized token, and the tool discards the line regardless.
+  - **Attunable beats No Trade: trust the wiki, and alert** (user, 2026-09-24). An item natively `Attunable` shows
+    `No Trade` in the window once equipped, so the capture genuinely cannot distinguish it from a natively
+    `No Trade` item. When the page says `Attunable` and the capture says `No Trade`, **keep `Attunable`** and tell
+    the user — do not let blind regeneration silently downgrade a correct page. The user may later ask for this
+    exact pair to be treated as *matching* (i.e. stop alerting), probably as a setting, so keep the comparison and
+    the alert separable rather than hard-coding one behaviour.
+  - **`This is a meal!` and friends: alert, never act** (user, 2026-09-24). These appear on the flags line of 11
+    sampled pages and in no captured window — EQL removed them. They are not meaningless: in original EverQuest
+    `This is a hearty meal!` meant the food lasted longer, and that may still be true under the hood with the UI
+    simply no longer exposing it. The user's own practice is to move the text into `notes` by hand to preserve the
+    history. **The tool must not do that move itself and must not silently drop the line** — it raises it in the
+    UI and leaves it to the human.
+- **A label is at most two words, and digits end it.** Both bounds came from a failing measurement, not from
+  reasoning. Allowing digits let a backward label scan run through a preceding value, so
+  `STR: +10 WIS: +10 INT: +10` (single-spaced, real) read as one field. Allowing three words then made every
+  single-spaced `Skill: Archery Atk Delay: 0` read as a label "Archery Atk Delay"; at two words no mis-split
+  survived and no real label was lost. One line needs a second rule — `Size: MEDIUM WT: 3.0` splits wrongly into
+  a two-word label, and what gives it away is that doing so leaves `Size` with an *empty* value, which no real
+  page has.
+- **"Zero unparsed lines" is not evidence the split is right.** A wrong boundary still produces a field, just one
+  with a nonsense label, so the unparsed count read zero while `MEDIUM WT` and `Blunt Atk Delay` were being
+  produced. What caught them is the label census (`WikiSpike grammar`, which prints every distinct label and flag
+  token it produced with an example) — the wikitext equivalent of the OCR corpus's silent-wrong count, and worth
+  reaching for the same way: eyeball the vocabulary, not the error count.
+- **Pages that are genuinely broken stay broken.** One page writes `SV FIRE +5 SV COLD +5` with no colons at all;
+  it is reported as one unrecognized token rather than repaired into fields. Same principle as the OCR side: a
+  flagged gap beats a silent guess.
+- Parsing is tolerant by contract — unterminated braces, a stray `}}`, an unclosed `[[` and a missing parameter
+  all yield "couldn't read this", never an exception and never a confidently wrong span (a wrong span is an edit
+  spliced into somebody else's prose). `ItemPageDocument.Parse` returning null just means "not an item page".
+- Every mutation re-parses the edited text and returns a new document. Spans are byte offsets, so one edit
+  invalidates every later one; re-parsing costs microseconds and removes the whole bug class.
+- **Correction to the notes below and to the plan: the recipes parameter is `recipes`, not `recipe`.** 64 of the
+  65 sampled pages that have one spell it plural; exactly one page writes `recipe`, which the template therefore
+  ignores. Outside the v1 write scope either way, but worth knowing before anyone "fixes" a spelling.
+- **A present-but-empty parameter is not an absent one, and its padding is a trap.** 343 of 662 sampled pages have
+  at least one parameter written and left blank (`|notes       = ` then a newline). Its raw value is *entirely*
+  whitespace, so "the padding before the value" and "the padding after it" are the same characters — computing
+  each independently emits them twice and silently adds a blank line to every such page. Caught only by the live
+  sweep, because no fixture had an empty parameter until one was added for it.
+- **`merchant_value` is always normalized to the compact coin form** (user, 2026-09-24). Target shape is
+  `"1p 2g 3s 4c"`, dropping any denomination that is zero (`"2g 1c"`), and the no-value case is written as the
+  literal string `absolutely nothing`. Measured on both sides, so the transform is well defined:
+  - The game already emits the right *content* in the wrong *spelling* — 36 captured windows give
+    `22 platinum 8 gold 5 silver 7 copper`, `1 platinum 5 silver 8 copper`, `8 copper`, `350 platinum`,
+    `absolutely nothing`. Note it has **already dropped the zero denominations** itself, so the tool's job is
+    purely `N platinum|gold|silver|copper` → `Np|g|s|c`, with `absolutely nothing` passed through verbatim.
+    Corroborated end to end on `Peridot`: the window says `9 platinum 5 gold 2 silver 4 copper`, the page already
+    says `9p 5g 2s 4c`.
+  - The wiki side is the mess. 48 of 64 sampled values are plain text but only loosely canonical —
+    `2.6pp`, `1.5p`, `18pp`, `~3pp`, `3.3p`, `1pp 7gp`, `1gp to vendor.`, `1.3 gold`, `2sp`, `1s`, plus
+    annotations like `with 111 Charisma` and `Max`. The other 16 are a full HTML block:
+    `<ul><li> 5 <span style="color:silver"><b>Silvers</b></span></li></ul>`, sometimes under a
+    `<p><b>VALUE TO VENDOR with CHA : 80 and faction at Ally</b></p>` heading. One real value is
+    `0p 0g 1s 0c with 111 Charisma`, which normalizes to `1s`.
+  - **Note this is the one field where replacing is not obviously loss-free**, and it needs deciding before the
+    write lands: several pages annotate the Charisma and faction the value was observed at, which suggests
+    merchant value varies by those. If it does, overwriting with a capture taken at different CHA is a data
+    change disguised as a reformat. Raise it with the user rather than assuming — the format normalization is
+    settled, the *value* comparison is not.
+- Fixtures: eleven real pages in `tests/EQLWikiAssistant.Tests/Wiki/Fixtures/`, **tracked in git** — unlike
+  screenshots these are public wikitext with nothing private in them. That folder's README says what each one is
+  there to prove; each exists because it broke a plausible simplifying assumption.
 
 **Checked-items ledger.** To avoid hitting the wiki unnecessarily, a local store (keyed by item name + entity kind)
 records the outcome of each check (`matched`/`edited`/`flagged`/`skipped`/`not-on-wiki`) along with a fingerprint of
@@ -490,8 +630,11 @@ fires for a filled native slot too, so it is not itself a foreign-modification s
 
 **Known unresolvable ambiguity: Attunable vs. No Trade.** An item natively `Attunable` shows `No Trade` once
 equipped/traded, but some items are natively `No Trade` with no `Attunable` state ever. The window can't
-disambiguate these, so a flag mismatch here may need the user's judgment rather than being auto-corrected — same
-"user can override/cancel" pattern as the exaltation case, no separate pipeline behavior.
+disambiguate these, so a flag mismatch here needs the user's judgment rather than being auto-corrected — same
+"user can override/cancel" pattern as the exaltation case, no separate pipeline behavior. **Resolved behaviour
+(user, 2026-09-24): keep the wiki's `Attunable` and alert.** The page is the more informed source here, because
+it was written by someone who saw the item before it was attuned. See "Reading and editing wiki pages" for the
+detail, including that the user may later want this pair treated as *matching* via a setting.
 
 **OCR engine choice: RapidOCR — this was tested, not assumed, and the alternative has been deleted.** The
 OS-provided `Windows.Media.Ocr` was the original default; testing against real item windows (`tools/OcrSpike`)
@@ -539,6 +682,21 @@ vocabulary) and testable on plain strings without an image/OCR round-trip. Start
 - MediaWiki 1.45.3, `api.php` at the site root (no script path). `login`/`clientlogin` API modules are available;
   there is **no OAuth extension**, so auth is via a bot password (Special:BotPasswords), which also bypasses the
   site's OATHAuth 2FA. Credentials are stored via Windows Credential Manager/DPAPI, never in the repo.
+  - **Reads are anonymous; only writes need the credential.** That keeps the common path — check an item, find it
+    already correct — free of credentials entirely.
+  - **The client must carry a cookie container.** MediaWiki's login token, its session and the later CSRF token are
+    tied together by cookies, so an `HttpClient` built without one fails at the second step with a `badtoken` that
+    reads like a token-handling bug. `MediaWikiClient.Create` builds a correctly configured one.
+  - **An API error arrives as HTTP 200 with an `error` object**, so the status code proves nothing; the client
+    unwraps it into a `MediaWikiException` carrying the wiki's own code.
+  - **Every edit sends `basetimestamp` and `assert=user`.** The first is the edit-conflict guard — without it an
+    edit somebody else saved between our read and our write is silently reverted, which is the difference between
+    a patch and a revert on a wiki other people are editing. The second turns an expired session into a loud
+    failure instead of an anonymous IP edit. `nocreate` is set too: creating a page is a different feature with
+    different review requirements, and doing it by accident is worse than failing.
+  - **The password is never in a file, a command line or an environment variable.** `WikiSpike login` reads it
+    from the console (unechoed) straight into Credential Manager. A command line would land in shell history and
+    in the process list.
 - Item pages follow this shape (see `Help:Contents` for the canonical blueprint, and e.g. `Earring of Bashing` for a
   real example with lore):
   - An era template at the top (`{{Classic Era}}`, `{{Kunark Era}}`, ...).
@@ -551,7 +709,7 @@ vocabulary) and testable on plain strings without an image/OCR round-trip. Start
     parsed stats, not hardcoded).
 - Iteration 1 only reads/writes the fields verifiable from the in-game item window: `itemname`, icon
   (`lucy_img_ID`), `statsblock`, `focus_effect`, lore (inside `notes`), `merchant_value`. Everything else on an
-  existing page (`dropsfrom`, `soldby`, `relatedquests`, `recipe`, `bookcontents`, `foraged`, unrelated categories)
+  existing page (`dropsfrom`, `soldby`, `relatedquests`, `recipes`, `bookcontents`, `foraged`, unrelated categories)
   is preserved untouched.
 
 ## Commands
@@ -599,6 +757,18 @@ dotnet run --project tools/GlyphSpike -- read "samples/some screenshot.png" 774,
 dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,700,570,250 \
   --out src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
 dotnet run --project tools/GlyphSpike -- advances "samples/any screenshot.png"   # updates the atlas in place
+
+# Wiki side. Reads are anonymous, so fetch/roundtrip/grammar need no credential:
+dotnet run --project tools/WikiSpike -- fetch "Earring of Bashing"       # page source + parsed v1 fields
+dotnet run --project tools/WikiSpike -- roundtrip 400 --seed 4242        # byte-for-byte check on a live sample
+dotnet run --project tools/WikiSpike -- grammar 400                      # plus the label/flag census
+dotnet run --project tools/WikiSpike -- grammar --cached .local-data/wiki-pages   # re-run offline on the cache
+
+# Store the bot password (prompts; never pass it as an argument — that lands in shell history and the process
+# list). Create one first at https://eqlwiki.com/Special:BotPasswords with "Edit existing pages" granted.
+dotnet run --project tools/WikiSpike -- login
+dotnet run --project tools/WikiSpike -- whoami     # confirm it logs in AND may edit; writes nothing
+dotnet run --project tools/WikiSpike -- edit "User:YourName/sandbox"   # 2 revisions, self-reverting, confirms first
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).

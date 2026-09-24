@@ -1,0 +1,36 @@
+[[File:Shimmering Ruby Stiletto.png|thumb]]
+<onlyinclude>{{Itempage
+|notes       = 
+|itemname    = Shimmering Ruby Stiletto
+|lucy_img_ID = 762
+|statsblock  = 
+No Trade, Placeable<br>
+Slot: PRIMARY SECONDARY<br>
+Skill: Piercing  Atk Delay: 30<br>
+DMG: 10 <br>
+Effect: [[Ignite|<span class='itemeff'>Ignite</span>]] (Combat, Casting Time: Instant) at Level 1<br>
+DEX: +2<br>
+SV POISON: +10<br>
+WT: 0.8  Size: MEDIUM<br>
+Class: WAR PAL RNG SHD BRD ROG<br>
+Race: ALL<br>
+
+|notes       = Backstab DMG: 10
+|dropsfrom = 
+
+[[Befallen]]
+
+* [[Korven Nisere]]
+
+}}</onlyinclude>
+
+[[Category:Bard Equipment]]
+[[Category:Ranger Equipment]]
+[[Category:Rogue Equipment]]
+[[Category:Shadow Knight Equipment]]
+[[Category:Paladin Equipment]]
+[[Category:Warrior Equipment]]
+[[Category:Primary]]
+[[Category:Secondary]]
+[[Category:Piercing]]
+[[Category:Befallen]]

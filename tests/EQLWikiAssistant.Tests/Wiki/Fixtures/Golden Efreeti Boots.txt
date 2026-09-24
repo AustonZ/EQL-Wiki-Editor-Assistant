@@ -1,0 +1,42 @@
+{{Classic Era}}<onlyinclude>{{Itempage
+|notes       = Sometimes referred to as GEB(s).
+|itemname    = Golden Efreeti Boots
+|lucy_img_ID = 764
+|statsblock  = 
+MAGIC ITEM<br>
+Slot: FEET<br>
+AC: 5<br>
+WIS: +9  INT: +9 SV POISON: +1<br>
+WT: 2.5  Size: MEDIUM<br>
+Class: ALL<br>
+Race: ALL<br>
+
+|focus_effect = Enhancement Haste II
+|dropsfrom = 
+
+[[Nagafen's Lair]]
+
+* [[Efreeti Lord Djarn]]
+
+}}</onlyinclude>
+
+[[Category:Bard Equipment]]
+[[Category:Cleric Equipment]]
+[[Category:Druid Equipment]]
+[[Category:Enchanter Equipment]]
+[[Category:Magician Equipment]]
+[[Category:Monk Equipment]]
+[[Category:Necromancer Equipment]]
+[[Category:Paladin Equipment]]
+[[Category:Ranger Equipment]]
+[[Category:Rogue Equipment]]
+[[Category:Shaman Equipment]]
+[[Category:Shadow Knight Equipment]]
+[[Category:Warrior Equipment]]
+[[Category:Wizard Equipment]]
+[[Category:Feet]]
+[[Category:Focus Items]]
+[[Category:Enhancement Haste II]]
+[[Category:Nagafen's Lair]]
+[[Category:Fashion: Plate]]
+[[Category:Fashion: Gold Tips]]

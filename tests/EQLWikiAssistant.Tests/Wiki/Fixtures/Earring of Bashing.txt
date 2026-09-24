@@ -1,0 +1,29 @@
+{{Classic Era}}
+
+<onlyinclude>{{Itempage
+|notes       = {{Item Lore|For those that like to bash}}
+|itemname    = Earring of Bashing
+|lucy_img_ID = 752
+|statsblock  = 
+Lore Equipped, No Trade<br>
+Slot: EAR<br>
+AC: 5<br>
+STR: +8  WIS: +8<br>
+SV FIRE: +5  SV DISEASE: +5  SV COLD: +5  SV MAGIC: +5  SV POISON: +5<br>
+WT: 0.1  Size: TINY<br>
+Class: WAR SHD SHM BST BER<br>
+Race: ALL<br>
+|dropsfrom = 
+
+[[Plane of Hate]]
+
+* [[Innoruuk_(God)|Innoruuk]]
+
+}}</onlyinclude>
+
+[[Category:Beastlord Equipment]]
+[[Category:Berserker Equipment]]
+[[Category:Shaman Equipment]]
+[[Category:Shadow Knight Equipment]]
+[[Category:Warrior Equipment]]
+[[Category:Ear]]

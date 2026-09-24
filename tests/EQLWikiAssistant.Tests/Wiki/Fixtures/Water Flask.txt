@@ -1,0 +1,242 @@
+{{Classic Era}}
+<onlyinclude>{{Itempage
+|notes       = Drink item
+|itemname    = Water Flask
+|lucy_img_ID = 584
+|statsblock  = 
+Quest<br>
+Size: SMALL  WT: 0.4<br>
+Class: ALL<br>
+Race: ALL<br>
+|merchant_value = 1s
+|dropsfrom = 
+
+Various Zones
+
+* Newbie Mobs
+
+|relatedquests = 
+
+* [[Quench Lasen's Thirst]]
+* [[Trooper Scale Armor Quests|Trooper Scale Pauldron]]
+* [[Coldain Prayer Shawl Quests|Coldain Shawl #7: Runed Coldain Prayer Shawl]]
+* [[Zimel's Blades (SoulFire)]]
+* [[Crush the Undead]]
+* [[Gnoll Bounty]]
+* [[Ice Goblin Necklaces]]
+* [[Merona's Brother]]
+* [[Note for Konem]]
+* [[Sneed's Rat Infestation]]
+
+|playercrafted = 
+
+* [[Brewing]] (Trivial: 21)
+** '''Yield: Water Flask''' x1
+** In [[Brew Barrel]]:
+:: {{SmIcon|584}} 4 x [[Pod of Water]] - Foraged
+:: {{SmIcon|704}} 1 x [[Bottle]] - Bought
+::*''On Failure Returns: ''[[Bottle]]''
+
+|recipes = 
+* [[Spell Research]]
+** [[Everfount]] (Trivial: 62)
+
+* [[Blacksmithing]]
+** [[Muffin Tin]] (Trivial: 35)
+** [[Pie Tin]] (Trivial: 35)
+** [[Bread Tin]] (Trivial: 38)
+** [[Cake Round]] (Trivial: 38)
+
+* [[Brewing]]
+** [[Fetid Essence]] (Trivial: 122)
+** [[Vodka]] (Trivial: 135)
+** [[Ginesh]] (Trivial: 168)
+
+*[[Skill Pottery|Pottery]]
+** [[Unfired Ceramic Lining]] (Trivial: 36)
+** [[Unfired Pie Tin]] (Trivial: 115)
+** [[Unfired Deity]] (Trivial: 135)
+
+|soldby = 
+
+{{ItemWhereTable|
+{{ItemWhereRow   | [[Ak'Anon]]                       | [[Rylin Coil]]                |               | (1469, -190) }}
+{{ItemWhereRow   | [[Ak'Anon]]                       | [[a clockwork grocer]]        |               | (904, -284) }}
+{{ItemWhereRow   | [[Ak'Anon]]                       | [[a clockwork merchant]]      |               | (484, -115) }}
+{{ItemWhereRow   | [[Ak'Anon]]                       | [[a clockwork merchant]]      |               | (1242, -775) }}
+{{ItemWhereRow   | [[Ak'Anon]]                       | [[a clockwork merchant]]      |               | (1284, -915) }}
+{{ItemWhereRow   | [[Ak'Anon]]                       | [[a clockwork merchant]]      |               | (1328, -778) }}
+{{ItemWhereRow   | [[Butcherblock Mountains]]        | [[Iglan Thranon]]             |               | (2806, -904) }}
+{{ItemWhereRow   | [[Butcherblock Mountains]]        | [[Gamin Griststone]]          |               | (2718, -941) }}
+{{ItemWhereRow   | [[Butcherblock Mountains]]        | [[Parn Gylwyn]]               |               | (1465, 2817) }}
+{{ItemWhereRow   | [[Butcherblock Mountains]]        | [[Felen Razdal]]              |               | (129, 2383) }}
+{{ItemWhereRow   | [[Cabilis|East Cabilis]]          | [[Klok Sweetzie]]             |               | (551, 160) }}
+{{ItemWhereRow   | [[Cabilis|West Cabilis]]          | [[Lybar]]                     |               | (292, 523) }}
+{{ItemWhereRow   | [[West Commonlands]]              | [[Innkeep Roster]]            |               | (-149, 452) }}
+{{ItemWhereRow   | [[West Commonlands]]              | [[Innkeep Olissa]]            |               | (-384, 2714) }}
+{{ItemWhereRowVel| [[Crystal Caverns]]               | [[Milliace Gemshard]]         |               | (-263, 233) }}
+{{ItemWhereRow   | [[Dreadlands]]                    | [[Klok F`tshai]]              |               | (780, 9140) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Paulina]]                   |               | (-732, -194) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Bradly]]                    |               | (-856, -99) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Stace]]                     |               | (1227, -2645) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Sorn]]                      |               | (1198, -2634) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Sharna]]                    |               | (-3790, -2399) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Iago]]                      |               | (-695, -134) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Lucetta]]                   |               | (1306, -2757) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Balthazar]]                 |               | (1328, -2722) }}
+{{ItemWhereRow   | [[Eastern Plains of Karana]]      | [[Tanrak]]                    |               | (1529, -2677) }}
+{{ItemWhereRow   | [[East Commonlands]]              | [[Bubar]]                     |               | (-1519, -116) }}
+{{ItemWhereRow   | [[East Commonlands]]              | [[Parthar]]                   |               | (-119, 240) }}
+{{ItemWhereRow   | [[East Commonlands]]              | [[Innkeep Harold]]            |               | (-187, 117) }}
+{{ItemWhereRow   | [[East Commonlands]]              | [[Innkeep Dolman]]            |               | (1028, 3682) }}
+{{ItemWhereRow   | [[East Commonlands]]              | [[Innkeep Juna]]              |               | (-334, 3022) }}
+{{ItemWhereRow   | [[East Commonlands]]              | [[Germe Threadspinner]]       |               | (1021, 3635) }}
+{{ItemWhereRow   | [[East Commonlands]]              | [[Innkeep Blaise]]            |               | (332, 4842) }}
+{{ItemWhereRow   | [[Erudin]]                        | [[Beth Breadmaker]]           |               | (136, 109) }}
+{{ItemWhereRow   | [[Erudin]]                        | [[Helia BlueHawk]]            |               | (-1186, -333) }}
+{{ItemWhereRow   | [[Erudin]]                        | [[Teria Finleather]]          |               | (-956, -98) }}
+{{ItemWhereRow   | [[Erudin]]                        | [[Borge Finleather]]          |               | (-994, -78) }}
+{{ItemWhereRow   | [[Erud's Crossing]]               | [[Renna]]                     |               | (-1479, 857) }}
+{{ItemWhereRow   | [[The Feerrott]]                  | [[Innkeep Gub]]               |               | (1144, 1444) }}
+{{ItemWhereRow   | [[The Feerrott]]                  | [[Innkeep Morpa]]             |               | (1144, -145) }}
+{{ItemWhereRow   | [[The Feerrott]]                  | [[Kogg]]                      |               | (1045, 1462) }}
+{{ItemWhereRow   | [[Felwithe]]                      | [[Rolyn Longwalker]]          |               | (4, -384)  }}
+{{ItemWhereRow   | [[Felwithe]]                      | [[Fishmonger Issa]]           |               | (258, -626) }}
+{{ItemWhereRow   | [[Felwithe]]                      | [[Merchant Sorintal]]         |               | (136, -415) }}
+{{ItemWhereRow   | [[Firiona Vie]]                   | [[Leala Swiftarrow]]          |               | (-3299, 3338) }}
+{{ItemWhereRow   | [[Firiona Vie]]                   | [[Glinya Sweetpie]]           |               | (-2750, 2550) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Rolfic Gohar]]              |               | (-189, -277) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Ralfson Gerositan]]         | At the [[Northern Desert of Ro|North Ro]] gate | (-384, -648) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Innkeep Paggie]]            | Inside the unnamed Inn (Bldg #12) | (-7, -232) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Innkeep Rastle]]            | Inside the unnamed Inn (Bldg #12) | (-22, -285) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Innkeep Nasumi]]            | Inside the Freeport Inn near [[Northern Desert of Ro|North Ro]] ZL | (-77, -720) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Innkeep Hunter]]            | Inside the Freeport Inn near [[Northern Desert of Ro|North Ro]] ZL | (-77, -699) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Winda Lylil]]               | Inside the [[Grub n Grog Tavern]] | (44, -729) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Henna Treghost]]            | Inside the [[Seafarer's Roost]] | (-246, -874) }}
+{{ItemWhereRow   | [[Freeport|East Freeport]]        | [[Gregor Nasin]]              | Inside the [[Seafarer's Roost]] | (-238, -835) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Rashinda Elore]]            |               | (290, 302) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Gern Tassel]]               |               | (70, -57)  }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Gibbon Morfield]]           |               | (287, 284) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Yellus Gravien]]            |               | (301, 273) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Tradesman Lyna]]            |               | (-103, 191) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Tradesman Tulan]]           |               | (-131, 209) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Innkeep Palola]]            |               | (-187, -63) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Bran Greenglade]]           |               | (-109, -128) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Alec Greenglade]]           | In blue building near bank (Bldg #18) | (-94, -128) }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Innkeep Rille]]             |               | (72, 72)   }}
+{{ItemWhereRow   | [[Freeport|North Freeport]]       | [[Innkeep Evelona]]           |               | (70, 56)   }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Merchant Weaolanae]]        |               | (428, 338) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Merchant Kanoldar]]         |               | (750, 357) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Innkeep Anisyla]]           |               | (-247, -435) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Innkeep Wuleran]]           |               | (-337, 141) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Innkeep Larya]]             |               | (940, 306) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Innkeep Linen]]             |               | (726, 459) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Merchant Aianya]]           |               | (251, 614) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Merchant Iludarae]]         |               | (-29, -149) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Merchant Kwein]]            |               | (155, 334) }}
+{{ItemWhereRow   | [[Greater Faydark]]               | [[Merchant Tuluvdar]]         |               | (-427, 466) }}
+{{ItemWhereRow   | [[Grobb]]                         | [[Ootok]]                     |               | (233, -31) }}
+{{ItemWhereRow   | [[Grobb]]                         | [[Wista]]                     |               | (131, -373) }}
+{{ItemWhereRow   | [[Grobb]]                         | [[Zatok]]                     |               | (155, -280) }}
+{{ItemWhereRow   | [[Halas]]                         | [[Dok]]                       |               | (212, 275) }}
+{{ItemWhereRow   | [[Halas]]                         | [[Teria O`Danos]]             |               | (-6, -33)  }}
+{{ItemWhereRow   | [[Halas]]                         | [[Greta Terrilon]]            |               | (280, -327) }}
+{{ItemWhereRow   | [[Halas]]                         | [[Hetie McDonald]]            |               | (240, -154) }}
+{{ItemWhereRow   | [[Halas]]                         | [[Leopok Terrilon]]           |               | (205, 151) }}
+{{ItemWhereRow   | [[High Keep]]                     | [[Baker Jena]]                |               | (46, -260) }}
+{{ItemWhereRow   | [[High Keep]]                     | [[Treasurer Lynn]]          |               | (-70, -375)    }}
+{{ItemWhereRow   | [[Highpass Hold]]                 | [[Maigin Greyeagle]]          |               | (179, 483) }}
+{{ItemWhereRow   | [[Highpass Hold]]                 | [[Sernn Rossook]]             |               | (-218, 154) }}
+{{ItemWhereRow   | [[Kaladim|North Kaladim]]         | [[Doramafi Ratsbone]]         |               | (710, 88)  }}
+{{ItemWhereRow   | [[Kaladim|North Kaladim]]         | [[Harnoff Splitrock]]         |               | (726, 188) }}
+{{ItemWhereRow   | [[Kerra Island]]                  | [[Melixis]]                   |               | (519, 179) }}
+{{ItemWhereRow   | [[Kithicor Forest]]               | [[Innkeep Min]]               |               | (1465, 2383) }}
+{{ItemWhereRow   | [[Kithicor Forest]]               | [[Elsbyth]]                   |               | (-776, 3082) }}
+{{ItemWhereRow   | [[Kithicor Forest]]               | [[Innkeep Jurn]]              |               | (-281, 3821) }}
+{{ItemWhereRow   | [[Kithicor Forest]]               | [[Innkeep Grace]]             |               | (1095, -684) }}
+{{ItemWhereRow   | [[Lake Rathetear]]                | [[Dreana]]                    |               | (-424, 450) }}
+{{ItemWhereRow   | [[Lake Rathetear]]                | [[Turga]]                     |               | (3126, -1815) }}
+{{ItemWhereRow   | [[Lavastorm Mountains]]           | [[Jenah Wheelspinner]]        |               | (401, 826) }}
+{{ItemWhereRow   | [[Lesser Faydark]]                | [[Anelia Thrywiel]]           |               | (-307, 1242) }}
+{{ItemWhereRow   | [[Misty Thicket]]                 | [[Bim Buskin]]                |               | (905, -2345) }}
+{{ItemWhereRow   | [[Neriak|Neriak Foreign Quarter]] | [[Ootok]]                     |               | (-417, -457) }}
+{{ItemWhereRow   | [[Neriak|Neriak Foreign Quarter]] | [[Smaka]]                     |               | (-335, -107) }}
+{{ItemWhereRow   | [[Neriak|Neriak Foreign Quarter]] | [[Vala Tanbor]]               |               | (210, -215) }}
+{{ItemWhereRow   | [[Neriak|Neriak Foreign Quarter]] | [[The Gobbler]]               |               | (-323, -125) }}
+{{ItemWhereRow   | [[Neriak|Neriak Foreign Quarter]] | [[Tal Drana]]                 |               | (106, -251) }}
+{{ItemWhereRow   | [[Neriak|Neriak Foreign Quarter]] | [[Bull Crusher]]              |               | (-390, -252) }}
+{{ItemWhereRow   | [[Neriak|Neriak Foreign Quarter]] | [[Dran `slug` Rembor]]        |               | (210, -244) }}
+{{ItemWhereRow   | [[Neriak|Neriak Foreign Quarter]] | [[Sal Drana]]                 |               | (106, -238) }}
+{{ItemWhereRow   | [[Neriak|Neriak Commons]]         | [[Dunred M`Trik]]             |               | (71, -866) }}
+{{ItemWhereRow   | [[Neriak|Neriak Commons]]         | [[Volkoon D`Dbth]]            |               | (-43, -1030) }}
+{{ItemWhereRow   | [[Northern Karana]]               | [[Romella]]                   |               | (-682, -201) }}
+{{ItemWhereRow   | [[Northern Karana]]               | [[Innkeep Disda]]             |               | (118, 1382) }}
+{{ItemWhereRow   | [[Northern Karana]]               | [[Innkeep James]]             |               | (156, 1379) }}
+{{ItemWhereRow   | [[Northern Karana]]               | [[Bilbis Briar]]              |               | (-4149, 1201) }}
+{{ItemWhereRow   | [[Northern Desert of Ro]]         | [[Murissa Sandwhisper]]       |               | (3712, 126) }}
+{{ItemWhereRow   | [[Northern Desert of Ro]]         | [[Innkeep Valon]]             |               | (3415, 503) }}
+{{ItemWhereRow   | [[Oasis of Marr]]                 | [[Isslana]]                   |               | (512, 71)  }}
+{{ItemWhereRow   | [[Oasis of Marr]]                 | [[Innkeep Marnan]]            |               | (-1321, -261) }}
+{{ItemWhereRow   | [[Oggok]]                         | [[Angrog]]                    |               | (-243, -2) }}
+{{ItemWhereRow   | [[Oggok]]                         | [[Sinsaal]]                   |               | (267, 677) }}
+{{ItemWhereRow   | [[Oggok]]                         | [[Crunga]]                    |               | (548, -176) }}
+{{ItemWhereRow   | [[Oggok]]                         | [[Erung]]                     |               | (512, -183) }}
+{{ItemWhereRow   | [[Ocean of Tears]]                | [[Cleonae Kalen]]             |               | (503, -9253) }}
+{{ItemWhereRow   | [[Ocean of Tears]]                | [[Endan Halson]]              |               | (-2211, 7721) }}
+{{ItemWhereRow   | [[The Overthere]]                 | [[Tin Merchant I]]            |               | (2733, 2582) }}
+{{ItemWhereRow   | [[The Overthere]]                 | [[Klok G`rshai]]              |               | (2212, -2912) }}
+{{ItemWhereRow   | [[Paineel]]                       | [[Rallia Hapera]]             |               | (941, 770) }}
+{{ItemWhereRow   | [[Paineel]]                       | [[Geomar Hapera]]             |               | (953, 757) }}
+{{ItemWhereRow   | [[Paineel]]                       | [[Linnleu Brackmar]]          |               | (734, 820) }}
+{{ItemWhereRow   | [[Paineel]]                       | [[Keletha Nightweaver]]       |               | (734, 861) }}
+{{ItemWhereRow   | [[Paineel]]                       | [[Gorng Alusnein]]            |               | (984, 636) }}
+{{ItemWhereRow   | [[Paineel]]                       | [[Iva Tersala]]               |               | (970, 649) }}
+{{ItemWhereRow   | [[Western Plains of Karana]]      | [[Misla McMannus]]            |               | (-4023, -2344) }}
+{{ItemWhereRow   | [[Western Plains of Karana]]      | [[Innkeep Danin]]             |               | (-1514, -13005) }}
+{{ItemWhereRow   | [[Western Plains of Karana]]      | [[Innkeep Rislarn]]           |               | (326, -4417) }}
+{{ItemWhereRow   | [[Western Plains of Karana]]      | [[Cleet Miller Jr]]           |               | (-3013, -5735) }}
+{{ItemWhereRow   | [[Qeynos|South Qeynos]]           | [[Karn Tassen]]               |               | (-165, -255) }}
+{{ItemWhereRow   | [[Qeynos|South Qeynos]]           | [[Voleen Tassen]]             |               | (-192, -266) }}
+{{ItemWhereRow   | [[Qeynos|North Qeynos]]           | [[Tubal Weaver]]              |               | (216, 94)  }}
+{{ItemWhereRow   | [[Qeynos|North Qeynos]]           | [[Tanlyn Galliway]]           |               | (125, 204) }}
+{{ItemWhereRow   | [[Qeynos|North Qeynos]]           | [[Sneed Galliway]]            |               | (132, 243) }}
+{{ItemWhereRow   | [[Qeynos|North Qeynos]]           | [[Ghil Starn]]                |               | (157, 195) }}
+{{ItemWhereRow   | [[Surefall Glade]]                | [[Sequea Erthinon]]           |               | (-155, -293) }}
+{{ItemWhereRow   | [[Surefall Glade]]                | [[Grathin Nilm]]              |               | (104, -86) }}
+{{ItemWhereRow   | [[Rathe Mountains]]               | [[Guzzla]]                    |               | (1760, 1288) }}
+{{ItemWhereRow   | [[Rathe Mountains]]               | [[Viira Bali]]                |               | (1644, -875) }}
+{{ItemWhereRow   | [[Rathe Mountains]]               | [[Philicia Drinn]]            |               | (4002, -1359) }}
+{{ItemWhereRow   | [[Rathe Mountains]]               | [[Sven Drinn]]                |               | (3992, -1383) }}
+{{ItemWhereRow   | [[Rathe Mountains]]               | [[Susanna]]                   |               | (2908, -769) }}
+{{ItemWhereRow   | [[Rathe Mountains]]               | [[Innkeep Troy]]              |               | (4283, 842) }}
+{{ItemWhereRow   | [[Rathe Mountains]]               | [[Innkeep Serge]]             |               | (4294, 831) }}
+{{ItemWhereRow   | [[Rathe Mountains]]               | [[Chandra Kali]]              |               | (3922, 1390) }}
+{{ItemWhereRow   | [[Rivervale]]                     | [[Crista Tagglefoot]]         |               | (-69, -381) }}
+{{ItemWhereRow   | [[Rivervale]]                     | [[Daleen Leafsway]]           |               | (-87, -343) }}
+{{ItemWhereRow   | [[Rivervale]]                     | [[Wibble Bramblebush]]        |               | (6, -329)  }}
+{{ItemWhereRow   | [[RunnyEye Citadel]]              | [[A goblin merchant]]         |               | (8, 130), (60, 139) }}
+{{ItemWhereRowVel| [[Skyshrine]]                     | [[Ruru the Cook]]             |               | (142, -475) }}
+{{ItemWhereRow   | [[Solusek's Eye]]                 | [[goblin merchant]]           |               | (-753, -437) }}
+{{ItemWhereRow   | [[Southern Desert of Ro]]         | [[Rathmana Allin]]            |               | (1210, 1402) }}
+{{ItemWhereRow   | [[Steamfont Mountains]]           | [[Finkel Rardobaen]]          |               | (-1515, -1844) }}
+{{ItemWhereRow   | [[Steamfont Mountains]]           | [[Glen Garginburr]]           |               | (-1786, 337) }}
+{{ItemWhereRowVel| [[Stonebrunt Mountains]]          | [[Chef Stead]]                |               | (1348, -490) }}
+{{ItemWhereRowVel| [[Thurgadin]]                     | [[Petcas Coldbeard]]          |               | (-57, 94)  }}
+{{ItemWhereRowVel| [[Thurgadin]]                     | [[Perkins Doughbeard]]        | Thurgadin Bank| (-279, 134)  }}
+{{ItemWhereRowVel| [[Thurgadin]]                     | [[Mordin Frostcleaver]]       |               | (-220, -216) }}
+{{ItemWhereRowVel| [[Icewell Keep]]                  | [[Coldain Outcast]]           |               | (52, 928)  }}
+{{ItemWhereRow   | [[Timorous Deep]]                 | [[Seloris Windweaver]]        |               | (-4867, -3439) }}
+{{ItemWhereRow   | [[Warsliks Woods]]                | [[Klok Rogalin]]              |               | (-1882, -600) }}
+}}
+
+}}</onlyinclude>
+
+[[Category:Inventory Items]]
+[[Category:Drink]]
+[[Category:Vendor Sold]]
+[[Category:Player Crafted]]
+[[Category:Tradeskill Ingredient]]
+[[Category:Brewing Ingredient]]
+[[Category:Pottery Ingredient]]
+
+[[Category:Quest Items]]

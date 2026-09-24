@@ -1,0 +1,40 @@
+{{Classic Era}}
+<onlyinclude>{{Itempage
+|notes       = {{Item Lore | Fishbone Earring.}}
+|itemname    = Fishbone Earring
+|lucy_img_ID = 522
+|statsblock  = 
+MAGIC ITEM  LORE ITEM<br>
+Slot: EAR<br>
+DEX: +3<br>
+Effect:  [[Enduring Breath]] (Worn)<br>
+WT: 0.1  Size: TINY<br>
+Class: ALL<br>
+Race: ALL<br>
+|dropsfrom = 
+
+[[Qeynos Hills]]
+
+* [[Hadden]]
+
+}}</onlyinclude>
+
+[[Category:Worn Effects]]
+[[Category:Bard Equipment]]
+[[Category:Cleric Equipment]]
+[[Category:Druid Equipment]]
+[[Category:Enchanter Equipment]]
+[[Category:Magician Equipment]]
+[[Category:Monk Equipment]]
+[[Category:Necromancer Equipment]]
+[[Category:Paladin Equipment]]
+[[Category:Ranger Equipment]]
+[[Category:Rogue Equipment]]
+[[Category:Shaman Equipment]]
+[[Category:Shadow Knight Equipment]]
+[[Category:Warrior Equipment]]
+[[Category:Wizard Equipment]]
+[[Category:Ear]]
+[[Category:Qeynos Hills]]
+[[Category:Worn Effects]]
+[[Category:Enduring Breath (Worn)]]

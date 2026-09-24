@@ -17,5 +17,6 @@
     <Project Path="tools/LocateSpike/LocateSpike.csproj" />
     <Project Path="tools/OcrSpike/OcrSpike.csproj" />
     <Project Path="tools/ParseSpike/ParseSpike.csproj" />
+    <Project Path="tools/WikiSpike/WikiSpike.csproj" />
   </Folder>
 </Solution>

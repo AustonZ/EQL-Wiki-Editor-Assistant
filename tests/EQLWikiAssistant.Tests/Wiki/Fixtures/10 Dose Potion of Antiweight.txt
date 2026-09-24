@@ -1,0 +1,21 @@
+{{Classic Era}}
+
+<onlyinclude>{{Itempage
+|notes       = 
+|itemname    = 10 Dose Potion of Antiweight
+|lucy_img_ID = 703
+|statsblock  = 
+EXPENDABLE  Charges: 10<br>
+Effect: [[Levitation]] (Any Slot, Casting Time: 4.0)<br>
+WT: 0.4  Size: SMALL<br>
+Class: ALL<br>
+Race: ALL<br>
+|playercrafted = 
+
+* [[Alchemy]] (Trivial: No Fail)
+** '''Yield: 10 Dose Potion of Antiweight''' x1
+** In [[Bearskin Potion Bag]]:
+:: {{SmIcon|703}} 10 x [[Potion of Antiweight]] - Crafted
+}}</onlyinclude>
+
+[[Category:Inventory Items]]

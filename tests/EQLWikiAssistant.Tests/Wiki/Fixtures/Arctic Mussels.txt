@@ -1,0 +1,52 @@
+{{Velious Era}}
+
+<onlyinclude>{{Itempage
+|notes       = '''Edible''' careful not to eat it if you need it for a quest.
+
+Ground Spawn in [[Cobalt Scar]], some were found in the water by the Othmir merchants, near the shoreline.
+
+July 24/2020 Ground spawns in Cobalt Scar are legitimate. Found them in the water near the Othmir merchants as stated on Allalhazam.
+Ground spawn in Cobalt Scar at:
++240, -1140 (in the water, close to shore)
++510, -1365 (in the water, close to shore)
+455.86, -648.36, -51.69 - WNW of Easternmost sunken ship
+
+Dec 3/2025 Above spots didn't work for me but I found one at 220, -1267
+
+The ground spawn item looks like a black rock.
+
+
+Can be [[Skill Forage | Foraged.]] Ones found on the ground may have been dropped by a player after foraged if they do not look like a black rock.
+|itemname    = Arctic Mussels
+|lucy_img_ID = 998
+|statsblock  = 
+This is a meal!<br>
+WT: 0.5  Size: SMALL<br>
+Class: ALL<br>
+Race: ALL<br>
+|relatedquests = 
+
+* [[Coldain Ring Quests|Coldain Ring Quest #9]]
+
+|foraged = 
+
+* [[Cobalt Scar]]
+* [[Crystal Caverns]]
+* [[Great Divide]]
+* [[Iceclad Ocean]]
+* [[Kael Drakkel]]
+* [[Skyshrine]]
+* [[Thurgadin]]
+
+|recipes = 
+* [[Baking]]
+** [[Shellcracker's Seaside Salad]] (Trivial: 180)
+* [[Brewing]]
+** [[Tainted Avalanche Ale]] (Trivial: 248)
+
+}}</onlyinclude>
+
+[[Category:Inventory Items]]
+[[Category:Foraged]]
+
+[[Category:Quest Items]]

@@ -1,0 +1,36 @@
+{{Classic Era}}
+
+<onlyinclude>{{Itempage
+|notes       = {{Item Lore Missing}}
+|itemname    = Blackened Alloy Longsword
+|lucy_img_ID = 590
+|statsblock  = 
+MAGIC ITEM  LORE ITEM  <br>
+Slot: PRIMARY SECONDARY<br>
+Skill: 1H Slashing  Atk Delay: 29<br>
+DMG: 10 <br>
+SV POISON: +3<br>
+WT: 2.0  Size: MEDIUM<br>
+Class: WAR PAL RNG SHD BRD ROG<br>
+Race: ALL<br>
+|dropsfrom = 
+
+[[Clan Runnyeye]]
+
+* [[Battlelord Paluk]]
+* [[Lord Pickclaw]]
+* [[A Pickclaw Destroyer]]
+
+}}</onlyinclude>
+
+[[Category:Bard Equipment]]
+[[Category:Paladin Equipment]]
+[[Category:Ranger Equipment]]
+[[Category:Rogue Equipment]]
+[[Category:Shadow Knight Equipment]]
+[[Category:Warrior Equipment]]
+[[Category:Primary]]
+[[Category:Secondary]]
+[[Category:1H Slashing]]
+[[Category:RunnyEye Citadel]]
+[[Category:Light source]]

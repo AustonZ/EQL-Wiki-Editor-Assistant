@@ -1,0 +1,28 @@
+{{Classic Era}}
+
+<onlyinclude>{{Itempage
+|notes       = {{Item Lore|A special cloak made of scales}}
+|itemname    = Cloak of Scales
+|lucy_img_ID = 657
+|statsblock  = 
+MAGIC ITEM  LORE ITEM  NO DROP<br>
+Slot: BACK<br>
+AC: 15 <br>
+STR: +10 WIS: +10 INT: +10 HP: +50 MANA: +50<br>
+WT: 1.0  Size: SMALL<br>
+Class: WAR SHD SHM MNK NEC<br>
+Race: ALL<br>
+|dropsfrom = 
+
+[[Plane of Hate]]
+
+* [[Innoruuk_(God)|Innoruuk]]
+
+}}</onlyinclude>
+
+[[Category:Shaman Equipment]]
+[[Category:Shadow Knight Equipment]]
+[[Category:Warrior Equipment]]
+[[Category:Necromancer Equipment]]
+[[Category:Monk Equipment]]
+[[Category:Back]]
