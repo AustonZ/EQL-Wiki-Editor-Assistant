@@ -47,7 +47,7 @@ public static class ItemParser
     public static ParsedItem Parse(IReadOnlyList<OcrLine> lines)
     {
         var warnings = new List<string>();
-        List<List<OcrLine>> rows = GroupIntoRows(lines);
+        List<List<OcrLine>> rows = GroupIntoRows(lines).Where(HasAnyAlphanumeric).ToList();
         int i = 0;
 
         if (rows.Count == 0)
@@ -193,6 +193,16 @@ public static class ItemParser
         foreach (List<OcrLine> row in rows) row.Sort((a, b) => a.BoundingBox.X.CompareTo(b.BoundingBox.X));
         return rows;
     }
+
+    /// <summary>Drops rows with no letters or digits at all. The window's own chrome occasionally reads as
+    /// punctuation — a real capture has the tab-bar corner, clipped at the crop's left edge, recognized as
+    /// "()" — and because the header is parsed positionally, one such junk row between the tab row and the
+    /// content-area name shifts every following field by one: the name is read as "()", and the real name row is
+    /// then consumed as the flags row. No legitimate field is punctuation-only, so dropping these outright is
+    /// safer than trying to identify the name row by similarity to the title (which would quietly defeat the
+    /// title-vs-content occlusion check, whose entire job is to notice when those two *don't* match).</summary>
+    private static bool HasAnyAlphanumeric(List<OcrLine> row) =>
+        row.Any(l => l.Text.Any(char.IsLetterOrDigit));
 
     private static string JoinRow(List<OcrLine> row) => string.Join(' ', row.Select(l => l.Text.Trim()));
 

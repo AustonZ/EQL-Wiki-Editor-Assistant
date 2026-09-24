@@ -242,6 +242,34 @@ public class ItemParserTests
     }
 
     [Fact]
+    public void Parse_PunctuationOnlyJunkRow_DoesNotShiftTheHeader()
+    {
+        // Verbatim from a real capture: the window's own tab-bar corner, clipped at the crop's left edge, was
+        // recognized as "()" and landed on its own row between the tab row and the content-area name. Because
+        // the header is positional, that made the name parse as "()", pushed the real name row into the flags
+        // field, and tripped the title-vs-content occlusion check on a completely clean capture.
+        OcrLine[] lines =
+        [
+            L("Kavruul's Mystic Pouch", 134, 0),
+            L("Description", 159, 18),
+            L("()", 0, 36),
+            L("Kavruul's Mystic Pouch", 58, 49),
+            L("Class: ALL", 56, 79),
+            L("Race: ALL", 55, 94),
+            L("Size:", 6, 126),
+            L("SMALL", 78, 126),
+        ];
+
+        ParsedItem item = ItemParser.Parse(lines);
+
+        Assert.Equal("Kavruul's Mystic Pouch", item.Name);
+        Assert.False(item.TitleContentNameMismatch);
+        Assert.Empty(item.Flags);
+        Assert.Equal(["ALL"], item.Classes);
+        Assert.Contains(item.Stats, kv => kv.Key == "Size" && kv.Value == "SMALL");
+    }
+
+    [Fact]
     public void Parse_LongClassListWrappingToASecondRow_AbsorbsTheContinuation()
     {
         // Verbatim from a real capture: a class list too long for one row wraps onto an unlabeled second row.

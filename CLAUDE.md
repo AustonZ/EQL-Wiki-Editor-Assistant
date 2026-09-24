@@ -46,7 +46,7 @@ The full design rationale, wiki research findings, and milestone plan live in
   (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device).
   **Read the `[GeneratedComInterface]` note below before touching `Interop/`** — it documents a real, confirmed
   runtime failure mode, not a style preference.
-- `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — two `IOcrEngine` implementations: **`RapidOcrEngine`
+- `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — the `IOcrEngine` implementation: **`RapidOcrEngine`
   wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline). See "OCR engine choice" below — this
   wasn't arbitrary: the OS-provided `Windows.Media.Ocr` was tried first and replaced after real testing showed it
   meaningfully less accurate, then removed outright once it had no remaining use.
@@ -257,6 +257,12 @@ body by pattern-matching each row, since the body's actual field set varies a lo
 - **Known, accepted v1 simplification**: effect sub-line modifiers (`Cast Time: 4.0 seconds`, `Cooldown: 240
   seconds`) aren't associated back to the specific effect line above them — they land in the generic `Stats` bag
   like any other label/value line. Revisit only if something downstream ends up needing that grouping.
+- **A punctuation-only junk row shifts the whole positional header.** The window's own chrome occasionally reads
+  as text — a real capture had the tab-bar corner, clipped at the crop's left edge, recognized as `()` on its own
+  row between the tab row and the content-area name, which made the name parse as `()` and pushed the real name
+  row into the flags field. Rows with no letters or digits at all are dropped before parsing. Note the safer fix
+  is dropping junk, *not* identifying the name row by similarity to the title — that would quietly defeat the
+  title-vs-content occlusion check, whose whole job is to notice when those two genuinely differ.
 - **Open issue — OCR drops isolated stat digits, and it's the dominant remaining data gap.** Measured over 99
   real item windows: ~20 stat values are lost, so roughly 1 item in 5 is missing at least one stat. The parser
   surfaces each as an orphaned-label warning rather than guessing (never silently drop the field), but that's a
