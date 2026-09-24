@@ -67,7 +67,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   `--probe x,y,dx,dy,count` to dump raw pixel RGB along a ray — that's how the window-chrome colour profile in
   "Locating item windows" was measured, so use it rather than guessing before changing anything in
   `WindowBoundsFinder`; `ParseSpike` runs the full Locate -> Parse pipeline and dumps every parsed field per
-  window; `AccuracySpike` scores that pipeline against tracked ground truth (see "Measuring extraction accuracy").
+  window; `AccuracySpike` scores that pipeline against tracked ground truth (see "Measuring extraction accuracy");
+  `GlyphSpike` measures raw pixels, segments text and builds/verifies the UI font atlas (see "Glyph matching").
   Keep using these — don't recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
   `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
@@ -318,6 +319,50 @@ item's own name again for others.
   screenshot and dumps every parsed field per window (including a `[FOREIGN]` marker on foreign exaltations) —
   use this, don't recreate an ad hoc version, when tuning parser rules against new samples.
 
+**Glyph matching (`Core.Glyphs`, atlas in `Glyphs/eql-ui-font.atlas`) — the UI font is a deterministic bitmap
+blit, so reading it is exact template matching, not recognition.** Measured, not assumed: the same 'A' in an item
+window and in the in-game Notes Window is byte-identical, anti-aliasing intermediates included. Build and inspect
+with `tools/GlyphSpike` — `dump` prints a region's raw intensities (the `--probe` of this work; measure before
+changing a constant), `segment` shows the bands/runs/glyphs found, `cluster` groups by exact equality, `atlas`
+builds the labelled atlas, `verify` reads a real region back.
+- **Anti-aliasing is one fixed ramp in every colour, once normalized.** Absolute values differ per colour because
+  the ramp is scaled to that colour's peak — white on a content area runs `16 64 112 159 191 223 255`, title-bar
+  grey on black runs `0 38 77 115 141 166 192`, magenta effect text runs `16 58 100 141 169 196 224` — but
+  divided by `(peak - background)` all three are the same seven steps, exactly `k/15` for k in 0,3,6,9,11,13,15.
+  So **one colour-blind atlas covers the whole UI**; no per-colour atlas is needed. Intensity is the **maximum**
+  channel (the opposite of `WindowBoundsFinder`'s frame test, which needs the minimum — different question).
+- **The off-ramp counter is the check on all of it.** Captures are lossless, so a pixel that doesn't land on a
+  ramp step means the model no longer describes the image (rescaled? another skin or UI scale?) and the tool
+  refuses to build an atlas rather than rounding. It caught both calibration bugs below before inspection did.
+- **Background is per band, peak is per colour within a band.** A 2px-wide `i` or `l` tops out at ramp level 4
+  (191 where white's peak is 255) because its stem is never fully covered, so a per-run peak mis-normalizes it;
+  and a single row routinely carries two colours (a white `Focus Effect:` label beside a magenta effect name), so
+  a per-band peak is wrong too. Runs are grouped by which channels their brightest pixel uses.
+- **Baseline is the modal glyph bottom per band, ties broken _downward_.** On a line of letters this is
+  unambiguous; on the sheet's `<>?|:~` row only `?` and `:` sit on the baseline while `<` and `>` float above it,
+  and breaking that 2-2 tie upward put the atlas's `:` 2px out so it never matched — every real `Race:` read as
+  `Race.`, a silent substitution. A tempting global rule ("text is on a 16px grid, take the modal phase across
+  all bands") is **wrong**: the pitch is 16px through the stat block but 23px down the exaltation rows.
+- **Glyphs inside a word touch** (a real `ALL` has 'A' ending at x=869 and 'L' beginning at x=870), so gap
+  splitting cannot separate them — the reader walks a run left to right taking the largest exact match. Largest
+  by width *then height*: a `.` legitimately matches a `:`'s lower dot, so a width-only rule reintroduces the
+  `Race.` bug from the other direction.
+- **Atlas labelling is positional, not a manual pass.** The Notes Window sheet spells known strings with every
+  character space-separated, so `GlyphAtlas.FromLabelledBands` labels by position and **refuses** if any row's
+  glyph count disagrees — a miscount would shift every later label and bake wrong characters in.
+- **Result: 88 characters, 87 distinct shapes.** The single collision is `l` = `I`, both a bare 2x9 bar with no
+  serif or crossbar. That is irreducible at the glyph level: the atlas records both labels and leaves the choice
+  to context. Guessing one would be a silent substitution, which is the failure this engine exists to remove.
+- The atlas is an **embedded resource** of `Core` (`GlyphAtlas.Bundled`), not a file beside the executable —
+  contrast the RapidOCR models, whose loose-file dependency has already caused a real runtime failure twice.
+- **Known gap: the sheet has a backtick but no `'` or `"`.** Both quote styles occur in real item names
+  (`Kilva's Skin of Flame` against `Kavruul`s Mystic Pouch`), and an apostrophe currently reads as nothing.
+  Needs one more Notes Window line captured; `GlyphAtlasTests` pins the gap so it stays visible.
+- **Still open (stage 3)**: bands that merge with window chrome (the item icon, divider rules, the tier bar)
+  break calibration for that band, so the `Class:` and title-bar rows read with gaps while every clean text row
+  reads perfectly — including `Ornamentation` (not `Omamentation`), `Worn Exaltation` (not `Wom`) and
+  `SV. Void: 7`, the isolated digit RapidOCR drops entirely.
+
 **Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to OCR
 settings or parser rules must be judged by a number, not by eyeballing warning counts — 18 tunable OCR parameters
 against ~100 item windows is unmeasurable by eye, and the failure that matters most (a *silently* wrong value) is
@@ -492,6 +537,18 @@ dotnet run --project tools/AccuracySpike -- --bootstrap  # regenerate ground tru
 
 # The corpus regression test (~3 min, opt-in so it can't get muted):
 $env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracyTests"
+
+# Glyph matching: read a region's raw pixel intensities (the --probe of this work; measure before tuning),
+# then segment it, then read it back with the atlas:
+dotnet run --project tools/GlyphSpike -- dump "samples/some screenshot.png" 864,373,12,12 [--raw]
+dotnet run --project tools/GlyphSpike -- segment "samples/some screenshot.png" 774,279,388,522
+dotnet run --project tools/GlyphSpike -- verify "samples/some screenshot.png" 774,279,388,522 \
+  --atlas src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
+
+# Regenerate the atlas from the in-game Notes Window glyph sheet (the region must cover exactly its six
+# character rows, in order — the builder refuses on a glyph-count mismatch):
+dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,810,570,100 \
+  --out src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
 ```
 
 Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).

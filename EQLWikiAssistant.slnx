@@ -13,6 +13,7 @@
     <Project Path="tools/AccuracySpike/AccuracySpike.csproj" />
     <Project Path="tools/CaptureSpike/CaptureSpike.csproj" />
     <Project Path="tools/EQLWikiAssistant.TestSupport/EQLWikiAssistant.TestSupport.csproj" />
+    <Project Path="tools/GlyphSpike/GlyphSpike.csproj" />
     <Project Path="tools/LocateSpike/LocateSpike.csproj" />
     <Project Path="tools/OcrSpike/OcrSpike.csproj" />
     <Project Path="tools/ParseSpike/ParseSpike.csproj" />
