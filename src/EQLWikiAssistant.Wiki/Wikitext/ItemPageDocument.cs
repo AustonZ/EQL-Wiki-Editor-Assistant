@@ -156,6 +156,35 @@ public sealed class ItemPageDocument
         return Reparse(WikitextScanner.ReplaceValue(Wikitext, parameter, block.Render()));
     }
 
+    /// <summary>
+    /// Removes every duplicate of a named parameter, keeping the last — the one MediaWiki actually renders.
+    ///
+    /// The user's own routine includes cleaning these up (2026-09-25), and it is a *compliance* fix rather than a
+    /// formatting one: a page with two <c>|notes=</c> has content that does not render, which is a defect in what
+    /// the page says. Rare but real — 3 of 744 sampled pages.
+    ///
+    /// Removing takes the parameter's whole <c>|name = value</c> run, not just its value, or a stray <c>|notes =</c>
+    /// is left behind. Duplicates are removed back to front so the earlier spans stay valid while iterating.
+    /// </summary>
+    public ItemPageDocument WithoutDuplicateParameters()
+    {
+        TemplateParameter[] doomed = [.. Template.Parameters
+            .Where(p => p.Name is not null && p.SegmentStart >= 0)
+            .GroupBy(p => p.Name!, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            // Keep the last occurrence, which is the one MediaWiki uses; drop everything before it.
+            .SelectMany(g => g.SkipLast(1))
+            .OrderByDescending(p => p.SegmentStart)];
+
+        if (doomed.Length == 0) return this;
+
+        string wikitext = Wikitext;
+        foreach (TemplateParameter parameter in doomed)
+            wikitext = wikitext[..parameter.SegmentStart] + wikitext[parameter.SegmentEnd..];
+
+        return Reparse(wikitext);
+    }
+
     /// <summary>Removes the <c>{{Item Lore Missing}}</c> placeholder wherever it appears in <c>notes</c>, along
     /// with a <c>&lt;br&gt;</c> immediately following it — real pages write
     /// <c>{{Item Lore Missing}}&lt;br&gt;</c> before the human's own text, and leaving that break behind opens the

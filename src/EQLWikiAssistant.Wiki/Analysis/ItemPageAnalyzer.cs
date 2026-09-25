@@ -4,17 +4,25 @@ using EQLWikiAssistant.Wiki.Wikitext;
 
 namespace EQLWikiAssistant.Wiki.Analysis;
 
-/// <summary>The whole comparison of one capture against one page.</summary>
+/// <summary>The whole comparison of one capture against one page, plus what the page gets wrong on its own terms.</summary>
 public sealed record ItemPageAnalysis(
     string PageTitle,
-    IReadOnlyList<FieldFinding> Findings)
+    IReadOnlyList<FieldFinding> Findings,
+    IReadOnlyList<ComplianceFinding> Compliance)
 {
     public IEnumerable<FieldFinding> Changes => Findings.Where(f => f.IsChange);
     public IEnumerable<FieldFinding> Blockers => Findings.Where(f => f.Blocks);
 
-    /// <summary>True when the page already agrees with the capture and nothing needs a human — the "matched"
-    /// outcome the ledger records.</summary>
-    public bool IsClean => !Findings.Any(f => f.IsChange || f.Blocks);
+    /// <summary>
+    /// True when the page already agrees with the capture, nothing needs a human, and nothing the tool would fix
+    /// on compliance grounds remains — the "matched" outcome the ledger records.
+    ///
+    /// Compliance counts here deliberately: a page that matches the capture but still carries
+    /// <c>{{Item Lore Missing}}</c> is not done, because the tool's edit would still change it. Compliance the tool
+    /// *cannot* fix is excluded, since no amount of editing would clear it and the item would never be recordable.
+    /// </summary>
+    public bool IsClean =>
+        !Findings.Any(f => f.IsChange || f.Blocks) && !Compliance.Any(c => c.ToolWillFix);
 
     public FieldFinding? Find(string field) =>
         Findings.FirstOrDefault(f => string.Equals(f.Field, field, StringComparison.Ordinal));
@@ -58,11 +66,15 @@ public static class ItemPageAnalyzer
     private static readonly string[] DescriptiveFlagMarkers =
         ["This is a meal", "This is a drink", "This is a snack", "This is a banquet", "The Book is", "The Note is"];
 
+    /// <param name="wholePageWikitext">The complete page source, for the compliance checks that look outside the
+    /// template call (the <c>&lt;onlyinclude&gt;</c> wrapper and the era banner both sit around it). Defaults to the
+    /// document's own text, which is the same thing unless a caller has a reason to differ.</param>
     public static ItemPageAnalysis Analyze(
         ParsedItem captured,
         ItemPageDocument page,
         string pageTitle,
-        WikiMapping? mapping = null)
+        WikiMapping? mapping = null,
+        string? wholePageWikitext = null)
     {
         ArgumentNullException.ThrowIfNull(captured);
         ArgumentNullException.ThrowIfNull(page);
@@ -83,7 +95,10 @@ public static class ItemPageAnalyzer
         AddEffectFindings(findings, captured, page, block, mapping);
         NormalizeSignsIfTheEditWouldBeInconsistent(findings);
 
-        return new ItemPageAnalysis(pageTitle, findings);
+        return new ItemPageAnalysis(
+            pageTitle,
+            findings,
+            ComplianceChecker.Check(page, wholePageWikitext ?? page.Wikitext, mapping));
     }
 
     private static void AddNameFindings(

@@ -286,6 +286,7 @@ async Task<int> AnalyzeCorpusAsync()
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
     var verdictCounts = new Dictionary<FieldVerdict, int>();
     var needsReview = new List<(string Item, FieldFinding Finding)>();
+    var compliance = new List<(string Item, ComplianceFinding Finding)>();
     int notItemPages = 0, missing = 0, misnamed = 0, unusable = 0, clean = 0, changed = 0;
 
     foreach (ExpectedWindow window in items)
@@ -309,6 +310,8 @@ async Task<int> AnalyzeCorpusAsync()
             window.MerchantValue, window.Lore, []);
 
         ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, lookup.Page!.Title);
+        foreach (ComplianceFinding c in analysis.Compliance)
+            compliance.Add((window.Name!, c));
         foreach (FieldFinding finding in analysis.Findings)
         {
             verdictCounts[finding.Verdict] = verdictCounts.GetValueOrDefault(finding.Verdict) + 1;
@@ -338,6 +341,12 @@ async Task<int> AnalyzeCorpusAsync()
     Console.WriteLine("=== field verdicts ===");
     foreach (FieldVerdict verdict in Enum.GetValues<FieldVerdict>())
         Console.WriteLine($"  {verdict,-16} {verdictCounts.GetValueOrDefault(verdict)}");
+
+    Console.WriteLine();
+    Console.WriteLine($"=== template compliance ({compliance.Count} finding(s)) ===");
+    foreach (var group in compliance.GroupBy(c => (c.Finding.Rule, c.Finding.ToolWillFix)).OrderByDescending(g => g.Count()))
+        Console.WriteLine($"  {group.Count(),4}  {group.Key.Rule,-24} " +
+                          $"{(group.Key.ToolWillFix ? "tool fixes" : "needs a human"),-14} e.g. {group.First().Item}");
 
     Console.WriteLine();
     Console.WriteLine($"=== needs review ({needsReview.Count}) ===");

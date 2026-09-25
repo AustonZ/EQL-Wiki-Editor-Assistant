@@ -23,8 +23,17 @@ public sealed record TemplateParameter(
     int? Index,
     string RawValue,
     int ValueStart,
-    int ValueLength)
+    int ValueLength,
+    int SegmentStart = -1,
+    int SegmentEnd = -1)
 {
+    /// <summary>Offset of this parameter's own <c>|</c>, and the offset just past its last character — the whole
+    /// <c>|name = value</c> run. Needed to *remove* a parameter, which the value span alone cannot express:
+    /// splicing out only the value leaves a stray <c>|name =</c> behind.</summary>
+    public int SegmentStart { get; init; } = SegmentStart;
+
+    public int SegmentEnd { get; init; } = SegmentEnd;
+
     /// <summary>The value with surrounding whitespace removed — what a comparison should use. MediaWiki itself
     /// trims named parameter values, so this is the value the wiki actually sees.</summary>
     public string Value => RawValue.Trim();

@@ -432,6 +432,42 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   being dropped, plus real staleness and four `merchant_value` corrections. It also caught a typo on a live page
   (`Lore Equpped`).
 
+**Template compliance (`Wiki.Analysis.ComplianceChecker`).** What a page gets wrong on its own terms, independent of
+any capture. **Compliance changes what the page *says*; formatting changes only how it reads** — the latter belongs
+to the separate prettifier and this checker must never stray into it. Every rule was kept or dropped on measured
+frequency across 744 real item pages, so none is hypothetical:
+
+| rule | pages | tool fixes? |
+|---|---|---|
+| era template missing | **232** | no — the window never says which expansion an item is from |
+| `{{Item Lore Missing}}` present | 35 | yes |
+| `<onlyinclude>` wrapper missing | 4 | no — repairing it means deciding what to enclose |
+| duplicate parameter | 3 | yes |
+| unrecognized parameter name | 3 | no |
+| required parameter missing | 0 | no |
+
+- **`ToolWillFix` is the load-bearing distinction.** A compliance problem the tool can correct is part of the edit it
+  proposes; one it cannot is reported and left alone. Nothing in between — the tool never half-fixes a page and
+  never claims to have fixed what it only noticed.
+- **An unrecognized parameter name is content that does not render at all**, which is why it is worth a rule despite
+  hitting only 3 pages: one writes `recipe` for `recipes`, so that page's recipe section is invisible. It is
+  *reported*, not renamed — the closest known name may not be what the author meant, and guessing would move
+  somebody's content somewhere they did not choose.
+- **Era banners are matched by shape, not against a list.** The wiki has twelve (`Classic`, `Velious`, `Kunark`,
+  `Chardok Revamp`, `Sky`, `Temple`, `Epics`, `FearHateRevamp`, `EpicQuests`, `Paineel`, `Fear`, `Luclin`) and gains
+  one per expansion, so a fixed list would report a brand-new era as missing — the same trap the open-ended flag
+  vocabulary avoids.
+- **The era rule fires on roughly a third of all pages and the tool can never clear it.** Kept because the user's
+  routine includes template compliance, but it is the one rule worth reconsidering if it proves to be noise; it is on
+  their TODO as a decision.
+- **Compliance the tool *would* fix counts against `ItemPageAnalysis.IsClean`**, so a page that matches the capture
+  but still carries `{{Item Lore Missing}}` is not "done" — the tool's edit would still change it. Compliance it
+  cannot fix is excluded, since no amount of editing would clear it and such an item could never be recorded as
+  checked.
+- Removing a duplicate takes the parameter's whole `|name = value` run (`TemplateParameter.SegmentStart`/`SegmentEnd`),
+  not just its value — splicing out the value alone leaves a stray `|notes =` behind — and keeps the **last**
+  occurrence, the one MediaWiki renders.
+
 **Eligibility (`Core.Items.ItemEligibility`, pipeline step 4b).** A foreign exaltation or a levelled item (`+X>0`)
 blocks automated processing. **The load-bearing rule is the ledger one and it is easy to get backwards: an
 ineligible item gets no ledger row at all** — not `flagged`, not `skipped`. It was never actually checked, so the
@@ -979,6 +1015,7 @@ dotnet run --project tools/WikiSpike -- grammar --cached .local-data/wiki-pages 
 # levelled items, or the numbers lie). The wiki-side equivalent of AccuracySpike:
 dotnet run --project tools/WikiSpike -- analyze
 dotnet run --project tools/WikiSpike -- analyze --detail   # plus every non-matching field, per item
+# The analyze summary also cross-tabs template-compliance findings by rule and by whether the tool can fix them.
 
 # Store the bot password (prompts; never pass it as an argument — that lands in shell history and the process
 # list). Create one first at https://eqlwiki.com/Special:BotPasswords with "Edit existing pages" granted.

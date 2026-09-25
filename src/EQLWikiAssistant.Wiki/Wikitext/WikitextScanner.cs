@@ -161,6 +161,9 @@ public static class WikitextScanner
             if (text[i] == '=') { equals = i; break; }
         }
 
+        // segmentStart points just past this parameter's own '|', which is what removing it has to take with it.
+        int pipe = segmentStart - 1;
+
         if (equals < 0)
         {
             into.Add(new TemplateParameter(
@@ -168,7 +171,9 @@ public static class WikitextScanner
                 Index: ++positional,
                 RawValue: text[segmentStart..segmentEnd],
                 ValueStart: segmentStart,
-                ValueLength: segmentEnd - segmentStart));
+                ValueLength: segmentEnd - segmentStart,
+                SegmentStart: pipe,
+                SegmentEnd: segmentEnd));
             return;
         }
 
@@ -177,7 +182,9 @@ public static class WikitextScanner
             Index: null,
             RawValue: text[(equals + 1)..segmentEnd],
             ValueStart: equals + 1,
-            ValueLength: segmentEnd - equals - 1));
+            ValueLength: segmentEnd - equals - 1,
+            SegmentStart: pipe,
+            SegmentEnd: segmentEnd));
     }
 
     /// <summary>If <paramref name="i"/> starts a construct whose contents must not be scanned for <c>|</c> or
