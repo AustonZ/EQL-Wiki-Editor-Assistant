@@ -241,11 +241,22 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
     `<ul><li> 5 <span style="color:silver"><b>Silvers</b></span></li></ul>`, sometimes under a
     `<p><b>VALUE TO VENDOR with CHA : 80 and faction at Ally</b></p>` heading. One real value is
     `0p 0g 1s 0c with 111 Charisma`, which normalizes to `1s`.
-  - **Note this is the one field where replacing is not obviously loss-free**, and it needs deciding before the
-    write lands: several pages annotate the Charisma and faction the value was observed at, which suggests
-    merchant value varies by those. If it does, overwriting with a capture taken at different CHA is a data
-    change disguised as a reformat. Raise it with the user rather than assuming — the format normalization is
-    settled, the *value* comparison is not.
+  - **The captured figure always wins, and those CHA annotations are a legacy artifact** (user, 2026-09-24). In
+    legacy EverQuest players had to guess and check to learn an item's value, which is why pages record the
+    conditions a figure was seen under (`with 111 Charisma`, `(68 CHA @ Kindly)`, `Max`). EQL removed the
+    guesswork: the window states the **maximum** value directly, independent of Charisma and faction. So an
+    annotated legacy figure is frequently *wrong* rather than merely misformatted — `187p1g9s1cp (68 CHA @
+    Kindly)` records a sub-maximum price — and replacing it is a correction. The annotations go with it.
+  - **Consequently there is deliberately no parser for the legacy forms.** Since the page's value is never a
+    source of truth, nothing has to be understood about it: the tool renders the captured value and compares
+    strings, and an HTML block or a `2.6pp` simply differs and is overwritten. Writing a tolerant reader for all
+    of that would be work in service of a value that gets discarded anyway.
+  - Implemented as `Core.Items.MerchantValue` (`TryParseGameText` / `ToWikiText`), with a test asserting that
+    *every* merchant value in the verified corpus parses — so a future change to the game's phrasing fails the
+    build instead of quietly writing a wrong figure. An unreadable value reports failure rather than zero;
+    returning zero would publish `absolutely nothing` for an item whose price merely could not be read. The `p/g/s/c`
+    spelling is a wiki convention and belongs in the mapping layer once that exists (milestone 6); it lives in
+    `Core` for now because there is no mapping layer yet and one convention does not justify an abstraction.
 - Fixtures: eleven real pages in `tests/EQLWikiAssistant.Tests/Wiki/Fixtures/`, **tracked in git** — unlike
   screenshots these are public wikitext with nothing private in them. That folder's README says what each one is
   there to prove; each exists because it broke a plausible simplifying assumption.
