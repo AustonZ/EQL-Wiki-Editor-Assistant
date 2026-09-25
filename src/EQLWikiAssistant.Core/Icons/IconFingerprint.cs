@@ -36,29 +36,91 @@ public sealed record IconFingerprint(byte[] Signature, int InkWidth, int InkHeig
     }
 
     /// <summary>
-    /// How different two renderings of the same icon may be.
+    /// How different two renderings of the same icon may be, as a correlation distance.
     ///
     /// **Measured, and the measurement is the only reason to trust it.** Over 80 real same-icon pairs and 134
-    /// different-icon controls from the sample set (`WikiSpike icons`), same-icon distances run 0.002 to 0.070
-    /// (median 0.016) while different-icon distances start at 0.037 (median 0.145). The two overlap between 0.037
-    /// and 0.070, so no value is perfect and the choice is which error to make:
+    /// different-icon controls (`WikiSpike icons`):
     ///
     /// <code>
     /// threshold   false mismatches (of 80)   false matches (of 134)
-    ///   0.033              7                          0
-    ///   0.035              7                          0
-    ///   0.038              6                          2
-    ///   0.040              6                          5
+    ///   0.10               6                          0
+    ///   0.12               4                          0
+    ///   0.13               4                          0
+    ///   0.15               4                          2
     /// </code>
     ///
-    /// 0.035 is the last point with **no false matches**, which is the error that matters: a false mismatch costs
-    /// the user a glance, while a false match silently blesses a page pointing at the wrong artwork — and silently
-    /// wrong is the failure this whole project is built to avoid. Roughly 9% of correct icons will ask for that
-    /// glance, which is the price.
+    /// 0.13 is the last point with **no false matches**, which is the error that matters: a false mismatch costs the
+    /// user a glance, while a false match silently blesses a page pointing at the wrong artwork.
+    ///
+    /// Combined with the <see cref="MinimumContrast"/> gate this leaves 2 false alerts out of the 75 pairs it is
+    /// willing to judge — under 3%, against 9% for the mean-absolute-difference measure it replaced.
     /// </summary>
-    public const double SameIconThreshold = 0.035;
+    public const double SameIconThreshold = 0.13;
 
-    public bool LooksLike(IconFingerprint other) => DistanceTo(other) <= SameIconThreshold;
+    /// <summary>
+    /// How much the signature varies. A near-black icon has almost none, and comparing two of those is comparing
+    /// noise.
+    ///
+    /// Real case: `Nightmare Hide` is an almost entirely black sprite with a faint outline. The ink box ends up
+    /// driven by that thin outline rather than by the artwork, the 12x12 signature is nearly uniform, and the
+    /// comparison produced a confident mismatch against the item's own correct icon. Refusing to judge is the right
+    /// answer — this check exists to flag wrong icons, and an alert nobody can act on is worse than no alert.
+    /// </summary>
+    public double Contrast
+    {
+        get
+        {
+            if (Signature.Length == 0) return 0;
+            double mean = Signature.Average(v => (double)v);
+            double variance = Signature.Sum(v => (v - mean) * (v - mean)) / Signature.Length;
+            return Math.Sqrt(variance) / 255.0;
+        }
+    }
+
+    /// <summary>Below this there is not enough variation in the sprite to tell one icon from another. Measured: the
+    /// icons that defeated the comparison sit under 0.06, while ordinary ones are well above it.</summary>
+    public const double MinimumContrast = 0.06;
+
+    /// <summary>Whether this fingerprint carries enough signal to be worth comparing at all.</summary>
+    public bool IsComparable => Signature.Length > 0 && Contrast >= MinimumContrast;
+
+    /// <summary>Whether these are the same artwork. Uses the correlation measure, which separated the classes
+    /// measurably better than comparing absolute values — see <see cref="SameIconThreshold"/>. Callers should check
+    /// <see cref="IsComparable"/> first; this answers the question it is asked either way.</summary>
+    public bool LooksLike(IconFingerprint other) => CorrelationDistanceTo(other) <= SameIconThreshold;
+
+    /// <summary>
+    /// An alternative distance that ignores overall brightness and contrast, expressed as 1 - Pearson correlation
+    /// so that 0 is identical and larger is worse, like <see cref="DistanceTo"/>.
+    ///
+    /// Worth having because the two sides are not the same rendering: the game draws the icon about 1.10x larger
+    /// than the wiki's file and interpolates when it does, which shifts values slightly across the whole sprite.
+    /// A measure that only cares about the *pattern* should be less sensitive to that than one comparing absolute
+    /// values — whether it actually is, is a question for the corpus rather than for reasoning.
+    /// </summary>
+    public double CorrelationDistanceTo(IconFingerprint other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        if (other.Signature.Length != Signature.Length)
+            throw new ArgumentException("Fingerprints were built with different grids and cannot be compared.", nameof(other));
+        if (Signature.Length == 0) return 1;
+
+        double meanA = Signature.Average(v => (double)v);
+        double meanB = other.Signature.Average(v => (double)v);
+
+        double covariance = 0, varianceA = 0, varianceB = 0;
+        for (int i = 0; i < Signature.Length; i++)
+        {
+            double a = Signature[i] - meanA;
+            double b = other.Signature[i] - meanB;
+            covariance += a * b;
+            varianceA += a * a;
+            varianceB += b * b;
+        }
+
+        if (varianceA == 0 || varianceB == 0) return varianceA == varianceB ? 0 : 1;
+        return 1 - covariance / Math.Sqrt(varianceA * varianceB);
+    }
 }
 
 /// <summary>Computes <see cref="IconFingerprint"/>s. See that type for why the comparison is perceptual.</summary>

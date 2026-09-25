@@ -48,6 +48,14 @@ public static class ItemIconReader
             IconStrip.Width,
             IconStrip.Height);
 
-        return IconHasher.TryFingerprint(image, region, out fingerprint);
+        if (!IconHasher.TryFingerprint(image, region, out fingerprint)) return false;
+
+        // A near-black sprite carries too little variation to tell one icon from another — `Nightmare Hide` is
+        // almost entirely black with a faint outline, and comparing it produced a confident mismatch against its
+        // own correct icon. Refusing to judge is the right answer for a check whose only job is to flag.
+        if (fingerprint.IsComparable) return true;
+
+        fingerprint = new IconFingerprint([], 0, 0);
+        return false;
     }
 }

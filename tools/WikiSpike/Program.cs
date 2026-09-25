@@ -44,6 +44,7 @@ switch (args[0])
     case "grammar": return await RoundTripAsync(reportGrammar: true);
     case "analyze": return await AnalyzeCorpusAsync();
     case "icons": return await CompareIconsAsync();
+    case "icondiff": return await DiffIconPixelsAsync();
     case "login": return Login();
     case "whoami": return await WhoAmIAsync();
     case "logout": return Logout();
@@ -437,7 +438,7 @@ async Task<int> CompareIconsAsync()
         double distance = captured.DistanceTo(onWiki);
         Console.WriteLine(
             $"  {item.Name,-34} id {iconId,-5} captured {captured.InkWidth}x{captured.InkHeight} " +
-            $"vs wiki {onWiki.InkWidth}x{onWiki.InkHeight}  distance {distance,6:F3}  " +
+            $"vs wiki {onWiki.InkWidth}x{onWiki.InkHeight}  distance {distance,6:F3} corr {captured.CorrelationDistanceTo(onWiki),6:F3} contrast {captured.Contrast,5:F3}/{onWiki.Contrast,5:F3}  " +
             $"{(captured.LooksLike(onWiki) ? "match" : "MISMATCH")}");
     }
 
@@ -453,13 +454,99 @@ async Task<int> CompareIconsAsync()
                 if (otherId == iconId) continue;
                 double distance = captured.DistanceTo(onWiki);
                 Console.WriteLine(
-                    $"  {name,-30} vs {otherName}'s icon {otherId,-5} distance {distance,6:F3}  " +
+                    $"  {name,-30} vs {otherName}'s icon {otherId,-5} distance {distance,6:F3} corr {captured.CorrelationDistanceTo(onWiki),6:F3} contrast {captured.Contrast,5:F3}/{onWiki.Contrast,5:F3}  " +
                     $"{(captured.LooksLike(onWiki) ? "FALSE MATCH" : "correctly rejected")}");
             }
     }
 
     Console.WriteLine($"\nicon downloads this run: {cache.Downloads}");
     return 0;
+}
+
+// Tests whether the game renders icons losslessly from the same asset the wiki files came from. If it does, the
+// comparison can be an exact pixel diff instead of a perceptual one, and every alert would be a real defect.
+// The discriminating question is whether the game *interpolates* when it scales: nearest-neighbour reuses the
+// source colours exactly, while any smoothing invents new ones.
+async Task<int> DiffIconPixelsAsync()
+{
+    if (args.Length < 2) { Console.Error.WriteLine("usage: WikiSpike icondiff <screenshot>"); return 1; }
+
+    CapturedImage image = await ImageFile.LoadAsync(args[1]);
+    using var rapid = new RapidOcrEngine();
+    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+    IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
+
+    using MediaWikiClient client = MediaWikiClient.Create(endpoint);
+    using var http = new HttpClient();
+    http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
+    var cache = new IconCache(Path.Combine(RepoPaths.LocalDataDirectory, "icon-cache"), new WikiIconSource(http, endpoint));
+    string scratch = Path.Combine(RepoPaths.LocalDataDirectory, "icon-scratch");
+    Directory.CreateDirectory(scratch);
+
+    foreach (LocatedWindow window in windows)
+    {
+        if (window.PossiblyOccluded || window.ActiveTab != ItemWindowTab.Description) continue;
+
+        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+        ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
+        if (lookup.Outcome != LookupOutcome.Found) continue;
+        if (ItemPageDocument.Parse(lookup.Page!.Wikitext)?.IconId is not { Length: > 0 } iconId) continue;
+        if (await cache.GetAsync(iconId) is not { } bytes) continue;
+
+        string file = Path.Combine(scratch, $"item_{new string([.. iconId.Where(char.IsLetterOrDigit)])}.png");
+        if (!File.Exists(file)) await File.WriteAllBytesAsync(file, bytes);
+        CapturedImage wiki = await ImageFile.LoadOverBackgroundAsync(file, background: 16);
+
+        // Ink boxes on both sides, using the same floor, so the two are measured identically.
+        Rect captured = InkBox(image, new Rect(
+            window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
+            ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height));
+        Rect onWiki = InkBox(wiki, new Rect(0, 0, wiki.Width, wiki.Height));
+        if (captured.Width == 0 || onWiki.Width == 0) continue;
+
+        var wikiColours = new HashSet<int>();
+        for (int y = onWiki.Y; y < onWiki.Y + onWiki.Height; y++)
+            for (int x = onWiki.X; x < onWiki.X + onWiki.Width; x++)
+                wikiColours.Add(ColourAt(wiki, x, y));
+
+        var capturedColours = new HashSet<int>();
+        for (int y = captured.Y; y < captured.Y + captured.Height; y++)
+            for (int x = captured.X; x < captured.X + captured.Width; x++)
+                capturedColours.Add(ColourAt(image, x, y));
+
+        int shared = capturedColours.Count(c => wikiColours.Contains(c));
+
+        Console.WriteLine($"--- {item.Name} (icon {iconId})");
+        Console.WriteLine($"    captured ink {captured.Width}x{captured.Height} at window-rel " +
+                          $"({captured.X - window.Bounds.X},{captured.Y - window.Bounds.Y})   " +
+                          $"wiki ink {onWiki.Width}x{onWiki.Height} at ({onWiki.X},{onWiki.Y})");
+        Console.WriteLine($"    scale x {(double)captured.Width / onWiki.Width:F3}  y {(double)captured.Height / onWiki.Height:F3}");
+        Console.WriteLine($"    distinct colours: captured {capturedColours.Count}, wiki {wikiColours.Count}, " +
+                          $"captured-also-in-wiki {shared} ({100.0 * shared / capturedColours.Count:F0}%)");
+    }
+
+    return 0;
+
+    static int ColourAt(CapturedImage img, int x, int y)
+    {
+        int o = (y * img.Width + x) * 4;
+        return (img.Pixels[o + 2] << 16) | (img.Pixels[o + 1] << 8) | img.Pixels[o];
+    }
+
+    static Rect InkBox(CapturedImage img, Rect region)
+    {
+        int minX = int.MaxValue, minY = int.MaxValue, maxX = -1, maxY = -1;
+        for (int y = Math.Max(0, region.Y); y < Math.Min(region.Y + region.Height, img.Height); y++)
+            for (int x = Math.Max(0, region.X); x < Math.Min(region.X + region.Width, img.Width); x++)
+            {
+                int o = (y * img.Width + x) * 4;
+                if (Math.Max(img.Pixels[o + 2], Math.Max(img.Pixels[o + 1], img.Pixels[o])) <= IconHasher.InkFloor) continue;
+                minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
+                minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
+            }
+
+        return maxX < 0 ? new Rect(0, 0, 0, 0) : new Rect(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
 }
 
 int Login()

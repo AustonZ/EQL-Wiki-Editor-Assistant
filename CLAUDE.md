@@ -522,10 +522,22 @@ wrong or the capture caught something odd, and choosing one is a human's call.
   left of the item's name — nothing to trace, unlike the window outline. `ItemIconReader.IconStrip` is the region it
   occupies, measured across all 43 screenshots (`LocateSpike --icon`): window-relative x 12..52, y 52..100, with the
   name and flag rows starting at x ≈ 56.
-- **The comparison must be scale-invariant.** The wiki stores 40x40 PNGs; the game draws the same sprite ~1.1x
-  larger (a Water Flask is 21x44 on screen against 19x40 on the wiki). The ink's own bounding box is found on both
-  sides and resampled onto a 12x12 grid, so neither the sprite's position in its cell nor the padding a caller
-  included matters.
+- **An exact pixel diff is not possible against these files, and this was tested rather than assumed.** The idea is
+  sound in principle — the wiki icons were pulled programmatically from the game's own assets and PNG is lossless,
+  so a fixed offset and a byte comparison ought to work. It fails on measurement (`WikiSpike icondiff`):
+  - the game draws the sprite at a consistent **~1.10x** the wiki file's size (42x43 against 38x39, 33x44 against
+    30x40, 21x44 against 19x40), so there is no 1:1 pixel mapping to find an offset for; and
+  - only **2-7%** of the colours in the captured icon appear anywhere in the wiki file. Nearest-neighbour scaling
+    cannot invent a colour, so the game is interpolating — and the capture often has *more* distinct colours than
+    the source (115 against 81 on one item), which is the signature of exactly that.
+  - **This is not a UI-scale setting the user could change.** Glyph matching proves the UI text is a byte-identical
+    bitmap blit at this scale (2094 fields exact), so nothing global is being resampled; the 1.10 is specific to
+    icons. Either the game renders a 40x40 asset into a larger cell, or the wiki's files were themselves downscaled
+    to 40x40 during extraction — in which case they are lossy relative to the game and re-extracting at native size
+    would make an exact diff possible. Worth knowing before anyone tries this again.
+- **So the comparison is perceptual**, and scale-invariant by construction: the ink's own bounding box is found on
+  both sides and resampled onto a 12x12 colour grid, so neither the sprite's position in its cell nor the padding a
+  caller included matters.
 - **Three bugs found by measurement, each of which made the check useless in a different way**, and none of which
   any unit test would have caught:
   - **Alpha was being discarded.** `ImageFile.LoadAsync` decodes with `BitmapAlphaMode.Ignore`, which is right for
@@ -542,10 +554,18 @@ wrong or the capture caught something odd, and choosing one is a human's call.
 - **The negative control is what proved any of this.** A check that says "match" to everything looks perfect;
   `WikiSpike icons` therefore also compares each captured icon against the *other* items' wiki icons. That is what
   exposed the first two designs, both of which passed the same-item cases.
-- **The threshold was measured, not chosen**: 80 same-icon pairs run 0.002-0.070 (median 0.016), 134 different-icon
-  controls start at 0.037 (median 0.145). They overlap, so the choice is which error to make — 0.035 is the last
-  point with **zero false matches**, at the cost of ~9% of correct icons asking for a glance. A false mismatch costs
-  a glance; a false match silently blesses a wrong icon, which is the failure this project exists to avoid.
+- **Comparison is by correlation, not absolute difference**, and that too was measured: mean absolute difference
+  gave 7 false alerts out of 80 at its best zero-false-match threshold, correlation gives 4. Correlation ignores an
+  overall brightness or contrast shift, which is precisely what two different renderings of one sprite differ by.
+- **An icon with too little contrast is not judged at all.** `Nightmare Hide` is almost entirely black with a faint
+  outline: the ink box ends up driven by the outline, the signature is nearly uniform, and the comparison produced a
+  confident mismatch against the item's *own* correct icon. `IconFingerprint.IsComparable` gates on signature
+  standard deviation (0.06), and `ItemIconReader` refuses to return a fingerprint below it — an alert nobody can act
+  on is worse than no alert.
+- **The threshold was measured, not chosen**: 0.13 is the last point with **zero false matches**. With the contrast
+  gate, that leaves **2 false alerts out of the 75 pairs it is willing to judge, under 3%** (5 of 80 are skipped as
+  too dark; 18 of the 134 controls likewise). A false mismatch costs a glance; a false match silently blesses a
+  wrong icon, which is the failure this project exists to avoid.
 - **The cache** keeps each `File:item_<ID>.png` on disk, keyed by id, and is consulted before any network call —
   icons are static and heavily shared (three corpus breastplates all use id 624, so three items cost one download).
   No expiry; "clear icon cache" / "re-download this icon" belong in Settings. A **missing** icon is cached too, with
