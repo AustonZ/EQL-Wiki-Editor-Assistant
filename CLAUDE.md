@@ -262,18 +262,48 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
   there to prove; each exists because it broke a plausible simplifying assumption.
 
 **Item name vs page title (`Wiki.Wikitext.PageTitle`).** The `Itempage` template needs `itemname` to equal the
-page's title, so a divergence is a defect — but two things complicate that, both measured on 538 real item pages.
-- **A parenthesised qualifier on the title is a legitimate convention, not an error.** 10 of 538 pages have
-  `itemname` ≠ title and **8 of those are this pattern**: `Rough Ashwood Recurve Bow (Hemp)`,
-  `Imbued Dwarven Chain Cloak (Bristlebane)`, `Tailoring (Item)`, `A Sealed Letter (Thex Dagger Quest)`,
-  `Essence of Barbarian (Wormwood)`. One in-game item needs several wiki pages (craft material, deity, quest
-  variant, left/right book page) and `itemname` holds the real in-game name. `TitleMatch.DisambiguatedTitle` is
-  reported as its own outcome so this can be treated differently from a real divergence — **open question for the
-  user: should it be silent, or still surface?** Only 2 of 538 genuinely diverge.
-- **The grave/apostrophe confusion appears in both directions and the tool can actually fix it.** One real page
+page's title. **Any mismatch is a defect** (`PageTitle.IsDefect`), measured at 10 of 538 real item pages — so
+expect a few hundred broken pages wiki-wide.
+- **Verified mechanism, because an earlier note here claimed mismatches render fine and that was wrong.**
+  `Itempage` renders the item as a hover box whose visible anchor is a link to `[[itemname]]`, so when `itemname`
+  is not the page's own title the page shows a link to somewhere else. Two failure modes, both observed live:
+  - no page has that name, so the reader gets a red "page does not exist" link where the item should be —
+    `Essence of Barbarian (Wormwood)`, `Imbued Dwarven Chain Gorget (Bristlebane)`;
+  - a page *does* have that name, so the box silently anchors to an unrelated article — `Tailoring (Item)` links
+    to the Tailoring *skill* page. Worse for being invisible.
+- **`TitleMatch.DisambiguatedTitle` is a defect with a recognizable cause, not an exception to the rule.** 8 of the
+  10 mismatches are a title of the form `<itemname> (<qualifier>)`, arising where one in-game item needs several
+  wiki pages (craft material, deity, quest variant, left/right book page) and the editor left `itemname` as the
+  shared in-game name. It is reported separately only so the user can be told what kind of problem it is.
+- **The fix is not obvious, which is why the tool only reports.** The in-game item really does share one name
+  across its variants, so setting `itemname` to the qualified title would render a name the game never shows.
+  Resolving it properly probably needs a template change — relevant to the user's plan to improve the template.
+- **The grave/apostrophe confusion appears in both directions, and the tool has authoritative data.** One real page
   titles itself `Engraved Di\`Zok Deathbringer` with `itemname = Engraved Di'Zok Deathbringer`; another is the
   reverse. Glyph matching reads the true in-game character (the atlas keeps `'` and `` ` `` distinct, which a test
-  pins), so unlike a general recognizer this tool has authoritative data here rather than a coin flip.
+  pins), so unlike a general recognizer this tool knows which is right rather than guessing.
+- **Beware measuring this with sanitized filenames.** A first pass reported 33 mismatches including `Summoned_
+  Arrow` and `Crimson training tunic_`; those were an artifact of the measuring script replacing `:` and `*` (both
+  legal in MediaWiki titles) to make safe filenames. The real figures come from comparing against titles as the
+  API returns them. `_` in a URL is just MediaWiki's rendering of a space and means nothing here.
+
+**Finding an item's page (`Wiki.MediaWiki.ItemPageLookup`).** More than one API call, because of two measured
+hazards.
+- **A quote-character mismatch must be offered as a candidate, not reported as a new item** (user, 2026-09-25). The
+  user cannot rename a page; their remedy is to create a correctly-named one and redirect the old, so a missed
+  candidate becomes a duplicate nobody can delete. On a miss the lookup retries the name's quote variants and, if
+  one exists, returns `FoundMisnamedCandidate` — the item still counts as new (`TreatAsNew`), because acting on the
+  wrong page is worse than treating a real item as unlisted, but the user is told what was found and prompted to
+  consider a redirect.
+  - **The variant ordering is what makes the request cap safe.** Four quote characters over two positions is
+    sixteen combinations, more than the cap, so an arbitrary order could discard a plausible apostrophe/grave swap
+    in favour of a curly-quote form nobody has observed. Variants are ordered by how many curly quotes they use, so
+    the cap only trims the tail. A name with no quotes costs no extra requests at all.
+  - Redirects are followed by the client, so an already-redirected misspelt page resolves to the right one and the
+    lookup never sees it — desired, not a gap.
+- **A title-illegal name cannot be queried**, so it returns `NameUnusable` rather than "not found" and never issues
+  the request. The page very likely exists under a name a human chose, and creating a second would be the wrong
+  move.
 - **An in-game name containing a title-illegal character must be referred to the user, never rewritten** (user,
   2026-09-25). MediaWiki forbids `# [ ] { } | < >` in titles (derived from this wiki's own `legaltitlechars`), and
   `#` is the one that turns up on real items — a `Cell Key #5` cannot have a page at its own name. The wiki's

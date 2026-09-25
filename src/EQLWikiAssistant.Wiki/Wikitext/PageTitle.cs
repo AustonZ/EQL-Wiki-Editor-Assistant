@@ -6,13 +6,18 @@ public enum TitleMatch
     /// <summary>The page's <c>itemname</c> is exactly its title — what the template requires.</summary>
     Exact,
 
-    /// <summary>The title is the <c>itemname</c> plus a parenthesised qualifier, e.g. the page
-    /// <c>Rough Ashwood Recurve Bow (Hemp)</c> whose <c>itemname</c> is <c>Rough Ashwood Recurve Bow</c>. This is a
-    /// real and deliberate convention on the wiki for one in-game item that needs several pages (craft material,
-    /// deity, quest variant, left/right book page), not a defect.</summary>
+    /// <summary>
+    /// The title is the <c>itemname</c> plus a parenthesised qualifier — the page
+    /// <c>Essence of Barbarian (Wormwood)</c> whose <c>itemname</c> is <c>Essence of Barbarian</c>.
+    ///
+    /// **This is still a defect**, distinguished from <see cref="Divergent"/> only because it has a recognizable
+    /// cause worth telling the user about. It arises where one in-game item needs several wiki pages (craft
+    /// material, deity, quest variant, left/right book page) and the editor left <c>itemname</c> as the shared
+    /// in-game name. See <see cref="PageTitle"/> for what it breaks and why the fix is not obvious.
+    /// </summary>
     DisambiguatedTitle,
 
-    /// <summary>The two genuinely disagree. Always a human's call.</summary>
+    /// <summary>The two disagree in some other way. Always a human's call.</summary>
     Divergent,
 }
 
@@ -81,10 +86,9 @@ public static class PageTitle
     /// <summary>
     /// Compares a page's <c>itemname</c> parameter against its actual title.
     ///
-    /// The template needs these to agree, so a divergence is worth a human's attention — but
-    /// <see cref="TitleMatch.DisambiguatedTitle"/> is reported separately because it is a legitimate convention,
-    /// not an error. Measured on 538 real item pages: 10 disagree, 8 of them by exactly this parenthetical
-    /// pattern, and only 2 genuinely diverge (one of those being a grave accent written as an apostrophe).
+    /// **Any mismatch is a defect** — see <see cref="IsDefect"/>. Measured on 538 real item pages: 10 disagree, 8
+    /// of them by the parenthetical pattern and 2 in some other way (one being a grave accent written as an
+    /// apostrophe). At ~1.5% of item pages, expect a few hundred broken pages wiki-wide.
     /// </summary>
     public static TitleMatch Compare(string? itemName, string pageTitle)
     {
@@ -106,6 +110,24 @@ public static class PageTitle
 
         return TitleMatch.Divergent;
     }
+
+    /// <summary>
+    /// Whether this outcome needs a human. True for every mismatch, including
+    /// <see cref="TitleMatch.DisambiguatedTitle"/>.
+    ///
+    /// **Verified against the live wiki (2026-09-25), because an earlier note in this repo claimed the opposite.**
+    /// `Itempage` renders the item as a hover box whose visible anchor is a link to <c>[[itemname]]</c>, so when
+    /// <c>itemname</c> is not the page's own title the page shows a link to somewhere else. Two failure modes, both
+    /// observed: if no page has that name the reader gets a red "page does not exist" link where the item should be
+    /// (`Essence of Barbarian (Wormwood)`), and if a page *does* have that name the box silently anchors to an
+    /// unrelated article — `Tailoring (Item)` links to the Tailoring *skill* page, which is worse for being
+    /// invisible.
+    ///
+    /// **The fix is not obvious, which is why this only reports.** The in-game item genuinely shares one name
+    /// across its variants, so setting <c>itemname</c> to the qualified title would render a name the game never
+    /// shows. Properly resolving it likely needs a template change rather than a page edit.
+    /// </summary>
+    public static bool IsDefect(TitleMatch match) => match != TitleMatch.Exact;
 
     private static string Normalize(string value) =>
         string.Join(' ', value.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries));
