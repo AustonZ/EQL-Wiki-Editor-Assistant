@@ -261,6 +261,62 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
   screenshots these are public wikitext with nothing private in them. That folder's README says what each one is
   there to prove; each exists because it broke a plausible simplifying assumption.
 
+**Item name vs page title (`Wiki.Wikitext.PageTitle`).** The `Itempage` template needs `itemname` to equal the
+page's title, so a divergence is a defect — but two things complicate that, both measured on 538 real item pages.
+- **A parenthesised qualifier on the title is a legitimate convention, not an error.** 10 of 538 pages have
+  `itemname` ≠ title and **8 of those are this pattern**: `Rough Ashwood Recurve Bow (Hemp)`,
+  `Imbued Dwarven Chain Cloak (Bristlebane)`, `Tailoring (Item)`, `A Sealed Letter (Thex Dagger Quest)`,
+  `Essence of Barbarian (Wormwood)`. One in-game item needs several wiki pages (craft material, deity, quest
+  variant, left/right book page) and `itemname` holds the real in-game name. `TitleMatch.DisambiguatedTitle` is
+  reported as its own outcome so this can be treated differently from a real divergence — **open question for the
+  user: should it be silent, or still surface?** Only 2 of 538 genuinely diverge.
+- **The grave/apostrophe confusion appears in both directions and the tool can actually fix it.** One real page
+  titles itself `Engraved Di\`Zok Deathbringer` with `itemname = Engraved Di'Zok Deathbringer`; another is the
+  reverse. Glyph matching reads the true in-game character (the atlas keeps `'` and `` ` `` distinct, which a test
+  pins), so unlike a general recognizer this tool has authoritative data here rather than a coin flip.
+- **An in-game name containing a title-illegal character must be referred to the user, never rewritten** (user,
+  2026-09-25). MediaWiki forbids `# [ ] { } | < >` in titles (derived from this wiki's own `legaltitlechars`), and
+  `#` is the one that turns up on real items — a `Cell Key #5` cannot have a page at its own name. The wiki's
+  editors resolved that by hand as `Cell Key No. 5`; `No. 5`, `Number 5`, `5` and dropping the `#` are all
+  defensible, the choice is permanent, it becomes the URL, and a wrong guess creates a page nobody can delete. So
+  `PageTitle` only ever reports.
+  - **Such a name also breaks lookup**, which matters as much as the write side: the API returns an error or
+    nothing. Treat that as "the page does not exist" — but never quietly, because it very likely *does* exist under
+    a hand-chosen name. Warn loudly before creating anything.
+  - **The ledger must then record the wiki's name alongside the in-game name** (user, 2026-09-25), or an item whose
+    page was deliberately renamed looks unhandled on every future capture. Milestone 4b.
+  - No sample in the 101-window corpus contains an illegal character, so this is implemented from MediaWiki's rule
+    rather than from measured data.
+
+**Analyzing a capture against a page (milestone 4).** Rules confirmed by the user (2026-09-25), ahead of the diff
+engine itself:
+- **A template field absent from a page is fine unless the capture has data for it.** Absence is only a defect when
+  it would hide something the tool is adding or changing; don't demand a full parameter set.
+- **`No Trade` makes merchant value unverifiable — preserve whatever the wiki has, and say so.** Measured across
+  the verified corpus: **all 63 `No Trade` windows show no merchant-value row at all**, and **all 12 `Attunable`
+  windows show a real value**. So the absence is a property of tradeability, not evidence the item is worthless,
+  and overwriting the wiki's figure with "nothing" would destroy a value no future capture of an attuned item can
+  ever recover. Note this is **broader than the Attunable-vs-No-Trade case the rule was first framed around**: any
+  `No Trade` capture is unverifiable, natively-No-Trade items included.
+  - **`absolutely nothing` and "no row at all" must stay distinguishable**, and they are: `absolutely nothing`
+    never co-occurs with `No Trade` in the corpus. The first is a verified worthless item and gets written; the
+    second is a gap and gets a "couldn't verify merchant value" warning.
+- See "Reading and editing wiki pages" for the flag rules (legacy discarded, vocabulary open-ended, wiki
+  `Attunable` beats captured `No Trade`, `This is a meal!` alerted but never acted on) and the `merchant_value`
+  normalization.
+
+**Eligibility (`Core.Items.ItemEligibility`, pipeline step 4b).** A foreign exaltation or a levelled item (`+X>0`)
+blocks automated processing. **The load-bearing rule is the ledger one and it is easy to get backwards: an
+ineligible item gets no ledger row at all** — not `flagged`, not `skipped`. It was never actually checked, so the
+next capture must be treated as new; any row would make it look handled and quietly exclude it from ever being
+checked properly. `ShouldWriteLedgerEntry` says so on the result rather than leaving each caller to remember.
+- **Ornamentation counts as a foreign exaltation** (user, 2026-09-25, resolving the plan's open question). It is
+  never native — only ever applied by a player — so a filled slot blocks regardless of its name. That last part
+  matters: `IsForeignExaltation` short-circuits for Ornamentation instead of relying on the name comparison, which
+  would read an ornamentation named like the item itself as "native". Its explanation also avoids claiming a name
+  mismatch, which would be misleading for a slot that is foreign by nature.
+- Every blocker is reported, not just the first, so the user sees the whole picture in one pass.
+
 **Checked-items ledger.** To avoid hitting the wiki unnecessarily, a local store (keyed by item name + entity kind)
 records the outcome of each check (`matched`/`edited`/`flagged`/`skipped`/`not-on-wiki`) along with a fingerprint of
 the parsed in-game data. A capture that reproduces an already-`matched`/`edited`, unchanged fingerprint skips the
@@ -718,11 +774,13 @@ vocabulary) and testable on plain strings without an image/OCR round-trip. Start
     answered for an authenticated bot-password session. The CSRF token flow, `assert=user` and `nocreate` are all
     confirmed working against the real wiki too (`WikiSpike edit` on the developer's own sandbox page, restored byte for byte
     and checked by an independent read).
-  - **Not verified, and don't claim otherwise: that `basetimestamp` *rejects* a concurrent edit.** Only that it is
-    accepted in the format sent. MediaWiki attempts a three-way merge when a base timestamp is supplied, so a
-    non-conflicting concurrent edit is merged rather than refused — the guard catches *unmergeable* concurrency,
-    not all of it. Proving the rejection needs a genuinely unmergeable conflict on a real page, which costs
-    revisions nobody can delete. Treat the guard as defence in depth; the review flow re-fetches before writing.
+  - **Not verified, and deliberately left that way: that `basetimestamp` *rejects* a concurrent edit.** Only that
+    it is accepted in the format sent. MediaWiki attempts a three-way merge when a base timestamp is supplied, so
+    non-conflicting concurrency is merged rather than refused — the guard catches *unmergeable* concurrency, not
+    all of it. **The user ruled out investigating further** (2026-09-25): the wiki has few editors and ~19,000 item
+    pages, so a collision inside the seconds-wide window between this tool's read and its write is effectively
+    impossible, and a user who does hit one can resolve it by hand. Keep sending the parameter — it costs nothing
+    and is the right thing to send — but don't build machinery around it.
 - Item pages follow this shape (see `Help:Contents` for the canonical blueprint, and e.g. `Earring of Bashing` for a
   real example with lore):
   - An era template at the top (`{{Classic Era}}`, `{{Kunark Era}}`, ...).

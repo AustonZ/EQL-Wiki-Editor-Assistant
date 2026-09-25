@@ -231,6 +231,14 @@ public static class ItemParser
     public static bool IsForeignExaltation(ExaltationSlot slot, string itemBaseName)
     {
         if (slot.Name is null) return false;
+
+        // A filled Ornamentation slot is foreign by definition: ornamentation is never something an item ships
+        // with, only something a player applies (user, 2026-09-23), and the user has since confirmed it should be
+        // treated exactly like any other foreign exaltation (2026-09-25). The name comparison below would usually
+        // reach the same answer, but only usually — an ornamentation whose name happened to resemble the item's own
+        // would slip through as "native", and this is the one slot where that inference is knowably wrong.
+        if (slot.Kind == ExaltationKind.Ornamentation) return true;
+
         int threshold = Math.Max(2, itemBaseName.Length / 6);
         return !EditDistance.IsCloseMatch(slot.Name, itemBaseName, threshold);
     }
