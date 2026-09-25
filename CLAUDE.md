@@ -318,8 +318,31 @@ hazards.
   - No sample in the 101-window corpus contains an illegal character, so this is implemented from MediaWiki's rule
     rather than from measured data.
 
-**Analyzing a capture against a page (milestone 4).** Rules confirmed by the user (2026-09-25), ahead of the diff
-engine itself:
+**The wiki mapping (`Wiki.Mapping.WikiMapping`).** The game↔wiki translation, as **data with built-in defaults**
+(`WikiMapping.Default`, `Load`/`SaveAsync` for a user-edited copy in app-data) — the plan's mapping layer arriving
+with milestone 4 as it predicted, covering the subset the diff needs. Built by censusing both sides: 37 distinct
+stat labels across the 101 verified windows against 49 across 744 real pages.
+- The bulk is straightforward renaming (`Weight`→`WT`, `Strength`→`STR`, `SV. Fire`→`SV FIRE`, `Base Dmg`→`DMG`,
+  `Delay`→`Atk Delay`, `Dmg Bon`→`DMG Bonus`, `Size Cap`→`Size Capacity`). Canonical wiki casing is caps
+  (`SV FIRE` on 31 pages against `SV Fire` on 3).
+- **An unmapped stat is reported, never dropped.** That is why `StatDisposition` has no "ignore" member: a stat the
+  tool has never seen is how a game patch announces itself, and discarding it silently would lose real data from a
+  public wiki with nobody the wiser. `Accuracy`, `Container`, `Type` and `Items` are live examples — real game data
+  with no agreed wiki home — deliberately left unmapped so they surface as questions for the user.
+- **`Ratio` is the one stat marked derived and therefore ignored silently.** It is Base Dmg over Delay, both of
+  which the wiki stores, so recording the quotient would be a third value to keep consistent for no gain — and it
+  is the one stat where a rounding difference between the game and a recomputation would look like a data error.
+- **Two mapping gaps were found only by running the analyzer over the corpus**, and both would have pushed a
+  regression to the wiki:
+  - **Units differ on `Weight Reduction`**: the game shows `100`, the wiki `100%`. The comparison called them
+    different and would have stripped the `%` off every such page. Hence `StatMapping.WikiSuffix`.
+  - **Slot names need their own mapping**: the wiki writes slots in caps, which is mechanical, but its `FINGER` is
+    the game's `Fingers`. Censused across all 18 slot names in the corpus, so the exception list is known to be
+    complete rather than guessed at.
+
+**Analyzing a capture against a page (`Wiki.Analysis.ItemPageAnalyzer`, milestone 4).** Produces per-field
+`FieldFinding`s and changes nothing, so each judgement is reviewable on its own. Rules confirmed by the user
+(2026-09-25):
 - **A template field absent from a page is fine unless the capture has data for it.** Absence is only a defect when
   it would hide something the tool is adding or changing; don't demand a full parameter set.
 - **`No Trade` makes merchant value unverifiable — preserve whatever the wiki has, and say so.** Measured across
@@ -331,9 +354,26 @@ engine itself:
   - **`absolutely nothing` and "no row at all" must stay distinguishable**, and they are: `absolutely nothing`
     never co-occurs with `No Trade` in the corpus. The first is a verified worthless item and gets written; the
     second is a gap and gets a "couldn't verify merchant value" warning.
+- **The wiki sometimes holds more detail than the window shows, and that is not staleness.** A real page has
+  `Range: 50 / 75 / 100` where the capture sees `50`. Overwriting would discard the alternatives, so a wiki value
+  that is a slash-separated list containing the captured one is `NeedsReview`, not `Differs`.
+- **Only a leading `+` is ignored when comparing values.** The wiki writes a bonus as `+8` and the game as `8` and
+  neither is more correct; everything else compares exactly, because this is the comparison that decides whether a
+  number on a public wiki gets overwritten and a tolerant one would hide the errors it exists to find.
 - See "Reading and editing wiki pages" for the flag rules (legacy discarded, vocabulary open-ended, wiki
   `Attunable` beats captured `No Trade`, `This is a meal!` alerted but never acted on) and the `merchant_value`
   normalization.
+- **`WikiSpike analyze [--detail]` runs the analyzer over every verified capture against the live wiki** — the
+  wiki-side equivalent of `AccuracySpike`, and the only thing that finds a rule this wrong. **It must apply
+  eligibility first**, which is a mistake worth not repeating: an initial run analyzed levelled items too and
+  reported 300 differing fields and "76 of 85 pages are stale", when a levelled item's stats are *legitimately*
+  higher than the wiki's level-0 figures (Bladestopper +7 shows AC 43 against a correct 25). Filtering to eligible
+  items dropped that to 19.
+- Baseline on the verified corpus (2026-09-25), eligible items only: 41 of 90 distinct captures are eligible (the
+  rest are levelled), 38 have pages, **9 pages already correct and 29 would change** — 258 fields match, 19 differ,
+  45 are missing on the wiki, 2 unverifiable, 11 need review. The differences are dominated by legacy flag lines
+  being dropped, plus real staleness and four `merchant_value` corrections. It also caught a typo on a live page
+  (`Lore Equpped`).
 
 **Eligibility (`Core.Items.ItemEligibility`, pipeline step 4b).** A foreign exaltation or a levelled item (`+X>0`)
 blocks automated processing. **The load-bearing rule is the ledger one and it is easy to get backwards: an
@@ -877,6 +917,11 @@ dotnet run --project tools/WikiSpike -- fetch "Earring of Bashing"       # page 
 dotnet run --project tools/WikiSpike -- roundtrip 400 --seed 4242        # byte-for-byte check on a live sample
 dotnet run --project tools/WikiSpike -- grammar 400                      # plus the label/flag census
 dotnet run --project tools/WikiSpike -- grammar --cached .local-data/wiki-pages   # re-run offline on the cache
+
+# Diff every verified capture against its live wiki page (eligibility applied first — see the note above about
+# levelled items, or the numbers lie). The wiki-side equivalent of AccuracySpike:
+dotnet run --project tools/WikiSpike -- analyze
+dotnet run --project tools/WikiSpike -- analyze --detail   # plus every non-matching field, per item
 
 # Store the bot password (prompts; never pass it as an argument — that lands in shell history and the process
 # list). Create one first at https://eqlwiki.com/Special:BotPasswords with "Edit existing pages" granted.

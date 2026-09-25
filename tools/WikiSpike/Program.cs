@@ -1,6 +1,13 @@
 using EQLWikiAssistant.TestSupport;
 using EQLWikiAssistant.Wiki.MediaWiki;
+using EQLWikiAssistant.Core.Items;
+using EQLWikiAssistant.TestSupport.Accuracy;
+using EQLWikiAssistant.Wiki.Analysis;
 using EQLWikiAssistant.Wiki.Wikitext;
+
+// The accuracy scorer has its own FieldVerdict (how well extraction did) which is a different question from the
+// analyzer's (how the page compares to the capture). This tool bridges both, so it names the one it means.
+using FieldVerdict = EQLWikiAssistant.Wiki.Analysis.FieldVerdict;
 
 // Milestone 3 spike tool: exercise the wiki client and the wikitext layer against the real eqlwiki.com, the same
 // way OcrSpike/LocateSpike/ParseSpike exercise the capture side against real screenshots. Keep using this rather
@@ -11,6 +18,7 @@ using EQLWikiAssistant.Wiki.Wikitext;
 //   WikiSpike roundtrip <count> [--seed N]    fetch N random item pages and verify byte-for-byte round-trip
 //   WikiSpike roundtrip --cached <dir>        same, against a directory of previously saved .txt pages
 //   WikiSpike grammar <count> [--seed N]      report which statsblock lines the grammar cannot read
+//   WikiSpike analyze [--detail]              diff every verified capture against its live wiki page
 //   WikiSpike login                           prompt for a bot password and store it in Credential Manager
 //   WikiSpike whoami                          confirm the credential logs in and may edit (writes nothing)
 //   WikiSpike logout                          delete the stored credential
@@ -29,6 +37,7 @@ switch (args[0])
     case "fetch": return await FetchAsync();
     case "roundtrip": return await RoundTripAsync(reportGrammar: false);
     case "grammar": return await RoundTripAsync(reportGrammar: true);
+    case "analyze": return await AnalyzeCorpusAsync();
     case "login": return Login();
     case "whoami": return await WhoAmIAsync();
     case "logout": return Logout();
@@ -226,6 +235,113 @@ async Task<IReadOnlyList<(string, string)>> LoadPagesAsync()
 
 static string Sanitize(string title) =>
     string.Concat(title.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+
+// Runs the real analyzer over every verified capture in the corpus against that item's live wiki page, so the diff
+// rules can be judged against ~100 real items instead of hand-written cases. Read-only; writes nothing.
+async Task<int> AnalyzeCorpusAsync()
+{
+    if (!File.Exists(RepoPaths.ExpectedItemsFile))
+    {
+        Console.Error.WriteLine($"No ground truth at {RepoPaths.ExpectedItemsFile}.");
+        return 1;
+    }
+
+    bool detail = args.Contains("--detail");
+    ExpectedCorpus corpus = ExpectedCorpus.Load(RepoPaths.ExpectedItemsFile);
+
+    // One entry per distinct item; the corpus captures several items more than once.
+    var items = corpus.Samples
+        .SelectMany(s => s.Windows)
+        .Where(w => !w.Occluded && !string.IsNullOrWhiteSpace(w.Name) && w.Name != ExpectedCorpus.TodoMarker)
+        .GroupBy(w => w.Name!, StringComparer.Ordinal)
+        .Select(g => g.First())
+        .OrderBy(w => w.Name, StringComparer.Ordinal)
+        .ToList();
+
+    // Eligibility (step 4b) runs before analysis in the real pipeline, and it must run here too or the numbers
+    // lie: a levelled item's stats are legitimately higher than the wiki's level-0 figures, so including one
+    // reports a stale page where there is none. Bladestopper +7 shows AC 43 against the page's 25 for exactly that
+    // reason. Foreign exaltations are excluded for the same kind of reason — the window includes another item's
+    // contribution.
+    var ineligible = new List<(string Name, string Reason)>();
+    var eligible = new List<ExpectedWindow>();
+    foreach (ExpectedWindow window in items)
+    {
+        ParsedItem probe = new(
+            window.Name!, window.Level, false, window.Flags, [], [], [], [],
+            [.. window.Exaltations.Select(e => new ExaltationSlot(Enum.Parse<ExaltationKind>(e.Kind, true), e.Name))],
+            [], null, null, []);
+
+        ItemEligibility check = ItemEligibility.Check(probe);
+        if (check.IsEligible) eligible.Add(window);
+        else ineligible.Add((window.Name!, check.Blockers[0].Reason.ToString()));
+    }
+
+    Console.WriteLine($"{items.Count} distinct captured items; {eligible.Count} eligible, {ineligible.Count} skipped:");
+    foreach (var group in ineligible.GroupBy(i => i.Reason))
+        Console.WriteLine($"  {group.Count(),3} {group.Key}  e.g. {group.First().Name}");
+    Console.WriteLine($"Analyzing {eligible.Count} eligible items against the live wiki...");
+    items = eligible;
+
+    using MediaWikiClient client = MediaWikiClient.Create(endpoint);
+    var verdictCounts = new Dictionary<FieldVerdict, int>();
+    var needsReview = new List<(string Item, FieldFinding Finding)>();
+    int notItemPages = 0, missing = 0, misnamed = 0, unusable = 0, clean = 0, changed = 0;
+
+    foreach (ExpectedWindow window in items)
+    {
+        ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, window.Name!);
+        if (lookup.Outcome == LookupOutcome.NameUnusable) { unusable++; Console.WriteLine($"  [unusable name] {window.Name}"); continue; }
+        if (lookup.Outcome == LookupOutcome.FoundMisnamedCandidate) { misnamed++; Console.WriteLine($"  [misnamed?] {window.Name} -> {lookup.Page!.Title}"); continue; }
+        if (lookup.Outcome == LookupOutcome.NotFound) { missing++; continue; }
+
+        ItemPageDocument? page = ItemPageDocument.Parse(lookup.Page!.Wikitext);
+        if (page is null) { notItemPages++; continue; }
+
+        ParsedItem captured = new(
+            window.Name!, window.Level, window.TitleContentNameMismatch,
+            window.Flags, window.Classes, window.Races, window.Slots,
+            [.. window.Stats.Select(s => new KeyValuePair<string, string>(s.Label, s.Value))],
+            [], [], window.MerchantValue, window.Lore, []);
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, lookup.Page!.Title);
+        foreach (FieldFinding finding in analysis.Findings)
+        {
+            verdictCounts[finding.Verdict] = verdictCounts.GetValueOrDefault(finding.Verdict) + 1;
+            if (finding.Blocks) needsReview.Add((window.Name!, finding));
+        }
+
+        if (analysis.IsClean) clean++; else changed++;
+
+        if (detail)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"--- {lookup.Page!.Title}");
+            foreach (FieldFinding f in analysis.Findings.Where(f => f.Verdict != FieldVerdict.Matches))
+                Console.WriteLine($"    {f.Verdict,-14} {f.Field,-22} captured=[{f.Captured}] wiki=[{f.OnWiki}]");
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("=== lookup ===");
+    Console.WriteLine($"  pages analyzed          : {clean + changed}  ({clean} already correct, {changed} would change)");
+    Console.WriteLine($"  no page on the wiki     : {missing}");
+    Console.WriteLine($"  page exists, not an item: {notItemPages}   (spell/effect names in the corpus)");
+    Console.WriteLine($"  probably misnamed       : {misnamed}");
+    Console.WriteLine($"  name unusable as a title: {unusable}");
+
+    Console.WriteLine();
+    Console.WriteLine("=== field verdicts ===");
+    foreach (FieldVerdict verdict in Enum.GetValues<FieldVerdict>())
+        Console.WriteLine($"  {verdict,-16} {verdictCounts.GetValueOrDefault(verdict)}");
+
+    Console.WriteLine();
+    Console.WriteLine($"=== needs review ({needsReview.Count}) ===");
+    foreach (var group in needsReview.GroupBy(r => r.Finding.Field).OrderByDescending(g => g.Count()))
+        Console.WriteLine($"  {group.Count(),4}  {group.Key,-24} e.g. {group.First().Item}");
+
+    return 0;
+}
 
 int Login()
 {
