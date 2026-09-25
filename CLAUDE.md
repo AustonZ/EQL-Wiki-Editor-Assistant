@@ -515,8 +515,45 @@ records the outcome of each check (`matched`/`edited`/`flagged`/`skipped`/`not-o
 the parsed in-game data. A capture that reproduces an already-`matched`/`edited`, unchanged fingerprint skips the
 wiki fetch entirely. `flagged` items (icon mismatch, occluded capture) are never treated as done.
 
-**Icon cache.** Wiki icon files (`File:item_<ID>.png`) are static and reused across many items, so each is
-downloaded at most once into a local on-disk cache before any icon comparison.
+**Icon comparison (`Core.Icons`, `Wiki.MediaWiki.IconCache`) — flag only, per the plan.** Catches a page whose
+`lucy_img_ID` points at the wrong artwork. It never proposes a new id: the tool cannot know whether the page is
+wrong or the capture caught something odd, and choosing one is a human's call.
+- **The in-game icon has no frame.** The game draws the sprite with transparency straight onto the window's 16-grey,
+  left of the item's name — nothing to trace, unlike the window outline. `ItemIconReader.IconStrip` is the region it
+  occupies, measured across all 43 screenshots (`LocateSpike --icon`): window-relative x 12..52, y 52..100, with the
+  name and flag rows starting at x ≈ 56.
+- **The comparison must be scale-invariant.** The wiki stores 40x40 PNGs; the game draws the same sprite ~1.1x
+  larger (a Water Flask is 21x44 on screen against 19x40 on the wiki). The ink's own bounding box is found on both
+  sides and resampled onto a 12x12 grid, so neither the sprite's position in its cell nor the padding a caller
+  included matters.
+- **Three bugs found by measurement, each of which made the check useless in a different way**, and none of which
+  any unit test would have caught:
+  - **Alpha was being discarded.** `ImageFile.LoadAsync` decodes with `BitmapAlphaMode.Ignore`, which is right for
+    screenshots and wrong for a wiki PNG: transparent pixels keep whatever RGB the encoder left, usually white, so
+    the whole 40x40 file read as ink. Every icon came back a mismatch at close to the random baseline.
+    `LoadOverBackgroundAsync` composites over the game's own background grey instead, so both sides are the same
+    sprite on the same backdrop.
+  - **The ink floor was far too high.** At 70, a dark brown pauldrons icon is almost entirely below it, so only its
+    white highlights counted and a 38x14 sprite was measured as a 27x10 sliver — read as a confident mismatch. The
+    floor belongs just above the 16-grey background; it is 28.
+  - **A luminance-only 64-bit difference hash could not separate the classes.** Rings and earrings are all small
+    objects on a dark field with much the same brightness pattern; what distinguishes them is hue. Keeping colour,
+    on a 12x12x3 signature compared by mean absolute difference, does.
+- **The negative control is what proved any of this.** A check that says "match" to everything looks perfect;
+  `WikiSpike icons` therefore also compares each captured icon against the *other* items' wiki icons. That is what
+  exposed the first two designs, both of which passed the same-item cases.
+- **The threshold was measured, not chosen**: 80 same-icon pairs run 0.002-0.070 (median 0.016), 134 different-icon
+  controls start at 0.037 (median 0.145). They overlap, so the choice is which error to make — 0.035 is the last
+  point with **zero false matches**, at the cost of ~9% of correct icons asking for a glance. A false mismatch costs
+  a glance; a false match silently blesses a wrong icon, which is the failure this project exists to avoid.
+- **The cache** keeps each `File:item_<ID>.png` on disk, keyed by id, and is consulted before any network call —
+  icons are static and heavily shared (three corpus breastplates all use id 624, so three items cost one download).
+  No expiry; "clear icon cache" / "re-download this icon" belong in Settings. A **missing** icon is cached too, with
+  a short TTL, since that is the one fact here that changes when somebody uploads a file. Icon ids come from a wiki
+  parameter and are sanitized before they touch a path.
+- **Still to wire up**: decoding a downloaded PNG currently goes through `TestSupport.ImageFile`, which is dev-only
+  and file-based. Production needs a `byte[]` → `CapturedImage` decoder behind a port, since `Wiki` is portable
+  `net10.0` and cannot use WinRT imaging directly.
 
 **Multi-window / occlusion handling.** A single screenshot may contain more than one item detail window; all of
 them must be located and processed. A partially obscured window must be detected and surfaced to the user as a
@@ -1045,6 +1082,14 @@ dotnet run --project tools/WikiSpike -- grammar --cached .local-data/wiki-pages 
 # levelled items, or the numbers lie). The wiki-side equivalent of AccuracySpike:
 dotnet run --project tools/WikiSpike -- analyze
 dotnet run --project tools/WikiSpike -- analyze --detail   # plus every non-matching field, per item
+
+# Icon comparison against a real screenshot. Prints each captured icon against the one its page points at, AND a
+# negative control against the other items' icons — without that control a check that says "match" to everything
+# looks perfect, which is exactly how two earlier designs passed:
+dotnet run --project tools/WikiSpike -- icons "samples/12a-3-ear-items.png"
+
+# Find the icon strip in a window (the icon has no frame, so it has to be measured, not traced):
+dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --icon
 # The analyze summary also cross-tabs template-compliance findings by rule and by whether the tool can fix them.
 
 # Store the bot password (prompts; never pass it as an argument — that lands in shell history and the process

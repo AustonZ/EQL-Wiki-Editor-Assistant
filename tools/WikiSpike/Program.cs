@@ -1,6 +1,11 @@
 using EQLWikiAssistant.TestSupport;
 using EQLWikiAssistant.Wiki.MediaWiki;
+using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Items;
+using EQLWikiAssistant.Core.Locate;
+using EQLWikiAssistant.Core.Ocr;
+using EQLWikiAssistant.Core.Glyphs;
+using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.TestSupport.Accuracy;
 using EQLWikiAssistant.Wiki.Analysis;
 using EQLWikiAssistant.Wiki.Wikitext;
@@ -38,6 +43,7 @@ switch (args[0])
     case "roundtrip": return await RoundTripAsync(reportGrammar: false);
     case "grammar": return await RoundTripAsync(reportGrammar: true);
     case "analyze": return await AnalyzeCorpusAsync();
+    case "icons": return await CompareIconsAsync();
     case "login": return Login();
     case "whoami": return await WhoAmIAsync();
     case "logout": return Logout();
@@ -353,6 +359,106 @@ async Task<int> AnalyzeCorpusAsync()
     foreach (var group in needsReview.GroupBy(r => r.Finding.Field).OrderByDescending(g => g.Count()))
         Console.WriteLine($"  {group.Count(),4}  {group.Key,-24} e.g. {group.First().Item}");
 
+    return 0;
+}
+
+// Reads each item icon out of a real screenshot and compares it against the icon the item's wiki page points at.
+// This is the only way to know whether the perceptual hash actually survives the two renderings being different
+// sizes — the wiki stores 40x40 PNGs and the game draws the same sprite about 1.2x larger.
+async Task<int> CompareIconsAsync()
+{
+    if (args.Length < 2) { Console.Error.WriteLine("usage: WikiSpike icons <screenshot>"); return 1; }
+
+    CapturedImage image = await ImageFile.LoadAsync(args[1]);
+    using var rapid = new RapidOcrEngine();
+    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+    IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
+
+    using MediaWikiClient client = MediaWikiClient.Create(endpoint);
+    using var http = new HttpClient();
+    http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
+    var cache = new IconCache(
+        Path.Combine(RepoPaths.LocalDataDirectory, "icon-cache"), new WikiIconSource(http, endpoint));
+
+    string scratch = Path.Combine(RepoPaths.LocalDataDirectory, "icon-scratch");
+    Directory.CreateDirectory(scratch);
+
+    var fingerprints = new List<(string Name, IconFingerprint Captured, string IconId)>();
+    var wikiIcons = new List<(string Name, IconFingerprint OnWiki, string IconId)>();
+
+    Console.WriteLine($"{windows.Count} window(s) in {Path.GetFileName(args[1])}");
+    foreach (LocatedWindow window in windows)
+    {
+        if (!ItemIconReader.TryRead(image, window, out IconFingerprint captured))
+        {
+            Console.WriteLine("  (no readable icon — occluded, a Lore capture, or too little ink)");
+            continue;
+        }
+
+        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+        ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
+        if (lookup.Outcome != LookupOutcome.Found)
+        {
+            Console.WriteLine($"  {item.Name,-34} captured icon {captured.InkWidth}x{captured.InkHeight}, no page");
+            continue;
+        }
+
+        ItemPageDocument? page = ItemPageDocument.Parse(lookup.Page!.Wikitext);
+        if (page?.IconId is not { Length: > 0 } iconId)
+        {
+            Console.WriteLine($"  {item.Name,-34} page has no lucy_img_ID");
+            continue;
+        }
+
+        byte[]? bytes = await cache.GetAsync(iconId);
+        if (bytes is null)
+        {
+            Console.WriteLine($"  {item.Name,-34} wiki has no File:item_{iconId}.png");
+            continue;
+        }
+
+        // Written once per icon id. Several items routinely share one (12d has three breastplates on id 624), and
+        // the decoder keeps the file mapped, so rewriting it mid-run fails outright. Production will decode from
+        // the bytes directly and never touch a file — see the note in CLAUDE.md about needing a decoder port.
+        string file = Path.Combine(scratch, $"item_{new string([.. iconId.Where(char.IsLetterOrDigit)])}.png");
+        if (!File.Exists(file)) await File.WriteAllBytesAsync(file, bytes);
+        // Composited over the game's own background grey, so both sides are the same sprite on the same backdrop.
+        CapturedImage wikiIcon = await ImageFile.LoadOverBackgroundAsync(file, background: 16);
+
+        if (!IconHasher.TryFingerprint(wikiIcon, new Rect(0, 0, wikiIcon.Width, wikiIcon.Height), out IconFingerprint onWiki))
+        {
+            Console.WriteLine($"  {item.Name,-34} the wiki's icon {iconId} has no readable ink");
+            continue;
+        }
+
+        fingerprints.Add((item.Name, captured, iconId));
+        wikiIcons.Add((item.Name, onWiki, iconId));
+
+        double distance = captured.DistanceTo(onWiki);
+        Console.WriteLine(
+            $"  {item.Name,-34} id {iconId,-5} captured {captured.InkWidth}x{captured.InkHeight} " +
+            $"vs wiki {onWiki.InkWidth}x{onWiki.InkHeight}  distance {distance,6:F3}  " +
+            $"{(captured.LooksLike(onWiki) ? "match" : "MISMATCH")}");
+    }
+
+    // The negative control, and the only thing that makes the "match" results above mean anything: a check that
+    // says yes to everything is worthless. Every captured icon is also compared against the *other* items' wiki
+    // icons, which should land far outside the threshold.
+    if (fingerprints.Count > 1)
+    {
+        Console.WriteLine("\n--- control: each capture against the other items' wiki icons ---");
+        foreach ((string name, IconFingerprint captured, string iconId) in fingerprints)
+            foreach ((string otherName, IconFingerprint onWiki, string otherId) in wikiIcons)
+            {
+                if (otherId == iconId) continue;
+                double distance = captured.DistanceTo(onWiki);
+                Console.WriteLine(
+                    $"  {name,-30} vs {otherName}'s icon {otherId,-5} distance {distance,6:F3}  " +
+                    $"{(captured.LooksLike(onWiki) ? "FALSE MATCH" : "correctly rejected")}");
+            }
+    }
+
+    Console.WriteLine($"\nicon downloads this run: {cache.Downloads}");
     return 0;
 }
 

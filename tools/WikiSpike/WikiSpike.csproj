@@ -10,6 +10,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Wiki\EQLWikiAssistant.Wiki.csproj" />
     <ProjectReference Include="..\EQLWikiAssistant.TestSupport\EQLWikiAssistant.TestSupport.csproj" />
+    <ProjectReference Include="..\..\src\EQLWikiAssistant.Ocr\EQLWikiAssistant.Ocr.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Direct reference so the bundled .onnx models copy to this tool's own output — see CLAUDE.md; a transitive
+         reference through EQLWikiAssistant.Ocr does not copy them. -->
+    <PackageReference Include="RapidOcrNet" Version="4.2.0" />
   </ItemGroup>
 
 </Project>

@@ -58,6 +58,35 @@ for (int i = 0; i < windows.Count; i++)
     Console.WriteLine();
     Console.WriteLine($"--- Window {i}: {w.Bounds}, {w.Lines.Count} line(s), " +
         $"HasLoreTab={w.HasLoreTab}, PossiblyOccluded={w.PossiblyOccluded} ---");
+    if (args.Contains("--icon"))
+    {
+        // Bounding box of everything that is not the content area's 16-grey, inside the strip left of the text.
+        // Measuring this is the only way to find out whether the item icon sits at a fixed offset in the window;
+        // the plan's locate history is a long argument for measuring rather than assuming exactly this sort of thing.
+        // The icon sits in the strip left of the content text, drawn with transparency straight onto the window's
+        // 16-grey — there is no frame around it. Chrome rules and the content outline live in the 26-70 band, so
+        // requiring a brighter pixel keeps them out; x starts at 2 to clear the outline column entirely.
+        const int scanLeft = 2, scanTop = 30, scanRight = 53, scanBottom = 130, inkFloor = 70;
+        int minX = int.MaxValue, minY = int.MaxValue, maxX = -1, maxY = -1, lit = 0;
+        for (int y = scanTop; y < scanBottom; y++)
+            for (int x = scanLeft; x < scanRight; x++)
+            {
+                int ax = w.Bounds.X + x, ay = w.Bounds.Y + y;
+                if (ax >= image.Width || ay >= image.Height) continue;
+                int o = (ay * image.Width + ax) * 4;
+                int max = Math.Max(image.Pixels[o + 2], Math.Max(image.Pixels[o + 1], image.Pixels[o]));
+                if (max <= inkFloor) continue;
+                lit++;
+                minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
+                minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
+            }
+
+        Console.WriteLine(lit == 0
+            ? "  icon: nothing found in the strip"
+            : $"  icon ink: x {minX}..{maxX} (w {maxX - minX + 1}), y {minY}..{maxY} (h {maxY - minY + 1}), {lit} px");
+        continue;
+    }
+
     foreach (var line in w.Lines)
         Console.WriteLine($"  [{line.BoundingBox.X,4},{line.BoundingBox.Y,4}] {line.Text}");
 
