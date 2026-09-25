@@ -266,16 +266,13 @@ public static class ItemPageAnalyzer
                 continue;
             }
 
-            // Derived values (Ratio is Base Dmg over Delay) are deliberately not stored, so they are not reported.
-            if (statMapping.Disposition == StatDisposition.Derived || statMapping.WikiLabel is null) continue;
+            // Stats the wiki deliberately does not record (Ratio, Container) are ignored rather than reported;
+            // the mapping carries a note saying why for each.
+            if (statMapping.Disposition == StatDisposition.NotStored || statMapping.WikiLabel is null) continue;
 
             string wikiLabel = statMapping.WikiLabel;
             string? onWiki = block?.Find(wikiLabel)?.Value;
-
-            // The value as the wiki spells it, units included — Weight Reduction is 100 in-game and 100% here.
-            string wanted = capturedValue + (statMapping.WikiSuffix is { } suffix && !capturedValue.EndsWith(suffix, StringComparison.Ordinal)
-                ? suffix
-                : "");
+            string wanted = ToWikiValue(capturedValue, statMapping);
 
             if (onWiki is null)
                 findings.Add(new FieldFinding(wikiLabel, FieldVerdict.MissingOnWiki, wanted, null));
@@ -303,6 +300,32 @@ public static class ItemPageAnalyzer
     /// </summary>
     private static bool ValuesAgree(string captured, string onWiki) =>
         string.Equals(Trim(captured), Trim(onWiki), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A captured value written the way the wiki writes it: the unit suffix appended where the two sides differ
+    /// (`Weight Red: 100` in-game is `Weight Reduction: 100%` here), and an explicit `+` on the fields the wiki
+    /// signs (`STR: +5` where the game says `5`).
+    ///
+    /// **This is only the value the tool would write. It is deliberately not part of deciding whether two values
+    /// match** — <see cref="ValuesAgree"/> ignores a leading `+`, so a page saying `STR: 5` counts as correct and
+    /// generates no edit. A sign is cosmetic: `STR: 5` reads unambiguously, and rewriting it would be exactly the
+    /// incidental reformatting this tool is not allowed to do (see the prettifier note in CLAUDE.md). The sign gets
+    /// applied when the value is being written anyway, for some other reason.
+    /// </summary>
+    private static string ToWikiValue(string capturedValue, StatMapping mapping)
+    {
+        string value = capturedValue.Trim();
+
+        if (mapping.WikiSuffix is { } suffix && !value.EndsWith(suffix, StringComparison.Ordinal))
+            value += suffix;
+
+        // Only a bare non-negative number gains a sign; a value already signed keeps its own, and something like
+        // "SMALL" or "1H Slashing" is left alone.
+        if (mapping.Signed && value.Length > 0 && char.IsAsciiDigit(value[0]))
+            value = "+" + value;
+
+        return value;
+    }
 
     /// <summary>Whether the wiki holds a slash-separated list of which the captured value is one member.</summary>
     private static bool IsOneAlternativeOf(string captured, string onWiki) =>

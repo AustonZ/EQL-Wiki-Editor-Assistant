@@ -325,13 +325,30 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
 - The bulk is straightforward renaming (`Weight`→`WT`, `Strength`→`STR`, `SV. Fire`→`SV FIRE`, `Base Dmg`→`DMG`,
   `Delay`→`Atk Delay`, `Dmg Bon`→`DMG Bonus`, `Size Cap`→`Size Capacity`). Canonical wiki casing is caps
   (`SV FIRE` on 31 pages against `SV Fire` on 3).
-- **An unmapped stat is reported, never dropped.** That is why `StatDisposition` has no "ignore" member: a stat the
-  tool has never seen is how a game patch announces itself, and discarding it silently would lose real data from a
-  public wiki with nobody the wiser. `Accuracy`, `Container`, `Type` and `Items` are live examples — real game data
-  with no agreed wiki home — deliberately left unmapped so they surface as questions for the user.
-- **`Ratio` is the one stat marked derived and therefore ignored silently.** It is Base Dmg over Delay, both of
-  which the wiki stores, so recording the quotient would be a third value to keep consistent for no gain — and it
-  is the one stat where a rounding difference between the game and a recomputation would look like a data error.
+- **An unmapped stat is reported, never dropped.** A stat the tool has never seen is how a game patch announces
+  itself, and discarding it silently would lose real data from a public wiki with nobody the wiser. `Accuracy` is
+  the one remaining example: real game data (on 12 of 101 windows) with no agreed wiki home, left unmapped so it
+  surfaces as a question rather than being invented a field.
+- **Two stats are `NotStored` and ignored silently, for different reasons** — the mapping carries a note on each, so
+  a future reader does not have to guess:
+  - `Ratio` is Base Dmg over Delay, both of which the wiki stores. Recording the quotient would be a third value to
+    keep consistent for no gain, and it is the one stat where a rounding difference between the game and a
+    recomputation would look like a data error.
+  - `Container` (open/closed) is already implied by the container fields the wiki does store — Capacity and Size
+    Capacity — so it adds nothing (user, 2026-09-25).
+- **`Type` and `Items` go into the statsblock** (user, 2026-09-25). `Type: Shield` marks an item usable for bashing
+  and belongs with `Slot`; `Items: Arrows` restricts what a container may hold and belongs with `Size Capacity`.
+  Those positions are a *rendering* concern for whenever the renderer is built — the diff only needs the labels.
+  The user is separately getting both added to the template's documented vocabulary, so the tool is not writing
+  fields the template does not sanction.
+- **The wiki signs attributes and resists; the game does not.** The wiki writes `STR: +5` where the window says
+  `5`. Measured rather than assumed: `STR` is signed on 126 pages against 4 plain and `SV FIRE` 68 against 0, while
+  `WT` is plain on all 721, and `AC`/`DMG`/`Atk Delay`/`Range`/`Capacity`/`Weight Reduction` are never signed.
+  `StatMapping.Signed` carries it.
+  - **A sign-only difference is deliberately not an edit.** `STR: 5` on a page reads unambiguously, so rewriting it
+    to `+5` would be precisely the incidental reformatting this tool is not allowed to do — that belongs to the
+    prettifier. The sign is applied to the value the tool *proposes*, and only when that value is being written
+    anyway for some other reason. `ValuesAgree` ignores a leading `+` accordingly.
 - **Two mapping gaps were found only by running the analyzer over the corpus**, and both would have pushed a
   regression to the wiki:
   - **Units differ on `Weight Reduction`**: the game shows `100`, the wiki `100%`. The comparison called them
@@ -354,9 +371,12 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   - **`absolutely nothing` and "no row at all" must stay distinguishable**, and they are: `absolutely nothing`
     never co-occurs with `No Trade` in the corpus. The first is a verified worthless item and gets written; the
     second is a gap and gets a "couldn't verify merchant value" warning.
-- **The wiki sometimes holds more detail than the window shows, and that is not staleness.** A real page has
-  `Range: 50 / 75 / 100` where the capture sees `50`. Overwriting would discard the alternatives, so a wiki value
-  that is a slash-separated list containing the captured one is `NeedsReview`, not `Differs`.
+- **The wiki sometimes holds more detail than the window shows, and that is not staleness.** A wiki value that is a
+  slash-separated list containing the captured one is `NeedsReview`, not `Differs`, since overwriting would discard
+  the alternatives. Only two pages do this, both ammo — `CLASS 1 Bone Point Arrow` has `Range: 50 / 75 / 100` and
+  `CLASS 3 Wood Point Arrow` has `5 / 25 / 50`. Note both also carry a parallel triple in their recipe line
+  (`Fletching (Trivial: 68 / 68 / 82)`), so these pages appear to aggregate several arrow variants; the game shows
+  the single range of whichever variant is in hand. Unexplained as of 2026-09-25 and left to the user.
 - **Only a leading `+` is ignored when comparing values.** The wiki writes a bonus as `+8` and the game as `8` and
   neither is more correct; everything else compares exactly, because this is the comparison that decides whether a
   number on a public wiki gets overwritten and a tolerant one would hide the errors it exists to find.

@@ -210,6 +210,95 @@ public class ItemPageAnalyzerTests
         Assert.DoesNotContain(analysis.Findings, f => f.Captured == "2.5");
     }
 
+    /// <summary>The wiki writes attributes and resists with an explicit sign (`STR: +5`) where the game says `5`.
+    /// Measured: STR is signed on 126 pages against 4 plain, SV FIRE 68 against 0, while WT is plain on all 721.</summary>
+    [Theory]
+    [InlineData("Strength", "5", "+5")]
+    [InlineData("SV. Fire", "10", "+10")]
+    [InlineData("HP", "55", "+55")]
+    [InlineData("Strength", "-3", "-3")]        // an already-signed value keeps its own sign
+    [InlineData("AC", "43", "43")]              // never signed on the wiki
+    [InlineData("Weight", "0.4", "0.4")]
+    [InlineData("Size", "MEDIUM", "MEDIUM")]    // not a number at all
+    public void SignedFieldsAreProposedWithASign(string gameLabel, string capturedValue, string expected)
+    {
+        ItemPageAnalysis analysis = Analyze(Captured(stats: [new(gameLabel, capturedValue)]), "Earring of Bashing");
+
+        Assert.Contains(analysis.Findings, f => f.Captured == expected);
+    }
+
+    /// <summary>But a sign-only difference is not an edit. `STR: 5` on a page reads unambiguously, so rewriting it to
+    /// `+5` would be exactly the incidental reformatting this tool is not allowed to do — that belongs to the
+    /// prettifier. The sign is applied only when the value is being written anyway.</summary>
+    [Fact]
+    public void ASignOnlyDifferenceIsNotAnEdit()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \nSTR: 8<br>\n}}")!;
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Thing", stats: [new("Strength", "8")]), page, "Thing");
+
+        Assert.Equal(FieldVerdict.Matches, analysis.Find("STR")!.Verdict);
+    }
+
+    /// <summary>The game writes `Weight Red: 100` and the wiki `Weight Reduction: 100%`. Identical data — and without
+    /// the suffix the comparison called them different and would have stripped the % off every such page.</summary>
+    [Fact]
+    public void AUnitSuffixIsAppliedAndDoesNotCountAsADifference()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Bag\n|statsblock = \nWeight Reduction: 100%<br>\n}}")!;
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Bag", stats: [new("Weight Red", "100")]), page, "Bag");
+
+        FieldFinding finding = analysis.Find("Weight Reduction")!;
+        Assert.Equal(FieldVerdict.Matches, finding.Verdict);
+        Assert.Equal("100%", finding.Captured);
+    }
+
+    /// <summary>Container properties the user placed in the statsblock (2026-09-25): Type marks an item usable for
+    /// bashing, Items restricts what a container may hold.</summary>
+    [Theory]
+    [InlineData("Type", "Shield")]
+    [InlineData("Items", "Arrows")]
+    public void ContainerPropertiesAreMappedIntoTheStatsBlock(string label, string value)
+    {
+        ItemPageAnalysis analysis = Analyze(Captured(stats: [new(label, value)]), "Earring of Bashing");
+
+        FieldFinding finding = analysis.Find(label)!;
+        Assert.Equal(FieldVerdict.MissingOnWiki, finding.Verdict);
+        Assert.Equal(value, finding.Captured);
+    }
+
+    /// <summary>Open/closed is already implied by the container fields the wiki does store, so it adds nothing and is
+    /// ignored rather than reported (user, 2026-09-25).</summary>
+    [Fact]
+    public void ContainerOpenOrClosedIsIgnored()
+    {
+        ItemPageAnalysis analysis = Analyze(Captured(stats: [new("Container", "CLOSED.")]), "Earring of Bashing");
+
+        Assert.Null(analysis.Find("Container"));
+        Assert.DoesNotContain(analysis.Findings, f => f.Captured == "CLOSED.");
+    }
+
+    /// <summary>A real page has `Range: 50 / 75 / 100` against a captured `50`. Overwriting would discard the
+    /// alternatives, so it is a human's call.</summary>
+    [Fact]
+    public void AWikiValueListingSeveralAlternativesNeedsReview()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Arrow\n|statsblock = \nRange: 50 / 75 / 100<br>\n}}")!;
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Arrow", stats: [new("Range", "50")]), page, "Arrow");
+
+        FieldFinding finding = analysis.Find("Range")!;
+        Assert.Equal(FieldVerdict.NeedsReview, finding.Verdict);
+        Assert.False(finding.IsChange);
+    }
+
     /// <summary>The important one: a stat with no mapping is never dropped. An unmapped stat is how a game patch
     /// announces itself, and discarding it would lose real data with nobody the wiser.</summary>
     [Fact]

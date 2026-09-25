@@ -9,9 +9,10 @@ public enum StatDisposition
     /// <summary>The wiki stores it, under <see cref="StatMapping.WikiLabel"/>.</summary>
     Stored,
 
-    /// <summary>The wiki deliberately does not store it, because it is derived from values the wiki does store.
-    /// Ignored silently — reporting it would be noise on every single item.</summary>
-    Derived,
+    /// <summary>The wiki deliberately does not record it. Ignored silently — reporting it would be noise on every
+    /// affected item. <see cref="StatMapping.Note"/> says why, because the reasons differ and a future reader
+    /// should not have to guess.</summary>
+    NotStored,
 }
 
 /// <summary>
@@ -21,8 +22,20 @@ public enum StatDisposition
 /// <c>Weight Red: 100</c> where the wiki writes <c>Weight Reduction: 100%</c> — identical data, and without this the
 /// comparison called them different and would have stripped the <c>%</c> off every such page. Found by running the
 /// analyzer over the corpus, not by reading either format.
+///
+/// <see cref="Signed"/> marks the fields the wiki writes with an explicit sign: `STR: +5` where the game says `5`.
+/// Measured, not assumed — attributes and resists are overwhelmingly signed (`STR` 126 signed against 4 plain,
+/// `SV FIRE` 68 against 0) while `WT`, `AC`, `DMG`, `Atk Delay`, `Range`, `Capacity` and `Weight Reduction` never
+/// are (`WT` 0 signed against 721). **It affects only the value the tool proposes, never whether two values match**
+/// — see <c>ItemPageAnalyzer</c> for why a sign-only difference is deliberately not an edit.
 /// </summary>
-public sealed record StatMapping(string GameLabel, string? WikiLabel, StatDisposition Disposition, string? WikiSuffix = null);
+public sealed record StatMapping(
+    string GameLabel,
+    string? WikiLabel,
+    StatDisposition Disposition,
+    string? WikiSuffix = null,
+    bool Signed = false,
+    string? Note = null);
 
 /// <summary>
 /// The translation between what the game window says and what the wiki records.
@@ -166,24 +179,41 @@ public sealed class WikiMapping
             ("Haste", "Haste"),
             ("Capacity", "Capacity"),
             ("Size Cap", "Size Capacity"),
+            // Container properties the user placed in the statsblock (2026-09-25): Type sits with Slot (it marks an
+            // item as usable for bashing), Items sits with Size Capacity (it restricts what a container may hold).
+            ("Type", "Type"),
+            ("Items", "Items"),
         ];
 
         var map = new Dictionary<string, StatMapping>(StringComparer.OrdinalIgnoreCase);
         foreach ((string game, string wiki) in stored)
             map[game] = new StatMapping(game, wiki, StatDisposition.Stored);
 
+        // The fields the wiki writes with an explicit sign — attributes and resists, measured (see StatMapping).
+        foreach (string game in new[]
+                 {
+                     "Strength", "Stamina", "Agility", "Dexterity", "Wisdom", "Intelligence", "Charisma",
+                     "HP", "Mana", "End",
+                     "SV. Fire", "SV. Cold", "SV. Magic", "SV. Disease", "SV. Poison", "SV. Void",
+                 })
+            map[game] = map[game] with { Signed = true };
+
         // The one field where the units differ: the game writes 100, the wiki 100%.
         map["Weight Red"] = new StatMapping("Weight Red", "Weight Reduction", StatDisposition.Stored, WikiSuffix: "%");
 
-        // Ratio is Base Dmg over Delay. The wiki stores both, so recording the quotient would be a third value to
-        // keep consistent with the other two for no gain — and it is the one stat where a rounding difference
-        // between the game and a recomputation would look like a data error.
-        map["Ratio"] = new StatMapping("Ratio", null, StatDisposition.Derived);
+        map["Ratio"] = new StatMapping("Ratio", null, StatDisposition.NotStored, Note:
+            "Base Dmg over Delay. The wiki stores both inputs, so recording the quotient would be a third value to " +
+            "keep consistent for no gain — and a rounding difference between the game and a recomputation would " +
+            "look like a data error.");
+
+        map["Container"] = new StatMapping("Container", null, StatDisposition.NotStored, Note:
+            "Whether the bag is open or closed. Already implied by the other container fields the wiki does store " +
+            "(Capacity, Size Capacity), so it adds nothing (user, 2026-09-25).");
 
         return new WikiMapping
         {
             Stats = map,
-            UnmappedGameLabels = ["Accuracy", "Container", "Type", "Items"],
+            UnmappedGameLabels = ["Accuracy"],
             Slots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Fingers"] = "FINGER" },
         };
     }
@@ -196,7 +226,7 @@ public sealed class WikiMapping
         public string TemplateName { get; set; } = "Itempage";
         public Dictionary<string, string> Parameters { get; set; } = [];
         public Dictionary<string, string> Stats { get; set; } = [];
-        public List<string> DerivedStats { get; set; } = [];
+        public List<string> NotStoredStats { get; set; } = [];
         public List<string> UnmappedGameLabels { get; set; } = [];
 
         public static WikiMappingFile From(WikiMapping mapping) => new()
@@ -215,8 +245,8 @@ public sealed class WikiMapping
             Stats = mapping.Stats.Values
                 .Where(s => s.Disposition == StatDisposition.Stored && s.WikiLabel is not null)
                 .ToDictionary(s => s.GameLabel, s => s.WikiLabel!, StringComparer.Ordinal),
-            DerivedStats = [.. mapping.Stats.Values
-                .Where(s => s.Disposition == StatDisposition.Derived)
+            NotStoredStats = [.. mapping.Stats.Values
+                .Where(s => s.Disposition == StatDisposition.NotStored)
                 .Select(s => s.GameLabel)],
             UnmappedGameLabels = [.. mapping.UnmappedGameLabels],
         };
@@ -226,8 +256,8 @@ public sealed class WikiMapping
             var map = new Dictionary<string, StatMapping>(StringComparer.OrdinalIgnoreCase);
             foreach ((string game, string wiki) in Stats)
                 map[game] = new StatMapping(game, wiki, StatDisposition.Stored);
-            foreach (string game in DerivedStats)
-                map[game] = new StatMapping(game, null, StatDisposition.Derived);
+            foreach (string game in NotStoredStats)
+                map[game] = new StatMapping(game, null, StatDisposition.NotStored);
 
             return new WikiMapping
             {
