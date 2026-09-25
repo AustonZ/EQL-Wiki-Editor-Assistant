@@ -510,10 +510,32 @@ checked properly. `ShouldWriteLedgerEntry` says so on the result rather than lea
   mismatch, which would be misleading for a slot that is foreign by nature.
 - Every blocker is reported, not just the first, so the user sees the whole picture in one pass.
 
-**Checked-items ledger.** To avoid hitting the wiki unnecessarily, a local store (keyed by item name + entity kind)
-records the outcome of each check (`matched`/`edited`/`flagged`/`skipped`/`not-on-wiki`) along with a fingerprint of
-the parsed in-game data. A capture that reproduces an already-`matched`/`edited`, unchanged fingerprint skips the
-wiki fetch entirely. `flagged` items (icon mismatch, occluded capture) are never treated as done.
+**Checked-items ledger (`Wiki.Ledger.CheckedItemsLedger`, pipeline step 5).** A local store keyed by item name +
+entity kind, recording each check's outcome, the captured data's fingerprint, the wiki revision seen or written and
+the mapping version it ran under. A capture that reproduces an already-`Matched`/`Edited`, unchanged fingerprint
+skips the wiki fetch entirely.
+- **The whole point is avoiding network calls, so `Consult` answers from disk and must be called before any fetch.**
+  A design that consulted the ledger afterwards would be pointless, which is why the tests assert on request
+  *counts* against a counting fake client rather than on return values.
+- **Only `Matched` and `Edited` mean done.** `Flagged`, `Skipped` and `NotOnWiki` left something undone, so they
+  never let a capture skip the wiki however recent and unchanged the row is — the outcome is checked *before* the
+  fingerprint for exactly that reason. `NotOnWiki` included: somebody may have created the page since.
+- **An ineligible item writes no row at all** — see `Core.Items.ItemEligibility`. Repeated here because it is the
+  rule most likely to be got backwards, and getting it wrong makes an unchecked item look handled forever.
+- **`WikiPageTitle` is recorded separately from the item name**, because the two legitimately differ: an item whose
+  in-game name cannot be a MediaWiki title (`Cell Key #5`) lives at a name a human chose (`Cell Key No. 5`), and
+  without recording it every future capture looks unhandled.
+- **The fingerprint (`Core.Items.ItemFingerprint`) covers what an edit depends on and nothing else.** Lists are
+  sorted, because a class list is a set and the window's emission order must not invalidate a row. The captured
+  level is included so a future version that processes levelled items can never confuse `+0` with `+7`. **Parser
+  warnings are excluded**: they quote OCR fragments and churn with every tuning change, so including them would
+  expire every row on every release — the same reasoning that keeps warning *text* out of the accuracy corpus.
+- No expiry by default: a checked item does not drift on its own, and the fingerprint and mapping version are what
+  actually invalidate a row. `MaximumAge` exists for the user who wants one.
+- JSON rather than SQLite — a few thousand small records, written whole and rarely, with no query beyond a keyed
+  lookup. Saved via a temporary file so an interrupted write cannot truncate it, and a corrupt ledger loads as empty
+  rather than throwing: every row is reconstructible by capturing the item again, so losing it beats refusing to
+  start.
 
 **Icon comparison (`Core.Icons`, `Wiki.MediaWiki.IconCache`) — flag only, per the plan.** Catches a page whose
 `lucy_img_ID` points at the wrong artwork. It never proposes a new id: the tool cannot know whether the page is
@@ -530,11 +552,17 @@ wrong or the capture caught something odd, and choosing one is a human's call.
   - only **2-7%** of the colours in the captured icon appear anywhere in the wiki file. Nearest-neighbour scaling
     cannot invent a colour, so the game is interpolating — and the capture often has *more* distinct colours than
     the source (115 against 81 on one item), which is the signature of exactly that.
-  - **This is not a UI-scale setting the user could change.** Glyph matching proves the UI text is a byte-identical
-    bitmap blit at this scale (2094 fields exact), so nothing global is being resampled; the 1.10 is specific to
-    icons. Either the game renders a 40x40 asset into a larger cell, or the wiki's files were themselves downscaled
-    to 40x40 during extraction — in which case they are lossy relative to the game and re-extracting at native size
-    would make an exact diff possible. Worth knowing before anyone tries this again.
+  - **The 1.10 has no explanation in any setting, and that question is closed** (user, 2026-09-25): the raw game
+    assets store icons in atlases divided into 40x40 regions, the UI skin files specify 40x40, and UI scaling is set
+    to 100%. Everything says 40x40 and the game upscales ~10% anyway. Glyph matching independently confirms nothing
+    *global* is resampled — the UI font is a byte-identical blit across 2094 fields — so this is icon-specific game
+    behaviour, not configuration. Don't re-investigate it; the wiki files are not downscaled copies, so there is no
+    higher-resolution source to re-extract.
+  - **Scale tolerance is permanent here, not a workaround** — and this is the asymmetry with glyph matching worth
+    understanding. A different UI scale or skin would break exact glyph matching too, but there the answer is to
+    regenerate the atlas for that profile. Icons have no such luxury: the wiki's files are fixed at 40x40 for
+    everyone, so whatever a given player's client renders has to be compared against that one size. A comparison
+    that tolerates scale is the only kind that can work across scales and skins at all.
 - **So the comparison is perceptual**, and scale-invariant by construction: the ink's own bounding box is found on
   both sides and resampled onto a 12x12 colour grid, so neither the sprite's position in its cell nor the padding a
   caller included matters.
