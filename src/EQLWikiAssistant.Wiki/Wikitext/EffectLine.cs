@@ -65,22 +65,28 @@ public static class EffectLine
         // template names both.
         parenthetical.AddRange(effect.Conditions);
 
-        string? level = null;
+        // Modifiers are collected first and appended in a fixed order, so the rendered line does not depend on the
+        // order the window happened to list them in. Casting Time, then Cooldown, then Cooldown Group — matching
+        // real pages (`Alter Plane: Sky` reads "(Any Slot/Can Equip, Casting Time: Instant, Cooldown: 120 seconds)")
+        // and the user's instruction to put cooldowns at the end of the parenthetical (2026-09-25).
+        string? castTime = null, cooldown = null, cooldownGroup = null, level = null;
         foreach ((string label, string value) in effect.Modifiers)
         {
             switch (label)
             {
-                case "Cast Time":
-                    parenthetical.Add($"Casting Time: {CastTime(value)}");
-                    break;
-                case "Required Level":
-                    level = value;
-                    break;
+                case "Cast Time": castTime = CastTime(value); break;
+                case "Cooldown": cooldown = value; break;
+                case "Cooldown Group": cooldownGroup = value; break;
+                case "Required Level": level = value; break;
                 default:
                     unsupported.Add($"'{label}' ({value}) has no place in the wiki's effect convention.");
                     break;
             }
         }
+
+        if (castTime is not null) parenthetical.Add($"Casting Time: {castTime}");
+        if (cooldown is not null) parenthetical.Add($"Cooldown: {cooldown}");
+        if (cooldownGroup is not null) parenthetical.Add($"Cooldown Group: {cooldownGroup}");
 
         var line = new StringBuilder();
         line.Append(WikiLabel).Append(": ").Append(Link(effect.Name));

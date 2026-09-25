@@ -345,10 +345,14 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   `5`. Measured rather than assumed: `STR` is signed on 126 pages against 4 plain and `SV FIRE` 68 against 0, while
   `WT` is plain on all 721, and `AC`/`DMG`/`Atk Delay`/`Range`/`Capacity`/`Weight Reduction` are never signed.
   `StatMapping.Signed` carries it.
-  - **A sign-only difference is deliberately not an edit.** `STR: 5` on a page reads unambiguously, so rewriting it
-    to `+5` would be precisely the incidental reformatting this tool is not allowed to do — that belongs to the
-    prettifier. The sign is applied to the value the tool *proposes*, and only when that value is being written
-    anyway for some other reason. `ValuesAgree` ignores a leading `+` accordingly.
+  - **A sign-only difference is an edit only when the edit would otherwise be inconsistent** (user, 2026-09-25).
+    On its own, `STR: 5` reads unambiguously and rewriting it to `+5` is the incidental reformatting that belongs
+    to the prettifier. But if the edit is already writing `WIS: +8` on that page, leaving `STR: 5` beside it
+    produces a line *the tool itself* made inconsistent — so those get normalized too, and only then.
+    `ValuesAgree` ignores a leading `+`, and
+    `ItemPageAnalyzer.NormalizeSignsIfTheEditWouldBeInconsistent` promotes the sign-only matches afterwards.
+    **It has to be a post-pass, not a rule inside the comparison**, because the answer depends on what every other
+    field concluded; a per-field rule cannot see that. `FieldFinding.SignedStat` carries the flag it needs.
 - **Two mapping gaps were found only by running the analyzer over the corpus**, and both would have pushed a
   regression to the wiki:
   - **Units differ on `Weight Reduction`**: the game shows `100`, the wiki `100%`. The comparison called them
@@ -371,12 +375,12 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   - **`absolutely nothing` and "no row at all" must stay distinguishable**, and they are: `absolutely nothing`
     never co-occurs with `No Trade` in the corpus. The first is a verified worthless item and gets written; the
     second is a gap and gets a "couldn't verify merchant value" warning.
-- **The wiki sometimes holds more detail than the window shows, and that is not staleness.** A wiki value that is a
-  slash-separated list containing the captured one is `NeedsReview`, not `Differs`, since overwriting would discard
-  the alternatives. Only two pages do this, both ammo — `CLASS 1 Bone Point Arrow` has `Range: 50 / 75 / 100` and
-  `CLASS 3 Wood Point Arrow` has `5 / 25 / 50`. Note both also carry a parallel triple in their recipe line
-  (`Fletching (Trivial: 68 / 68 / 82)`), so these pages appear to aggregate several arrow variants; the game shows
-  the single range of whichever variant is in hand. Unexplained as of 2026-09-25 and left to the user.
+- **A slash-separated wiki value means several items were combined onto one page.** Only two pages do this, both
+  ammo — `CLASS 1 Bone Point Arrow` has `Range: 50 / 75 / 100`, `CLASS 3 Wood Point Arrow` has `5 / 25 / 50` — and
+  both carry a parallel triple in their recipe line (`Fletching (Trivial: 68 / 68 / 82)`). Confirmed by the user
+  (2026-09-25): somebody merged three arrows into one entry, and the right fix is splitting the page. So this is
+  reported as a plain `Differs` rather than held back, since only a human can do the splitting and the mismatch is
+  what tells them to.
 - **Only a leading `+` is ignored when comparing values.** The wiki writes a bonus as `+8` and the game as `8` and
   neither is more correct; everything else compares exactly, because this is the comparison that decides whether a
   number on a public wiki gets overwritten and a tolerant one would hide the errors it exists to find.
@@ -400,14 +404,22 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   effect".
 - **A cast time is written without its unit.** The game says `12.0 seconds`, every real page says
   `Casting Time: 12.0`. Found by the corpus run flagging `Careless Lightning` as differing when only the unit did.
-- **An effect the convention cannot express is refused, not written incomplete.** `EffectRender.IsComplete` is false
-  when any part had no wiki representation, and the analyzer reports `NeedsReview` rather than emitting a line that
-  looks finished while having quietly dropped real game data. Two live cases, both on the user's TODO: `Charge` and
-  `Consumable` kinds have no agreed parenthetical token, and `Cooldown`/`Cooldown Group` have no agreed place at all
-  (10 of the 48 corpus effects have a cooldown).
-- **Open question recorded for the user**: every line is rebuilt from the capture, so a parenthetical part the window
-  does not show disappears — a live `Burn` page reads `(Combat, Casting Time: Instant)` where the game shows no cast
-  time for that proc. Probably harmless, but it is a deletion the capture cannot justify.
+- **Parenthetical order is fixed regardless of the order the window listed things**: kind, conditions,
+  `Casting Time`, `Cooldown`, `Cooldown Group` — then `at Level N` outside the parentheses. Cooldowns go last
+  (user, 2026-09-25), which is also where the one real page carrying one puts it (`Alter Plane: Sky` reads
+  `(Any Slot/Can Equip, Casting Time: Instant, Cooldown: 120 seconds) at Level 45`).
+- **`Charge Clicky` and `Consumable Clicky` are interim wording** (user, 2026-09-25). The template documents only
+  `Combat`, `Clicky` and `Worn`; both of these behave as clickies, so they are rendered that way until the community
+  formalizes it — which is on the user's list, along with the cooldown placement and `Worn` itself. When it lands,
+  `WikiMapping.EffectKinds` is the only thing that changes.
+- **An effect the convention still cannot express is refused, not written incomplete.** `EffectRender.IsComplete` is
+  false when any part had no wiki representation and the analyzer reports `NeedsReview`, rather than emitting a line
+  that looks finished while having quietly dropped real game data. With Charge/Consumable/Cooldown settled, nothing
+  in the corpus trips this any more — it remains as the guard for whatever the next patch adds.
+- **A rebuilt line completely replaces the old one** (user, 2026-09-25), including parts the window does not show:
+  a live `Burn` page reads `(Combat, Casting Time: Instant)` where the game shows no cast time for that proc, and
+  that `Casting Time: Instant` goes. This was raised as an open question and settled deliberately — no merging, the
+  capture is the whole truth for an effect line.
 - **`WikiSpike analyze [--detail]` runs the analyzer over every verified capture against the live wiki** — the
   wiki-side equivalent of `AccuracySpike`, and the only thing that finds a rule this wrong. **It must apply
   eligibility first**, which is a mistake worth not repeating: an initial run analyzed levelled items too and

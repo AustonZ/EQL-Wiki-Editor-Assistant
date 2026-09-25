@@ -227,11 +227,10 @@ public class ItemPageAnalyzerTests
         Assert.Contains(analysis.Findings, f => f.Captured == expected);
     }
 
-    /// <summary>But a sign-only difference is not an edit. `STR: 5` on a page reads unambiguously, so rewriting it to
-    /// `+5` would be exactly the incidental reformatting this tool is not allowed to do — that belongs to the
-    /// prettifier. The sign is applied only when the value is being written anyway.</summary>
+    /// <summary>On its own, a sign-only difference is not an edit. `STR: 5` reads unambiguously, so rewriting it to
+    /// `+5` is the incidental reformatting this tool must leave to the prettifier.</summary>
     [Fact]
-    public void ASignOnlyDifferenceIsNotAnEdit()
+    public void ASignOnlyDifferenceAloneIsNotAnEdit()
     {
         ItemPageDocument page = ItemPageDocument.Parse(
             "{{Itempage\n|itemname = Thing\n|statsblock = \nSTR: 8<br>\n}}")!;
@@ -239,6 +238,42 @@ public class ItemPageAnalyzerTests
         ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
             Captured(name: "Thing", stats: [new("Strength", "8")]), page, "Thing");
 
+        Assert.Equal(FieldVerdict.Matches, analysis.Find("STR")!.Verdict);
+        Assert.True(analysis.IsClean);
+    }
+
+    /// <summary>But if the edit is already writing another signed stat, leaving this one unsigned produces a line
+    /// the tool itself made inconsistent — so it gets normalized too, and only then (user, 2026-09-25).</summary>
+    [Fact]
+    public void ASignOnlyDifferenceIsCorrectedWhenTheEditWouldOtherwiseBeInconsistent()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \nSTR: 8  WIS: +3<br>\n}}")!;
+
+        // WIS genuinely changed; STR differs only by its missing sign.
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Thing", stats: [new("Strength", "8"), new("Wisdom", "9")]), page, "Thing");
+
+        Assert.Equal(FieldVerdict.Differs, analysis.Find("WIS")!.Verdict);
+
+        FieldFinding str = analysis.Find("STR")!;
+        Assert.Equal(FieldVerdict.Differs, str.Verdict);
+        Assert.Equal("+8", str.Captured);
+        Assert.Contains("already writing another signed stat", str.Explanation);
+    }
+
+    /// <summary>An unsigned field changing does not drag the signs along — only an inconsistency *between signed
+    /// stats* justifies touching them.</summary>
+    [Fact]
+    public void AnUnsignedFieldChangingDoesNotTriggerSignNormalization()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \nSTR: 8  AC: 5<br>\n}}")!;
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Thing", stats: [new("Strength", "8"), new("AC", "6")]), page, "Thing");
+
+        Assert.Equal(FieldVerdict.Differs, analysis.Find("AC")!.Verdict);
         Assert.Equal(FieldVerdict.Matches, analysis.Find("STR")!.Verdict);
     }
 
@@ -387,7 +422,7 @@ public class ItemPageAnalyzerTests
     {
         ParsedItem captured = Captured(name: "Bladestopper") with
         {
-            Effects = [new EffectEntry("Click", "Rune IV", [], [new("Cooldown", "600 sec")])],
+            Effects = [new EffectEntry("Click", "Rune IV", [], [new("Charges Remaining", "3")])],
         };
 
         ItemPageAnalysis analysis = Analyze(captured, "Bladestopper");
@@ -395,7 +430,25 @@ public class ItemPageAnalyzerTests
         FieldFinding finding = analysis.Find("Click Effect")!;
         Assert.Equal(FieldVerdict.NeedsReview, finding.Verdict);
         Assert.False(finding.IsChange);
-        Assert.Contains("Cooldown", finding.Explanation);
+        Assert.Contains("Charges Remaining", finding.Explanation);
+    }
+
+    /// <summary>A cooldown used to be unexpressible and is not any more (user, 2026-09-25), so Bladestopper's click
+    /// effect now renders rather than being held back.</summary>
+    [Fact]
+    public void AnEffectWithACooldownNowRenders()
+    {
+        ParsedItem captured = Captured(name: "Bladestopper") with
+        {
+            Effects = [new EffectEntry("Click", "Rune IV", [], [new("Cast Time", "Instant"), new("Cooldown", "600 sec")])],
+        };
+
+        FieldFinding finding = Analyze(captured, "Bladestopper").Find("Click Effect")!;
+
+        Assert.Equal(FieldVerdict.Differs, finding.Verdict);
+        Assert.Equal(
+            "Effect: [[Rune IV|<span class='itemeff'>Rune IV</span>]] (Clicky, Casting Time: Instant, Cooldown: 600 sec)",
+            finding.Captured);
     }
 
     // ---- lists ----

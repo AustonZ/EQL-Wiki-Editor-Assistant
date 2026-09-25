@@ -103,9 +103,11 @@ public sealed class WikiMapping
     /// Game effect kind -> the token the wiki puts in an effect line's parenthetical.
     ///
     /// The template documents `Combat`, `Clicky` and `Worn`. The game also produces `Charge` and `Consumable`
-    /// effects, which have no agreed token — 4 and 3 respectively in the verified corpus — so they are absent here
-    /// on purpose and the renderer refuses rather than picking one. `Worn` is in the game and on real pages but
-    /// missing from the template's documented list, which is on the user's list to fix.
+    /// effects, which the template has no wording for; the user's interim choice (2026-09-25) is
+    /// `Charge Clicky` and `Consumable Clicky`, since both behave as clickies. **Interim is the operative word** —
+    /// formalizing all of this with the wiki community is on the user's list, and when it lands this table is the
+    /// only thing that changes. `Worn` is likewise in the game and on real pages but missing from the template's
+    /// documented list.
     /// </summary>
     public IReadOnlyDictionary<string, string> EffectKinds { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -250,7 +252,9 @@ public sealed class WikiMapping
                 ["Combat"] = "Combat",
                 ["Click"] = "Clicky",
                 ["Worn"] = "Worn",
-                // Charge and Consumable are deliberately absent — see EffectKinds.
+                // Interim wording pending a community decision — see EffectKinds.
+                ["Charge"] = "Charge Clicky",
+                ["Consumable"] = "Consumable Clicky",
             },
             FocusEffectKinds = ["Focus"],
         };

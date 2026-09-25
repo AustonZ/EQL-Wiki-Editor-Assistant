@@ -36,8 +36,13 @@ public sealed record FieldFinding(
     FieldVerdict Verdict,
     string? Captured,
     string? OnWiki,
-    string? Explanation = null)
+    string? Explanation = null,
+    bool SignedStat = false)
 {
+    /// <summary>Whether this field is one the wiki writes with an explicit sign. Carried on the finding so the
+    /// sign post-pass can tell a signed stat from any other field without re-consulting the mapping.</summary>
+    public bool SignedStat { get; init; } = SignedStat;
+
     /// <summary>True when the tool would change the page for this field.</summary>
     public bool IsChange => Verdict is FieldVerdict.Differs or FieldVerdict.MissingOnWiki;
 

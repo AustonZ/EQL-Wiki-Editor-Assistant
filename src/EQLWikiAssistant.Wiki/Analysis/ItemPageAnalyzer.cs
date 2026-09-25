@@ -81,6 +81,7 @@ public static class ItemPageAnalyzer
         AddListFinding(findings, SlotsField, [.. captured.Slots.Select(mapping.ToWikiSlot)], block);
         AddStatFindings(findings, captured, block, mapping);
         AddEffectFindings(findings, captured, page, block, mapping);
+        NormalizeSignsIfTheEditWouldBeInconsistent(findings);
 
         return new ItemPageAnalysis(pageTitle, findings);
     }
@@ -275,10 +276,12 @@ public static class ItemPageAnalyzer
             string? onWiki = block?.Find(wikiLabel)?.Value;
             string wanted = ToWikiValue(capturedValue, statMapping);
 
+            bool signed = statMapping.Signed;
+
             if (onWiki is null)
-                findings.Add(new FieldFinding(wikiLabel, FieldVerdict.MissingOnWiki, wanted, null));
+                findings.Add(new FieldFinding(wikiLabel, FieldVerdict.MissingOnWiki, wanted, null, SignedStat: signed));
             else if (ValuesAgree(wanted, onWiki))
-                findings.Add(new FieldFinding(wikiLabel, FieldVerdict.Matches, wanted, onWiki));
+                findings.Add(new FieldFinding(wikiLabel, FieldVerdict.Matches, wanted, onWiki, SignedStat: signed));
             else if (IsOneAlternativeOf(wanted, onWiki))
                 // A slash-separated value means somebody combined several items onto one page — the two real cases
                 // are ammo pages carrying three arrow variants at once, with a parallel triple in their recipe line.
@@ -289,7 +292,7 @@ public static class ItemPageAnalyzer
                     $"The page lists several values for {wikiLabel} where the window shows one. That usually means " +
                     "several items were combined into one page, which is worth splitting up rather than editing."));
             else
-                findings.Add(new FieldFinding(wikiLabel, FieldVerdict.Differs, wanted, onWiki));
+                findings.Add(new FieldFinding(wikiLabel, FieldVerdict.Differs, wanted, onWiki, SignedStat: signed));
         }
     }
 
@@ -302,6 +305,39 @@ public static class ItemPageAnalyzer
     /// </summary>
     private static bool ValuesAgree(string captured, string onWiki) =>
         string.Equals(Trim(captured), Trim(onWiki), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Promotes sign-only matches to changes, but **only when the edit already touches another signed stat**
+    /// (user, 2026-09-25).
+    ///
+    /// The reasoning is about what the page looks like afterwards. On its own, a page saying `STR: 5` is fine and
+    /// rewriting it to `+5` is the incidental reformatting this tool must leave to the prettifier. But if the edit
+    /// is already writing `WIS: +8` on that page, leaving `STR: 5` beside it produces a line the tool itself made
+    /// inconsistent — so those get normalized too, and only then.
+    ///
+    /// Note this is a post-pass over the findings rather than a rule inside the comparison, because the answer
+    /// depends on what *every other* field concluded. A per-field rule cannot see that.
+    /// </summary>
+    private static void NormalizeSignsIfTheEditWouldBeInconsistent(List<FieldFinding> findings)
+    {
+        bool editingASignedStat = findings.Any(f => f.IsChange && f.SignedStat);
+        if (!editingASignedStat) return;
+
+        for (int i = 0; i < findings.Count; i++)
+        {
+            FieldFinding finding = findings[i];
+            if (!finding.SignedStat || finding.Verdict != FieldVerdict.Matches) continue;
+            if (string.Equals(finding.Captured, finding.OnWiki, StringComparison.Ordinal)) continue;
+
+            findings[i] = finding with
+            {
+                Verdict = FieldVerdict.Differs,
+                Explanation = "Only the sign differs, which would normally be left to the prettifier — but this " +
+                              "edit is already writing another signed stat on the page, so leaving this one " +
+                              "unsigned would make the result inconsistent.",
+            };
+        }
+    }
 
     /// <summary>
     /// Effects, which the wiki splits two ways: focus effects get their own template parameter

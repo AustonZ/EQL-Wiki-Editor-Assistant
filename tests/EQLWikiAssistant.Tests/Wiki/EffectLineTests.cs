@@ -65,31 +65,55 @@ public class EffectLineTests
             "Effect: [[Mystery|<span class='itemeff'>Mystery</span>]] (Worn)",
             EffectLine.Render(Effect("Worn", "Mystery")).Line);
 
-    /// <summary>Charge and Consumable have no agreed token, so the renderer refuses rather than picking one. Writing
-    /// a line without the kind would misrepresent when the effect applies.</summary>
+    /// <summary>Charge and Consumable have no template wording of their own; the user's interim choice (2026-09-25)
+    /// is to treat both as clickies until the community formalizes it.</summary>
     [Theory]
-    [InlineData("Charge")]
-    [InlineData("Consumable")]
-    public void AnEffectKindWithNoAgreedTokenIsRefused(string kind)
-    {
-        EffectRender render = EffectLine.Render(Effect(kind, "Word of Healing"));
+    [InlineData("Charge", "Charge Clicky")]
+    [InlineData("Consumable", "Consumable Clicky")]
+    public void ChargeAndConsumableRenderAsClickies(string kind, string token) =>
+        Assert.Equal(
+            $"Effect: [[Word of Healing|<span class='itemeff'>Word of Healing</span>]] ({token})",
+            EffectLine.Render(Effect(kind, "Word of Healing")).Line);
 
-        Assert.False(render.IsComplete);
-        Assert.Contains(render.Unsupported, u => u.Contains(kind) && u.Contains("no agreed token"));
+    /// <summary>Cooldowns go at the end of the parenthetical (user, 2026-09-25), which is also where the one real
+    /// page carrying one puts it: `Alter Plane: Sky` reads "(Any Slot/Can Equip, Casting Time: Instant,
+    /// Cooldown: 120 seconds) at Level 45".</summary>
+    [Fact]
+    public void CooldownsGoAtTheEndOfTheParenthetical() =>
+        Assert.Equal(
+            "Effect: [[Rune IV|<span class='itemeff'>Rune IV</span>]] " +
+            "(Clicky, Can Equip, Casting Time: Instant, Cooldown: 240 seconds, Cooldown Group: Rune) at Level 45",
+            EffectLine.Render(Effect("Click", "Rune IV", ["Can Equip"],
+            [
+                new("Cooldown Group", "Rune"),
+                new("Required Level", "45"),
+                new("Cast Time", "Instant"),
+                new("Cooldown", "240 seconds"),
+            ])).Line);
+
+    /// <summary>Modifier order in the rendered line does not depend on the order the window happened to list them,
+    /// which the test above already relies on — the input there is deliberately scrambled.</summary>
+    [Fact]
+    public void ModifierOrderDoesNotDependOnTheCaptureOrder()
+    {
+        string? forward = EffectLine.Render(Effect("Click", "X", [],
+            [new("Cast Time", "Instant"), new("Cooldown", "10 seconds")])).Line;
+        string? reversed = EffectLine.Render(Effect("Click", "X", [],
+            [new("Cooldown", "10 seconds"), new("Cast Time", "Instant")])).Line;
+
+        Assert.Equal(forward, reversed);
     }
 
-    /// <summary>A modifier with no place in the convention is reported, so the line is never written having quietly
-    /// lost it. Cooldown is the real case: 10 corpus effects have one and the template's parenthetical does not
-    /// mention it.</summary>
-    [Theory]
-    [InlineData("Cooldown", "240 seconds")]
-    [InlineData("Cooldown Group", "Rune")]
-    public void AModifierWithNoWikiRepresentationIsReported(string label, string value)
+    /// <summary>A modifier with no place at all in the convention is still reported, so a line is never written
+    /// having quietly lost one.</summary>
+    [Fact]
+    public void AModifierWithNoWikiRepresentationIsReported()
     {
-        EffectRender render = EffectLine.Render(Effect("Combat", "Rune IV", modifiers: [new(label, value)]));
+        EffectRender render = EffectLine.Render(
+            Effect("Combat", "Rune IV", modifiers: [new("Charges Remaining", "3")]));
 
         Assert.False(render.IsComplete);
-        Assert.Contains(render.Unsupported, u => u.Contains(label));
+        Assert.Contains(render.Unsupported, u => u.Contains("Charges Remaining"));
     }
 
     /// <summary>The wiki writes a cast time as a bare number; the game says "12.0 seconds". Measured across the
