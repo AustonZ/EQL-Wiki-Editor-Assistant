@@ -499,3 +499,6 @@ $RECYCLE.BIN/
 
 # Personal, machine-local permission grants — not shared project config.
 .claude/settings.local.json
+
+# Claude-maintained list of things for the user to do; not source control material for now.
+/TODO.md

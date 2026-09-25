@@ -82,10 +82,9 @@ public sealed class WikiMapping
     /// Game stat labels that are real data with no agreed wiki home yet, listed so the diff can say something
     /// specific instead of "unknown field".
     ///
-    /// These are not oversights, they are open questions for the user: `Accuracy` appears on 12 of 101 captured
-    /// windows and no sampled wiki page has a field for it; `Container`, `Type` and `Items` are container
-    /// properties in the same position. Guessing a wiki label for any of them would invent a convention the wiki's
-    /// editors never agreed to.
+    /// Guessing a wiki label for one of these would invent a convention the wiki's editors never agreed to, so they
+    /// are surfaced as questions instead. Empty as of 2026-09-25: the four that were here (`Accuracy`, `Container`,
+    /// `Type`, `Items`) have all been resolved by the user. Kept because the next game patch will refill it.
     /// </summary>
     public IReadOnlyList<string> UnmappedGameLabels { get; init; } = [];
 
@@ -99,6 +98,34 @@ public sealed class WikiMapping
     /// </summary>
     public IReadOnlyDictionary<string, string> Slots { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Game effect kind -> the token the wiki puts in an effect line's parenthetical.
+    ///
+    /// The template documents `Combat`, `Clicky` and `Worn`. The game also produces `Charge` and `Consumable`
+    /// effects, which have no agreed token — 4 and 3 respectively in the verified corpus — so they are absent here
+    /// on purpose and the renderer refuses rather than picking one. `Worn` is in the game and on real pages but
+    /// missing from the template's documented list, which is on the user's list to fix.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> EffectKinds { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Effect kinds the wiki stores in their own template parameter rather than a statsblock line.</summary>
+    public IReadOnlyList<string> FocusEffectKinds { get; init; } = [];
+
+    /// <summary>The wiki's parenthetical token for a game effect kind, or null if it has none agreed.</summary>
+    public string? FindEffectKind(string gameKind)
+    {
+        ArgumentNullException.ThrowIfNull(gameKind);
+        return EffectKinds.TryGetValue(gameKind.Trim(), out string? token) ? token : null;
+    }
+
+    /// <summary>Whether this kind belongs in <see cref="FocusEffectParameter"/> instead of the statsblock.</summary>
+    public bool IsFocusEffect(string gameKind)
+    {
+        ArgumentNullException.ThrowIfNull(gameKind);
+        return FocusEffectKinds.Contains(gameKind.Trim(), StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>The wiki's spelling of a game slot name.</summary>
     public string ToWikiSlot(string gameSlot)
@@ -183,6 +210,9 @@ public sealed class WikiMapping
             // item as usable for bashing), Items sits with Size Capacity (it restricts what a container may hold).
             ("Type", "Type"),
             ("Items", "Items"),
+            // Added to the game the week of 2026-09-22, so no legacy page has it and every item that shows one is
+            // an addition. The game already writes the % and the sign ("+13.6%").
+            ("Accuracy", "Accuracy"),
         ];
 
         var map = new Dictionary<string, StatMapping>(StringComparer.OrdinalIgnoreCase);
@@ -213,8 +243,16 @@ public sealed class WikiMapping
         return new WikiMapping
         {
             Stats = map,
-            UnmappedGameLabels = ["Accuracy"],
+            UnmappedGameLabels = [],
             Slots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Fingers"] = "FINGER" },
+            EffectKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Combat"] = "Combat",
+                ["Click"] = "Clicky",
+                ["Worn"] = "Worn",
+                // Charge and Consumable are deliberately absent — see EffectKinds.
+            },
+            FocusEffectKinds = ["Focus"],
         };
     }
 

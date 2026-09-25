@@ -302,7 +302,11 @@ async Task<int> AnalyzeCorpusAsync()
             window.Name!, window.Level, window.TitleContentNameMismatch,
             window.Flags, window.Classes, window.Races, window.Slots,
             [.. window.Stats.Select(s => new KeyValuePair<string, string>(s.Label, s.Value))],
-            [], [], window.MerchantValue, window.Lore, []);
+            [.. window.Exaltations.Select(e => new ExaltationSlot(Enum.Parse<ExaltationKind>(e.Kind, true), e.Name))],
+            [.. window.Effects.Select(e => new EffectEntry(
+                e.Kind, e.Name, e.Conditions,
+                [.. e.Modifiers.Select(m => new KeyValuePair<string, string>(m.Label, m.Value))]))],
+            window.MerchantValue, window.Lore, []);
 
         ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, lookup.Page!.Title);
         foreach (FieldFinding finding in analysis.Findings)

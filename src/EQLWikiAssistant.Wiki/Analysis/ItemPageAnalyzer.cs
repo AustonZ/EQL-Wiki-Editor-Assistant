@@ -80,6 +80,7 @@ public static class ItemPageAnalyzer
         // Slots go through the mapping: the wiki writes them in caps, and its `FINGER` is the game's `Fingers`.
         AddListFinding(findings, SlotsField, [.. captured.Slots.Select(mapping.ToWikiSlot)], block);
         AddStatFindings(findings, captured, block, mapping);
+        AddEffectFindings(findings, captured, page, block, mapping);
 
         return new ItemPageAnalysis(pageTitle, findings);
     }
@@ -279,13 +280,14 @@ public static class ItemPageAnalyzer
             else if (ValuesAgree(wanted, onWiki))
                 findings.Add(new FieldFinding(wikiLabel, FieldVerdict.Matches, wanted, onWiki));
             else if (IsOneAlternativeOf(wanted, onWiki))
-                // The wiki records several values where the window shows one — a real page has
-                // "Range: 50 / 75 / 100" against a captured 50. Replacing that would discard detail the capture
-                // cannot reproduce, so it is a human's call rather than an edit.
+                // A slash-separated value means somebody combined several items onto one page — the two real cases
+                // are ammo pages carrying three arrow variants at once, with a parallel triple in their recipe line.
+                // The user's call (2026-09-25) is that this is a genuine mismatch to surface, not something to hold
+                // back: the right fix is usually splitting the page, which only a human can do.
                 findings.Add(new FieldFinding(
-                    wikiLabel, FieldVerdict.NeedsReview, wanted, onWiki,
-                    $"The page lists several values for {wikiLabel} and the window shows one of them. Overwriting " +
-                    "would drop the others, so this is left alone."));
+                    wikiLabel, FieldVerdict.Differs, wanted, onWiki,
+                    $"The page lists several values for {wikiLabel} where the window shows one. That usually means " +
+                    "several items were combined into one page, which is worth splitting up rather than editing."));
             else
                 findings.Add(new FieldFinding(wikiLabel, FieldVerdict.Differs, wanted, onWiki));
         }
@@ -300,6 +302,79 @@ public static class ItemPageAnalyzer
     /// </summary>
     private static bool ValuesAgree(string captured, string onWiki) =>
         string.Equals(Trim(captured), Trim(onWiki), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Effects, which the wiki splits two ways: focus effects get their own template parameter
+    /// (<c>focus_effect = Improved Vampirism III</c>) while everything else is an <c>Effect:</c> line in the
+    /// statsblock.
+    ///
+    /// **A legacy link is a real correction, not reformatting.** The <c>&lt;span class='itemeff'&gt;</c> wrapper is
+    /// what gives the effect a tooltip, which a bare <c>[[Name]]</c> does not (user, 2026-09-25), so a line naming
+    /// the right effect in the old form still differs in a way worth fixing. That is the opposite call from the
+    /// `STR: 5` versus `+5` case, and for a concrete reason: one changes what the page *does*, the other only how it
+    /// looks.
+    /// </summary>
+    private static void AddEffectFindings(
+        List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page, StatsBlock? block, WikiMapping mapping)
+    {
+        // Existing Effect: lines, by the effect they name. A statsblock can carry several.
+        var onWiki = new List<(string? Name, string Value)>();
+        if (block is not null)
+            foreach (StatsField field in block.AllFields()
+                         .Where(f => string.Equals(f.Label, EffectLine.WikiLabel, StringComparison.OrdinalIgnoreCase)))
+                onWiki.Add((EffectLine.TryReadName(field.Value), field.Value));
+
+        foreach (EffectEntry effect in captured.Effects)
+        {
+            string field = $"{effect.Kind} Effect";
+
+            if (mapping.IsFocusEffect(effect.Kind))
+            {
+                CompareFocusEffect(findings, field, effect, page);
+                continue;
+            }
+
+            EffectRender render = EffectLine.Render(effect, mapping);
+            (string? Name, string Value) existing = onWiki.FirstOrDefault(
+                e => string.Equals(e.Name, effect.Name, StringComparison.OrdinalIgnoreCase));
+
+            if (!render.IsComplete)
+            {
+                // Refuse rather than write a line that has quietly lost part of the effect.
+                findings.Add(new FieldFinding(
+                    field, FieldVerdict.NeedsReview, effect.Name, existing.Value,
+                    $"This effect cannot be written in the wiki's convention yet: {string.Join(" ", render.Unsupported)}"));
+                continue;
+            }
+
+            string wanted = render.Line!;
+
+            if (existing.Value is null)
+                findings.Add(new FieldFinding(field, FieldVerdict.MissingOnWiki, wanted, null));
+            else if (string.Equals($"{EffectLine.WikiLabel}: {existing.Value}", wanted, StringComparison.Ordinal))
+                findings.Add(new FieldFinding(field, FieldVerdict.Matches, wanted, existing.Value));
+            else
+                findings.Add(new FieldFinding(
+                    field, FieldVerdict.Differs, wanted, existing.Value,
+                    EffectLine.HasTooltipLink(existing.Value)
+                        ? null
+                        : "The existing link is the legacy [[Name]] form, which gets no tooltip. Rewriting it to " +
+                          "the itemeff span form is a functional fix, not a style change."));
+        }
+    }
+
+    private static void CompareFocusEffect(
+        List<FieldFinding> findings, string field, EffectEntry effect, ItemPageDocument page)
+    {
+        string? onWiki = page.FocusEffect;
+
+        if (string.IsNullOrWhiteSpace(onWiki))
+            findings.Add(new FieldFinding(field, FieldVerdict.MissingOnWiki, effect.Name, null));
+        else if (string.Equals(onWiki, effect.Name, StringComparison.Ordinal))
+            findings.Add(new FieldFinding(field, FieldVerdict.Matches, effect.Name, onWiki));
+        else
+            findings.Add(new FieldFinding(field, FieldVerdict.Differs, effect.Name, onWiki));
+    }
 
     /// <summary>
     /// A captured value written the way the wiki writes it: the unit suffix appended where the two sides differ

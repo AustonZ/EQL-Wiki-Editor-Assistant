@@ -283,10 +283,11 @@ public class ItemPageAnalyzerTests
         Assert.DoesNotContain(analysis.Findings, f => f.Captured == "CLOSED.");
     }
 
-    /// <summary>A real page has `Range: 50 / 75 / 100` against a captured `50`. Overwriting would discard the
-    /// alternatives, so it is a human's call.</summary>
+    /// <summary>A slash-separated wiki value means somebody combined several items onto one page — the two real cases
+    /// are ammo pages holding three arrow variants. The user's call (2026-09-25) is to surface it as a genuine
+    /// mismatch, since the right fix is usually splitting the page.</summary>
     [Fact]
-    public void AWikiValueListingSeveralAlternativesNeedsReview()
+    public void AWikiValueListingSeveralAlternativesIsAMismatch()
     {
         ItemPageDocument page = ItemPageDocument.Parse(
             "{{Itempage\n|itemname = Arrow\n|statsblock = \nRange: 50 / 75 / 100<br>\n}}")!;
@@ -295,8 +296,8 @@ public class ItemPageAnalyzerTests
             Captured(name: "Arrow", stats: [new("Range", "50")]), page, "Arrow");
 
         FieldFinding finding = analysis.Find("Range")!;
-        Assert.Equal(FieldVerdict.NeedsReview, finding.Verdict);
-        Assert.False(finding.IsChange);
+        Assert.Equal(FieldVerdict.Differs, finding.Verdict);
+        Assert.Contains("combined into one page", finding.Explanation);
     }
 
     /// <summary>The important one: a stat with no mapping is never dropped. An unmapped stat is how a game patch
@@ -304,16 +305,97 @@ public class ItemPageAnalyzerTests
     [Fact]
     public void AnUnmappedStatIsReportedRatherThanDropped()
     {
-        ItemPageAnalysis analysis = Analyze(
-            Captured(stats: [new("Accuracy", "+13.6%"), new("Sharpness", "+4")]), "Earring of Bashing");
-
-        FieldFinding known = analysis.Find("Accuracy")!;
-        Assert.Equal(FieldVerdict.NeedsReview, known.Verdict);
-        Assert.Contains("no agreed field", known.Explanation);
+        ItemPageAnalysis analysis = Analyze(Captured(stats: [new("Sharpness", "+4")]), "Earring of Bashing");
 
         FieldFinding novel = analysis.Find("Sharpness")!;
         Assert.Equal(FieldVerdict.NeedsReview, novel.Verdict);
         Assert.Contains("possibly new", novel.Explanation);
+        Assert.False(novel.IsChange);
+    }
+
+    /// <summary>Accuracy was added to the game the week of 2026-09-22 and is correct to write (user, 2026-09-25), so
+    /// no legacy page has it and every item showing one is an addition. It was the last entry in
+    /// <c>UnmappedGameLabels</c>, which is now empty — this pins that it really is mapped.</summary>
+    [Fact]
+    public void AccuracyIsWrittenRatherThanQueried()
+    {
+        ItemPageAnalysis analysis = Analyze(Captured(stats: [new("Accuracy", "+13.6%")]), "Earring of Bashing");
+
+        FieldFinding finding = analysis.Find("Accuracy")!;
+        Assert.Equal(FieldVerdict.MissingOnWiki, finding.Verdict);
+        Assert.Equal("+13.6%", finding.Captured);
+        Assert.True(finding.IsChange);
+    }
+
+    // ---- effects ----
+
+    /// <summary>Golden Efreeti Boots really does carry `| focus_effect = Enhancement Haste II`.</summary>
+    [Fact]
+    public void AFocusEffectIsComparedAgainstItsOwnTemplateParameter()
+    {
+        ParsedItem captured = Captured(name: "Golden Efreeti Boots") with
+        {
+            Effects = [new EffectEntry("Focus", "Enhancement Haste II", [], [])],
+        };
+
+        ItemPageAnalysis analysis = Analyze(captured, "Golden Efreeti Boots");
+
+        Assert.Equal(FieldVerdict.Matches, analysis.Find("Focus Effect")!.Verdict);
+    }
+
+    /// <summary>Fishbone Earring's page has the legacy bare link: `Effect:  [[Enduring Breath]] (Worn)`. The effect
+    /// and its details are right, but the link gets no tooltip — so this is a functional correction, not a style
+    /// one, which is the opposite call from the sign case above.</summary>
+    [Fact]
+    public void ALegacyEffectLinkIsAFunctionalCorrection()
+    {
+        ParsedItem captured = Captured(name: "Fishbone Earring") with
+        {
+            Effects = [new EffectEntry("Worn", "Enduring Breath", [], [])],
+        };
+
+        ItemPageAnalysis analysis = Analyze(captured, "Fishbone Earring");
+
+        FieldFinding finding = analysis.Find("Worn Effect")!;
+        Assert.Equal(FieldVerdict.Differs, finding.Verdict);
+        Assert.Equal("Effect: [[Enduring Breath|<span class='itemeff'>Enduring Breath</span>]] (Worn)", finding.Captured);
+        Assert.Contains("no tooltip", finding.Explanation);
+        Assert.Contains("functional fix", finding.Explanation);
+    }
+
+    [Fact]
+    public void AnEffectAlreadyInTheModernFormMatches()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \n" +
+            "Effect: [[Burn|<span class='itemeff'>Burn</span>]] (Combat) at Level 10<br>\n}}")!;
+
+        ParsedItem captured = Captured(name: "Thing") with
+        {
+            Effects = [new EffectEntry("Combat", "Burn", [], [new("Required Level", "10")])],
+        };
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, "Thing");
+
+        Assert.Equal(FieldVerdict.Matches, analysis.Find("Combat Effect")!.Verdict);
+    }
+
+    /// <summary>An effect the convention cannot express yet is refused rather than written incomplete — writing the
+    /// line without its cooldown would look finished while having lost real game data.</summary>
+    [Fact]
+    public void AnEffectTheConventionCannotExpressIsRefused()
+    {
+        ParsedItem captured = Captured(name: "Bladestopper") with
+        {
+            Effects = [new EffectEntry("Click", "Rune IV", [], [new("Cooldown", "600 sec")])],
+        };
+
+        ItemPageAnalysis analysis = Analyze(captured, "Bladestopper");
+
+        FieldFinding finding = analysis.Find("Click Effect")!;
+        Assert.Equal(FieldVerdict.NeedsReview, finding.Verdict);
+        Assert.False(finding.IsChange);
+        Assert.Contains("Cooldown", finding.Explanation);
     }
 
     // ---- lists ----

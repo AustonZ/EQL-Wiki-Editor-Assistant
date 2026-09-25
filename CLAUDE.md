@@ -383,6 +383,31 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
 - See "Reading and editing wiki pages" for the flag rules (legacy discarded, vocabulary open-ended, wiki
   `Attunable` beats captured `No Trade`, `This is a meal!` alerted but never acted on) and the `merchant_value`
   normalization.
+**Effects (`Wiki.Wikitext.EffectLine`).** The wiki splits them two ways, per the convention the user supplied
+(2026-09-25) as the template documents it:
+- **Focus effects get their own template parameter** — `| focus_effect = Improved Vampirism III`. No line, no link,
+  no parenthetical.
+- **Everything else is a statsblock line**:
+  `Effect: [[?|<span class='itemeff'>?</span>]] (Combat / Clicky / Worn / Can Equip / Must Equip / Casting Time: ?) at Level ?`
+  Both `?` in the link are the effect name; the parenthetical keeps whichever parts apply, comma-separated; the
+  `at Level ?` carries a required level or is omitted.
+- **The `<span class='itemeff'>` wrapper is functional, not decorative** (user, 2026-09-25): it is what gives the
+  effect a tooltip, which a bare `[[Name]]` does not. So converting a legacy link is a real correction the user makes
+  on every item they touch, and the analyzer reports it as `Differs` with that reason attached. **Contrast the
+  `STR: 5` versus `STR: +5` case, which is purely cosmetic and deliberately left alone** — the line between them is
+  whether it changes what the page *does* or only how it looks. `EffectLine.HasTooltipLink` is what distinguishes
+  them; `TryReadName` reads the link target so "same effect written the old way" is never confused with "a different
+  effect".
+- **A cast time is written without its unit.** The game says `12.0 seconds`, every real page says
+  `Casting Time: 12.0`. Found by the corpus run flagging `Careless Lightning` as differing when only the unit did.
+- **An effect the convention cannot express is refused, not written incomplete.** `EffectRender.IsComplete` is false
+  when any part had no wiki representation, and the analyzer reports `NeedsReview` rather than emitting a line that
+  looks finished while having quietly dropped real game data. Two live cases, both on the user's TODO: `Charge` and
+  `Consumable` kinds have no agreed parenthetical token, and `Cooldown`/`Cooldown Group` have no agreed place at all
+  (10 of the 48 corpus effects have a cooldown).
+- **Open question recorded for the user**: every line is rebuilt from the capture, so a parenthetical part the window
+  does not show disappears — a live `Burn` page reads `(Combat, Casting Time: Instant)` where the game shows no cast
+  time for that proc. Probably harmless, but it is a deletion the capture cannot justify.
 - **`WikiSpike analyze [--detail]` runs the analyzer over every verified capture against the live wiki** — the
   wiki-side equivalent of `AccuracySpike`, and the only thing that finds a rule this wrong. **It must apply
   eligibility first**, which is a mistake worth not repeating: an initial run analyzed levelled items too and
