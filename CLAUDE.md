@@ -708,6 +708,21 @@ vocabulary) and testable on plain strings without an image/OCR round-trip. Start
   - **The password is never in a file, a command line or an environment variable.** `WikiSpike login` reads it
     from the console (unechoed) straight into Credential Manager. A command line would land in shell history and
     in the process list.
+  - **Verify a credential with `WikiSpike whoami`, which writes nothing.** It logs in and then *asks* the wiki what
+    the session may do (`meta=userinfo&uiprop=rights`). The alternative — attempting an edit to see whether it
+    works — leaves a permanent revision in some page's history, and an ordinary editor on this wiki cannot delete
+    a page or a revision. `whoami` also catches the failure that matters most with a fresh bot password: a login
+    that silently didn't stick, which would otherwise edit as the user's IP address.
+  - **Verified live (2026-09-25): ConfirmEdit/Turnstile does not block a logged-in API edit.** The extension is
+    installed and could have blocked automated edits outright, so this was a real open question; it is now
+    answered for an authenticated bot-password session. The CSRF token flow, `assert=user` and `nocreate` are all
+    confirmed working against the real wiki too (`WikiSpike edit` on the developer's own sandbox page, restored byte for byte
+    and checked by an independent read).
+  - **Not verified, and don't claim otherwise: that `basetimestamp` *rejects* a concurrent edit.** Only that it is
+    accepted in the format sent. MediaWiki attempts a three-way merge when a base timestamp is supplied, so a
+    non-conflicting concurrent edit is merged rather than refused — the guard catches *unmergeable* concurrency,
+    not all of it. Proving the rejection needs a genuinely unmergeable conflict on a real page, which costs
+    revisions nobody can delete. Treat the guard as defence in depth; the review flow re-fetches before writing.
 - Item pages follow this shape (see `Help:Contents` for the canonical blueprint, and e.g. `Earring of Bashing` for a
   real example with lore):
   - An era template at the top (`{{Classic Era}}`, `{{Kunark Era}}`, ...).
