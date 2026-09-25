@@ -65,6 +65,17 @@ public sealed class WikiMapping
     /// <summary>The template every item page transcludes.</summary>
     public string TemplateName { get; init; } = "Itempage";
 
+    /// <summary>
+    /// The era every item currently in the game belongs to.
+    ///
+    /// **The era banner is how the wiki records that an item has actually been seen in game** (user, 2026-09-25), so
+    /// a capture is itself the confirmation and the tool sets this unconditionally. EQL has shipped no expansion
+    /// yet, so everything in game is Classic. When the first one lands, `Kunark` becomes valid for in-game items and
+    /// this stops being a constant — that needs a way to ask the user which era an item belongs to without being
+    /// annoying about it, which is deliberately left as a future feature rather than guessed at now.
+    /// </summary>
+    public string CurrentEra { get; init; } = "Classic";
+
     /// <summary>Parameter names for the fields v1 reads and writes.</summary>
     public string ItemNameParameter { get; init; } = "itemname";
     public string IconIdParameter { get; init; } = "lucy_img_ID";
@@ -114,6 +125,21 @@ public sealed class WikiMapping
 
     /// <summary>Effect kinds the wiki stores in their own template parameter rather than a statsblock line.</summary>
     public IReadOnlyList<string> FocusEffectKinds { get; init; } = [];
+
+    /// <summary>
+    /// The statsblock's line order, each entry listing the wiki labels that share one line, in order. Taken verbatim
+    /// from the Item Page Blueprint on `Help:Contents` (user, 2026-09-25), which is the authority the user's own
+    /// compliance routine follows.
+    ///
+    /// **Nothing reads this yet** — the diff compares fields and does not care where they sit. It exists because the
+    /// renderer that milestone 5 needs does, and because the blueprint was in hand now; recording it while the
+    /// source is in front of us beats reconstructing it later from example pages that disagree with each other.
+    ///
+    /// Note the blueprint lists several labels no capture has ever produced (`Skill Mod`, `Attack`, `Clairvoyance`,
+    /// `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`, `Recommended level`, `Required level`) and omits
+    /// several the game does produce (`Range`, `Accuracy`, `Type`, `Items`). Both gaps are on the user's list.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<string>> StatsBlockLineOrder { get; init; } = [];
 
     /// <summary>The wiki's parenthetical token for a game effect kind, or null if it has none agreed.</summary>
     public string? FindEffectKind(string gameKind)
@@ -174,7 +200,8 @@ public sealed class WikiMapping
     private static WikiMapping CreateDefault()
     {
         // (game label, wiki label). Confident mappings only — see UnmappedGameLabels for what was deliberately
-        // left out. The wiki's canonical casing is used (SV FIRE, not SV Fire: 31 pages to 3).
+        // left out. Canonical labels come from the Item Page Blueprint on Help:Contents, not from what is most
+        // common on existing pages — see the SV note below.
         (string Game, string Wiki)[] stored =
         [
             ("Size", "Size"),
@@ -192,16 +219,21 @@ public sealed class WikiMapping
             ("End", "END"),
             ("HP Regen", "HP Regen"),
             ("Mana Regen", "Mana Regen"),
-            ("End Regen", "End Regen"),
-            ("SV. Fire", "SV FIRE"),
-            ("SV. Cold", "SV COLD"),
-            ("SV. Magic", "SV MAGIC"),
-            ("SV. Disease", "SV DISEASE"),
-            ("SV. Poison", "SV POISON"),
-            ("SV. Void", "SV VOID"),
+            ("End Regen", "END Regen"),
+            // Title case, per the Item Page Blueprint on Help:Contents. **This reverses an earlier choice made on
+            // frequency** — real pages write `SV FIRE` 31 times against `SV Fire` 3 — because the blueprint is the
+            // template the user's routine complies with, and frequency only measures how many pages predate it.
+            // Harmless to switch: the comparison finds a stat case-insensitively, so this changes only what gets
+            // written, never whether an existing line counts as matching.
+            ("SV. Fire", "SV Fire"),
+            ("SV. Cold", "SV Cold"),
+            ("SV. Magic", "SV Magic"),
+            ("SV. Disease", "SV Disease"),
+            ("SV. Poison", "SV Poison"),
+            ("SV. Void", "SV Void"),
             ("Base Dmg", "DMG"),
             ("Dmg Bon", "DMG Bonus"),
-            ("Backstab Dmg", "Backstab"),
+            ("Backstab Dmg", "BACKSTAB"),
             ("Delay", "Atk Delay"),
             ("Skill", "Skill"),
             ("Range", "Range"),
@@ -257,6 +289,25 @@ public sealed class WikiMapping
                 ["Consumable"] = "Consumable Clicky",
             },
             FocusEffectKinds = ["Focus"],
+            StatsBlockLineOrder =
+            [
+                // The flags line is unlabelled, so it is named here by convention rather than by a wiki label.
+                ["(flags)"],
+                ["Slot"],
+                ["Skill", "Atk Delay"],
+                ["DMG", "DMG Bonus", "AC", "BACKSTAB", "Magic DMG", "Poison DMG"],
+                ["Skill Mod"],
+                ["STR", "DEX", "STA", "CHA", "WIS", "INT", "AGI", "HP", "MANA", "END"],
+                ["SV Fire", "SV Disease", "SV Cold", "SV Magic", "SV Poison", "SV Void"],
+                ["Attack", "HP Regen", "Mana Regen", "Haste", "Clairvoyance", "Spell Dmg", "Heal Amount", "END Regen"],
+                ["Recommended level", "Required level"],
+                ["Effect"],
+                ["Charges"],
+                ["Size", "WT"],
+                ["Weight Reduction", "Capacity", "Size Capacity"],
+                ["Class"],
+                ["Race"],
+            ],
         };
     }
 

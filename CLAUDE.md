@@ -322,9 +322,35 @@ hazards.
 (`WikiMapping.Default`, `Load`/`SaveAsync` for a user-edited copy in app-data) — the plan's mapping layer arriving
 with milestone 4 as it predicted, covering the subset the diff needs. Built by censusing both sides: 37 distinct
 stat labels across the 101 verified windows against 49 across 744 real pages.
-- The bulk is straightforward renaming (`Weight`→`WT`, `Strength`→`STR`, `SV. Fire`→`SV FIRE`, `Base Dmg`→`DMG`,
-  `Delay`→`Atk Delay`, `Dmg Bon`→`DMG Bonus`, `Size Cap`→`Size Capacity`). Canonical wiki casing is caps
-  (`SV FIRE` on 31 pages against `SV Fire` on 3).
+- The bulk is straightforward renaming (`Weight`→`WT`, `Strength`→`STR`, `SV. Fire`→`SV Fire`, `Base Dmg`→`DMG`,
+  `Delay`→`Atk Delay`, `Dmg Bon`→`DMG Bonus`, `Size Cap`→`Size Capacity`).
+- **Canonical labels come from the Item Page Blueprint on `Help:Contents`, not from what existing pages do most.**
+  This reverses an earlier choice here: `SV FIRE` appears on 31 pages against `SV Fire` on 3, and the frequency
+  argument lost anyway, because the blueprint is the template the user's compliance routine follows and frequency
+  only measures how many pages predate it. Same for `BACKSTAB` and `END Regen`. Harmless to switch, because the
+  comparison finds a stat case-insensitively — it changes only what gets *written*, never whether an existing line
+  counts as matching.
+- **`StatsBlockLineOrder` records the blueprint's line layout**, each entry naming the wiki labels that share a
+  line. Nothing reads it yet — the diff compares fields and does not care where they sit — but the renderer
+  milestone 5 needs does, and recording it while the blueprint was in hand beats reconstructing it later from
+  example pages that disagree with each other.
+- **The blueprint and the game have gaps in both directions**, all on the user's TODO: it lists labels no capture
+  has produced (`Skill Mod`, `Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`,
+  `Recommended level`, `Required level`) and omits several the game does (`Range`, `Accuracy`, `Type`, `Items`),
+  plus `Worn` and `Can Equip` in the effect parenthetical.
+
+**Derived categories (`Wiki.Mapping.CategoryRules`).** Which `[[Category:...]]` lines an item's classes and slots
+imply — 16 class categories (`BRD` → `Bard Equipment`) and 18 slot categories, both taken verbatim from the
+blueprint rather than from sampling pages. **Sampling would have been wrong here**: `Golden Efreeti Boots` says
+`Class: ALL` but lists only 14 of the 16 class categories, predating Beastlord and Berserker, so a census would have
+recorded an incomplete convention as the convention.
+- **The derived set is only ever a subset of a page's categories.** Real pages also carry zone names, `Quest Items`,
+  `Focus Items`, `Inventory Items` and `Fashion:` entries, none of them derivable from an item window.
+  `CategoryRules.IsDerivable` is what marks the tool's own territory; everything else is preserved untouched.
+- The documented quirk holds: the slot is `FINGER`, the category is `Fingers`. `ANY` is a real slot with no category
+  and contributes none — and is deliberately not reported as unrecognized, which would be a false alarm.
+- An unknown class code or slot is *reported* rather than silently shortening the list, the same rule as an unmapped
+  stat and for the same reason.
 - **An unmapped stat is reported, never dropped.** A stat the tool has never seen is how a game patch announces
   itself, and discarding it silently would lose real data from a public wiki with nobody the wiser. `Accuracy` is
   the one remaining example: real game data (on 12 of 101 windows) with no agreed wiki home, left unmapped so it
@@ -439,12 +465,23 @@ frequency across 744 real item pages, so none is hypothetical:
 
 | rule | pages | tool fixes? |
 |---|---|---|
-| era template missing | **232** | no — the window never says which expansion an item is from |
+| era banner missing or wrong | **232 missing, 176 legacy** | yes |
 | `{{Item Lore Missing}}` present | 35 | yes |
 | `<onlyinclude>` wrapper missing | 4 | no — repairing it means deciding what to enclose |
 | duplicate parameter | 3 | yes |
 | unrecognized parameter name | 3 | no |
 | required parameter missing | 0 | no |
+
+- **The era banner is how the wiki records that an item has actually been seen in game** (user, 2026-09-25), which
+  is exactly what a capture proves — so the tool sets it rather than reporting it, and sets it even over a legacy
+  banner (176 sampled pages say `Velious Era`, inherited from the Project1999 import). Every item currently in EQL
+  is `Classic`; `WikiMapping.CurrentEra` holds that. **When the first expansion ships this stops being a constant**,
+  and the open question then is how to ask the user which era an item belongs to without being annoying about it —
+  deliberately left as a future feature rather than guessed at now.
+  - This is the one place the tool rewrites something *outside* the `Itempage` call, and that is deliberate: the
+    banner is page-level furniture, not item data.
+  - Banners are matched by shape, so a page carrying an era this tool has never heard of is still recognized (and
+    corrected) rather than treated as having none.
 
 - **`ToolWillFix` is the load-bearing distinction.** A compliance problem the tool can correct is part of the edit it
   proposes; one it cannot is reported and left alone. Nothing in between — the tool never half-fixes a page and
@@ -453,13 +490,6 @@ frequency across 744 real item pages, so none is hypothetical:
   hitting only 3 pages: one writes `recipe` for `recipes`, so that page's recipe section is invisible. It is
   *reported*, not renamed — the closest known name may not be what the author meant, and guessing would move
   somebody's content somewhere they did not choose.
-- **Era banners are matched by shape, not against a list.** The wiki has twelve (`Classic`, `Velious`, `Kunark`,
-  `Chardok Revamp`, `Sky`, `Temple`, `Epics`, `FearHateRevamp`, `EpicQuests`, `Paineel`, `Fear`, `Luclin`) and gains
-  one per expansion, so a fixed list would report a brand-new era as missing — the same trap the open-ended flag
-  vocabulary avoids.
-- **The era rule fires on roughly a third of all pages and the tool can never clear it.** Kept because the user's
-  routine includes template compliance, but it is the one rule worth reconsidering if it proves to be noise; it is on
-  their TODO as a decision.
 - **Compliance the tool *would* fix counts against `ItemPageAnalysis.IsClean`**, so a page that matches the capture
   but still carries `{{Item Lore Missing}}` is not "done" — the tool's edit would still change it. Compliance it
   cannot fix is excluded, since no amount of editing would clear it and such an item could never be recorded as

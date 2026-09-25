@@ -18,7 +18,8 @@ public class ComplianceCheckerTests
     private static IReadOnlyList<ComplianceFinding> CheckText(string wikitext) =>
         ComplianceChecker.Check(ItemPageDocument.Parse(wikitext)!, wikitext);
 
-    /// <summary>A well-formed page raises nothing. Worth pinning, or every other assertion here is meaningless.</summary>
+    /// <summary>A well-formed page raises nothing. Worth pinning, or every other assertion here is meaningless.
+    /// Earring of Bashing already carries {{Classic Era}}.</summary>
     [Fact]
     public void ACompliantPageRaisesNothing() =>
         Assert.Empty(Check("Earring of Bashing"));
@@ -74,36 +75,48 @@ public class ComplianceCheckerTests
         Assert.False(finding.ToolWillFix);
     }
 
-    /// <summary>232 of 744 pages — by far the most common defect, and one the tool can never fix, because the item
-    /// window does not say which expansion an item came from.</summary>
+    /// <summary>232 of 744 pages have no banner. The era is how the wiki records that an item has actually been seen
+    /// in game (user, 2026-09-25), so a capture is itself the confirmation and the tool sets it.</summary>
     [Fact]
-    public void AMissingEraTemplateIsReportedAndNeverGuessed()
+    public void AMissingEraTemplateIsFixedNotJustReported()
     {
         ComplianceFinding finding = Assert.Single(
             Check("Bladestopper").Where(f => f.Rule == ComplianceChecker.EraTemplateRule));
 
-        Assert.False(finding.ToolWillFix);
-        Assert.Contains("cannot supply it", finding.Detail);
+        Assert.True(finding.ToolWillFix);
+        Assert.Contains("Classic Era", finding.Detail);
     }
 
-    /// <summary>The wiki has twelve era banners and gains one per expansion, so they are matched by shape. A fixed
-    /// list would report a brand-new era as missing — the exact failure the open-ended flag vocabulary avoids.</summary>
+    /// <summary>A legacy banner is corrected too — 176 sampled pages say `Velious Era`, inherited from the
+    /// Project1999 import. If the item was just seen in game, it is Classic Era whatever the page says.</summary>
+    [Theory]
+    [InlineData("{{Velious Era}}")]
+    [InlineData("{{Kunark Era}}")]
+    [InlineData("{{Chardok Revamp Era}}")]
+    public void ALegacyEraBannerIsCorrected(string banner)
+    {
+        ComplianceFinding finding = Assert.Single(
+            CheckText(Page(banner)).Where(f => f.Rule == ComplianceChecker.EraTemplateRule));
+
+        Assert.True(finding.ToolWillFix);
+        Assert.Contains("Classic Era", finding.Detail);
+    }
+
     [Theory]
     [InlineData("{{Classic Era}}")]
-    [InlineData("{{Velious Era}}")]
-    [InlineData("{{Chardok Revamp Era}}")]
-    [InlineData("{{Some Future Era}}")]
-    [InlineData("{{ Kunark Era }}")]
-    public void AnyEraBannerCounts(string banner) =>
+    [InlineData("{{ Classic Era }}")]
+    public void TheCurrentEraRaisesNothing(string banner) =>
         Assert.DoesNotContain(
-            CheckText($"{banner}<onlyinclude>{{{{Itempage\n|itemname = X\n|lucy_img_ID = 1\n|statsblock = \nClass: ALL<br>\n}}}}</onlyinclude>"),
-            f => f.Rule == ComplianceChecker.EraTemplateRule);
+            CheckText(Page(banner)), f => f.Rule == ComplianceChecker.EraTemplateRule);
+
+    private static string Page(string banner) =>
+        $"{banner}\n<onlyinclude>{{{{Itempage\n|itemname = X\n|lucy_img_ID = 1\n|statsblock = \nClass: ALL<br>\n}}}}</onlyinclude>";
 
     [Fact]
     public void AMissingRequiredParameterIsReported()
     {
         ComplianceFinding finding = Assert.Single(CheckText(
-            "{{Classic Era}}<onlyinclude>{{Itempage\n|itemname = X\n|statsblock = \nClass: ALL<br>\n}}</onlyinclude>")
+            "{{Classic Era}}\n<onlyinclude>{{Itempage\n|itemname = X\n|statsblock = \nClass: ALL<br>\n}}</onlyinclude>")
             .Where(f => f.Rule == ComplianceChecker.MissingParameterRule));
 
         Assert.Contains("lucy_img_ID", finding.Detail);

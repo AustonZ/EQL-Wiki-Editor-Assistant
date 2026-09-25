@@ -157,6 +157,81 @@ public sealed class ItemPageDocument
     }
 
     /// <summary>
+    /// Ensures the page opens with exactly one era banner, and that it is the given era.
+    ///
+    /// **The era is how the wiki records that an item has actually been seen in the game** (user, 2026-09-25), which
+    /// is why this is an automatic fix rather than something to report: a capture *is* the confirmation. Every item
+    /// currently in EQL is Classic Era, so a page that is missing a banner or carries a legacy one
+    /// (176 sampled pages say `Velious Era`, inherited from the Project1999 import) is corrected outright.
+    ///
+    /// This is the one place the tool rewrites something outside the `Itempage` call, and it is deliberate: the
+    /// banner is page-level furniture, not item data.
+    /// </summary>
+    public ItemPageDocument WithEraTemplate(string era)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(era);
+        string wanted = $"{{{{{era} Era}}}}";
+
+        var existing = EraTemplates(Wikitext).OrderByDescending(c => c.Start).ToList();
+
+        // Already correct and unduplicated: leave the page completely alone rather than re-splicing identical text.
+        if (existing.Count == 1 &&
+            string.Equals(Wikitext[existing[0].Start..existing[0].End], wanted, StringComparison.Ordinal))
+            return this;
+
+        string wikitext = Wikitext;
+        foreach (TemplateCall call in existing)
+        {
+            int end = call.End;
+            // Take a newline that immediately followed the banner, so removing it does not leave a blank line.
+            if (end < wikitext.Length && wikitext[end] == '\r') end++;
+            if (end < wikitext.Length && wikitext[end] == '\n') end++;
+            wikitext = wikitext[..call.Start] + wikitext[end..];
+        }
+
+        return Reparse(wanted + "\n" + wikitext.TrimStart('\r', '\n'));
+    }
+
+    /// <summary>True when the page carries exactly one banner and it names this era.</summary>
+    public bool HasEraTemplate(string era)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(era);
+        IReadOnlyList<TemplateCall> banners = EraTemplates(Wikitext);
+        return banners.Count == 1 &&
+               string.Equals(banners[0].Name, $"{era} Era", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The era banner currently on the page, or null. More than one is itself a defect.</summary>
+    public string? CurrentEra
+    {
+        get
+        {
+            IReadOnlyList<TemplateCall> banners = EraTemplates(Wikitext);
+            return banners.Count == 0 ? null : banners[0].Name;
+        }
+    }
+
+    /// <summary>Every `{{... Era}}` banner, matched by shape rather than against a list: the wiki has twelve and
+    /// gains one per expansion, so a fixed list would fail to notice a brand-new era already on a page.</summary>
+    private static IReadOnlyList<TemplateCall> EraTemplates(string wikitext)
+    {
+        var found = new List<TemplateCall>();
+        for (int i = 0; i + 1 < wikitext.Length; i++)
+        {
+            if (wikitext[i] != '{' || wikitext[i + 1] != '{') continue;
+
+            int close = wikitext.IndexOf("}}", i + 2, StringComparison.Ordinal);
+            if (close < 0) break;
+
+            string name = wikitext[(i + 2)..close].Trim();
+            if (name.EndsWith(" Era", StringComparison.OrdinalIgnoreCase) && !name.Contains('\n'))
+                found.Add(new TemplateCall(name, i, close + 2 - i, []));
+        }
+
+        return found;
+    }
+
+    /// <summary>
     /// Removes every duplicate of a named parameter, keeping the last — the one MediaWiki actually renders.
     ///
     /// The user's own routine includes cleaning these up (2026-09-25), and it is a *compliance* fix rather than a

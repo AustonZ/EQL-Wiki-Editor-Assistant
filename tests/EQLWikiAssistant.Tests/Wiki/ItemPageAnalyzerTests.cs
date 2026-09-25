@@ -194,7 +194,7 @@ public class ItemPageAnalyzerTests
         ItemPageAnalysis analysis = Analyze(
             Captured(stats: [new("SV. Void", "+7")]), "Earring of Bashing");
 
-        FieldFinding finding = analysis.Find("SV VOID")!;
+        FieldFinding finding = analysis.Find("SV Void")!;
         Assert.Equal(FieldVerdict.MissingOnWiki, finding.Verdict);
         Assert.True(finding.IsChange);
     }
@@ -232,8 +232,11 @@ public class ItemPageAnalyzerTests
     [Fact]
     public void ASignOnlyDifferenceAloneIsNotAnEdit()
     {
+        // The era banner and lucy_img_ID are here only so the compliance rules stay quiet and IsClean means what
+        // this test is actually asserting.
         ItemPageDocument page = ItemPageDocument.Parse(
-            "{{Itempage\n|itemname = Thing\n|statsblock = \nSTR: 8<br>\n}}")!;
+            "{{Classic Era}}\n<onlyinclude>{{Itempage\n|itemname = Thing\n|lucy_img_ID = 1\n" +
+            "|statsblock = \nSTR: 8<br>\n}}</onlyinclude>")!;
 
         ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
             Captured(name: "Thing", stats: [new("Strength", "8")]), page, "Thing");

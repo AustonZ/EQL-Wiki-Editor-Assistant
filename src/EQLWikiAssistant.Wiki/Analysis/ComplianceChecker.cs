@@ -108,23 +108,19 @@ public static class ComplianceChecker
                 "elsewhere. Adding the wrapper means deciding what it should enclose, which is a human's call.",
                 ToolWillFix: false));
 
-        // 232 of 744 pages — by far the most common defect, and one the tool can never fix: which expansion an item
-        // belongs to is not visible in the item window. Reported so the user can supply it, never guessed.
-        if (!HasEraTemplate(wholePageWikitext))
+        // The most common defect by far — 232 of 744 pages have no banner and 176 more carry a legacy one — and,
+        // since a capture is itself the confirmation that an item is in the game, the one the tool is most entitled
+        // to fix.
+        if (!page.HasEraTemplate(mapping.CurrentEra))
             findings.Add(new ComplianceFinding(
                 EraTemplateRule,
-                "The page has no era template ({{Classic Era}}, {{Kunark Era}}, ...). The item window does not say " +
-                "which expansion an item is from, so this tool cannot supply it.",
-                ToolWillFix: false));
+                page.CurrentEra is null
+                    ? $"The page has no era template. It will be set to {{{{{mapping.CurrentEra} Era}}}} — capturing " +
+                      "the item in game is what confirms it is in the game."
+                    : $"The page says {{{{{page.CurrentEra}}}}}. It will be set to {{{{{mapping.CurrentEra} Era}}}}, " +
+                      "since this item was just seen in game.",
+                ToolWillFix: true));
 
         return findings;
     }
-
-    /// <summary>Whether the page opens with an era banner. Matched by shape rather than against a list, because the
-    /// wiki has twelve of them and adds more per expansion — `Classic`, `Velious`, `Kunark`, `Chardok Revamp`,
-    /// `Sky`, `Temple`, `Epics`, `FearHateRevamp`, `EpicQuests`, `Paineel`, `Fear` and `Luclin` all occur — and a
-    /// fixed list would report a brand-new era as missing.</summary>
-    private static bool HasEraTemplate(string wikitext) =>
-        WikitextScanner.FindTemplates(wikitext, "Era").Count > 0 ||
-        System.Text.RegularExpressions.Regex.IsMatch(wikitext, @"\{\{\s*[A-Za-z0-9 ]+\s+Era\s*\}\}");
 }
