@@ -109,17 +109,38 @@ wrong value and fails the same way (`E_NOINTERFACE` → `InvalidCastException`, 
 issue); and `Direct3D11CaptureFramePool.Create(...)` silently never raises `FrameArrived` without a `DispatcherQueue`
 pumped on the calling thread — use `CreateFreeThreaded(...)` instead (fine on this app's Windows 11 target).
 
-**Formatting is somebody else's edit — never ours** (user, 2026-09-24). The user wants a separate wiki-source
-prettifier eventually, possibly launched from this tool but always as its own edit: *"A single 'automatically
-reformatted' edit with no actual data changes is much easier to work with when reviewing diff history."* Two
-standing design consequences, both of which the current wikitext layer already satisfies:
-- **This tool never reformats incidentally.** No whitespace normalization, no re-rendering a block to tidy it, no
-  "while we're here" fixes. That is why the raw source is the source of truth (see "Reading and editing wiki
-  pages"), and it is a constraint to preserve, not an implementation detail that happened to fall out.
-- **Non-compliance is reported, not fixed.** The eventual flow flags "this page needs reformatting" in the UI and
-  the user runs the prettifier separately (expected to be the same component in a `check` mode). So parsing needs
-  to be able to *describe* what is off without changing it — which `StatsBlockLine` already does by keeping both
-  the verbatim text and the parse. Out of scope for now; don't build it, don't design against it.
+**Formatting is a separate edit, and the prettifier that makes it is v1 scope** (user, 2026-09-25, promoted from a
+parked future feature). *"A single 'automatically reformatted' edit with no actual data changes is much easier to
+work with when reviewing diff history."*
+- **The data edit goes first; the prettifier runs second.** Settled, not arbitrary: running it first would not stay
+  pretty, because the data edit adds new content as unformatted lines (see the minimal-edit rule below) and the page
+  would need reformatting again — prettify-first collapses into prettify-first-and-last. It would also force a
+  purely syntactic pass to understand legacy forms with a very short remaining life (the `<ul><li>` merchant-value
+  blocks, legacy flag lines, `{{Item Lore Missing}}`, stale era banners) that the semantic pass deletes anyway.
+  **Semantics before syntax.**
+- **v1 runs the prettifier automatically after any change** and prompts to commit the reformatting if any is needed
+  — a CI formatting gate, with the twist that this codebase starts messy and the reformat must not bury the data
+  change. **A brand-new page goes through it before its first wiki commit**: there is no reason for a page's history
+  to start dirty when it doesn't have to.
+- **MVP is the flag-only version**: the tool marks a page as needing reformatting — it knows, because it knows when
+  it added an unformatted line — and the user runs the prettifier separately.
+- **The data edit never reformats incidentally.** No whitespace normalization, no re-rendering a block to tidy it,
+  no "while we're here" fixes. That is why the raw source is the source of truth (see "Reading and editing wiki
+  pages"), and it stays binding however capable the prettifier becomes.
+- **The data pass reports non-compliance rather than fixing formatting.** So parsing has to be able to *describe*
+  what is off without changing it — which `StatsBlockLine` already does by keeping both the verbatim text and the
+  parse.
+
+**The minimal-edit rule (user, 2026-09-25).** What lets the data edit stay surgical against a page nobody formatted.
+Its whole virtue is that it never requires the tool to understand a layout it did not create, which is where any
+cleverer placement rule would go wrong on a messy page.
+- **A flag or value that already exists is changed in place.** Nothing else on the line moves.
+- **Something entirely new goes on its own line**, placed **before the `Class:` line** so the diff reads naturally —
+  the blueprint puts `Class` and `Race` last, so that position is derived rather than invented, and it falls back to
+  appending when there is no `Class:` line. The follow-up reformatting puts it where it belongs.
+- **A template parameter that does not exist at all** is the third case, since there is no line to add it to: insert
+  it in the blueprint's parameter order. `ItemPageDocument.WithParameter` deliberately refuses to invent one, so
+  adding a parameter is its own operation with its own placement decision.
 
 **The `statsblock`-to-real-template migration is expected, and both shapes must work** (user, 2026-09-24). The
 user intends to make a case to the other editors for promoting most of `statsblock`'s contents to explicit
@@ -497,6 +518,26 @@ frequency across 744 real item pages, so none is hypothetical:
 - Removing a duplicate takes the parameter's whole `|name = value` run (`TemplateParameter.SegmentStart`/`SegmentEnd`),
   not just its value — splicing out the value alone leaves a stray `|notes =` behind — and keeps the **last**
   occurrence, the one MediaWiki renders.
+
+**Building the edit (`Wiki.Analysis.ItemPageEditor`, milestone 5).** Turns an `ItemPageAnalysis` into actual
+wikitext under the minimal-edit rule. **It decides nothing** — every judgement was already made by the analyzer and
+the compliance checker — which is what keeps "what would change" reviewable separately from "how it gets written".
+- `StatsField` carries the value's offset inside the line, and `StatsBlockLine.ReplaceFieldValue` splices it, so an
+  existing value is changed where it stands. Without offsets the only way to change one field would be to rewrite
+  the line, which is the incidental reformatting the data edit is not allowed to do. Verified on a real page:
+  `AC: 5 <br>` becomes `AC: 6 <br>` **with the stray space before the break preserved**.
+- `StatsBlock.InsertLine` places new content before the `Class:` line, falling back to appending.
+- The flags line is regenerated whole (it has no labels to edit in place, and legacy flags are discarded rather than
+  translated), and **an item with genuinely no flags loses the line** rather than keeping an empty one — 20 of the
+  101 verified windows have no flags, and a blanked line leaves a bare `<br>` behind.
+- An effect line is matched to the existing one **by the effect's name**, so the right line is rewritten on a page
+  carrying several.
+- `ProposedEdit.NeedsReformatting` is true when a line was added but not positioned — the precise trigger the
+  prettifier follow-up needs. `Deferred` carries what the tool declined: compliance it cannot fix, and a parameter
+  that does not exist yet (there is no line to change in place, and inventing a position is a judgement).
+- `tools/WikiSpike -- preview <screenshot>` runs the whole pipeline — locate, parse, eligibility, lookup, analyze,
+  edit — and prints the proposed line diff. It exists so the edit can be judged against real pages before any UI
+  does, the same reason `AccuracySpike` and `WikiSpike analyze` exist.
 
 **Eligibility (`Core.Items.ItemEligibility`, pipeline step 4b).** A foreign exaltation or a levelled item (`+X>0`)
 blocks automated processing. **The load-bearing rule is the ledger one and it is easy to get backwards: an
@@ -1130,6 +1171,10 @@ dotnet run --project tools/WikiSpike -- grammar --cached .local-data/wiki-pages 
 # levelled items, or the numbers lie). The wiki-side equivalent of AccuracySpike:
 dotnet run --project tools/WikiSpike -- analyze
 dotnet run --project tools/WikiSpike -- analyze --detail   # plus every non-matching field, per item
+
+# The whole pipeline end to end against a screenshot — locate, parse, eligibility, lookup, analyze, edit — printing
+# the proposed line diff. Exists so the edit can be judged on real pages before there is a UI to judge it in:
+dotnet run --project tools/WikiSpike -- preview "samples/some screenshot.png"
 
 # Icon comparison against a real screenshot. Prints each captured icon against the one its page points at, AND a
 # negative control against the other items' icons — without that control a check that says "match" to everything

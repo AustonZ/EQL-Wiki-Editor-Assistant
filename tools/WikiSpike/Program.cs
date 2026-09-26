@@ -45,6 +45,7 @@ switch (args[0])
     case "analyze": return await AnalyzeCorpusAsync();
     case "icons": return await CompareIconsAsync();
     case "icondiff": return await DiffIconPixelsAsync();
+    case "preview": return await PreviewEditsAsync();
     case "login": return Login();
     case "whoami": return await WhoAmIAsync();
     case "logout": return Logout();
@@ -546,6 +547,84 @@ async Task<int> DiffIconPixelsAsync()
             }
 
         return maxX < 0 ? new Rect(0, 0, 0, 0) : new Rect(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+}
+
+// The whole pipeline end to end against a real screenshot: locate, parse, check eligibility, find the page,
+// analyze, and build the edit — printing the proposed wikitext as a line diff. This is the closest thing to what
+// the review UI will show, and the point of having it before the UI exists is that the edit can be judged on real
+// pages without one.
+async Task<int> PreviewEditsAsync()
+{
+    if (args.Length < 2) { Console.Error.WriteLine("usage: WikiSpike preview <screenshot>"); return 1; }
+
+    CapturedImage image = await ImageFile.LoadAsync(args[1]);
+    using var rapid = new RapidOcrEngine();
+    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+    IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
+    using MediaWikiClient client = MediaWikiClient.Create(endpoint);
+
+    foreach (LocatedWindow window in windows)
+    {
+        if (window.PossiblyOccluded) { Console.WriteLine("--- (occluded window, skipped)"); continue; }
+
+        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+        Console.WriteLine();
+        Console.WriteLine($"=== {item.Name}");
+
+        ItemEligibility eligibility = ItemEligibility.Check(item);
+        if (!eligibility.IsEligible)
+        {
+            // No ledger row is written for these either — see ItemEligibility.
+            foreach (IneligibilityDetail blocker in eligibility.Blockers)
+                Console.WriteLine($"    ineligible: {blocker.Explanation}");
+            continue;
+        }
+
+        ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
+        if (lookup.Outcome != LookupOutcome.Found)
+        {
+            Console.WriteLine($"    {lookup.Outcome}{(lookup.Warning is null ? "" : ": " + lookup.Warning)}");
+            continue;
+        }
+
+        ItemPageDocument? page = ItemPageDocument.Parse(lookup.Page!.Wikitext);
+        if (page is null) { Console.WriteLine("    the page is not an item page"); continue; }
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(item, page, lookup.Page!.Title);
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis);
+
+        if (!edit.HasChanges) { Console.WriteLine("    already correct — no edit"); }
+        else
+        {
+            Console.WriteLine($"    summary: {edit.Summary}");
+            Console.WriteLine($"    needs reformatting afterwards: {edit.NeedsReformatting}");
+            PrintLineDiff(edit.OriginalWikitext, edit.NewWikitext);
+        }
+
+        foreach (string deferred in edit.Deferred) Console.WriteLine($"    ! {deferred}");
+        foreach (FieldFinding finding in analysis.Findings.Where(f => f.Blocks))
+            Console.WriteLine($"    ? {finding.Field}: {finding.Explanation ?? "needs review"}");
+    }
+
+    return 0;
+
+    // A crude line diff — enough to eyeball whether the edit is surgical, which is the whole question.
+    static void PrintLineDiff(string before, string after)
+    {
+        string[] a = before.Replace("\r\n", "\n").Split('\n');
+        string[] b = after.Replace("\r\n", "\n").Split('\n');
+        var removed = new List<string>(a);
+        var added = new List<string>(b);
+
+        foreach (string line in a.Intersect(b).ToList())
+        {
+            removed.RemoveAll(l => l == line);
+            added.RemoveAll(l => l == line);
+        }
+
+        foreach (string line in removed) Console.WriteLine($"      - {line}");
+        foreach (string line in added) Console.WriteLine($"      + {line}");
     }
 }
 

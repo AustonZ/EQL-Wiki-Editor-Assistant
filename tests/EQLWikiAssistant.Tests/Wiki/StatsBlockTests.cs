@@ -8,6 +8,14 @@ namespace EQLWikiAssistant.Tests.Wiki;
 /// </summary>
 public class StatsBlockTests
 {
+    /// <summary>Compares what these tests mean — the label and the value — rather than the whole record, which now
+    /// also carries the value's offset so that an in-place edit is possible.</summary>
+    private static void AssertField(string label, string value, StatsField field)
+    {
+        Assert.Equal(label, field.Label);
+        Assert.Equal(value, field.Value);
+    }
+
     [Fact]
     public void Parse_SplitsALineIntoLabelValuePairs()
     {
@@ -15,8 +23,8 @@ public class StatsBlockTests
 
         Assert.Equal(StatsLineKind.Fields, line.Kind);
         Assert.Collection(line.Fields,
-            f => Assert.Equal(new StatsField("WT", "0.1"), f),
-            f => Assert.Equal(new StatsField("Size", "TINY"), f));
+            f => AssertField("WT", "0.1", f),
+            f => AssertField("Size", "TINY", f));
     }
 
     /// <summary>Most pages separate two fields with a double space; several use a single one. Both are real.</summary>
@@ -63,7 +71,7 @@ public class StatsBlockTests
         StatsBlockLine line = StatsBlock.Parse("EXPENDABLE  Charges: 10<br>").Lines[0];
 
         Assert.Equal(["EXPENDABLE"], line.Flags);
-        Assert.Equal(new StatsField("Charges", "10"), Assert.Single(line.Fields));
+        AssertField("Charges", "10", Assert.Single(line.Fields));
     }
 
     [Theory]
@@ -107,8 +115,8 @@ public class StatsBlockTests
         StatsBlockLine line = StatsBlock.Parse(text + "<br>").Lines[0];
 
         Assert.Collection(line.Fields,
-            f => Assert.Equal(new StatsField(firstLabel, firstValue), f),
-            f => Assert.Equal(new StatsField(secondLabel, secondValue), f));
+            f => AssertField(firstLabel, firstValue, f),
+            f => AssertField(secondLabel, secondValue, f));
     }
 
     /// <summary>"Size: MEDIUM WT: 3.0" is the one line a word cap alone cannot fix, since "MEDIUM WT" is only two
@@ -120,8 +128,8 @@ public class StatsBlockTests
         StatsBlockLine line = StatsBlock.Parse("Size: MEDIUM WT: 3.0<br>").Lines[0];
 
         Assert.Collection(line.Fields,
-            f => Assert.Equal(new StatsField("Size", "MEDIUM"), f),
-            f => Assert.Equal(new StatsField("WT", "3.0"), f));
+            f => AssertField("Size", "MEDIUM", f),
+            f => AssertField("WT", "3.0", f));
     }
 
     /// <summary>A page that simply omits its colons has nothing to parse. Reporting the whole line as one

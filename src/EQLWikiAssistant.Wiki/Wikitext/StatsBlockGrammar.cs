@@ -49,7 +49,19 @@ internal static class StatsBlockGrammar
         {
             int valueStart = labels[i].Colon + 1;
             int valueEnd = i + 1 < labels.Count ? labels[i + 1].Start : text.Length;
-            fields.Add(new StatsField(labels[i].Label, text[valueStart..valueEnd].Trim()));
+
+            // The span records where the *trimmed* value sits, not the whitespace around it, so replacing it leaves
+            // the line's own spacing exactly as the page author wrote it.
+            int trimmedStart = valueStart;
+            while (trimmedStart < valueEnd && char.IsWhiteSpace(text[trimmedStart])) trimmedStart++;
+            int trimmedEnd = valueEnd;
+            while (trimmedEnd > trimmedStart && char.IsWhiteSpace(text[trimmedEnd - 1])) trimmedEnd--;
+
+            fields.Add(new StatsField(
+                labels[i].Label,
+                text[trimmedStart..trimmedEnd],
+                trimmedStart,
+                trimmedEnd - trimmedStart));
         }
 
         return fields;
