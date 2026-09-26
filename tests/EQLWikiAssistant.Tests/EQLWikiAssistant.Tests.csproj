@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Core\EQLWikiAssistant.Core.csproj" />
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Capture\EQLWikiAssistant.Capture.csproj" />
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Ocr\EQLWikiAssistant.Ocr.csproj" />
+    <ProjectReference Include="..\..\src\EQLWikiAssistant.Pipeline\EQLWikiAssistant.Pipeline.csproj" />
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Wiki\EQLWikiAssistant.Wiki.csproj" />
     <ProjectReference Include="..\..\tools\EQLWikiAssistant.TestSupport\EQLWikiAssistant.TestSupport.csproj" />
   </ItemGroup>

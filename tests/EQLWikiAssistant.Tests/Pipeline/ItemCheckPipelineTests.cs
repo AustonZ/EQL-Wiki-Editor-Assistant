@@ -1,0 +1,435 @@
+using EQLWikiAssistant.Core.Locate;
+using EQLWikiAssistant.Core.Ocr;
+using EQLWikiAssistant.Pipeline;
+using EQLWikiAssistant.Tests.Wiki;
+using EQLWikiAssistant.Wiki.Ledger;
+using EQLWikiAssistant.Wiki.MediaWiki;
+
+namespace EQLWikiAssistant.Tests.Pipeline;
+
+/// <summary>
+/// The pipeline's *sequencing*, which is where the rules that matter live: the ledger is consulted before the wiki,
+/// an item nobody checked gets no ledger row, and a commit refuses a page that has moved on.
+///
+/// **Everything here is asserted on wiki request counts and ledger contents, not on return values.** "An unchanged,
+/// already-matched item costs zero wiki traffic" is the actual property the ledger exists for, and only a counting
+/// fake can state it. The pixel-level work upstream (tracing a window, reading its glyphs) keeps its own golden
+/// tests against real screenshots; this stands in a fake locator instead, because a frame synthesized to satisfy a
+/// dozen measured pixel thresholds would test those thresholds rather than this sequence.
+/// </summary>
+public class ItemCheckPipelineTests
+{
+    private static OcrLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
+
+    /// <summary>A verbatim-shaped Description capture of `Earring of Bashing`, the page also used as a wikitext
+    /// fixture — so the analysis run here is against real page text.</summary>
+    private static readonly OcrLine[] EarringLines =
+    [
+        L("Earring of Bashing", 96, 0),
+        L("Description", 170, 18),
+        L("Earring of Bashing", 62, 49),
+        L("Lore Equipped, No Trade", 61, 64),
+        L("Class: WAR SHD SHM BST BER", 61, 78),
+        L("Race: ALL", 60, 95),
+        L("Ear", 61, 113),
+        L("Size:", 10, 191),
+        L("TINY", 82, 191),
+        L("AC:", 141, 193),
+        L("5", 228, 193),
+        L("Weight:", 10, 206),
+        L("0.1", 105, 209),
+        L("Strength:", 12, 241),
+        L("8", 95, 242),
+        L("Wisdom:", 141, 239),
+        L("8", 229, 241),
+    ];
+
+    /// <summary>The same item with a levelled name — ineligible, because the wiki stores level-0 data only.</summary>
+    private static readonly OcrLine[] LevelledLines =
+        [.. EarringLines.Select(l => new OcrLine(l.Text.Replace("Earring of Bashing", "Earring of Bashing +3"), l.BoundingBox, l.Words))];
+
+    private static readonly OcrLine[] LoreTabLines =
+    [
+        L("Earring of Bashing", 96, 0),
+        L("Lore", 170, 18),
+        L("A trophy of the first bashing.", 20, 49),
+    ];
+
+    /// <summary>A frame only has to exist for cropping; the fake locator supplies the bounds and the lines, and a
+    /// blank frame simply has no icon to read, which is an outcome the pipeline already handles.</summary>
+    private static CapturedImage BlankFrame(int width = 500, int height = 700) =>
+        new(width, height, new byte[width * height * 4]);
+
+    private static LocatedWindow Window(
+        IReadOnlyList<OcrLine> lines,
+        bool occluded = false,
+        bool hasLoreTab = false,
+        ItemWindowTab tab = ItemWindowTab.Description) =>
+        new(new Rect(0, 0, 400, 600), lines, hasLoreTab, occluded, tab);
+
+    private static (ItemCheckPipeline Pipeline, FakeWiki Wiki, CheckedItemsLedger Ledger) Build(
+        LocatedWindow window, string? pageWikitext = null, string pageTitle = "Earring of Bashing")
+    {
+        var wiki = new FakeWiki();
+        if (pageWikitext is not null) wiki.Pages[pageTitle] = new WikiPage(pageTitle, pageWikitext, 100, DateTimeOffset.UnixEpoch);
+
+        var ledger = new CheckedItemsLedger();
+        return (new ItemCheckPipeline(wiki, new FakeLocator(window), ledger), wiki, ledger);
+    }
+
+    private static string EarringPage() => WikiFixtures.Load("Earring of Bashing");
+
+    // --- the ledger rules -------------------------------------------------------------------------------
+
+    /// <summary>The headline property. A page that already agrees is recorded as matched, and capturing the same
+    /// item again then costs **no wiki requests at all** — which is the only reason the ledger exists.</summary>
+    [Fact]
+    public async Task ASecondCaptureOfAnUnchangedMatchedItemMakesNoWikiRequests()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines), EarringPage());
+
+        IReadOnlyList<ItemCheckResult> first = await pipeline.CheckAsync(BlankFrame());
+        Assert.Equal(ItemCheckStatus.AlreadyCorrect, first[0].Status);
+        Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
+        Assert.True(wiki.Fetches > 0);
+
+        int after = wiki.Fetches;
+        IReadOnlyList<ItemCheckResult> second = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.AlreadyChecked, second[0].Status);
+        Assert.Equal(after, wiki.Fetches);
+    }
+
+    /// <summary>"Re-check anyway" must reach the wiki however settled the row is — otherwise the override does
+    /// nothing, and the user has no way to act on a page somebody else changed.</summary>
+    [Fact]
+    public async Task ReCheckAnywayForcesAFetch()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), EarringPage());
+        await pipeline.CheckAsync(BlankFrame());
+
+        int after = wiki.Fetches;
+        pipeline.ReCheckAnyway = true;
+        IReadOnlyList<ItemCheckResult> again = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.True(wiki.Fetches > after);
+        Assert.Equal(ItemCheckStatus.AlreadyCorrect, again[0].Status);
+    }
+
+    /// <summary>The rule most likely to be got backwards, and the most damaging to get wrong: an ineligible item was
+    /// never actually checked, so any row — even `Skipped` — would make it look handled forever.</summary>
+    [Fact]
+    public async Task AnIneligibleItemWritesNoLedgerRowAndNeverReachesTheWiki()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.Ineligible, results[0].Status);
+        Assert.False(results[0].Eligibility!.IsEligible);
+        Assert.Equal(0, ledger.Count);
+        Assert.Equal(0, wiki.Fetches);
+    }
+
+    /// <summary>...and the user's "skip" action must not sneak one in either.</summary>
+    [Fact]
+    public async Task SkippingAnIneligibleItemStillWritesNoRow()
+    {
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        pipeline.RecordSkipped(results[0]);
+
+        Assert.Equal(0, ledger.Count);
+    }
+
+    /// <summary>An occluded window is the same case for the same reason — nothing was read, so nothing was
+    /// checked.</summary>
+    [Fact]
+    public async Task AnOccludedWindowIsReportedAndWritesNoRow()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines, occluded: true));
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.Occluded, results[0].Status);
+        Assert.NotEmpty(results[0].Warnings);
+        Assert.Equal(0, ledger.Count);
+        Assert.Equal(0, wiki.Fetches);
+    }
+
+    /// <summary>A page that agrees but still needs a human is `Flagged`, not `Matched` — and `Flagged` never lets a
+    /// later capture skip the wiki, which is exactly the point.</summary>
+    [Fact]
+    public async Task APageThatAgreesButNeedsAHumanIsFlaggedRatherThanMatched()
+    {
+        // The title bar and the body disagree — the parser's occlusion safety net — which the pipeline must not
+        // paper over. Truncated past the parser's length-scaled tolerance, since ordinary OCR noise reconciles.
+        OcrLine[] lines = [.. EarringLines];
+        lines[0] = L("of Bashing", 96, 0);
+
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.True(results[0].NeedsAttention);
+        Assert.Equal(CheckOutcome.Flagged, ledger.Find("Earring of Bashing")!.Outcome);
+
+        int after = wiki.Fetches;
+        await pipeline.CheckAsync(BlankFrame());
+        Assert.True(wiki.Fetches > after);
+    }
+
+    /// <summary>An item whose lore has not been captured is not done either, however well the rest of the page
+    /// agrees — recording it as matched would mean never looking at its lore again.</summary>
+    [Fact]
+    public async Task APageThatAgreesButHasUncapturedLoreIsFlagged()
+    {
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines, hasLoreTab: true), EarringPage());
+
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        Assert.Equal(ItemCheckStatus.AlreadyCorrect, result.Status);
+        Assert.Equal(CheckOutcome.Flagged, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    /// <summary>An item with no page is recorded, but as `NotOnWiki` — never as done, because somebody may create
+    /// the page tomorrow.</summary>
+    [Fact]
+    public async Task AnItemWithNoPageIsRecordedButNeverCountsAsDone()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines));
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.NotOnWiki, results[0].Status);
+        Assert.Equal(CheckOutcome.NotOnWiki, ledger.Find("Earring of Bashing")!.Outcome);
+
+        int after = wiki.Fetches;
+        await pipeline.CheckAsync(BlankFrame());
+        Assert.True(wiki.Fetches > after);
+    }
+
+    /// <summary>A page that exists but carries no Itempage call has nothing to compare, and that is a page defect
+    /// worth a human rather than an error.</summary>
+    [Fact]
+    public async Task APageThatIsNotAnItemPageIsFlagged()
+    {
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines), "A redirect-ish page with no template at all.");
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.NotAnItemPage, results[0].Status);
+        Assert.Equal(CheckOutcome.Flagged, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    /// <summary>The wiki being unreachable must not abandon the frame or record anything: nothing was checked.</summary>
+    [Fact]
+    public async Task AWikiFailureIsReportedWithoutARow()
+    {
+        var wiki = new FakeWiki { FailFetches = true };
+        var ledger = new CheckedItemsLedger();
+        var pipeline = new ItemCheckPipeline(wiki, new FakeLocator(Window(EarringLines)), ledger);
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.Failed, results[0].Status);
+        Assert.NotNull(results[0].Error);
+        Assert.Equal(0, ledger.Count);
+    }
+
+    // --- the edit and the commit ------------------------------------------------------------------------
+
+    /// <summary>A stale page produces a reviewable edit and **writes nothing** — checking is read-only, so the user
+    /// sees every window in a frame before anything is committed.</summary>
+    [Fact]
+    public async Task AStalePageProducesAReviewableEditAndWritesNothing()
+    {
+        OcrLine[] lines = [.. EarringLines];
+        lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
+
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.EditProposed, results[0].Status);
+        Assert.True(results[0].CanCommit);
+        Assert.Contains("AC: 6<br>", results[0].Edit!.NewWikitext);
+        Assert.Equal(0, wiki.Edits);
+        Assert.Equal(0, ledger.Count);
+    }
+
+    [Fact]
+    public async Task CommittingWritesThePageAndRecordsTheEdit()
+    {
+        OcrLine[] lines = [.. EarringLines];
+        lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
+
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+
+        Assert.Equal(CommitStatus.Committed, commit.Status);
+        Assert.Equal(1, wiki.Edits);
+        Assert.Contains("AC: 6<br>", wiki.Pages["Earring of Bashing"].Wikitext);
+
+        LedgerEntry entry = ledger.Find("Earring of Bashing")!;
+        Assert.Equal(CheckOutcome.Edited, entry.Outcome);
+        Assert.Equal("Earring of Bashing", entry.WikiPageTitle);
+    }
+
+    /// <summary>
+    /// The guard that matters more than `basetimestamp` does. MediaWiki merges what it can, and this tool's edits
+    /// are wholesale parameter replacements — exactly the shape that merges cleanly while discarding somebody's
+    /// work. So a page that changed between the check and the commit is refused outright.
+    /// </summary>
+    [Fact]
+    public async Task CommittingRefusesAPageSomebodyElseEditedSinceTheCheck()
+    {
+        OcrLine[] lines = [.. EarringLines];
+        lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
+
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        // Somebody else saves a change while the user is looking at the diff.
+        wiki.Pages["Earring of Bashing"] = wiki.Pages["Earring of Bashing"] with
+        {
+            Wikitext = wiki.Pages["Earring of Bashing"].Wikitext + "\n[[Category:Somebody's addition]]",
+            RevisionId = 101,
+        };
+
+        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+
+        Assert.Equal(CommitStatus.PageChangedSinceCheck, commit.Status);
+        Assert.Equal(0, wiki.Edits);
+        Assert.Equal(0, ledger.Count);
+        Assert.Contains("101", commit.Error);
+    }
+
+    /// <summary>What the user sees is what gets written — the review screen lets them amend the wikitext, and an
+    /// edit that silently saved something else would make the review meaningless.</summary>
+    [Fact]
+    public async Task CommittingWritesTheUsersOwnTextWhenTheyAmendedIt()
+    {
+        OcrLine[] lines = [.. EarringLines];
+        lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
+
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(lines), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        string amended = result.Edit!.NewWikitext.Replace("AC: 6<br>", "AC: 7<br>");
+        await pipeline.CommitAsync(result, amended, "hand-corrected");
+
+        Assert.Contains("AC: 7<br>", wiki.Pages["Earring of Bashing"].Wikitext);
+        Assert.Equal("hand-corrected", wiki.LastSummary);
+    }
+
+    /// <summary>Skipping records that the user looked and declined — as `Skipped`, which never counts as done, so
+    /// the item comes back next time.</summary>
+    [Fact]
+    public async Task SkippingRecordsAnUnresolvedRow()
+    {
+        OcrLine[] lines = [.. EarringLines];
+        lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
+
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        pipeline.RecordSkipped(result, "waiting on a template change");
+
+        Assert.Equal(CheckOutcome.Skipped, ledger.Find("Earring of Bashing")!.Outcome);
+        Assert.Equal(0, wiki.Edits);
+
+        int after = wiki.Fetches;
+        await pipeline.CheckAsync(BlankFrame());
+        Assert.True(wiki.Fetches > after);
+    }
+
+    // --- the two-capture lore flow ---------------------------------------------------------------------
+
+    /// <summary>A window that offers a Lore tab says so, so the UI can ask for the second capture instead of
+    /// quietly checking an item whose lore it never saw.</summary>
+    [Fact]
+    public async Task ADescriptionCaptureOfALoreBearingItemAsksForTheLoreTab()
+    {
+        (ItemCheckPipeline pipeline, _, _) =
+            Build(Window(EarringLines, hasLoreTab: true), EarringPage());
+
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        Assert.True(result.NeedsLoreCapture);
+        Assert.True(result.NeedsAttention);
+        Assert.Contains(result.Warnings, w => w.Contains("Lore tab"));
+    }
+
+    /// <summary>A Lore capture contributes its prose and nothing else — it has no stats to compare — and the
+    /// Description capture that follows picks it up.</summary>
+    [Fact]
+    public async Task ALoreCaptureIsRecordedAndSatisfiesTheNextDescriptionCapture()
+    {
+        var wiki = new FakeWiki();
+        wiki.Pages["Earring of Bashing"] =
+            new WikiPage("Earring of Bashing", EarringPage(), 100, DateTimeOffset.UnixEpoch);
+
+        var locator = new FakeLocator(Window(LoreTabLines, hasLoreTab: true, tab: ItemWindowTab.Lore));
+        var pipeline = new ItemCheckPipeline(wiki, locator, new CheckedItemsLedger());
+
+        ItemCheckResult lore = (await pipeline.CheckAsync(BlankFrame()))[0];
+        Assert.Equal(ItemCheckStatus.LoreRecorded, lore.Status);
+        Assert.Equal("A trophy of the first bashing.", lore.Lore);
+        Assert.Equal(0, wiki.Fetches);
+
+        locator.Window = Window(EarringLines, hasLoreTab: true);
+        ItemCheckResult description = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        Assert.False(description.NeedsLoreCapture);
+        Assert.Equal("A trophy of the first bashing.", description.Lore);
+    }
+
+    // --- fakes ------------------------------------------------------------------------------------------
+
+    private sealed class FakeLocator(LocatedWindow window) : IItemWindowLocator
+    {
+        public LocatedWindow Window { get; set; } = window;
+
+        public Task<IReadOnlyList<LocatedWindow>> LocateAsync(
+            CapturedImage image, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<LocatedWindow>>([Window]);
+    }
+
+    private sealed class FakeWiki : IMediaWikiClient
+    {
+        public Dictionary<string, WikiPage> Pages { get; } = new(StringComparer.Ordinal);
+        public int Fetches { get; private set; }
+        public int Edits { get; private set; }
+        public string? LastSummary { get; private set; }
+        public bool FailFetches { get; init; }
+
+        public Task<WikiPage?> FetchPageAsync(string title, CancellationToken cancellationToken = default)
+        {
+            Fetches++;
+            if (FailFetches) throw new HttpRequestException("the wiki is unreachable");
+            return Task.FromResult(Pages.GetValueOrDefault(title));
+        }
+
+        public Task LoginAsync(BotCredentials credentials, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<EditResult> EditAsync(
+            string title, string newWikitext, string summary, DateTimeOffset baseTimestamp,
+            CancellationToken cancellationToken = default)
+        {
+            Edits++;
+            LastSummary = summary;
+            bool unchanged = string.Equals(Pages[title].Wikitext, newWikitext, StringComparison.Ordinal);
+            Pages[title] = Pages[title] with { Wikitext = newWikitext, RevisionId = Pages[title].RevisionId + 1 };
+            return Task.FromResult(new EditResult(title, Pages[title].RevisionId, unchanged));
+        }
+    }
+}

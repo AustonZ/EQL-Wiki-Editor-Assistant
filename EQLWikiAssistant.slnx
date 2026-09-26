@@ -4,6 +4,7 @@
     <Project Path="src/EQLWikiAssistant.Capture/EQLWikiAssistant.Capture.csproj" />
     <Project Path="src/EQLWikiAssistant.Core/EQLWikiAssistant.Core.csproj" />
     <Project Path="src/EQLWikiAssistant.Ocr/EQLWikiAssistant.Ocr.csproj" />
+    <Project Path="src/EQLWikiAssistant.Pipeline/EQLWikiAssistant.Pipeline.csproj" />
     <Project Path="src/EQLWikiAssistant.Wiki/EQLWikiAssistant.Wiki.csproj" />
   </Folder>
   <Folder Name="/tests/">

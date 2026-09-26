@@ -1,0 +1,142 @@
+using EQLWikiAssistant.Core.Icons;
+using EQLWikiAssistant.Core.Items;
+using EQLWikiAssistant.Core.Ocr;
+using EQLWikiAssistant.Wiki.Analysis;
+using EQLWikiAssistant.Wiki.Ledger;
+using EQLWikiAssistant.Wiki.MediaWiki;
+
+namespace EQLWikiAssistant.Pipeline;
+
+/// <summary>What happened to one captured window. Ordered roughly by how far down the pipeline it got.</summary>
+public enum ItemCheckStatus
+{
+    /// <summary>The window is partly covered, so nothing was read from it. **No ledger row** — it was never
+    /// checked, and a row would make it look handled forever.</summary>
+    Occluded,
+
+    /// <summary>A foreign exaltation or a levelled item. **No ledger row**, for the same reason.</summary>
+    Ineligible,
+
+    /// <summary>The ledger already has this exact capture settled, so the wiki was never asked.</summary>
+    AlreadyChecked,
+
+    /// <summary>A Lore-tab capture: its prose was recorded against the item and nothing else was done.</summary>
+    LoreRecorded,
+
+    /// <summary>The item has no page at its own name. <see cref="ItemCheckResult.Lookup"/> says whether a
+    /// near-miss candidate or a title-illegal name is the reason, which changes what the user should do.</summary>
+    NotOnWiki,
+
+    /// <summary>A page exists but is not an item page — no <c>{{Itempage}}</c> call to read or edit.</summary>
+    NotAnItemPage,
+
+    /// <summary>The page already says what the capture says, and nothing needs fixing.</summary>
+    AlreadyCorrect,
+
+    /// <summary>There is an edit to review.</summary>
+    EditProposed,
+
+    /// <summary>The wiki refused or the network failed. Reported rather than thrown, so one bad item does not
+    /// abandon the rest of the frame.</summary>
+    Failed,
+}
+
+/// <summary>How the captured icon compared against the one the page points at. Flag-only: the tool never proposes a
+/// new <c>lucy_img_ID</c>, because it cannot know whether the page is wrong or the capture caught something odd.</summary>
+public sealed record IconComparison(
+    string IconId,
+    IconFingerprint Captured,
+    IconFingerprint OnWiki,
+    double Distance)
+{
+    public bool Matches => Captured.LooksLike(OnWiki);
+}
+
+/// <summary>
+/// Everything the review UI needs about one window, and nothing it has to recompute.
+///
+/// **Deliberately a report, not a handle.** Checking is read-only — it changes no page and (except for the
+/// automatic outcomes noted on <see cref="ItemCheckStatus"/>) writes no ledger row — so the user can look at every
+/// window in a frame before deciding anything. Committing is a separate call taking one of these back.
+/// </summary>
+public sealed record ItemCheckResult
+{
+    public required ItemCheckStatus Status { get; init; }
+
+    /// <summary>The item's base name, with any <c>+X</c> level suffix already stripped. Empty only for an occluded
+    /// window, where nothing was read.</summary>
+    public required string ItemName { get; init; }
+
+    public ParsedItem? Item { get; init; }
+
+    /// <summary>The window's crop of the frame, for showing the user what was captured beside the diff.</summary>
+    public CapturedImage? WindowImage { get; init; }
+
+    public ItemEligibility? Eligibility { get; init; }
+
+    public LedgerVerdict LedgerVerdict { get; init; }
+
+    public ItemPageLookupResult? Lookup { get; init; }
+
+    public ItemPageAnalysis? Analysis { get; init; }
+
+    public ProposedEdit? Edit { get; init; }
+
+    public IconComparison? Icon { get; init; }
+
+    /// <summary>Why the icon could not be compared, when it could not — a Lore capture, an unuploaded file, a page
+    /// with no <c>lucy_img_ID</c>, or a sprite too dark to judge. Informational: an icon check that cannot see the
+    /// icon must stay silent rather than report a mismatch.</summary>
+    public string? IconNote { get; init; }
+
+    /// <summary>The revision the analysis was built from, and the base timestamp any edit must carry.</summary>
+    public WikiPage? Page { get; init; }
+
+    /// <summary>True when the window offers a Lore tab whose text has not been captured yet — the prompt for the
+    /// two-capture flow.</summary>
+    public bool NeedsLoreCapture { get; init; }
+
+    /// <summary>Lore recorded from an earlier Lore-tab capture of this item, if any.</summary>
+    public string? Lore { get; init; }
+
+    /// <summary>Parser warnings plus anything the pipeline itself wants the user to see. Never a reason to hide a
+    /// result — a flagged gap is the point.</summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    public string? Error { get; init; }
+
+    /// <summary>Whether a commit is possible: there is an edit, and nothing is asking for a human first.</summary>
+    public bool CanCommit =>
+        Status == ItemCheckStatus.EditProposed &&
+        Edit is { HasChanges: true } &&
+        Page is not null;
+
+    /// <summary>Whether something here wants the user's judgement before the page is written — a field the analyzer
+    /// could not decide, a title defect, a suspect icon, or a name the capture itself could not agree on.</summary>
+    public bool NeedsAttention =>
+        (Analysis?.Blockers.Any() ?? false) ||
+        Icon is { Matches: false } ||
+        NeedsLoreCapture ||
+        (Item?.TitleContentNameMismatch ?? false);
+}
+
+/// <summary>What committing an edit did.</summary>
+public enum CommitStatus
+{
+    /// <summary>Written. <see cref="CommitResult.RevisionId"/> is the new revision.</summary>
+    Committed,
+
+    /// <summary>MediaWiki accepted the request and found the text identical to what was already there. Recorded as
+    /// a match rather than an edit.</summary>
+    NoChange,
+
+    /// <summary>**Somebody else edited the page between the check and the commit.** Not written: our text was built
+    /// from the older revision, so saving it would revert them. The user needs to re-check the item.</summary>
+    PageChangedSinceCheck,
+
+    /// <summary>The wiki refused, or the network failed. <see cref="CommitResult.Error"/> carries MediaWiki's own
+    /// code where there is one.</summary>
+    Failed,
+}
+
+public sealed record CommitResult(CommitStatus Status, long? RevisionId = null, string? Error = null);
