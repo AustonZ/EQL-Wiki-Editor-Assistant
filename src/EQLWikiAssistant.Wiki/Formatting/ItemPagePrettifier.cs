@@ -167,8 +167,11 @@ public static class ItemPagePrettifier
         string? blocker = FindReorderBlocker(lines);
         if (blocker is not null)
         {
-            notes.Add($"The statsblock kept its existing line order: {blocker}");
-            return string.Join('\n', lines.Select(RenderAsIs));
+            // Left **completely** untouched, not merely unordered — normalizing the spacing of a line the tool does
+            // not understand is still modifying it (user, 2026-09-28). Only the value's outer whitespace goes, and
+            // MediaWiki trims that anyway.
+            notes.Add($"The statsblock was left exactly as it was: {blocker}");
+            return rawValue.Trim();
         }
 
         var remaining = new List<StatsField>(lines.SelectMany(l => l.Fields));
@@ -226,6 +229,15 @@ public static class ItemPagePrettifier
             return $"'{unparsed.Text}' could not be read, and moving a line nobody could parse is how a formatter " +
                    "loses data.";
 
+        // **Legacy flags stop the formatter dead** (user, 2026-09-28): *"I don't want the prettifier to get into the
+        // business of understanding/reformatting obsolete flags and fields."* Real usage aims at items already
+        // updated for EQL; an old page should be left alone and reported rather than half-modernized by a pass whose
+        // only job is layout. Discarding legacy flags is the *data* pass's decision, made against a live capture.
+        if (lines.SelectMany(l => l.Flags).FirstOrDefault(f => !IsCurrentFlag(f)) is { } legacy)
+            return $"'{legacy}' is not a current EQL flag — it is a legacy one, or prose the grammar read as a " +
+                   "flag. Laying out a line the tool does not understand is how a formatter loses meaning, so the " +
+                   "whole block was left as it is.";
+
         if (lines.Any(l => l.Kind == StatsLineKind.Blank))
             return "it has a blank line in the middle, which is a paragraph break that may be doing visible work.";
 
@@ -249,10 +261,35 @@ public static class ItemPagePrettifier
             : null;
     }
 
-    /// <summary>A line kept where it is, with only its spacing normalized: no space before the break, none
-    /// trailing.</summary>
-    private static string RenderAsIs(StatsBlockLine line) =>
-        line.Kind == StatsLineKind.Blank ? "" : line.Text + (line.Break ?? "<br>");
+    /// <summary>
+    /// Whether a flag token is one of EQL's current ones, judged by *shape* rather than against a list.
+    ///
+    /// **A list would be the wrong tool**, for the same reason the capture side refuses to keep one: the devs keep
+    /// adding flags, and a list would reject exactly the rare items most worth recording. The shape separates them
+    /// cleanly, which was measured across 1,183 real pages rather than assumed — every legacy flag there is
+    /// ALL-CAPS (<c>MAGIC ITEM</c>, <c>EXPENDABLE</c>, <c>NODROP</c>, <c>NO RENT</c>) and every current one is Title
+    /// Case (<c>Lore Equipped</c>, <c>No Trade</c>, <c>Attunable</c>, <c>Placeable</c>, <c>Quest</c>).
+    ///
+    /// It also catches the third category the census turned up, which is neither: prose the grammar read as a flag
+    /// because it sat on the flags line — <c>This is a meal!</c>, <c>The Book is closed.</c>,
+    /// <c>Required level of 55.</c>, and one page's mis-parsed <c>Class:CLR DRU SHM</c>. Those fail on a lowercase
+    /// word, a terminal full stop or a colon, and a formatter should not be moving any of them.
+    /// </summary>
+    private static bool IsCurrentFlag(string flag)
+    {
+        string trimmed = flag.Trim();
+        if (trimmed.Length == 0 || trimmed.Contains(':')) return false;
+        if (trimmed[^1] is '.' or '!' or '?') return false;
+
+        foreach (string word in trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!char.IsUpper(word[0])) return false;
+            // An ALL-CAPS word is the legacy dialect. A single letter cannot tell us either way, so it passes.
+            if (word.Length > 1 && !word[1..].Any(char.IsLower)) return false;
+        }
+
+        return true;
+    }
 
     /// <summary>
     /// Proves the formatted page says exactly what the original said, and lists every way it does not.

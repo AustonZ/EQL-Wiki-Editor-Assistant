@@ -79,11 +79,64 @@ public class ItemPagePrettifierTests
     [Fact]
     public void AFlagSharingALineWithAFieldIsNotLost()
     {
-        PrettifyResult result = ItemPagePrettifier.Format(Page("EXPENDABLE  Charges: 10<br>"));
+        PrettifyResult result = ItemPagePrettifier.Format(Page("Quest  Charges: 10<br>"));
 
         Assert.True(result.IsSafe);
-        Assert.Contains("EXPENDABLE<br>", result.Formatted);
+        Assert.Contains("Quest<br>", result.Formatted);
         Assert.Contains("Charges: 10<br>", result.Formatted);
+    }
+
+    // --- legacy content stops it dead --------------------------------------------------------------------
+
+    /// <summary>
+    /// **A legacy flag leaves the whole block exactly as it was** (user, 2026-09-28): the formatting pass has no
+    /// business understanding obsolete flags, and discarding them is the *data* pass's decision, made against a live
+    /// capture. Real usage aims at items already updated for EQL; an old page gets reported, not half-modernized.
+    /// </summary>
+    [Fact]
+    public void ALegacyFlagLeavesTheStatsblockExactlyAsItWas()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("MAGIC ITEM  LORE ITEM  NO DROP<br>\nRace: ALL<br>\nAC: 10<br>"));
+
+        Assert.True(result.IsSafe);
+        Assert.Contains("MAGIC ITEM  LORE ITEM  NO DROP<br>\nRace: ALL<br>\nAC: 10<br>", result.Formatted);
+        Assert.Contains(result.Notes, n => n.Contains("not a current EQL flag"));
+    }
+
+    /// <summary>...including the legacy separators. Nothing about that line is touched, not even its spacing.</summary>
+    [Fact]
+    public void LegacyFlagSeparatorsAreNotNormalized()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("MAGIC ITEM  LORE ITEM<br>"));
+
+        Assert.DoesNotContain("MAGIC ITEM, LORE ITEM", result.Formatted);
+    }
+
+    /// <summary>
+    /// The shape rule, rather than a vocabulary list — the same reason the capture side keeps no known-flags list:
+    /// the devs keep adding flags, and a list would reject exactly the rare items most worth recording. All three
+    /// categories here are real, from a census of 1,183 pages.
+    /// </summary>
+    [Theory]
+    [InlineData("Lore Equipped", true)]
+    [InlineData("No Trade", true)]
+    [InlineData("Attunable", true)]
+    [InlineData("Placeable", true)]
+    [InlineData("Quest", true)]
+    [InlineData("Heirloom", true)]           // never seen on the wiki, but current — a list would have rejected it
+    [InlineData("MAGIC ITEM", false)]        // legacy
+    [InlineData("NODROP", false)]
+    [InlineData("EXPENDABLE", false)]
+    [InlineData("NO RENT", false)]
+    [InlineData("This is a meal!", false)]   // prose that landed on the flags line
+    [InlineData("The Book is closed.", false)]
+    [InlineData("Required level of 55.", false)]
+    [InlineData("Class:CLR DRU SHM", false)] // a mis-parsed Class line
+    public void CurrentFlagsAreToldFromLegacyOnesByShape(string flag, bool current)
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page($"{flag}<br>\nRace: ALL<br>\nAC: 10<br>"));
+
+        Assert.Equal(current, !result.Notes.Any(n => n.Contains("not a current EQL flag")));
     }
 
     /// <summary>
@@ -130,8 +183,9 @@ public class ItemPagePrettifierTests
         PrettifyResult result = ItemPagePrettifier.Format(Page("SV FIRE +5 SV COLD +5<br>\nAC: 10<br>\nSlot: WAIST<br>"));
 
         Assert.True(result.IsSafe);
-        Assert.Contains("SV FIRE +5 SV COLD +5<br>", result.Formatted);
-        Assert.Contains("Slot: WAIST<br>\nAC: 10<br>", result.Formatted);
+        // Read as one ALL-CAPS token, so it trips the legacy rule and the whole block is left untouched — which is
+        // the right answer twice over for a line nobody could parse properly in the first place.
+        Assert.Contains("SV FIRE +5 SV COLD +5<br>\nAC: 10<br>\nSlot: WAIST<br>", result.Formatted);
     }
 
     /// <summary>A blank line mid-block is a paragraph break that may be doing visible work, so the block is left

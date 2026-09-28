@@ -813,10 +813,10 @@ async Task<int> PrettifyCorpusAsync()
 
         foreach (string note in result.Notes)
         {
-            if (note.StartsWith("The statsblock kept", StringComparison.Ordinal))
+            if (note.StartsWith("The statsblock was left", StringComparison.Ordinal))
             {
                 keptOrder++;
-                orderReasons.Add((title, note["The statsblock kept its existing line order: ".Length..]));
+                orderReasons.Add((title, note["The statsblock was left exactly as it was: ".Length..]));
             }
             else if (note.StartsWith("The blueprint has no place", StringComparison.Ordinal))
             {
@@ -833,7 +833,7 @@ async Task<int> PrettifyCorpusAsync()
     Console.WriteLine($"  reformatted             : {changed}");
     Console.WriteLine($"  already correct         : {unchanged}");
     Console.WriteLine($"  REFUSED (content moved) : {refused}");
-    Console.WriteLine($"  statsblock order kept   : {keptOrder}");
+    Console.WriteLine($"  statsblock left alone   : {keptOrder}");
 
     if (refusalReasons.Count > 0)
     {
@@ -846,7 +846,7 @@ async Task<int> PrettifyCorpusAsync()
     if (orderReasons.Count > 0)
     {
         Console.WriteLine();
-        Console.WriteLine("--- statsblocks left in their existing order ---");
+        Console.WriteLine("--- statsblocks left exactly as they were ---");
         foreach (var group in orderReasons.GroupBy(r => Generalize(r.Reason)).OrderByDescending(g => g.Count()))
             Console.WriteLine($"  {group.Count(),5}  {group.Key}   e.g. {group.First().Page}");
     }

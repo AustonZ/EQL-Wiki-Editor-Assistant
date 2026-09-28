@@ -664,6 +664,48 @@ wrong or the capture caught something odd, and choosing one is a human's call.
 - Decoding is from bytes, never from a path — several items share one icon id (three corpus breastplates all use
   624), the decoder keeps a file mapped while it reads, and rewriting that file mid-run failed outright.
 
+**The formatting pass (`Wiki.Formatting.ItemPagePrettifier`).** Lays the `{{Itempage}}` call out the way the Item
+Page Blueprint says — parameters in blueprint order with aligned `=`, statsblock lines in blueprint order with the
+blueprint's grouping, stray spacing removed — and changes nothing about what the page says. It is always **its own
+edit, after the data edit**; see "Formatting is a separate edit" above for why that order is settled.
+- **Its licence to rearrange a public wiki's pages is that it can *prove* it preserved the content.** Every format is
+  verified by re-parsing the result and comparing parameter by parameter, with the statsblock compared as a multiset
+  of its fields, flags and unreadable lines; any mismatch returns the original untouched with a refusal naming what
+  differed. **This is not decoration — it caught a real bug in the formatter on 14 real pages**: the blueprint's own
+  `EXPENDABLE  Charges: 10<br>` is a flag *and* a field on one line, and reading flags only from flag-only lines
+  silently dropped it.
+- **It only touches the inside of the template call**, so the era banner, an in-world screenshot, categories and any
+  stray prose survive byte for byte by construction rather than by care.
+- **It leaves alone anything it does not understand, completely — not even the spacing** (user, 2026-09-28). The
+  triggers, measured across 1,183 real pages: a legacy flag (469 pages), an interior blank line (9, a paragraph
+  break that may be doing visible work), flags spread over two lines (merging is a bigger claim than laying out), a
+  duplicate label with conflicting values, and a line the grammar could not read.
+  - **Legacy flags stop it dead, by the user's decision**: *"I don't want the prettifier to get into the business of
+    understanding/reformatting obsolete flags and fields."* Discarding legacy flags is the **data** pass's call, made
+    against a live capture; a formatting pass has no business half-modernizing an old page. Real usage aims at items
+    already updated for EQL, so this costs little and is reported rather than silent.
+  - **Legacy is told from current by *shape*, not by a list** — the same reasoning that forbids a known-flags list on
+    the capture side, since the devs keep adding flags and a list would reject the rare items most worth recording.
+    Measured, not assumed: across 1,183 pages every legacy flag is ALL-CAPS (`MAGIC ITEM`, `EXPENDABLE`, `NODROP`,
+    `NO RENT`) and every current one is Title Case (`Lore Equipped`, `No Trade`, `Attunable`). The same rule catches
+    the third category the census found — prose that landed on the flags line (`This is a meal!`, `The Book is
+    closed.`, `Required level of 55.`) and one page's mis-parsed `Class:CLR DRU SHM` — via a lowercase word, a
+    terminal stop or a colon.
+- **A value whose markup only works at the start of a line keeps its own line.** A `*` is a bullet only there, so
+  folding `|relatedquests = * [[Quest]]` onto the parameter's line turns a list into a literal asterisk while the
+  value string stays byte-identical — **a rendering change no content check can see**. The layout rule has to be
+  right rather than verified; there is an invariant guard as well.
+- **The statsblock always starts on its own line**, even when currently one line long, or it would jump onto its own
+  the moment the data pass added a second — churn the formatting commit exists to prevent.
+- **A label the blueprint has no place for is kept, on its own line before `Class:`, and reported.** Led by `Deity`
+  (25 pages) and `Range` (15), then `Mana Cost`, `Mount Speed`, `Wind Resonance`, `String Resonance`, `Fire DMG`, and
+  the likely typos `SV.Magic`, `Dieties`, `Dmg Bon`. Dropping one would lose real data; guessing a slot would invent
+  a convention the editors have not agreed.
+- `tools/WikiSpike -- prettify --cached <dir>` runs it over the real corpus and censuses what it did — the same
+  methodology as `grammar` and `analyze`, and how both of the above bugs were found. `prettyshow <in> <out>` writes
+  one page's result so it can be diffed by eye, because a census says nothing about whether the layout is any good.
+  Baseline (2026-09-28): **744 item pages, 0 refusals, 478 statsblocks left alone**, median size change +5 bytes.
+
 **The pipeline (`Pipeline.ItemCheckPipeline`, milestone 5).** One captured frame in, one reviewable
 `ItemCheckResult` per item window out: locate → parse → eligibility → ledger → lookup → analyze → build the edit,
 plus the icon check. This is the orchestration every earlier milestone left "still to wire up"; `WikiSpike preview`
@@ -1280,6 +1322,11 @@ dotnet run --project tools/WikiSpike -- grammar --cached .local-data/wiki-pages 
 # levelled items, or the numbers lie). The wiki-side equivalent of AccuracySpike:
 dotnet run --project tools/WikiSpike -- analyze
 dotnet run --project tools/WikiSpike -- analyze --detail   # plus every non-matching field, per item
+
+# The formatting pass over the real corpus: how many pages it lays out, how many it leaves alone and why, and
+# whether it ever failed its own content check. Then eyeball one page, because a census says nothing about layout:
+dotnet run --project tools/WikiSpike -- prettify --cached .local-data/wiki-pages
+dotnet run --project tools/WikiSpike -- prettyshow ".local-data/wiki-pages/Girdle of Faith.txt" out.txt
 
 # The whole pipeline end to end against a screenshot — locate, parse, eligibility, lookup, analyze, edit — printing
 # the proposed line diff. Exists so the edit can be judged on real pages before there is a UI to judge it in:
