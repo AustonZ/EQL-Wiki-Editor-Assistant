@@ -383,10 +383,17 @@ public sealed class ItemCheckPipeline
             EditResult edit = await _wiki
                 .EditAsync(title, wikitext, summary, current.Timestamp, cancellationToken).ConfigureAwait(false);
 
+            // **A commit does not settle a judgement the tool declined to make.** Writing a corrected AC says
+            // nothing about a lore difference the user was warned of on the same screen, and recording `Edited`
+            // would count the whole item as done and never raise it again. `Flagged` keeps it coming back; the user
+            // settles it deliberately with RecordCheckedByHand. This is the same rule a page that already agrees
+            // follows, and it has to be, or the outcome would depend on whether some unrelated stat also changed.
             RecordLedgerEntry(
                 result.ItemName,
                 title,
-                edit.NoChange ? CheckOutcome.Matched : CheckOutcome.Edited,
+                result.NeedsAttention ? CheckOutcome.Flagged
+                    : edit.NoChange ? CheckOutcome.Matched
+                    : CheckOutcome.Edited,
                 edit.NewRevisionId ?? current.RevisionId,
                 FingerprintOf(result));
 
@@ -416,6 +423,30 @@ public sealed class ItemCheckPipeline
 
         RecordLedgerEntry(
             result.ItemName, result.Page?.Title, CheckOutcome.Skipped, result.Page?.RevisionId,
+            FingerprintOf(result), note);
+    }
+
+    /// <summary>
+    /// Records that the user looked at everything this item had flagged and is happy with it — their answer to a
+    /// judgement the tool deliberately declined to make.
+    ///
+    /// **This is the only way a flagged item becomes done**, and it has to exist, because both alternatives are
+    /// worse: without it, an item whose page the user has decided is *correct* — most often lore the wiki states
+    /// better than the game does — stays flagged and re-fetches on every capture forever, and the only other escape
+    /// would be making the tool overwrite the very thing the user just approved.
+    ///
+    /// It records `Matched` against this capture's fingerprint, so the item settles until something about it
+    /// actually changes.
+    /// </summary>
+    public void RecordCheckedByHand(ItemCheckResult result, string? note = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        // These never get a row at all, whatever the user says about them: nothing was read from them.
+        if (result.Status is ItemCheckStatus.Occluded or ItemCheckStatus.Ineligible) return;
+        if (string.IsNullOrWhiteSpace(result.ItemName)) return;
+
+        RecordLedgerEntry(
+            result.ItemName, result.Page?.Title, CheckOutcome.Matched, result.Page?.RevisionId,
             FingerprintOf(result), note);
     }
 

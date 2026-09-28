@@ -192,6 +192,18 @@ public partial class MainWindow : Window
         StatusText.Text = $"'{view.ItemName}' skipped.";
     }
 
+    private async void OnMarkCheckedClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel view || _services is null) return;
+
+        _services.Pipeline.RecordCheckedByHand(view.Result);
+        await _services.SaveLedgerAsync();
+        UpdateLedgerText();
+
+        view.Outcome = "Marked as checked — it will not come back unless the item itself changes.";
+        StatusText.Text = $"'{view.ItemName}' marked as checked.";
+    }
+
     private void OnOpenPageClick(object sender, RoutedEventArgs e)
     {
         if ((sender as Hyperlink)?.DataContext is not ResultViewModel { PageUrl: { } url }) return;

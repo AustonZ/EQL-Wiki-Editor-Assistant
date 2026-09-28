@@ -131,6 +131,32 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public bool HasFindings => Findings.Count > 0;
     public bool HasWarnings => Warnings.Count > 0;
 
+    /// <summary>
+    /// The lore the tool refused to overwrite, when the page's copy differs from the captured one.
+    ///
+    /// **It gets its own panel because lore is the one field a table cannot show.** Every other finding is a short
+    /// token that fits in a grid cell; lore is a paragraph, and the user's decision here is a judgement about prose
+    /// they have to actually read — most of the time the page's wording is the better one, which is exactly why the
+    /// tool does not touch it and exactly why the user has to be able to see both.
+    /// </summary>
+    public FieldFinding? LoreToCompare =>
+        Result.Analysis?.Find(ItemPageAnalyzer.LoreField) is { Verdict: FieldVerdict.NeedsReview, OnWiki: not null } f
+            ? f
+            : null;
+
+    public bool HasLoreToCompare => LoreToCompare is not null;
+    public string LoreOnWiki => LoreToCompare?.OnWiki ?? "";
+    public string LoreInGame => LoreToCompare?.Captured ?? "";
+
+    /// <summary>
+    /// Whether the user can settle this item by hand. Offered whenever something wants a human, because that is the
+    /// only thing standing between the item and "done" — the tool has already concluded everything it is willing to.
+    /// Not offered once an edit is pending, since saving it is the action that matters then.
+    /// </summary>
+    public bool CanMarkChecked =>
+        !HasOutcome && !IsBusy && Result.NeedsAttention &&
+        Result.Status is ItemCheckStatus.AlreadyCorrect or ItemCheckStatus.EditProposed;
+
     /// <summary>What the user is about to save. Editable, and what <c>Commit</c> writes.</summary>
     public string Wikitext
     {
@@ -153,6 +179,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         {
             Set(ref _outcome, value);
             OnPropertyChanged(nameof(CanAct));
+            OnPropertyChanged(nameof(CanSkip));
+            OnPropertyChanged(nameof(CanMarkChecked));
             OnPropertyChanged(nameof(HasOutcome));
         }
     }
@@ -166,6 +194,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         {
             Set(ref _isBusy, value);
             OnPropertyChanged(nameof(CanAct));
+            OnPropertyChanged(nameof(CanSkip));
+            OnPropertyChanged(nameof(CanMarkChecked));
         }
     }
 
@@ -180,6 +210,12 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private static IEnumerable<string> BuildWarnings(ItemCheckResult result)
     {
         foreach (string warning in result.Warnings) yield return warning;
+
+        // Every field the tool declined to decide, in the warning strip rather than only as a row in the findings
+        // table. The table truncates, and these are precisely the items nobody has judged yet — the tool has said
+        // so explicitly, so they are the last thing that should be skimmable.
+        foreach (FieldFinding blocker in result.Analysis?.Blockers ?? [])
+            yield return $"{blocker.Field}: {blocker.Explanation ?? "needs a human before anything is written."}";
 
         foreach (IneligibilityDetail blocker in result.Eligibility?.Blockers ?? [])
             yield return blocker.Explanation;

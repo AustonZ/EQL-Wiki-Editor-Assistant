@@ -683,6 +683,15 @@ testable) and that it includes the two steps preview skipped, the ledger and the
   never "done" — somebody may create the page tomorrow.
 - **A wiki failure is reported per window, not thrown.** One unreachable page must not abandon the rest of the
   frame, and must not write a row either.
+- **A commit does not settle a judgement the tool declined to make.** Committing a corrected AC says nothing about a
+  lore difference the user was warned of on the same screen, so a commit on an item that still `NeedsAttention`
+  records **`Flagged`**, not `Edited` — it keeps coming back. This has to match the rule a page that already agrees
+  follows, or the outcome would depend on whether some unrelated stat happened to change too.
+- **`RecordCheckedByHand` is the only way a flagged item becomes done**, and it has to exist: otherwise an item whose
+  page the user has decided is *correct* (most often lore the wiki states better than the game does) re-fetches on
+  every capture forever, and the only other escape would be making the tool overwrite the very thing the user just
+  approved. It records `Matched` against that capture's fingerprint, so the item settles until it actually changes.
+  The review screen offers it as "Looks right — mark as checked" whenever something is flagged.
 - **`CommitAsync` re-fetches and refuses a page that moved on**, which matters more than `basetimestamp` does here.
   MediaWiki merges what it can, and this tool's edits are wholesale parameter replacements — exactly the shape that
   merges cleanly while still discarding somebody's work. Keep sending the parameter; this is what actually catches
@@ -695,7 +704,9 @@ testable) and that it includes the two steps preview skipped, the ledger and the
 Capture reads an unfocused window fine, which is the whole reason a global hotkey is worth having.
 - **What is on screen is what gets saved.** The proposed wikitext is editable and the commit writes *that*, never
   `Edit.NewWikitext`. A review screen whose approve button saved something else would make the review meaningless.
-- **Warnings come first and are unmissable**, above the field table and the diff. A flagged gap is the product.
+- **Warnings come first and are unmissable**, above the field table and the diff. A flagged gap is the product, so
+  **every field the tool declined to decide is repeated in the warning strip** rather than living only as a row in
+  the findings grid — the grid truncates, and these are precisely the items nobody has judged yet.
 - Saving is confirmed explicitly: it writes to a public wiki under the user's own account, and an ordinary editor
   there cannot delete a revision.
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — `RapidOcrEngine` loads three
@@ -714,13 +725,18 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
 A Lore-tab window contributes its prose and nothing else (`LoreRecorded`); a Description capture of an item whose
 lore has not been seen reports `NeedsLoreCapture` and is `Flagged` rather than `Matched`; the two are joined by item
 name across frames, and the pipeline attaches the lore to the parsed item so the analyzer sees one complete capture.
-- **Lore is added when the page has none and never overwritten when it has some.** This is deliberately narrower
-  than the rule every other field follows, for two reasons that point the same way. **Prose is where a reading error
-  costs most and shows least** — every other field written here is a short token a reviewer checks at a glance, while
-  lore is a paragraph, and one wrong word inside one is exactly the silently-wrong edit this project exists to avoid.
-  And **the wiki's copy may deliberately hold more than the game shows**: page lore can carry wikilinks and
-  formatting the item window cannot display, so "differs" does not imply "stale" the way it does for AC. A difference
-  is therefore `NeedsReview`, with both texts shown for the user to judge.
+- **Lore is added when the page has none and never overwritten when it has some** (user, 2026-09-28, confirming the
+  proposed rule and asking for the warning below). This is deliberately narrower than the rule every other field
+  follows, for two reasons that point the same way. **Prose is where a reading error costs most and shows least** —
+  every other field written here is a short token a reviewer checks at a glance, while lore is a paragraph, and one
+  wrong word inside one is exactly the silently-wrong edit this project exists to avoid. And **the wiki's copy may
+  deliberately hold more than the game shows**: page lore can carry wikilinks and formatting the item window cannot
+  display, so "differs" does not imply "stale" the way it does for AC.
+- **A difference is warned about, not just recorded, because the wiki is usually — not always — right** (user,
+  2026-09-28: the page's wording has been correct nearly every time, but not every time). So a difference is
+  `NeedsReview`, it appears in the review screen's warning strip, and it gets **its own panel showing both texts in
+  full**. That panel exists because lore is the one field a findings grid cannot show: every other finding is a short
+  token that fits a cell, while this decision is a judgement about prose the user has to actually read.
 - **Comparison ignores line breaks and nothing else.** The game wraps lore to fit its window and the parser rejoins
   those rows with single spaces, so a page that breaks the same sentence differently is not a different sentence.
   Punctuation is content and compares exactly.

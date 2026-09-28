@@ -330,6 +330,67 @@ public class ItemCheckPipelineTests
         Assert.Equal("hand-corrected", wiki.LastSummary);
     }
 
+    /// <summary>
+    /// **Committing a stat fix must not quietly settle a judgement the tool declined to make.** Writing a corrected
+    /// AC says nothing about the lore difference the user was warned of on the same screen, and recording `Edited`
+    /// would count the whole item as done and never raise it again. The outcome must not depend on whether some
+    /// unrelated stat happened to change too.
+    /// </summary>
+    [Fact]
+    public async Task CommittingAnItemThatStillNeedsAHumanRecordsItAsFlagged()
+    {
+        OcrLine[] lines = [.. EarringLines];
+        lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
+
+        // A Lore tab that has not been captured is an outstanding judgement, and the edit is real and unrelated.
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(lines, hasLoreTab: true), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+
+        Assert.Equal(CommitStatus.Committed, commit.Status);
+        Assert.Equal(CheckOutcome.Flagged, ledger.Find("Earring of Bashing")!.Outcome);
+
+        int after = wiki.Fetches;
+        await pipeline.CheckAsync(BlankFrame());
+        Assert.True(wiki.Fetches > after);
+    }
+
+    /// <summary>
+    /// The user's answer to a judgement the tool refused to make — most often "the page's lore is the better
+    /// wording". It has to exist: without it such an item re-fetches on every capture forever, and the only other
+    /// escape would be overwriting the very thing the user just approved.
+    /// </summary>
+    [Fact]
+    public async Task MarkingAFlaggedItemAsCheckedByHandSettlesIt()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines, hasLoreTab: true), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+        Assert.Equal(CheckOutcome.Flagged, ledger.Find("Earring of Bashing")!.Outcome);
+
+        pipeline.RecordCheckedByHand(result, "the page's lore is better than the window's");
+
+        Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
+
+        int after = wiki.Fetches;
+        await pipeline.CheckAsync(BlankFrame());
+        Assert.Equal(after, wiki.Fetches);
+    }
+
+    /// <summary>...but it must not conjure a row for a window nothing was read from, whatever the user clicks.</summary>
+    [Fact]
+    public async Task MarkingAnIneligibleItemAsCheckedStillWritesNoRow()
+    {
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        pipeline.RecordCheckedByHand(result);
+
+        Assert.Equal(0, ledger.Count);
+    }
+
     /// <summary>Skipping records that the user looked and declined — as `Skipped`, which never counts as done, so
     /// the item comes back next time.</summary>
     [Fact]
