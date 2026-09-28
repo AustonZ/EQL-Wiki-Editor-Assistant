@@ -141,6 +141,13 @@ public sealed class WikiMapping
     /// </summary>
     public IReadOnlyList<IReadOnlyList<string>> StatsBlockLineOrder { get; init; } = [];
 
+    /// <summary>
+    /// The order the template's parameters are written in, for the formatting pass. A parameter the page carries
+    /// that is not listed here keeps its relative position after the ones that are — an unrecognized parameter is
+    /// somebody's content and gets preserved, not sorted into a place nobody chose.
+    /// </summary>
+    public IReadOnlyList<string> ParameterOrder { get; init; } = [];
+
     /// <summary>The wiki's parenthetical token for a game effect kind, or null if it has none agreed.</summary>
     public string? FindEffectKind(string gameKind)
     {
@@ -293,7 +300,9 @@ public sealed class WikiMapping
             [
                 // The flags line is unlabelled, so it is named here by convention rather than by a wiki label.
                 ["(flags)"],
-                ["Slot"],
+                // `Type` sits with `Slot` and `Items` with `Size Capacity` by the user's decision (2026-09-25);
+                // the blueprint omits both, and the user is having them added to the template's vocabulary.
+                ["Slot", "Type"],
                 ["Skill", "Atk Delay"],
                 ["DMG", "DMG Bonus", "AC", "BACKSTAB", "Magic DMG", "Poison DMG"],
                 ["Skill Mod"],
@@ -304,9 +313,14 @@ public sealed class WikiMapping
                 ["Effect"],
                 ["Charges"],
                 ["Size", "WT"],
-                ["Weight Reduction", "Capacity", "Size Capacity"],
+                ["Weight Reduction", "Capacity", "Size Capacity", "Items"],
                 ["Class"],
                 ["Race"],
+            ],
+            ParameterOrder =
+            [
+                "itemname", "lucy_img_ID", "statsblock", "focus_effect", "merchant_value", "notes", "bookcontents",
+                "dropsfrom", "soldby", "foraged", "playercrafted", "recipes", "relatedquests",
             ],
         };
     }

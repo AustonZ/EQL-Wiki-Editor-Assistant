@@ -8,6 +8,7 @@ using EQLWikiAssistant.Core.Glyphs;
 using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.TestSupport.Accuracy;
 using EQLWikiAssistant.Wiki.Analysis;
+using EQLWikiAssistant.Wiki.Formatting;
 using EQLWikiAssistant.Wiki.Wikitext;
 
 // The accuracy scorer has its own FieldVerdict (how well extraction did) which is a different question from the
@@ -24,6 +25,7 @@ using FieldVerdict = EQLWikiAssistant.Wiki.Analysis.FieldVerdict;
 //   WikiSpike roundtrip --cached <dir>        same, against a directory of previously saved .txt pages
 //   WikiSpike grammar <count> [--seed N]      report which statsblock lines the grammar cannot read
 //   WikiSpike analyze [--detail]              diff every verified capture against its live wiki page
+//   WikiSpike prettify <count>|--cached <dir>  run the formatting pass over real pages and report what it did
 //   WikiSpike login                           prompt for a bot password and store it in Credential Manager
 //   WikiSpike whoami                          confirm the credential logs in and may edit (writes nothing)
 //   WikiSpike logout                          delete the stored credential
@@ -43,6 +45,8 @@ switch (args[0])
     case "roundtrip": return await RoundTripAsync(reportGrammar: false);
     case "grammar": return await RoundTripAsync(reportGrammar: true);
     case "analyze": return await AnalyzeCorpusAsync();
+    case "prettify": return await PrettifyCorpusAsync();
+    case "prettyshow": return ShowPrettified();
     case "icons": return await CompareIconsAsync();
     case "icondiff": return await DiffIconPixelsAsync();
     case "preview": return await PreviewEditsAsync();
@@ -776,5 +780,115 @@ async Task<int> EditAsync()
     }
 
     Console.WriteLine("Write path verified end to end: token, conflict guard, session assertion and revert.");
+    return 0;
+}
+
+// Runs the formatting pass over real item pages and reports what it did — the same methodology as `grammar` and
+// `analyze`, and for the same reason: a rule that rearranges a public wiki's pages has to be judged against the
+// pages it will actually meet, not against hand-written examples. Writes nothing.
+async Task<int> PrettifyCorpusAsync()
+{
+    IReadOnlyList<(string Title, string Wikitext)> pages = await LoadPagesAsync();
+
+    int changed = 0, unchanged = 0, refused = 0, keptOrder = 0, notApplicable = 0;
+    var refusalReasons = new List<(string Page, string Reason)>();
+    var orderReasons = new List<(string Page, string Reason)>();
+    var unknownLabels = new List<(string Page, string Note)>();
+    var growth = new List<(string Page, int Delta)>();
+
+    foreach ((string title, string wikitext) in pages)
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(wikitext);
+
+        if (!result.IsSafe)
+        {
+            // Not an item page is "not applicable", not a refusal: the cache holds monster and zone pages too.
+            if (result.Refusals.Any(r => r.Contains("not an item page"))) { notApplicable++; continue; }
+            refused++;
+            foreach (string reason in result.Refusals) refusalReasons.Add((title, reason));
+            continue;
+        }
+
+        if (result.Changed) changed++; else unchanged++;
+
+        foreach (string note in result.Notes)
+        {
+            if (note.StartsWith("The statsblock kept", StringComparison.Ordinal))
+            {
+                keptOrder++;
+                orderReasons.Add((title, note["The statsblock kept its existing line order: ".Length..]));
+            }
+            else if (note.StartsWith("The blueprint has no place", StringComparison.Ordinal))
+            {
+                unknownLabels.Add((title, note));
+            }
+        }
+
+        growth.Add((title, result.Formatted.Length - wikitext.Length));
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"=== formatting {pages.Count} page(s) ===");
+    Console.WriteLine($"  not item pages          : {notApplicable}");
+    Console.WriteLine($"  reformatted             : {changed}");
+    Console.WriteLine($"  already correct         : {unchanged}");
+    Console.WriteLine($"  REFUSED (content moved) : {refused}");
+    Console.WriteLine($"  statsblock order kept   : {keptOrder}");
+
+    if (refusalReasons.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- refusals: the verification pass found the result saying something different ---");
+        foreach (var group in refusalReasons.GroupBy(r => Generalize(r.Reason)).OrderByDescending(g => g.Count()))
+            Console.WriteLine($"  {group.Count(),5}  {group.Key}\n           e.g. {group.First().Page}: {group.First().Reason}");
+    }
+
+    if (orderReasons.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- statsblocks left in their existing order ---");
+        foreach (var group in orderReasons.GroupBy(r => Generalize(r.Reason)).OrderByDescending(g => g.Count()))
+            Console.WriteLine($"  {group.Count(),5}  {group.Key}   e.g. {group.First().Page}");
+    }
+
+    if (unknownLabels.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- labels the blueprint has no place for ---");
+        foreach (var group in unknownLabels.GroupBy(u => u.Note).OrderByDescending(g => g.Count()))
+            Console.WriteLine($"  {group.Count(),5}  {group.Key}   e.g. {group.First().Page}");
+    }
+
+    if (growth.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- size change (a formatter should not be inventing or eating content) ---");
+        Console.WriteLine($"  median {growth.OrderBy(g => g.Delta).ElementAt(growth.Count / 2).Delta:+#;-#;0} bytes, " +
+                          $"largest shrink {growth.Min(g => g.Delta)}, largest growth {growth.Max(g => g.Delta)}");
+        foreach ((string page, int delta) in growth.OrderBy(g => g.Delta).Take(3))
+            Console.WriteLine($"    {delta,6}  {page}");
+    }
+
+    return refused == 0 ? 0 : 1;
+
+    // Groups reasons that differ only by the page's own values, so the census shows classes rather than instances.
+    static string Generalize(string reason)
+    {
+        int quote = reason.IndexOf('\'');
+        if (quote < 0) return reason;
+        int close = reason.IndexOf('\'', quote + 1);
+        return close < 0 ? reason : reason[..quote] + "'...'" + reason[(close + 1)..];
+    }
+}
+
+// Writes one page's formatted text to a file so it can be diffed against the cached original by eye. A census
+// tells you nothing about whether the layout is any good.
+int ShowPrettified()
+{
+    if (args.Length < 3) { Console.Error.WriteLine("usage: WikiSpike prettyshow <cached file> <out file>"); return 1; }
+    PrettifyResult result = ItemPagePrettifier.Format(File.ReadAllText(args[1]));
+    File.WriteAllText(args[2], result.Formatted);
+    foreach (string note in result.Notes) Console.WriteLine($"note: {note}");
+    foreach (string refusal in result.Refusals) Console.WriteLine($"REFUSED: {refusal}");
     return 0;
 }
