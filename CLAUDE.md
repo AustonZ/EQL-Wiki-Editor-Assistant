@@ -482,11 +482,17 @@ recorded an incomplete convention as the convention.
   reported 300 differing fields and "76 of 85 pages are stale", when a levelled item's stats are *legitimately*
   higher than the wiki's level-0 figures (Bladestopper +7 shows AC 43 against a correct 25). Filtering to eligible
   items dropped that to 19.
-- Baseline on the verified corpus (2026-09-25), eligible items only: 41 of 90 distinct captures are eligible (the
-  rest are levelled), 38 have pages, **9 pages already correct and 29 would change** — 258 fields match, 19 differ,
-  45 are missing on the wiki, 2 unverifiable, 11 need review. The differences are dominated by legacy flag lines
-  being dropped, plus real staleness and four `merchant_value` corrections. It also caught a typo on a live page
-  (`Lore Equpped`).
+- **Baseline on the verified corpus, re-measured 2026-09-28**, eligible items only: 41 of 90 distinct captures are
+  eligible (the rest are levelled), 38 have pages, **5 pages already correct and 33 would change** — 260 fields
+  match, 28 differ, 49 are missing on the wiki, 2 unverifiable, 2 need review (the two food-prose lines, which are
+  human-by-design), plus 14 compliance findings the tool fixes (12 era banners, 2 lore placeholders). The differences
+  are dominated by legacy flag lines being dropped, plus real staleness and four `merchant_value` corrections. It
+  also caught a typo on a live page (`Lore Equpped`).
+  - **The earlier "9 already correct and 29 would change" here was stale**, not a regression: it survived an update
+    that refreshed the field counts around it. Verified by re-running `analyze` at the commit before milestone 5's
+    pipeline work and getting the same 5/33, so nothing in that work moved it. Worth knowing because the split is
+    the number that *looks* like a regression when a rule changes — check it against a previous commit before
+    believing it.
 
 **Template compliance (`Wiki.Analysis.ComplianceChecker`).** What a page gets wrong on its own terms, independent of
 any capture. **Compliance changes what the page *says*; formatting changes only how it reads** — the latter belongs
