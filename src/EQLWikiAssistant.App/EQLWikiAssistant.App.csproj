@@ -4,7 +4,16 @@
     <ProjectReference Include="..\EQLWikiAssistant.Core\EQLWikiAssistant.Core.csproj" />
     <ProjectReference Include="..\EQLWikiAssistant.Capture\EQLWikiAssistant.Capture.csproj" />
     <ProjectReference Include="..\EQLWikiAssistant.Ocr\EQLWikiAssistant.Ocr.csproj" />
+    <ProjectReference Include="..\EQLWikiAssistant.Pipeline\EQLWikiAssistant.Pipeline.csproj" />
     <ProjectReference Include="..\EQLWikiAssistant.Wiki\EQLWikiAssistant.Wiki.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Direct, not transitive through EQLWikiAssistant.Ocr. RapidOcrNet's bundled .onnx models only reliably copy
+         to an executable's own output directory when the executable references the package itself — confirmed the
+         hard way twice, most recently by tools/OcrSpike failing at runtime with a missing-model-file error. See
+         CLAUDE.md, which flagged this project as needing the same treatment. -->
+    <PackageReference Include="RapidOcrNet" Version="4.2.0" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -13,6 +22,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationDisplayName>EQLWiki Editor Assistant</ApplicationDisplayName>
   </PropertyGroup>
 
 </Project>

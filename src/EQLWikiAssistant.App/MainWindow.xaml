@@ -5,8 +5,165 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EQLWikiAssistant.App"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="EQLWiki Editor Assistant" Height="900" Width="1300">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-    </Grid>
+        <Style x:Key="SectionHeading" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,14,0,4" />
+            <Setter Property="Foreground" Value="#444" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <ToolBarTray DockPanel.Dock="Top">
+            <ToolBar>
+                <Button x:Name="CaptureButton" Click="OnCaptureClick" Padding="10,3" FontWeight="SemiBold"
+                        Content="Capture now" ToolTip="Capture the game window and check every item window in it" />
+                <Separator />
+                <CheckBox x:Name="ReCheckBox" Content="Re-check anyway" VerticalAlignment="Center" Margin="4,0"
+                          Checked="OnReCheckChanged" Unchecked="OnReCheckChanged"
+                          ToolTip="Ask the wiki even for items the ledger has already settled" />
+                <Separator />
+                <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="4,0" Foreground="#555" />
+            </ToolBar>
+        </ToolBarTray>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text="Ready." />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock x:Name="LedgerText" Foreground="#666" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" MinWidth="200" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Every window found in the frame, including the ones nothing could be done with: a window the tool
+                 refused is exactly what the user needs to be told about. -->
+            <ListBox x:Name="ResultsList" Grid.Column="0" SelectionChanged="OnResultSelected"
+                     HorizontalContentAlignment="Stretch" BorderThickness="0,0,1,0" BorderBrush="#DDD">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="2,5">
+                            <TextBlock Text="{Binding ItemName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontSize="11" />
+                                <TextBlock Text="  •  done" FontSize="11" Foreground="Gray"
+                                           Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="#EEE" />
+
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="16,10,16,16">
+                <StackPanel x:Name="DetailPanel" DataContext="{Binding SelectedItem, ElementName=ResultsList}">
+                    <TextBlock Text="{Binding ItemName}" FontSize="21" FontWeight="Bold" TextWrapping="Wrap" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="  —  " Foreground="#AAA"
+                                   Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}" />
+                        <TextBlock Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}">
+                            <Hyperlink Click="OnOpenPageClick">
+                                <TextBlock Text="{Binding PageTitle}" />
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Warnings first and unmissable. A flagged gap is the product here; silently-wrong data on a
+                         public wiki is the failure this whole tool exists to avoid. -->
+                    <ItemsControl ItemsSource="{Binding Warnings}" Margin="0,12,0,0"
+                                  Visibility="{Binding HasWarnings, Converter={StaticResource BoolToVis}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#FFF8E1" BorderBrush="#F0D48A" BorderThickness="1"
+                                        CornerRadius="3" Padding="8,5" Margin="0,0,0,4">
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#5D4200" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="What differs" Style="{StaticResource SectionHeading}"
+                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}" />
+                    <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
+                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
+                              BorderBrush="#DDD" HorizontalScrollBarVisibility="Disabled"
+                              Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Field" Binding="{Binding Field}" Width="1.2*" />
+                            <DataGridTextColumn Header="In game" Binding="{Binding Captured}" Width="1.6*" />
+                            <DataGridTextColumn Header="On the wiki" Binding="{Binding OnWiki}" Width="1.6*" />
+                            <DataGridTextColumn Header="Verdict" Binding="{Binding Verdict}" Width="Auto" />
+                            <DataGridTextColumn Header="Note" Binding="{Binding Explanation}" Width="2*" />
+                        </DataGrid.Columns>
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="Foreground" Value="{Binding Foreground}" />
+                            </Style>
+                        </DataGrid.RowStyle>
+                    </DataGrid>
+
+                    <TextBlock Text="The edit" Style="{StaticResource SectionHeading}"
+                               Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}" />
+                    <Border BorderBrush="#DDD" BorderThickness="1" CornerRadius="3"
+                            Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
+                        <ItemsControl ItemsSource="{Binding Diff}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Background="{Binding Background}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding LineNumbers}" FontFamily="Consolas"
+                                                   FontSize="11" Foreground="#AAA" Margin="4,0,8,0" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas"
+                                                   FontSize="12" Foreground="{Binding Foreground}"
+                                                   TextWrapping="Wrap" Margin="0,0,4,0" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+
+                    <Expander Header="Edit the wikitext before saving" Margin="0,10,0,0"
+                              Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
+                        <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
+                                 FontFamily="Consolas" FontSize="12" Height="260" VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto" Margin="0,6,0,0" />
+                    </Expander>
+
+                    <StackPanel Margin="0,14,0,0"
+                                Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Edit summary" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Padding="4,3" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Content="Save to the wiki" Click="OnCommitClick" Padding="14,5"
+                                    FontWeight="SemiBold" IsEnabled="{Binding CanAct}" />
+                            <Button Content="Skip for now" Click="OnSkipClick" Padding="14,5" Margin="8,0,0,0"
+                                    IsEnabled="{Binding CanSkip}" />
+                            <TextBlock Text="{Binding Outcome}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       Foreground="SeaGreen" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="What was captured" Style="{StaticResource SectionHeading}" />
+                    <Image x:Name="WindowImage" Stretch="None" HorizontalAlignment="Left" Margin="0,2,0,0" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
 </Window>
