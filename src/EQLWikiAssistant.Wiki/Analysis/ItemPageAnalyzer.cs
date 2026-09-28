@@ -54,6 +54,7 @@ public static class ItemPageAnalyzer
     public const string ItemNameField = "itemname";
     public const string PageTitleField = "page title";
     public const string MerchantValueField = "merchant_value";
+    public const string LoreField = "lore";
     public const string FlagsField = "flags";
     public const string LegacyFlagsField = "flags (legacy)";
     public const string FlagProseField = "flags (descriptive text)";
@@ -85,6 +86,7 @@ public static class ItemPageAnalyzer
         StatsBlock? block = page.ReadStatsBlock();
 
         AddNameFindings(findings, captured, page, pageTitle);
+        AddLoreFinding(findings, captured, page);
         AddMerchantValueFinding(findings, captured, page);
         AddFlagFindings(findings, captured, block);
         AddListFinding(findings, ClassesField, captured.Classes, block);
@@ -100,6 +102,60 @@ public static class ItemPageAnalyzer
             findings,
             ComplianceChecker.Check(page, wholePageWikitext ?? page.Wikitext, mapping));
     }
+
+    /// <summary>
+    /// Compares the lore from the second capture against the page's <c>{{Item Lore|...}}</c> wrapper.
+    ///
+    /// **Lore is added when absent and never overwritten when present**, which is a deliberately narrower rule than
+    /// the one every other field follows, for two reasons that both point the same way:
+    /// - **Prose is where a reading error costs most and shows least.** Every other field this tool writes is a short
+    ///   token a reviewer checks at a glance; lore is a paragraph, and a single wrong word inside one is exactly the
+    ///   silently-wrong edit this project exists to avoid.
+    /// - **The wiki's copy may be deliberately more than the game's.** Lore on a page can carry wikilinks and
+    ///   formatting the window cannot show, so "differs" does not imply "the page is stale" the way it does for AC.
+    ///
+    /// So a difference is reported for the user to judge. Adding lore to a page that has none is safe in a way
+    /// replacing it is not: there is nothing to destroy, and the item demonstrably has lore because the game showed
+    /// a Lore tab.
+    /// </summary>
+    private static void AddLoreFinding(List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page)
+    {
+        if (captured.Lore is not { Length: > 0 } lore) return; // no second capture — not a finding either way
+
+        string? onWiki = page.Lore;
+
+        if (onWiki is { Length: > 0 })
+        {
+            findings.Add(LoreReadsTheSame(lore, onWiki)
+                ? new FieldFinding(LoreField, FieldVerdict.Matches, lore, onWiki)
+                : new FieldFinding(
+                    LoreField, FieldVerdict.NeedsReview, lore, onWiki,
+                    "The page's lore differs from the captured text. The tool does not overwrite lore: it is prose, " +
+                    "where a misread word would be invisible in review, and the page's copy may carry wikilinks or " +
+                    "formatting the item window cannot show. Compare them and edit by hand if the page is wrong."));
+            return;
+        }
+
+        if (!ItemPageDocument.CanBeWrittenAsLore(lore))
+        {
+            findings.Add(new FieldFinding(
+                LoreField, FieldVerdict.NeedsReview, lore, null,
+                "The captured lore contains a '|' or a brace pair, which would change what the {{Item Lore}} call " +
+                "means rather than appear inside it. Add it by hand."));
+            return;
+        }
+
+        findings.Add(new FieldFinding(LoreField, FieldVerdict.MissingOnWiki, lore, null));
+    }
+
+    /// <summary>Whitespace-insensitive, because the game wraps lore to fit its window and the parser rejoins those
+    /// rows with single spaces — a page that breaks the same sentence differently is not a different sentence.
+    /// Everything else compares exactly, since this is prose and punctuation is content.</summary>
+    private static bool LoreReadsTheSame(string a, string b) =>
+        string.Equals(CollapseWhitespace(a), CollapseWhitespace(b), StringComparison.Ordinal);
+
+    private static string CollapseWhitespace(string text) =>
+        string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static void AddNameFindings(
         List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page, string pageTitle)

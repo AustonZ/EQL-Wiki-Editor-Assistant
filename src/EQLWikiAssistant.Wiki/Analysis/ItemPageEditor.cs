@@ -102,6 +102,20 @@ public static class ItemPageEditor
                 edited = edited.WithParameter(mapping.MerchantValueParameter, merchantValue);
                 changes.Add($"merchant value {merchantValue}");
             }
+            else if (finding.Field == ItemPageAnalyzer.LoreField && finding.Captured is { } lore)
+            {
+                // Only ever reached for MissingOnWiki: the analyzer reports a *differing* lore as NeedsReview, so
+                // existing prose is never replaced. See AddLoreFinding for why that rule is narrower than the rest.
+                if (edited.Template.Find(mapping.NotesParameter) is null)
+                {
+                    deferred.Add($"The page has no |{mapping.NotesParameter}= parameter, so the item's lore could " +
+                                 "not be added. Add the parameter first.");
+                    continue;
+                }
+
+                edited = edited.WithLore(lore);
+                changes.Add("added the item's lore");
+            }
             else if (finding.Field.EndsWith(" Effect", StringComparison.Ordinal) &&
                      mapping.IsFocusEffect(finding.Field[..^" Effect".Length]) &&
                      finding.Captured is { } focus)
@@ -125,7 +139,8 @@ public static class ItemPageEditor
             {
                 if (finding.Captured is not { } wanted) continue;
                 if (finding.Field is ItemPageAnalyzer.MerchantValueField or ItemPageAnalyzer.PageTitleField
-                    or ItemPageAnalyzer.ItemNameField or ItemPageAnalyzer.FlagProseField) continue;
+                    or ItemPageAnalyzer.ItemNameField or ItemPageAnalyzer.FlagProseField
+                    or ItemPageAnalyzer.LoreField) continue; // all written as template parameters, above
 
                 if (finding.Field == ItemPageAnalyzer.FlagsField)
                 {

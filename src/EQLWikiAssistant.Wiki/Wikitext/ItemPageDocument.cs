@@ -285,6 +285,59 @@ public sealed class ItemPageDocument
         return Reparse(WikitextScanner.ReplaceValue(Wikitext, notes, value));
     }
 
+    /// <summary>
+    /// Characters that would change what a <c>{{Item Lore|...}}</c> call means rather than appear inside it: a pipe
+    /// starts a second parameter, and a brace pair opens or closes a template. Lore is prose and none of these has
+    /// ever appeared in a captured one, but writing a value that silently restructures somebody's page is exactly
+    /// the failure this codebase refuses to risk — so such text is reported to the user instead of written.
+    /// </summary>
+    public static bool CanBeWrittenAsLore(string loreText) =>
+        loreText is not null &&
+        !loreText.Contains('|') && !loreText.Contains("{{", StringComparison.Ordinal) &&
+        !loreText.Contains("}}", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Writes the item's lore into the <c>{{Item Lore|...}}</c> wrapper inside <c>notes</c>.
+    ///
+    /// **Two cases, because lore is the one v1 field that lives nested inside another parameter.** When the wrapper
+    /// is already there its value is spliced in place, so the rest of <c>notes</c> — which routinely holds a human's
+    /// own commentary — survives byte for byte. When it is not, the call is inserted at the front of <c>notes</c>,
+    /// which is where the <c>{{Item Lore Missing}}</c> placeholder it replaces also sat.
+    ///
+    /// Throws when the page has no <c>notes</c> parameter at all: that is the minimal-edit rule's third case, where
+    /// there is no line to change and choosing a position is a judgement — <see cref="WithParameter"/> refuses it
+    /// for the same reason.
+    /// </summary>
+    public ItemPageDocument WithLore(string loreText)
+    {
+        ArgumentNullException.ThrowIfNull(loreText);
+        if (!CanBeWrittenAsLore(loreText))
+            throw new ArgumentException(
+                "This lore text contains characters that would change the template's meaning.", nameof(loreText));
+
+        TemplateParameter notes = Template.Find("notes")
+            ?? throw new InvalidOperationException("The page has no |notes= parameter to write lore into.");
+
+        string value = notes.RawValue;
+        IReadOnlyList<TemplateCall> calls = WikitextScanner.FindTemplates(value, LoreTemplateName);
+
+        if (calls.Count > 0 && calls[0].Parameters.FirstOrDefault(p => p.Index == 1) is { } existing)
+            return Reparse(WikitextScanner.ReplaceValue(
+                Wikitext, notes, WikitextScanner.ReplaceValue(value, existing, loreText)));
+
+        string call = $"{{{{{LoreTemplateName}|{loreText}}}}}";
+
+        // An empty notes parameter becomes the call outright — WithParameter already knows how to keep the padding
+        // of a value that is nothing but whitespace, which is a trap this file documents elsewhere.
+        if (string.IsNullOrWhiteSpace(value)) return WithParameter("notes", call);
+
+        // Otherwise the call goes in front of whatever a human wrote, on its own line, per the minimal-edit rule.
+        int start = 0;
+        while (start < value.Length && char.IsWhiteSpace(value[start])) start++;
+        return Reparse(WikitextScanner.ReplaceValue(
+            Wikitext, notes, value[..start] + call + "<br>\n" + value[start..]));
+    }
+
     private ItemPageDocument Reparse(string wikitext) =>
         Parse(wikitext) ?? throw new InvalidOperationException(
             "The edit left the page without a parseable {{Itempage}} call; this is a bug in the edit, not in the page.");

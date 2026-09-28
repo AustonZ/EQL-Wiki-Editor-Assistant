@@ -249,7 +249,10 @@ public sealed class ItemCheckPipeline
             };
         }
 
-        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(item, page, wikiPage.Title, _mapping);
+        // The lore came from a separate capture of the Lore tab, so it is attached here rather than being on the
+        // Description capture the parser produced. The analyzer then sees one complete item.
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            lore is null ? item : item with { Lore = lore }, page, wikiPage.Title, _mapping);
         ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis, _mapping);
 
         (IconComparison? icon, string? iconNote) =

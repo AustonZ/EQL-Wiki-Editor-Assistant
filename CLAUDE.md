@@ -701,18 +701,32 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
   whether an edit is surgical, but it collapsed duplicate lines (real statsblocks repeat `<br>`) and paired a changed
   line with an unrelated one. Long unchanged runs fold away, because an item page can carry a `dropsfrom` table with
   nothing to do with the edit and a reviewer scrolling past it is a reviewer who stops reading.
-- **Still to come here**: lore is captured and carried but not yet *written* — see "The lore two-capture flow" below.
-  Logging in still needs `WikiSpike login` once; there is no in-app credential dialog yet (milestone 7).
+- **Still to come here**: logging in needs `WikiSpike login` once — there is no in-app credential dialog yet
+  (milestone 7), and no settings/mapping editor or ledger view (milestones 6-7).
 
-**The lore two-capture flow — half done, and the half that is missing is on the wiki side.** The window offers a Lore
-tab, so a lore-bearing item needs two captures. The pipeline handles the capture half: a Lore-tab window contributes
-its prose and nothing else (`LoreRecorded`), a Description capture of an item whose lore has not been seen reports
-`NeedsLoreCapture` and is `Flagged` rather than `Matched`, and the two are joined by item name across frames.
-- **What does not exist yet is comparing or writing it.** `ItemPageDocument` *reads* `{{Item Lore|...}}` out of
-  `notes`, but there is no `WithLore`, and `ItemPageAnalyzer` has no lore field — so an item whose lore is missing or
-  wrong on the wiki is not currently flagged for it, and the captured lore cannot be written. That is the next piece
-  of milestone 5, and it is deliberately not faked: reporting "lore checked" when nothing compared it would be
-  exactly the silent-wrong failure this project exists to avoid.
+**The lore two-capture flow (2026-09-28).** The window offers a Lore tab, so a lore-bearing item needs two captures.
+A Lore-tab window contributes its prose and nothing else (`LoreRecorded`); a Description capture of an item whose
+lore has not been seen reports `NeedsLoreCapture` and is `Flagged` rather than `Matched`; the two are joined by item
+name across frames, and the pipeline attaches the lore to the parsed item so the analyzer sees one complete capture.
+- **Lore is added when the page has none and never overwritten when it has some.** This is deliberately narrower
+  than the rule every other field follows, for two reasons that point the same way. **Prose is where a reading error
+  costs most and shows least** — every other field written here is a short token a reviewer checks at a glance, while
+  lore is a paragraph, and one wrong word inside one is exactly the silently-wrong edit this project exists to avoid.
+  And **the wiki's copy may deliberately hold more than the game shows**: page lore can carry wikilinks and
+  formatting the item window cannot display, so "differs" does not imply "stale" the way it does for AC. A difference
+  is therefore `NeedsReview`, with both texts shown for the user to judge.
+- **Comparison ignores line breaks and nothing else.** The game wraps lore to fit its window and the parser rejoins
+  those rows with single spaces, so a page that breaks the same sentence differently is not a different sentence.
+  Punctuation is content and compares exactly.
+- **`ItemPageDocument.WithLore` is the one edit that reaches inside another parameter.** An existing
+  `{{Item Lore|...}}` has its value spliced in place, so a human's own commentary elsewhere in `notes` survives byte
+  for byte; a page without the wrapper gets one at the front of `notes`, which is where the `{{Item Lore Missing}}`
+  placeholder it replaces also sat. A page with no `notes` parameter at all is the minimal-edit rule's third case and
+  is refused rather than guessed at.
+- **Lore containing `|` or a brace pair is refused, not written** (`CanBeWrittenAsLore`). A pipe would start a second
+  template parameter and braces would open or close a template — the value would restructure somebody's page rather
+  than sit inside it. No captured lore has ever contained one; the guard is there because the failure would be
+  silent.
 
 **Multi-window / occlusion handling.** A single screenshot may contain more than one item detail window; all of
 them must be located and processed. A partially obscured window must be detected and surfaced to the user as a
