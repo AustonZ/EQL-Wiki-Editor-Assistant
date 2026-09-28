@@ -17,18 +17,18 @@
     </Window.Resources>
 
     <DockPanel>
-        <ToolBarTray DockPanel.Dock="Top">
-            <ToolBar>
-                <Button x:Name="CaptureButton" Click="OnCaptureClick" Padding="10,3" FontWeight="SemiBold"
+        <!-- A plain header rather than a ToolBar: WPF's ToolBar restyles a CheckBox into a flat toggle with no box,
+             which makes a setting look like a button, and adds an overflow chevron that never has anything in it. -->
+        <Border DockPanel.Dock="Top" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="0,0,0,1" Padding="10,7">
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="CaptureButton" Click="OnCaptureClick" Padding="12,4" FontWeight="SemiBold"
                         Content="Capture now" ToolTip="Capture the game window and check every item window in it" />
-                <Separator />
-                <CheckBox x:Name="ReCheckBox" Content="Re-check anyway" VerticalAlignment="Center" Margin="4,0"
+                <CheckBox x:Name="ReCheckBox" Content="Re-check anyway" VerticalAlignment="Center" Margin="16,0,0,0"
                           Checked="OnReCheckChanged" Unchecked="OnReCheckChanged"
                           ToolTip="Ask the wiki even for items the ledger has already settled" />
-                <Separator />
-                <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="4,0" Foreground="#555" />
-            </ToolBar>
-        </ToolBarTray>
+                <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="16,0,0,0" Foreground="#666" />
+            </StackPanel>
+        </Border>
 
         <StatusBar DockPanel.Dock="Bottom">
             <StatusBarItem>
@@ -66,7 +66,16 @@
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="#EEE" />
 
-            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="16,10,16,16">
+            <!-- Shown only when nothing is selected. It is a separate element rather than a placeholder inside the
+                 detail panel because a binding against a null DataContext cannot resolve at all: WPF then falls back
+                 to the property's default, and every `Visibility` below silently reverts to Visible — which rendered
+                 the entire empty scaffold, lore panel and buttons included. -->
+            <TextBlock Grid.Column="2" x:Name="EmptyState" TextWrapping="Wrap" MaxWidth="420" Foreground="#888"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                       Text="Open an item window in game and press Ctrl+Shift+E.&#10;&#10;Every item window in the capture is checked against the wiki and listed on the left." />
+
+            <ScrollViewer Grid.Column="2" x:Name="DetailScroller" VerticalScrollBarVisibility="Auto"
+                          Padding="16,10,16,16" Visibility="Collapsed">
                 <StackPanel x:Name="DetailPanel" DataContext="{Binding SelectedItem, ElementName=ResultsList}">
                     <TextBlock Text="{Binding ItemName}" FontSize="21" FontWeight="Bold" TextWrapping="Wrap" />
 
@@ -103,10 +112,18 @@
                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Field" Binding="{Binding Field}" Width="1.2*" />
-                            <DataGridTextColumn Header="In game" Binding="{Binding Captured}" Width="1.6*" />
-                            <DataGridTextColumn Header="On the wiki" Binding="{Binding OnWiki}" Width="1.6*" />
+                            <DataGridTextColumn Header="In game" Binding="{Binding Captured}" Width="1.5*" />
+                            <DataGridTextColumn Header="On the wiki" Binding="{Binding OnWiki}" Width="1.5*" />
                             <DataGridTextColumn Header="Verdict" Binding="{Binding Verdict}" Width="Auto" />
-                            <DataGridTextColumn Header="Note" Binding="{Binding Explanation}" Width="2*" />
+                            <!-- A template column so the note wraps. As a text column it truncated mid-sentence,
+                                 which loses the part explaining *why* the tool concluded what it did. -->
+                            <DataGridTemplateColumn Header="Note" Width="2.2*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Margin="2,3" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                         <DataGrid.RowStyle>
                             <Style TargetType="DataGridRow">

@@ -128,6 +128,12 @@ public partial class MainWindow : Window
 
     private void OnResultSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
+        // Collapsed rather than left to the bindings: with no selection there is no DataContext for them to resolve
+        // against, so each `Visibility` falls back to Visible and the whole empty scaffold renders.
+        bool selected = ResultsList.SelectedItem is not null;
+        DetailScroller.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = selected ? Visibility.Collapsed : Visibility.Visible;
+
         WindowImage.Source = ResultsList.SelectedItem is ResultViewModel { Result.WindowImage: { } image }
             ? ToBitmap(image)
             : null;
