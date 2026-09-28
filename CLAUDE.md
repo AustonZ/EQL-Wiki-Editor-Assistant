@@ -43,7 +43,9 @@ The full design rationale, wiki research findings, and milestone plan live in
   since `Core` can't reference the Windows-only projects.
 - `src/EQLWikiAssistant.Capture` (`net10.0-windows10.0.19041.0`) — `GlobalHotKey` (Win32 `RegisterHotKey`, its own
   message-only window/thread, no UI-framework dependency), `WindowFinder` (find a window by title), `WindowCapturer`
-  (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device).
+  (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device), and
+  `WindowsImageDecoder` (the `IImageDecoder` implementation — WinRT `BitmapDecoder` reading from memory, for wiki
+  icon PNGs; it lives here because this is the project whose job is turning Windows pixels into a `CapturedImage`).
   **Read the `[GeneratedComInterface]` note below before touching `Interop/`** — it documents a real, confirmed
   runtime failure mode, not a style preference.
 - `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — the general-OCR `IOcrEngine`: **`RapidOcrEngine`
@@ -60,8 +62,14 @@ The full design rationale, wiki research findings, and milestone plan live in
   `Capture`/`Ocr` projects. It uses `[DllImport]` rather than `[LibraryImport]` because the latter's generator
   emits unsafe code, and enabling `<AllowUnsafeBlocks>` across a domain assembly for four P/Invokes is the worse
   trade — unrelated to the `[GeneratedComInterface]` rule below, which is about CsWinRT COM objects.
-- `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: capture trigger, review/diff screen,
-  settings/mapping editor, ledger view.
+- `src/EQLWikiAssistant.Pipeline` (`net10.0`) — **`ItemCheckPipeline`** and its report types: the whole sequence from
+  a captured frame to a reviewable per-window result, plus `WikitextDiff` (the review screen's line diff) and
+  `AppPaths` (where the ledger, mapping and icon cache live). See "The pipeline" below. It is its own assembly
+  because it is the only thing that depends on *both* the game side (`Core`) and the wiki side (`Wiki`), and neither
+  of those may depend on it.
+- `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: `AppServices` (the composition root),
+  `MainWindow` (capture trigger + review/diff screen), `ResultViewModel`. Settings/mapping editor and ledger view
+  are still to come (milestones 6-7).
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
 - `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
@@ -88,7 +96,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
   only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
   failed at runtime with a missing-model-file error until given its own direct reference). `EQLWikiAssistant.App`
-  will need the same treatment in milestone 2/5 — verify with a real run.
+  has the same direct reference, **verified by a real run** (2026-09-28): the models land in its own output and the
+  app starts.
 
 Note: WinRT namespaces like `Windows.Media.Ocr` and `Windows.Graphics.Capture` are only projected on a Windows-SDK-
 versioned TFM (`net10.0-windows10.0.19041.0`), not plain `net10.0-windows` — every project that touches them must
@@ -640,9 +649,70 @@ wrong or the capture caught something odd, and choosing one is a human's call.
   No expiry; "clear icon cache" / "re-download this icon" belong in Settings. A **missing** icon is cached too, with
   a short TTL, since that is the one fact here that changes when somebody uploads a file. Icon ids come from a wiki
   parameter and are sanitized before they touch a path.
-- **Still to wire up**: decoding a downloaded PNG currently goes through `TestSupport.ImageFile`, which is dev-only
-  and file-based. Production needs a `byte[]` → `CapturedImage` decoder behind a port, since `Wiki` is portable
-  `net10.0` and cannot use WinRT imaging directly.
+- **The decoder port closed the last dev-only gap here** (2026-09-28). Decoding a downloaded PNG used to go through
+  `TestSupport.ImageFile`, which is file-based and not shippable. `Core.Icons.IImageDecoder` is now the port and
+  `Capture.WindowsImageDecoder` the implementation — and **`ImageFile.LoadOverBackgroundAsync` delegates to it**
+  rather than keeping its own copy. That direction matters: every threshold above was measured *through* that
+  loader, and the numbers only transfer to the shipping tool if both sides decode identically. The alpha
+  compositing itself lives once, in `Core.Ocr.AlphaComposite`.
+- Decoding is from bytes, never from a path — several items share one icon id (three corpus breastplates all use
+  624), the decoder keeps a file mapped while it reads, and rewriting that file mid-run failed outright.
+
+**The pipeline (`Pipeline.ItemCheckPipeline`, milestone 5).** One captured frame in, one reviewable
+`ItemCheckResult` per item window out: locate → parse → eligibility → ledger → lookup → analyze → build the edit,
+plus the icon check. This is the orchestration every earlier milestone left "still to wire up"; `WikiSpike preview`
+was a hand-rolled version of the same sequence, and the differences are that this one is injectable (so it is
+testable) and that it includes the two steps preview skipped, the ledger and the icon check.
+- **Checking is read-only by construction.** `CheckAsync` can only fetch. Committing is `CommitAsync`, one item at a
+  time, after the user has looked — so every window in a frame can be reviewed before anything is written.
+- **Two ports exist only because this had to be real rather than dev-only**, and both are worth leaving alone:
+  `IImageDecoder` (above), and **`IItemWindowLocator`**, which lets the pipeline's *sequencing* be tested without a
+  screenshot. A frame synthesized to satisfy a dozen measured pixel thresholds would be testing those thresholds,
+  which already have their own golden tests against real samples.
+- **What the ledger records, and what it deliberately does not.** An occluded or ineligible window gets **no row at
+  all** — not `Skipped` — because it was never checked and any row would make it look handled forever. A page that
+  already agrees is settled immediately as `Matched`, since there is nothing to approve; but one that agrees while
+  *anything wants a human* (a blocking finding, a suspect icon, uncaptured lore, a title/content name mismatch) is
+  `Flagged` instead, which never lets a later capture skip the wiki. `NotOnWiki` is recorded too and is likewise
+  never "done" — somebody may create the page tomorrow.
+- **A wiki failure is reported per window, not thrown.** One unreachable page must not abandon the rest of the
+  frame, and must not write a row either.
+- **`CommitAsync` re-fetches and refuses a page that moved on**, which matters more than `basetimestamp` does here.
+  MediaWiki merges what it can, and this tool's edits are wholesale parameter replacements — exactly the shape that
+  merges cleanly while still discarding somebody's work. Keep sending the parameter; this is what actually catches
+  the case.
+- Tests (`tests/.../Pipeline/ItemCheckPipelineTests.cs`) assert on **wiki request counts and ledger contents**, not
+  on return values: "an unchanged, already-matched item costs zero wiki traffic" is the property the ledger exists
+  for, and only a counting fake can state it.
+
+**The review UI (`App`, milestone 5).** `Ctrl+Shift+E` captures the game window while it still has focus — Graphics
+Capture reads an unfocused window fine, which is the whole reason a global hotkey is worth having.
+- **What is on screen is what gets saved.** The proposed wikitext is editable and the commit writes *that*, never
+  `Edit.NewWikitext`. A review screen whose approve button saved something else would make the review meaningless.
+- **Warnings come first and are unmissable**, above the field table and the diff. A flagged gap is the product.
+- Saving is confirmed explicitly: it writes to a public wiki under the user's own account, and an ordinary editor
+  there cannot delete a revision.
+- `AppServices` is a plain composition root, built **once** and **off the UI thread** — `RapidOcrEngine` loads three
+  ONNX models in its constructor, the `MediaWikiClient` must keep one cookie container for its whole session, and
+  the ledger and icon cache only mean anything shared. Measured: the window is responsive in ~485ms.
+- **The `.onnx`-copy trap is confirmed handled for `App`**, which this file previously listed as needing a real run:
+  the direct `PackageReference` does put the models in the app's own output, and the app starts.
+- `WikitextDiff` is a real LCS line diff, replacing the spike tool's set subtraction — that was fine for eyeballing
+  whether an edit is surgical, but it collapsed duplicate lines (real statsblocks repeat `<br>`) and paired a changed
+  line with an unrelated one. Long unchanged runs fold away, because an item page can carry a `dropsfrom` table with
+  nothing to do with the edit and a reviewer scrolling past it is a reviewer who stops reading.
+- **Still to come here**: lore is captured and carried but not yet *written* — see "The lore two-capture flow" below.
+  Logging in still needs `WikiSpike login` once; there is no in-app credential dialog yet (milestone 7).
+
+**The lore two-capture flow — half done, and the half that is missing is on the wiki side.** The window offers a Lore
+tab, so a lore-bearing item needs two captures. The pipeline handles the capture half: a Lore-tab window contributes
+its prose and nothing else (`LoreRecorded`), a Description capture of an item whose lore has not been seen reports
+`NeedsLoreCapture` and is `Flagged` rather than `Matched`, and the two are joined by item name across frames.
+- **What does not exist yet is comparing or writing it.** `ItemPageDocument` *reads* `{{Item Lore|...}}` out of
+  `notes`, but there is no `WithLore`, and `ItemPageAnalyzer` has no lore field — so an item whose lore is missing or
+  wrong on the wiki is not currently flagged for it, and the captured lore cannot be written. That is the next piece
+  of milestone 5, and it is deliberately not faked: reporting "lore checked" when nothing compared it would be
+  exactly the silent-wrong failure this project exists to avoid.
 
 **Multi-window / occlusion handling.** A single screenshot may contain more than one item detail window; all of
 them must be located and processed. A partially obscured window must be detected and surfaced to the user as a
@@ -1125,7 +1195,10 @@ to configure.
 dotnet build                                                    # build everything
 dotnet test                                                     # run all tests
 dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test class
-dotnet run --project src/EQLWikiAssistant.App                   # run the WPF app
+# Run the app. Ctrl+Shift+E captures the game window from wherever you are — you never have to leave the game.
+# Reads are anonymous, so it only needs a credential the first time you save (store one with `WikiSpike login`).
+# Its state (ledger, mapping, icon cache) lives in %APPDATA%\EQLWikiAssistant — see Pipeline.AppPaths.
+dotnet run --project src/EQLWikiAssistant.App
 
 # OCR tuning against a real sample screenshot (feed it native resolution — upscaling hurts this engine):
 dotnet run --project tools/OcrSpike -- "samples/some screenshot.png" --crop x,y,w,h --save out.png
