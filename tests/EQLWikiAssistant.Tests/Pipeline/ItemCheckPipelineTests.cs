@@ -412,6 +412,113 @@ public class ItemCheckPipelineTests
         Assert.True(wiki.Fetches > after);
     }
 
+    // --- the formatting follow-up ----------------------------------------------------------------------
+
+    /// <summary>
+    /// **The formatting is offered, never folded in.** Mixing it into the data edit would bury a one-value
+    /// correction under a whole-page reflow, which is the review problem this tool exists to solve — so the data
+    /// commit writes exactly once and hands back a separate proposal.
+    /// </summary>
+    [Fact]
+    public async Task CommittingOffersTheFormattingAsASecondEditWithoutWritingIt()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+
+        Assert.Equal(CommitStatus.Committed, commit.Status);
+        Assert.Equal(1, wiki.Edits);
+        Assert.NotNull(commit.Formatting);
+        Assert.DoesNotContain("Reformatted", wiki.LastSummary);
+    }
+
+    [Fact]
+    public async Task TheFormattingEditIsWrittenSeparatelyAndSaysSo()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+
+        CommitResult formatting = await pipeline.CommitFormattingAsync(commit.Formatting!);
+
+        Assert.Equal(CommitStatus.Committed, formatting.Status);
+        Assert.Equal(2, wiki.Edits);
+        Assert.Contains("no data changes", wiki.LastSummary);
+    }
+
+    /// <summary>A page already laid out offers nothing — the prompt has to be silent when there is nothing to do, or
+    /// it becomes noise the user learns to dismiss.</summary>
+    [Fact]
+    public async Task ATidyPageOffersNoFormatting()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines), UntidyPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+        CommitResult first = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+        await pipeline.CommitFormattingAsync(first.Formatting!);
+
+        (FormattingProposal? again, _) = await pipeline.PrepareFormattingAsync("Earring of Bashing");
+
+        Assert.Null(again);
+    }
+
+    /// <summary>Same conflict rule as the data commit: a reflow saved over somebody else's change would be the worst
+    /// kind of edit to review.</summary>
+    [Fact]
+    public async Task TheFormattingEditRefusesAPageThatMovedOn()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+
+        wiki.Pages["Earring of Bashing"] = wiki.Pages["Earring of Bashing"] with
+        {
+            Wikitext = wiki.Pages["Earring of Bashing"].Wikitext + "\n[[Category:Somebody's addition]]",
+        };
+
+        CommitResult formatting = await pipeline.CommitFormattingAsync(commit.Formatting!);
+
+        Assert.Equal(CommitStatus.PageChangedSinceCheck, formatting.Status);
+        Assert.Equal(1, wiki.Edits);
+    }
+
+    /// <summary>
+    /// **The two passes compose the right way round on a legacy page**, which is the clearest argument for the
+    /// settled data-first order: the data edit replaces the legacy flags line with what the game actually says, and
+    /// only then does the formatter have a page it understands well enough to lay out. Running the formatter first
+    /// would have met a page it refuses to touch.
+    /// </summary>
+    [Fact]
+    public async Task ALegacyPageBecomesFormattableOnceTheDataEditHasModernizedIt()
+    {
+        string legacy = UntidyPage().Replace("Lore Equpped, No Trade<br>", "MAGIC ITEM  LORE ITEM<br>");
+
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), legacy);
+
+        // Before the data edit, the formatter lays out the parameters it understands but will not touch the
+        // statsblock — the legacy flags line comes back byte for byte, with a note saying why.
+        (FormattingProposal? before, IReadOnlyList<string> whyNot) =
+            await pipeline.PrepareFormattingAsync("Earring of Bashing");
+        Assert.NotNull(before);
+        Assert.Contains("MAGIC ITEM  LORE ITEM<br>", before!.Formatted);
+        Assert.Contains(whyNot, n => n.Contains("not a current EQL flag"));
+
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+
+        Assert.Equal(CommitStatus.Committed, commit.Status);
+        Assert.Equal(1, wiki.Edits);
+        Assert.NotNull(commit.Formatting);
+        Assert.DoesNotContain("MAGIC ITEM", commit.Formatting!.Formatted);
+    }
+
+    /// <summary>A page whose statsblock is laid out the wrong way round, so the formatter has something to do.</summary>
+    private static string UntidyPage() =>
+        "{{Classic Era}}\n<onlyinclude>{{Itempage\n|notes = \n|itemname = Earring of Bashing\n" +
+        "|lucy_img_ID = 1\n|statsblock = \nRace: ALL<br>\nClass: WAR SHD SHM BST BER<br>\n" +
+        "Lore Equpped, No Trade<br>\nSlot: EAR<br>\nAC: 5<br>\nSTR: +8  WIS: +8<br>\n" +
+        "Size: TINY  WT: 0.1<br>\n}}</onlyinclude>";
+
     // --- the two-capture lore flow ---------------------------------------------------------------------
 
     /// <summary>A window that offers a Lore tab says so, so the UI can ask for the second capture instead of

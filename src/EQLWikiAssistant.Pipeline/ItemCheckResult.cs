@@ -139,4 +139,33 @@ public enum CommitStatus
     Failed,
 }
 
-public sealed record CommitResult(CommitStatus Status, long? RevisionId = null, string? Error = null);
+/// <summary>
+/// Formatting the page still wants after a data edit — the second, separate commit.
+///
+/// **Separate because the user asked for it to be** (2026-09-25): *"A single 'automatically reformatted' edit with
+/// no actual data changes is much easier to work with when reviewing diff history."* Mixing the two would bury the
+/// data change under a whole-page reflow, which is the review problem this tool exists to solve.
+/// </summary>
+public sealed record FormattingProposal(
+    string PageTitle,
+    string Original,
+    string Formatted,
+    IReadOnlyList<string> Notes,
+    DateTimeOffset BaseTimestamp)
+{
+    /// <summary>Says plainly that no data changed, because that is the fact a reviewer scanning page history most
+    /// needs from this edit.</summary>
+    public string Summary => "Reformatted to the Item Page Blueprint (no data changes)";
+}
+
+public sealed record CommitResult(
+    CommitStatus Status,
+    long? RevisionId = null,
+    string? Error = null,
+    FormattingProposal? Formatting = null,
+    IReadOnlyList<string>? FormattingNotes = null)
+{
+    /// <summary>What the formatting pass declined to lay out, when there is nothing to commit but something worth
+    /// saying — most often that the page still carries legacy flags.</summary>
+    public IReadOnlyList<string> FormattingNotes { get; init; } = FormattingNotes ?? [];
+}

@@ -174,6 +174,13 @@ public partial class MainWindow : Window
                 _ => null,
             };
 
+            // The formatting pass has already run against the page as it now stands; offering it is a prompt, never
+            // an automatic second write.
+            view.Formatting = commit.Formatting;
+            foreach (string note in commit.FormattingNotes)
+                if (!view.Warnings.Contains(note))
+                    view.Warnings.Add(note);
+
             StatusText.Text = view.Outcome ?? commit.Error ?? "The edit did not go through.";
 
             if (commit.Status is CommitStatus.PageChangedSinceCheck or CommitStatus.Failed)
@@ -196,6 +203,34 @@ public partial class MainWindow : Window
         // Deliberately not phrased as "done": Skipped never counts as checked, so the item comes back next capture.
         view.Outcome = "Skipped — it will come back on the next capture.";
         StatusText.Text = $"'{view.ItemName}' skipped.";
+    }
+
+    private async void OnCommitFormattingClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel { Formatting: { } proposal } view || _services is null)
+            return;
+
+        view.IsBusy = true;
+        try
+        {
+            CommitResult commit = await _services.Pipeline.CommitFormattingAsync(proposal);
+
+            view.FormattingOutcome = commit.Status switch
+            {
+                CommitStatus.Committed => $"Formatting saved as revision {commit.RevisionId}.",
+                CommitStatus.NoChange => "The wiki found the text identical.",
+                _ => null,
+            };
+
+            StatusText.Text = view.FormattingOutcome ?? commit.Error ?? "The formatting edit did not go through.";
+
+            if (commit.Status is CommitStatus.PageChangedSinceCheck or CommitStatus.Failed)
+                MessageBox.Show(this, commit.Error, "Nothing was written", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            view.IsBusy = false;
+        }
     }
 
     private async void OnMarkCheckedClick(object sender, RoutedEventArgs e)

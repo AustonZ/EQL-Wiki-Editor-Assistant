@@ -3,6 +3,7 @@ using EQLWikiAssistant.Core.Items;
 using EQLWikiAssistant.Core.Locate;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Wiki.Analysis;
+using EQLWikiAssistant.Wiki.Formatting;
 using EQLWikiAssistant.Wiki.Ledger;
 using EQLWikiAssistant.Wiki.Mapping;
 using EQLWikiAssistant.Wiki.MediaWiki;
@@ -397,8 +398,16 @@ public sealed class ItemCheckPipeline
                 edit.NewRevisionId ?? current.RevisionId,
                 FingerprintOf(result));
 
+            // The formatting pass runs automatically after any change, as the user specified — but as its own
+            // proposal, for its own commit. Never folded into this one.
+            (FormattingProposal? formatting, IReadOnlyList<string> notes) =
+                await PrepareFormattingAsync(title, cancellationToken).ConfigureAwait(false);
+
             return new CommitResult(
-                edit.NoChange ? CommitStatus.NoChange : CommitStatus.Committed, edit.NewRevisionId);
+                edit.NoChange ? CommitStatus.NoChange : CommitStatus.Committed,
+                edit.NewRevisionId,
+                Formatting: formatting,
+                FormattingNotes: notes);
         }
         catch (MediaWikiException ex)
         {
@@ -424,6 +433,82 @@ public sealed class ItemCheckPipeline
         RecordLedgerEntry(
             result.ItemName, result.Page?.Title, CheckOutcome.Skipped, result.Page?.RevisionId,
             FingerprintOf(result), note);
+    }
+
+    /// <summary>
+    /// Fetches a page as it now stands and asks the formatting pass what it would do to it.
+    ///
+    /// **It formats what is actually on the wiki, not what we think we wrote.** MediaWiki normalizes a saved page
+    /// (trailing whitespace, for one), so formatting our own submitted text would propose an edit against a revision
+    /// that does not exist. It also means this is usable on its own, for a page nobody has just edited.
+    ///
+    /// Returns no proposal when the page is already laid out, when the formatter declined, or when there is nothing
+    /// to format — with the formatter's own notes either way, because "why is this page still untidy" is a question
+    /// the user will have and the answer is usually "it still carries legacy flags".
+    /// </summary>
+    public async Task<(FormattingProposal? Proposal, IReadOnlyList<string> Notes)> PrepareFormattingAsync(
+        string title, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        try
+        {
+            WikiPage? current = await _wiki.FetchPageAsync(title, cancellationToken).ConfigureAwait(false);
+            if (current is null) return (null, []);
+
+            PrettifyResult formatting = ItemPagePrettifier.Format(current.Wikitext, _mapping);
+            if (!formatting.IsSafe) return (null, formatting.Refusals);
+            if (!formatting.Changed) return (null, formatting.Notes);
+
+            return (
+                new FormattingProposal(
+                    current.Title, current.Wikitext, formatting.Formatted, formatting.Notes, current.Timestamp),
+                formatting.Notes);
+        }
+        catch (Exception ex) when (ex is MediaWikiException or HttpRequestException or TaskCanceledException)
+        {
+            // A data edit that succeeded must not be reported as failed because the follow-up could not be
+            // prepared. The formatting is an extra, and the user can run it again.
+            return (null, [$"The page could not be re-read to check its formatting: {ex.Message}"]);
+        }
+    }
+
+    /// <summary>
+    /// Writes the formatting edit. Same conflict rule as the data commit — re-fetch, and refuse a page that has
+    /// moved on — because a reflow saved over somebody else's change would be the worst kind to review.
+    /// </summary>
+    public async Task<CommitResult> CommitFormattingAsync(
+        FormattingProposal proposal, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(proposal);
+
+        try
+        {
+            WikiPage? current = await _wiki.FetchPageAsync(proposal.PageTitle, cancellationToken).ConfigureAwait(false);
+            if (current is null)
+                return new CommitResult(CommitStatus.Failed, Error: $"'{proposal.PageTitle}' no longer exists.");
+
+            if (!string.Equals(current.Wikitext, proposal.Original, StringComparison.Ordinal))
+                return new CommitResult(
+                    CommitStatus.PageChangedSinceCheck,
+                    Error: $"'{proposal.PageTitle}' changed since the formatting was worked out. Nothing was " +
+                           "written — capture the item again.");
+
+            EditResult edit = await _wiki.EditAsync(
+                    proposal.PageTitle, proposal.Formatted, proposal.Summary, current.Timestamp, cancellationToken)
+                .ConfigureAwait(false);
+
+            return new CommitResult(
+                edit.NoChange ? CommitStatus.NoChange : CommitStatus.Committed, edit.NewRevisionId);
+        }
+        catch (MediaWikiException ex)
+        {
+            return new CommitResult(CommitStatus.Failed, Error: $"The wiki refused the edit ({ex.Code}): {ex.Message}");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return new CommitResult(CommitStatus.Failed, Error: ex.Message);
+        }
     }
 
     /// <summary>

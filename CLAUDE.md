@@ -701,6 +701,23 @@ edit, after the data edit**; see "Formatting is a separate edit" above for why t
   (25 pages) and `Range` (15), then `Mana Cost`, `Mount Speed`, `Wind Resonance`, `String Resonance`, `Fire DMG`, and
   the likely typos `SV.Magic`, `Dieties`, `Dmg Bon`. Dropping one would lose real data; guessing a slot would invent
   a convention the editors have not agreed.
+- **It runs automatically after a data commit, as a prompt, never as a second automatic write.**
+  `ItemCheckPipeline.CommitAsync` hands back a `FormattingProposal`; `CommitFormattingAsync` writes it under its own
+  summary ("Reformatted to the Item Page Blueprint (no data changes)"), with the same re-fetch-and-refuse conflict
+  rule as the data commit — a reflow saved over somebody else's change would be the worst kind to review.
+  - **It formats the page as it now stands, re-read from the wiki, not the text we just submitted.** MediaWiki
+    normalizes a saved page, so formatting our own submission would propose an edit against a revision that does not
+    exist. It also makes `PrepareFormattingAsync` usable on its own, for a page nobody has just edited.
+  - **A failure here never fails the data commit**: the formatting is an extra, and the user can run it again.
+  - **The two passes compose the right way round on a legacy page, which is the clearest argument for the settled
+    data-first order.** Before the data edit the formatter refuses to touch such a statsblock; the data edit replaces
+    the legacy flags line with what the game actually says, and only then is the page one the formatter understands
+    well enough to lay out. Formatting first would have met a page it declines. A test pins exactly that sequence.
+  - A page with nothing to do offers nothing — a prompt that appears when there is no work becomes noise the user
+    learns to dismiss.
+  - **Still not applicable: the plan's "a brand-new page goes through the formatter before its first commit".** v1
+    never creates pages (`nocreate` is set, and creating one is a different feature with different review
+    requirements), so there is no first commit to get ahead of. It arrives with page creation, not before.
 - `tools/WikiSpike -- prettify --cached <dir>` runs it over the real corpus and censuses what it did — the same
   methodology as `grammar` and `analyze`, and how both of the above bugs were found. `prettyshow <in> <out>` writes
   one page's result so it can be diffed by eye, because a census says nothing about whether the layout is any good.

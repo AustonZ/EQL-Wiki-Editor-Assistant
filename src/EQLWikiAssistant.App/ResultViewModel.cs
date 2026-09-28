@@ -68,6 +68,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private string _summary;
     private string? _outcome;
     private bool _isBusy;
+    private FormattingProposal? _formatting;
+    private string? _formattingOutcome;
 
     public ResultViewModel(ItemCheckResult result)
     {
@@ -149,6 +151,46 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public string LoreInGame => LoreToCompare?.Captured ?? "";
 
     /// <summary>
+    /// The formatting edit offered after a data commit — its own edit, never folded into the first one.
+    /// </summary>
+    public FormattingProposal? Formatting
+    {
+        get => _formatting;
+        set
+        {
+            _formatting = value;
+            FormattingDiff.Clear();
+            if (value is not null)
+                foreach (DiffLine line in WikitextDiff.Compute(value.Original, value.Formatted))
+                    FormattingDiff.Add(new DiffLineViewModel(line));
+
+            OnPropertyChanged(nameof(Formatting));
+            OnPropertyChanged(nameof(HasFormatting));
+            OnPropertyChanged(nameof(CanCommitFormatting));
+        }
+    }
+
+    public ObservableCollection<DiffLineViewModel> FormattingDiff { get; } = [];
+
+    public bool HasFormatting => _formatting is not null;
+
+    public bool CanCommitFormatting => _formatting is not null && !IsBusy && FormattingOutcome is null;
+
+    /// <summary>What the formatting commit did, shown in place of its button afterwards.</summary>
+    public string? FormattingOutcome
+    {
+        get => _formattingOutcome;
+        set
+        {
+            Set(ref _formattingOutcome, value);
+            OnPropertyChanged(nameof(HasFormattingOutcome));
+            OnPropertyChanged(nameof(CanCommitFormatting));
+        }
+    }
+
+    public bool HasFormattingOutcome => !string.IsNullOrEmpty(_formattingOutcome);
+
+    /// <summary>
     /// Whether the user can settle this item by hand. Offered whenever something wants a human, because that is the
     /// only thing standing between the item and "done" — the tool has already concluded everything it is willing to.
     /// Not offered once an edit is pending, since saving it is the action that matters then.
@@ -181,6 +223,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
+            OnPropertyChanged(nameof(CanCommitFormatting));
             OnPropertyChanged(nameof(HasOutcome));
         }
     }
@@ -196,6 +239,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
+            OnPropertyChanged(nameof(CanCommitFormatting));
         }
     }
 

@@ -220,6 +220,49 @@
                                Margin="0,12,0,0" TextWrapping="Wrap"
                                Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
 
+                    <!-- The formatting follow-up: its own edit, never folded into the data one, because a single
+                         reformatting commit with no data changes is what makes page history reviewable. -->
+                    <StackPanel Visibility="{Binding HasFormatting, Converter={StaticResource BoolToVis}}"
+                                Margin="0,18,0,0">
+                        <Border Background="#EEF4FB" BorderBrush="#BBD4EC" BorderThickness="1" CornerRadius="3"
+                                Padding="10,7">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Foreground="#1B4A75"
+                                           Text="The page can also be tidied — as a separate edit" />
+                                <TextBlock TextWrapping="Wrap" Foreground="#33618C" Margin="0,3,0,0"
+                                           Text="Laid out to the Item Page Blueprint, with no data changes. Committing this separately keeps the edit above readable in the page's history." />
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderBrush="#DDD" BorderThickness="1" CornerRadius="3" Margin="0,8,0,0">
+                            <ItemsControl ItemsSource="{Binding FormattingDiff}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Background="{Binding Background}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding LineNumbers}" FontFamily="Consolas"
+                                                       FontSize="11" Foreground="#AAA" Margin="4,0,8,0" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas"
+                                                       FontSize="12" Foreground="{Binding Foreground}"
+                                                       TextWrapping="Wrap" Margin="0,0,4,0" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Content="Save the formatting" Click="OnCommitFormattingClick" Padding="14,5"
+                                    IsEnabled="{Binding CanCommitFormatting}" />
+                            <TextBlock Text="{Binding FormattingOutcome}" VerticalAlignment="Center"
+                                       Margin="12,0,0,0" Foreground="SeaGreen" FontWeight="SemiBold"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </StackPanel>
+
                     <TextBlock Text="What was captured" Style="{StaticResource SectionHeading}" />
                     <Image x:Name="WindowImage" Stretch="None" HorizontalAlignment="Left" Margin="0,2,0,0" />
                 </StackPanel>
