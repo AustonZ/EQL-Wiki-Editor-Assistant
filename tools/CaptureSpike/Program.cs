@@ -27,7 +27,8 @@ switch (args[0])
             ? WindowFinder.EnumerateVisibleWindows()
             : WindowFinder.FindByTitleSubstring(filter);
         foreach (var w in windows)
-            Console.WriteLine($"{w.Handle,12:X} {w.Title}");
+            // The process name is here because a title alone cannot identify the game — see WindowFinder.
+            Console.WriteLine($"{w.Handle,12:X}  {w.ProcessName,-16} {w.Title}");
         Console.WriteLine($"{windows.Count} window(s)");
         return 0;
     }

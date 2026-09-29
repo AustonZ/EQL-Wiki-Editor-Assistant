@@ -176,6 +176,7 @@ public sealed class ItemCheckPipeline
                 Item = item,
                 WindowImage = crop,
                 LedgerVerdict = verdict,
+                LedgerRow = _ledger.Find(item.Name),
                 Lore = lore,
                 Warnings = warnings,
             };

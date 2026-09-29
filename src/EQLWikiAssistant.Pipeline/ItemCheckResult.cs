@@ -76,6 +76,16 @@ public sealed record ItemCheckResult
 
     public LedgerVerdict LedgerVerdict { get; init; }
 
+    /// <summary>
+    /// The ledger row this capture matched, when there was one.
+    ///
+    /// **Carried so an already-checked item can still be opened on the wiki** (user, 2026-09-29). Skipping the fetch
+    /// is the whole point of the ledger, so there is no <see cref="Page"/> to link to — but the row knows the page's
+    /// title, and "let me go look at what this says" is exactly the question a stale-looking row raises. Before this
+    /// the one result with nothing to click was the one most likely to need it.
+    /// </summary>
+    public LedgerEntry? LedgerRow { get; init; }
+
     public ItemPageLookupResult? Lookup { get; init; }
 
     /// <summary>The captured icon's fingerprint, kept so the item can be re-analyzed when its lore arrives from a

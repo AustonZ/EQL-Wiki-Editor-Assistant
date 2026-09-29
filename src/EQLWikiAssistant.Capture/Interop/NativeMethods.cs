@@ -110,6 +110,9 @@ internal static class NativeMethods
     public static extern int GetWindowTextLengthW(IntPtr hWnd);
 
     [DllImport("user32.dll")]
+    public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
+
+    [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
     [DllImport("user32.dll")]

@@ -29,7 +29,20 @@ public sealed class AppServices : IDisposable
     /// knowledge belongs, and a second wiki would need its own mapping anyway.</summary>
     public static readonly Uri Endpoint = new("https://eqlwiki.com/api.php");
 
-    /// <summary>What the game's window title contains. Used to find the window to capture.</summary>
+    /// <summary>
+    /// The game's process name, without <c>.exe</c> — **how the window to capture is identified**.
+    ///
+    /// Measured, not assumed (2026-09-29): the running client is <c>eqgame</c>. It is the process rather than the
+    /// title because the title is genuinely ambiguous for this tool's own user — see <see cref="GameWindowTitle"/>.
+    /// </summary>
+    public const string GameProcessName = "eqgame";
+
+    /// <summary>
+    /// What the game's window title contains. **Only a fallback**, for the day the client is renamed.
+    ///
+    /// It cannot be the primary rule: anyone editing this wiki plausibly has a browser on a page titled
+    /// `... - EverQuest Legends Wiki - ...` and a Discord on `... | EverQuest Legends - Discord`, and both match.
+    /// </summary>
     public const string GameWindowTitle = "EverQuest";
 
     private readonly RapidOcrEngine _rapidOcr;
@@ -81,17 +94,31 @@ public sealed class AppServices : IDisposable
     /// Graphics Capture reads an unfocused window fine, which is what makes a global hotkey useful at all: the user
     /// presses it with the game focused and the result appears in this window behind it.
     /// </summary>
-    public async Task<(CapturedImage? Frame, string? Problem)> CaptureGameWindowAsync(
+    public async Task<(CapturedImage? Frame, string? Problem, string? Captured)> CaptureGameWindowAsync(
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<FoundWindow> windows = WindowFinder.FindByTitleSubstring(GameWindowTitle);
-        if (windows.Count == 0)
-            return (null, $"No window with '{GameWindowTitle}' in its title is open. Start the game first.");
+        // The process first. Falling back to the title is deliberate but second: it is what to do if the client is
+        // ever renamed, not a way to identify it.
+        IReadOnlyList<FoundWindow> windows = WindowFinder.FindByProcessName(GameProcessName);
+        bool byTitle = windows.Count == 0;
+        if (byTitle) windows = WindowFinder.FindByTitleSubstring(GameWindowTitle);
 
-        CapturedImage? frame = await Capturer.CaptureAsync(windows[0].Handle, cancellationToken);
-        return frame is null
-            ? (null, $"'{windows[0].Title}' could not be captured.")
-            : (frame, null);
+        if (windows.Count == 0)
+            return (null, $"No '{GameProcessName}' window is open, and nothing has '{GameWindowTitle}' in its " +
+                          "title either. Start the game first.", null);
+
+        FoundWindow window = windows[0];
+        CapturedImage? frame = await Capturer.CaptureAsync(window.Handle, cancellationToken);
+        if (frame is null) return (null, $"'{window.Title}' could not be captured.", null);
+
+        // **Say which window was read.** Silently picking one of several is the bug this is fixing, and a capture
+        // that says what it captured diagnoses itself — which the previous one, taking whatever sat topmost, could
+        // not. The title-fallback case names its competition too, since that is the ambiguous path.
+        string captured = byTitle && windows.Count > 1
+            ? $"'{window.Title}' (of {windows.Count} windows matching '{GameWindowTitle}')"
+            : $"'{window.Title}'";
+
+        return (frame, null, captured);
     }
 
     /// <summary>Logs in for a commit, using the bot password in Windows Credential Manager. Returns why it could not

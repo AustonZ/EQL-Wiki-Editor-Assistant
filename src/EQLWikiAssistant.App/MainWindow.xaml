@@ -121,6 +121,8 @@
                                 <TextBlock Text="{Binding PageTitle}" />
                             </Hyperlink>
                         </TextBlock>
+                        <TextBlock Text="{Binding LedgerNote}" Foreground="#888" Margin="8,0,0,0"
+                                   Visibility="{Binding HasLedgerNote, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
 
                     <!-- Warnings first and unmissable. A flagged gap is the product here; silently-wrong data on a

@@ -103,7 +103,7 @@ public partial class MainWindow : Window
         {
             BusyLabel.Text = "Capturing the game window…";
             StatusText.Text = BusyLabel.Text;
-            (CapturedImage? frame, string? problem) = await _services.CaptureGameWindowAsync();
+            (CapturedImage? frame, string? problem, string? captured) = await _services.CaptureGameWindowAsync();
             if (frame is null)
             {
                 StatusText.Text = problem;
@@ -123,9 +123,12 @@ public partial class MainWindow : Window
             await _services.SaveLedgerAsync();
             UpdateLedgerText();
 
+            // The "none found" case names the window it read. That is the one message where the user needs to know
+            // *what* was searched — a capture of the wrong window looks exactly like a capture with no item windows
+            // open, which is how a browser being captured instead of the game went undiagnosed (user, 2026-09-29).
             StatusText.Text = results.Count switch
             {
-                0 => "No item window was found in that capture.",
+                0 => $"No item window was found in {captured}.",
                 1 => "1 item window checked.",
                 _ => $"{results.Count} item windows checked.",
             };

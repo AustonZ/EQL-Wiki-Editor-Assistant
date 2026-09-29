@@ -8,6 +8,7 @@ using EQLWikiAssistant.Core.Items;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
 using EQLWikiAssistant.Wiki.Analysis;
+using EQLWikiAssistant.Wiki.Ledger;
 
 namespace EQLWikiAssistant.App;
 
@@ -212,13 +213,35 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         _ => Brushes.DimGray,
     };
 
-    public string PageTitle => Result.Page?.Title ?? Result.Lookup?.RequestedTitle ?? "";
+    /// <summary>
+    /// The page this item lives on, as far as anything knows.
+    ///
+    /// **The ledger row is the last fallback, and it is the one that matters** (user, 2026-09-29): an already-checked
+    /// item never reaches the wiki — that is the point of the ledger — so it has no <see cref="ItemCheckResult.Page"/>
+    /// and used to be the one result with nothing to click. It is also the one most likely to need it, since "is this
+    /// row stale, or has the page really been fixed?" is answered by going and looking.
+    /// </summary>
+    private string? KnownPageTitle =>
+        Result.Page?.Title ??
+        (Result.LedgerRow is { Outcome: not CheckOutcome.NotOnWiki } row ? row.WikiPageTitle ?? row.ItemName : null);
 
-    public bool HasPage => Result.Page is not null;
+    /// <summary>Includes a title that was merely looked up and not found, so the user can see what was searched for
+    /// — but that case gets no link, since it would only ever be a red one.</summary>
+    public string PageTitle => KnownPageTitle ?? Result.Lookup?.RequestedTitle ?? "";
 
-    public string? PageUrl => Result.Page is null
-        ? null
-        : $"https://eqlwiki.com/{Uri.EscapeDataString(Result.Page.Title.Replace(' ', '_'))}";
+    public bool HasPage => KnownPageTitle is not null;
+
+    public string? PageUrl => KnownPageTitle is { } title
+        ? $"https://eqlwiki.com/{Uri.EscapeDataString(title.Replace(' ', '_'))}"
+        : null;
+
+    /// <summary>When an already-checked item was last settled, and how. Shown beside the link, because the reason to
+    /// open the page is usually to judge whether the row is still right.</summary>
+    public string LedgerNote => Result.LedgerRow is not { } row
+        ? ""
+        : $"{row.Outcome.ToString().ToLowerInvariant()} {row.CheckedAt.ToLocalTime():yyyy-MM-dd HH:mm}";
+
+    public bool HasLedgerNote => LedgerNote.Length > 0;
 
     public bool HasDiff => Diff.Count > 0;
     public bool HasFindings => Findings.Count > 0;

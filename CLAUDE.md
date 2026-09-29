@@ -861,6 +861,23 @@ testable) and that it includes the two steps preview skipped, the ledger and the
 
 **The review UI (`App`, milestone 5).** `Ctrl+Shift+E` captures the game window while it still has focus — Graphics
 Capture reads an unfocused window fine, which is the whole reason a global hotkey is worth having.
+- **The game window is found by process name (`eqgame`), never by title** (bug found by the user, 2026-09-29, and
+  reproduced exactly). Matching `"EverQuest"` as a title substring also matched their browser on
+  `Dragon Bone Bracelet - EverQuest Legends Wiki - Vivaldi` and their Discord on
+  `#eql-wiki-content | EverQuest Legends - Discord` — both entirely ordinary windows for someone editing this wiki.
+  `EnumWindows` returns **Z-order**, so taking the first match captured whichever the user had touched last: pressing
+  the hotkey from inside the game worked, and clicking "Capture now" in the app captured the browser. `GameWindowTitle`
+  survives only as a fallback for the day the client is renamed.
+  - **It reported as "No item window was found", which is why it looked like a swallowed exception.** Nothing was
+    swallowed — a capture of the wrong window is indistinguishable from a capture with no item windows open. So that
+    message now **names the window it read**, which costs nothing and makes the case diagnose itself. `CaptureSpike
+    list` prints each window's process name for the same reason; that is how this was found.
+- **`App.OnStartup` installs a `DispatcherUnhandledException` handler**, which the user asked for in preference to a
+  debug log (2026-09-29). It earns its place independently of the bug above: the review screen's click handlers are
+  `async void`, as event handlers must be, so an exception in one reaches the dispatcher rather than any caller and
+  closes the window. It is marked handled — losing the other items on screen, some representing captures that are
+  awkward to retake, is worse than the failure itself — and the stack goes to `%APPDATA%\EQLWikiAssistant\errors.log`,
+  since a stack is too much for a dialog and too easy to lose once one is dismissed. Recording never throws.
 - **What is on screen is what gets saved.** The proposed wikitext is editable and the commit writes *that*, never
   `Edit.NewWikitext`. A review screen whose approve button saved something else would make the review meaningless.
   - **And the save button follows the same text, which it did not** (user, 2026-09-29). `CanAct` was
@@ -871,6 +888,11 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
   - **A hand-written edit needs a hand-written summary.** The summary loads blank when the tool proposes nothing,
     rather than inheriting its own "No changes" — which would be a false description of the revision — and `CanAct`
     requires one, so the wiki cannot receive an unexplained edit.
+- **An already-checked item still links to its page** (user, 2026-09-29). It never reaches the wiki — that is the
+  point of the ledger — so it has no `Page` and was the one result with nothing to click, while being the one most
+  likely to need it: "is this row stale, or has the page really been fixed?" is answered by going and looking. The
+  ledger row is carried on the result (`LedgerRow`) and supplies the title, plus the outcome and date beside it. A
+  page merely *looked up* and not found still gets no link, since it would only ever be a red one.
 - **Warnings come first and are unmissable**, above the field table and the diff. A flagged gap is the product, so
   **every field the tool declined to decide is repeated in the warning strip** rather than living only as a row in
   the findings grid — the grid truncates, and these are precisely the items nobody has judged yet.

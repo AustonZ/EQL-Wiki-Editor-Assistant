@@ -40,4 +40,28 @@ public class WindowFinderTests
         var noMatches = WindowFinder.FindByTitleSubstring(Guid.NewGuid().ToString("N"));
         Assert.Empty(noMatches);
     }
+
+    /// <summary>
+    /// Matching by process is what identifies the game, because its title does not: "EverQuest" also matches a
+    /// browser on the wiki and a Discord server of that name (user, 2026-09-29). Since enumeration is in Z-order,
+    /// taking the first match captured whichever of those was touched last.
+    /// </summary>
+    [Fact]
+    public void FindByProcessName_ReturnsEveryWindowOfThatProcessAndNothingElse()
+    {
+        var all = WindowFinder.EnumerateVisibleWindows();
+        string? sample = all.Select(w => w.ProcessName).FirstOrDefault(n => !string.IsNullOrEmpty(n));
+        if (sample is null) return; // No window whose process could be read — nothing to assert against.
+
+        var matches = WindowFinder.FindByProcessName(sample.ToUpperInvariant());
+
+        Assert.All(matches, w => Assert.Equal(sample, w.ProcessName, ignoreCase: true));
+        Assert.Equal(
+            all.Count(w => string.Equals(w.ProcessName, sample, StringComparison.OrdinalIgnoreCase)),
+            matches.Count);
+    }
+
+    [Fact]
+    public void FindByProcessName_FindsNothingForAProcessThatDoesNotExist() =>
+        Assert.Empty(WindowFinder.FindByProcessName(Guid.NewGuid().ToString("N")));
 }
