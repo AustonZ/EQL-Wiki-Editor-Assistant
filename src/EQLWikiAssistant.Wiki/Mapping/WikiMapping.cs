@@ -56,9 +56,20 @@ public sealed record StatMapping(
 /// </summary>
 public sealed class WikiMapping
 {
-    /// <summary>Bumped whenever the built-in defaults change. The ledger records the version an item was checked
-    /// under, so a mapping change invalidates stale entries rather than leaving them looking current.</summary>
-    public const int CurrentVersion = 1;
+    /// <summary>
+    /// Bumped whenever the built-in defaults change. The ledger records the version an item was checked under, so a
+    /// mapping change invalidates stale rows rather than leaving them looking current.
+    ///
+    /// **Bump this in the same commit as any change to what the tool would write** — a new stat, a changed wiki
+    /// label, a new category rule, a different statsblock line order. Forgetting means an item checked yesterday is
+    /// reported as settled today while the tool would now propose something different, and the user never sees it:
+    /// the ledger skips the wiki fetch entirely, so there is no later chance to notice.
+    ///
+    /// **2** (2026-09-28): categories are now derived and written at all, pet illusion became a mapped field, the
+    /// parameter order and two statsblock line positions were added. Rows written under 1 would have been treated
+    /// as settled while missing every category the tool would now add.
+    /// </summary>
+    public const int CurrentVersion = 2;
 
     public int Version { get; init; } = CurrentVersion;
 
