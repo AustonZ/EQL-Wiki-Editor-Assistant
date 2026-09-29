@@ -123,9 +123,15 @@ public static class CategoryRules
 
         foreach (string slot in wikiSlots)
         {
+            // An unrecognized slot is reported, with no exceptions. There used to be one here for `ANY`, on the
+            // stated grounds that it was "a real slot with no category" — it is not. `Any Slot` occurs only inside
+            // an effect's parenthetical (`Effect: [[Levitation]] (Any Slot, Casting Time: 4.0)`), where it means the
+            // effect works whichever slot the item is in; it is never a slot value. Measured 2026-09-28: 0 of 104
+            // captured windows and 0 of 1,183 wiki pages have a slot `ANY`, and the blueprint's table has no such
+            // entry. The exception silenced a value that does not exist, and would have silenced a genuinely new
+            // slot if one ever appeared — the opposite of what an unrecognized value is supposed to do here.
             if (SlotCategories.TryGetValue(slot.Trim(), out string? category)) categories.Add(category);
-            // "ANY" is a real slot with no category of its own, so it is neither emitted nor reported.
-            else if (!string.Equals(slot.Trim(), "ANY", StringComparison.OrdinalIgnoreCase)) unknown.Add(slot.Trim());
+            else unknown.Add(slot.Trim());
         }
 
         foreach (string label in wikiFieldLabels ?? [])

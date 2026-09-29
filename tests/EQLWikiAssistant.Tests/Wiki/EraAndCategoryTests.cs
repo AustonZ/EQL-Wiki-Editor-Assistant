@@ -117,13 +117,17 @@ public class CategoryRulesTests
     public void SlotsBecomeTheirOwnCategories(string wikiSlot, string expected) =>
         Assert.Equal([expected], CategoryRules.Derive([], [wikiSlot], out _));
 
-    /// <summary>`ANY` is a real slot in the blueprint with no category of its own, so it contributes none — and is
-    /// not reported as unrecognized either, which would be a false alarm.</summary>
+    /// <summary>
+    /// **`ANY` is not a slot**, and the exception that used to silence it here was an error of mine: `Any Slot`
+    /// occurs only inside an effect's parenthetical, where it means the effect works whichever slot the item is in.
+    /// Measured 2026-09-28 — 0 of 104 captured windows and 0 of 1,183 wiki pages carry a slot `ANY`. So it is
+    /// reported like any other unrecognized slot, which is what should happen to a value nobody has seen.
+    /// </summary>
     [Fact]
-    public void TheAnySlotContributesNoCategoryAndIsNotAnError()
+    public void AnySlotIsNotASlotAndIsReportedLikeAnyOtherUnknown()
     {
         Assert.Empty(CategoryRules.Derive([], ["ANY"], out IReadOnlyList<string> unrecognized));
-        Assert.Empty(unrecognized);
+        Assert.Equal(["ANY"], unrecognized);
     }
 
     /// <summary>`NONE` is the class-side equivalent: a real value meaning no class can use the item, with no

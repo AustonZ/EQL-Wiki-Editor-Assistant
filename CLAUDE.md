@@ -408,8 +408,17 @@ recorded an incomplete convention as the convention.
 - **The derived set is only ever a subset of a page's categories.** Real pages also carry zone names, `Quest Items`,
   `Focus Items`, `Inventory Items` and `Fashion:` entries, none of them derivable from an item window.
   `CategoryRules.IsDerivable` is what marks the tool's own territory; everything else is preserved untouched.
-- The documented quirk holds: the slot is `FINGER`, the category is `Fingers`. `ANY` is a real slot with no category
-  and contributes none — and is deliberately not reported as unrecognized, which would be a false alarm.
+- The documented quirk holds: the slot is `FINGER`, the category is `Fingers`.
+- **Correction (2026-09-28): `ANY` is not a slot, and an earlier note here saying it was "a real slot with no
+  category" was wrong.** `Any Slot` occurs only inside an *effect's* parenthetical — `Effect: [[Levitation]] (Any
+  Slot, Casting Time: 4.0)` — where it means the effect works whichever slot the item is in. Measured when the user
+  asked for an example and none could be produced: **0 of 104 captured windows and 0 of 1,183 wiki pages have a slot
+  `ANY`**, and the blueprint's 18-entry table has no such row. The special case built on that claim silenced a value
+  that does not exist and would have silenced a genuinely new slot if one appeared — the exact inverse of the rule
+  below. It is gone.
+  - Worth keeping as a method note: the claim survived because it *sounded* like the measured `FINGER`/`Fingers`
+    quirk it sat beside. "Ask for an example" is the cheap test that caught it, and `NONE` for classes — which does
+    have one, `Guise of the Deceived` — is what a real instance of the same shape looks like.
 - An unknown class code or slot is *reported* rather than silently shortening the list, the same rule as an unmapped
   stat and for the same reason.
 - **An unmapped stat is reported, never dropped.** A stat the tool has never seen is how a game patch announces
