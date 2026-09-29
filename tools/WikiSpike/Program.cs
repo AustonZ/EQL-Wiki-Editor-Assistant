@@ -29,6 +29,8 @@ using FieldVerdict = EQLWikiAssistant.Wiki.Analysis.FieldVerdict;
 //   WikiSpike prettify <count>|--cached <dir>  run the formatting pass over real pages and report what it did
 //   WikiSpike login                           prompt for a bot password and store it in Credential Manager
 //   WikiSpike whoami                          confirm the credential logs in and may edit (writes nothing)
+//   WikiSpike verified [<title>...]           the wiki's "Verified for EQLegends" list, and how much of the corpus
+//                                             it covers (48 of 744 item pages when measured)
 //   WikiSpike logout                          delete the stored credential
 //   WikiSpike edit <User: page>               append a timestamped line, then revert it (userspace only)
 //
@@ -50,6 +52,7 @@ switch (args[0])
     case "prettyshow": return ShowPrettified();
     case "icons": return args.Contains("--corpus") ? await MeasureIconsAcrossCorpusAsync() : await CompareIconsAsync();
     case "icondiff": return await DiffIconPixelsAsync();
+    case "verified": return await VerifiedAsync();
     case "preview": return await PreviewEditsAsync();
     case "login": return Login();
     case "whoami": return await WhoAmIAsync();
@@ -64,6 +67,7 @@ void Usage()
     Console.Error.WriteLine("  WikiSpike fetch <title>");
     Console.Error.WriteLine("  WikiSpike roundtrip <count> [--seed N] | --cached <dir>");
     Console.Error.WriteLine("  WikiSpike grammar <count> [--seed N] | --cached <dir>");
+    Console.Error.WriteLine("  WikiSpike verified [<title>...]");
     Console.Error.WriteLine("  WikiSpike login | whoami | logout");
     Console.Error.WriteLine("  WikiSpike edit \"User:<you>/sandbox\"   (two revisions, self-reverting, confirms first)");
 }
@@ -952,5 +956,43 @@ async Task<int> MeasureIconsAcrossCorpusAsync()
 
     Console.WriteLine();
     Console.WriteLine($"{captured.Count} item(s) with both icons readable; {wikiIcons.Count} distinct wiki icon(s).");
+    return 0;
+}
+
+/// <summary>
+/// The wiki's "Verified for EQLegends" list, measured against the corpus.
+///
+/// Exists for the same reason `analyze` and `prettify` do: a rule about real pages is worth a number before it is
+/// worth code. It is what established that only 48 of 744 cached item pages are verified — the measurement that
+/// settled verification as a warning rather than a blocker.
+/// </summary>
+async Task<int> VerifiedAsync()
+{
+    using MediaWikiClient client = MediaWikiClient.Create(endpoint);
+    var verified = new VerifiedPages(client, Path.Combine(Path.GetTempPath(), "wikispike-verified.json"));
+    await verified.RefreshAsync();
+
+    if (!verified.IsKnown) { Console.Error.WriteLine("The verified-pages list could not be read."); return 1; }
+    Console.WriteLine($"{VerifiedPages.ListPageTitle}: {verified.Count} title(s), revision {verified.RevisionId}");
+
+    if (args.Length > 1)
+    {
+        foreach (string title in args.Skip(1))
+            Console.WriteLine($"  {(verified.IsVerified(title) == true ? "VERIFIED  " : "unverified")}  {title}");
+        return 0;
+    }
+
+    string cached = Path.Combine(RepoPaths.LocalDataDirectory, "wiki-pages");
+    if (!Directory.Exists(cached)) return 0;
+
+    int items = 0, done = 0;
+    foreach (string file in Directory.EnumerateFiles(cached, "*.txt"))
+    {
+        if (!File.ReadAllText(file).Contains("{{Itempage", StringComparison.Ordinal)) continue;
+        items++;
+        if (verified.IsVerified(Path.GetFileNameWithoutExtension(file)) == true) done++;
+    }
+
+    Console.WriteLine($"cached item pages: {items}, verified {done} ({(items == 0 ? 0 : 100.0 * done / items):F1}%)");
     return 0;
 }

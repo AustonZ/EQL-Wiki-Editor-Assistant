@@ -79,6 +79,83 @@ public class ItemCheckPipelineTests
 
     private static string EarringPage() => WikiFixtures.Load("Earring of Bashing");
 
+    /// <summary>A pipeline that also knows the wiki's verified-pages list, holding exactly the titles given.</summary>
+    private static (ItemCheckPipeline Pipeline, CheckedItemsLedger Ledger) BuildWithVerifiedList(
+        LocatedWindow window, string pageWikitext, params string[] verifiedTitles)
+    {
+        var wiki = new FakeWiki();
+        wiki.Pages["Earring of Bashing"] =
+            new WikiPage("Earring of Bashing", pageWikitext, 100, DateTimeOffset.UnixEpoch);
+        wiki.Pages[VerifiedPages.ListPageTitle] = new WikiPage(
+            VerifiedPages.ListPageTitle, string.Join('\n', verifiedTitles), 179774, DateTimeOffset.UnixEpoch);
+
+        var ledger = new CheckedItemsLedger();
+        var verified = new VerifiedPages(
+            wiki, Path.Combine(Path.GetTempPath(), $"verified-{Guid.NewGuid():N}.json"));
+
+        return (new ItemCheckPipeline(wiki, new FakeLocator(window), ledger, verified: verified), ledger);
+    }
+
+    // --- verification (reported, never enforced) --------------------------------------------------------
+
+    /// <summary>
+    /// **Unverified warns and nothing more** (user, 2026-09-29). Verification attests that a whole page is accurate,
+    /// including the drops and quests this tool never reads, so it cannot be a blocker — and with only 48 of 744
+    /// sampled item pages verified, making it one would leave nearly every item permanently unsettled.
+    /// </summary>
+    [Fact]
+    public async Task AnUnverifiedPageIsWarnedAboutButStillCountsAsDone()
+    {
+        (ItemCheckPipeline pipeline, CheckedItemsLedger ledger) =
+            BuildWithVerifiedList(Window(EarringLines), EarringPage(), "Some_Other_Page");
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Contains(results[0].Warnings, w => w.Contains("Verified for EQLegends", StringComparison.Ordinal));
+        Assert.False(results[0].NeedsAttention);
+        Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    /// <summary>The other branch says nothing at all. An alert on every page — either "not yet verified" or "already
+    /// verified" — is an alert everyone learns to ignore (user, 2026-09-29).</summary>
+    [Fact]
+    public async Task AVerifiedPageSaysNothingAboutVerification()
+    {
+        (ItemCheckPipeline pipeline, _) =
+            BuildWithVerifiedList(Window(EarringLines), EarringPage(), "Earring_of_Bashing");
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.DoesNotContain(results[0].Warnings, w => w.Contains("Verified", StringComparison.Ordinal));
+    }
+
+    /// <summary>With no list configured the tool is silent, which is also what an unreachable wiki produces: a false
+    /// "unverified" would send the user to re-verify a page that is already done.</summary>
+    [Fact]
+    public async Task NothingIsSaidWhenTheListIsNotAvailable()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines), EarringPage());
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.DoesNotContain(results[0].Warnings, w => w.Contains("Verified", StringComparison.Ordinal));
+    }
+
+    /// <summary>The ledger-skip path answers it too, from the local list and with no wiki request — and that is the
+    /// item most likely to still be waiting on verification.</summary>
+    [Fact]
+    public async Task AnAlreadyCheckedItemIsStillToldItsPageIsUnverified()
+    {
+        (ItemCheckPipeline pipeline, _) =
+            BuildWithVerifiedList(Window(EarringLines), EarringPage(), "Some_Other_Page");
+
+        await pipeline.CheckAsync(BlankFrame());
+        IReadOnlyList<ItemCheckResult> again = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.AlreadyChecked, again[0].Status);
+        Assert.Contains(again[0].Warnings, w => w.Contains("Verified for EQLegends", StringComparison.Ordinal));
+    }
+
     /// <summary>A page whose data agrees but which carries a defect the tool will not fix — here the missing
     /// <c>&lt;onlyinclude&gt;</c> wrapper, which needs a human to decide what to enclose.</summary>
     private static string AgreeingPageWithSomethingTheToolWillNotFix() =>

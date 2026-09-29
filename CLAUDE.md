@@ -681,6 +681,43 @@ skips the wiki fetch entirely.
   rather than throwing: every row is reconstructible by capturing the item again, so losing it beats refusing to
   start.
 
+**"Verified for EQLegends" (`Wiki.MediaWiki.VerifiedPages`, 2026-09-29) — reported, never claimed and never
+enforced.** The wiki shows a toast on every unverified page; an editor clears it by typing "Verified" into it. Behind
+that sits an ordinary main-namespace page, **`VerifiedPages`**, one title per line — 1,873 lines / 1,860 distinct when
+measured.
+- **Read the list page, not the extension's API.** `EQLClientData` exposes an `action=eqlmetadata` taking `titles`,
+  but it self-describes as *"internal or unstable, and you should not use it"* and is POST-only. The list page is
+  stable public content and is what the toast itself reads. Every rendered page also carries
+  `wgEQLVerifiedPagesTitle`, `wgEQLVerifiedPagesRevision` and `wgEQLPageVerified`, which is how this was found.
+- **Title matching is copied from the toast's own script so the two cannot disagree**: trim, spaces → `_`, strip
+  leading colons; blank lines and `#` comments skipped; comparison exact and case-sensitive. **Nothing is
+  percent-encoded** — apostrophes and colons are literal (`User:Todlo/A_Young_Troll's_Guide...`,
+  `Elementalkin:_Air_Summon`), and 0 of 1,873 entries contain a literal space.
+- **It warns only when a page is *unverified*, and never blocks** (user, 2026-09-29). Two independent reasons:
+  - **The tool has no standing to demand it.** Verification attests that a *whole page* is accurate — drops, sold-by,
+    quests, recipes — and this tool only ever reads the item-window fields. So it reports and links; it does not set
+    `NeedsAttention` and never writes to the list.
+  - **Measured: only 48 of 744 cached item pages are verified (6.5%).** Blocking would leave ~93% of items
+    permanently unsettled, draining the ledger's "done" state of meaning.
+  - **A message on the other branch was proposed and rejected by the user**, for the reason that settles it: an alert
+    on *every* page, either "not yet verified" or "already verified", is an alert everyone learns to ignore. Only the
+    actionable branch speaks.
+- **Not knowing is silence.** A list that could not be read answers null and the caller says nothing — a false "this
+  is unverified" would send the user to re-verify a page already done. Same rule the icon check follows when it
+  cannot see an icon. A missing list page (somebody renames it) is likewise "unknown", not "nothing is verified".
+- Cached at `AppPaths.VerifiedPagesFile` with the list's revision id, refreshed at most every 5 minutes (matching the
+  wiki's own `wgEQLEraStatusClientTtlSeconds`). The cache is what lets the **ledger-skip path** answer with no wiki
+  request at all — and an already-checked item is the one most likely to still be waiting on verification.
+- **Verification is per-title and sticky, not per-revision.** The list holds bare titles, so editing a verified page
+  does *not* un-verify it: a page corrected by this tool stays marked verified although the correction postdates the
+  verification. That is the wiki's design, not something to work around, but it is why "already verified" is not
+  reassurance.
+- **For v2, writing is trivial and the risk is known**: the toast does a plain `action=edit` with
+  `appendtext:'\n<Title>\n'`, summary `Adding page to verified list`. It does **not** dedupe — the 13 duplicate lines
+  in the live list are the proof — so a writer must check the list first.
+- `tools/WikiSpike -- verified [<title>...]` prints the list's size and revision, answers specific titles, and
+  censuses the cached corpus. That is where the 48/744 figure comes from.
+
 **Icon comparison (`Core.Icons`, `Wiki.MediaWiki.IconCache`) — flag only, per the plan.** Catches a page whose
 `lucy_img_ID` points at the wrong artwork. It never proposes a new id: the tool cannot know whether the page is
 wrong or the capture caught something odd, and choosing one is a human's call.
@@ -1504,6 +1541,10 @@ dotnet run --project tools/WikiSpike -- fetch "Earring of Bashing"       # page 
 dotnet run --project tools/WikiSpike -- roundtrip 400 --seed 4242        # byte-for-byte check on a live sample
 dotnet run --project tools/WikiSpike -- grammar 400                      # plus the label/flag census
 dotnet run --project tools/WikiSpike -- grammar --cached .local-data/wiki-pages   # re-run offline on the cache
+
+# The wiki's "Verified for EQLegends" list: its size, specific titles, and how much of the corpus it covers:
+dotnet run --project tools/WikiSpike -- verified
+dotnet run --project tools/WikiSpike -- verified "Dragon Bone Bracelet" "Staff of Forbidden Rites"
 
 # Diff every verified capture against its live wiki page (eligibility applied first — see the note above about
 # levelled items, or the numbers lie). The wiki-side equivalent of AccuracySpike:

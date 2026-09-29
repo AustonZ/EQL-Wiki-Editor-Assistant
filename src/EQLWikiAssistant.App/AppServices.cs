@@ -52,6 +52,9 @@ public sealed class AppServices : IDisposable
     public CheckedItemsLedger Ledger { get; }
     public WikiMapping Mapping { get; }
     public IconCache Icons { get; }
+
+    /// <summary>The wiki's verified-pages list. Read-only here: the tool reports verification and never claims it.</summary>
+    public VerifiedPages Verified { get; }
     public ItemCheckPipeline Pipeline { get; }
     public WindowCapturer Capturer { get; }
     public ICredentialStore Credentials { get; } = new WindowsCredentialStore();
@@ -76,6 +79,7 @@ public sealed class AppServices : IDisposable
         _http = new HttpClient();
         _http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
         Icons = new IconCache(AppPaths.IconCacheDirectory, new WikiIconSource(_http, Endpoint));
+        Verified = new VerifiedPages(Wiki, AppPaths.VerifiedPagesFile);
 
         Pipeline = new ItemCheckPipeline(
             Wiki,
@@ -83,7 +87,8 @@ public sealed class AppServices : IDisposable
             Ledger,
             Mapping,
             Icons,
-            new WindowsImageDecoder());
+            new WindowsImageDecoder(),
+            Verified);
 
         Capturer = new WindowCapturer();
     }

@@ -40,6 +40,7 @@ public sealed class ItemCheckPipeline
     private readonly WikiMapping _mapping;
     private readonly IconCache? _icons;
     private readonly IImageDecoder? _decoder;
+    private readonly VerifiedPages? _verified;
 
     /// <summary>Lore captured from a Lore-tab window, by item name, waiting for the Description capture that needs
     /// it. Held here rather than by the caller because the two captures are separate frames, and the pipeline is
@@ -49,13 +50,16 @@ public sealed class ItemCheckPipeline
     /// <param name="icons">The icon cache, or null to skip the icon check. Optional because the check is flag-only:
     /// the tool never writes an icon id, so running without one is degraded rather than wrong.</param>
     /// <param name="decoder">Decodes a downloaded icon. Needed alongside <paramref name="icons"/>.</param>
+    /// <param name="verified">The wiki's verified-pages list, or null to say nothing about verification. Optional
+    /// for the same reason the icon cache is: the tool only ever reports this and never acts on it.</param>
     public ItemCheckPipeline(
         IMediaWikiClient wiki,
         IItemWindowLocator locator,
         CheckedItemsLedger ledger,
         WikiMapping? mapping = null,
         IconCache? icons = null,
-        IImageDecoder? decoder = null)
+        IImageDecoder? decoder = null,
+        VerifiedPages? verified = null)
     {
         _wiki = wiki ?? throw new ArgumentNullException(nameof(wiki));
         _locator = locator ?? throw new ArgumentNullException(nameof(locator));
@@ -63,6 +67,7 @@ public sealed class ItemCheckPipeline
         _mapping = mapping ?? WikiMapping.Default;
         _icons = icons;
         _decoder = decoder;
+        _verified = verified;
     }
 
     /// <summary>Set for the user's "re-check anyway" action: the ledger is still consulted, but never allowed to
@@ -82,11 +87,39 @@ public sealed class ItemCheckPipeline
         IReadOnlyList<LocatedWindow> windows = await _locator
             .LocateAsync(frame, cancellationToken).ConfigureAwait(false);
 
+        // Once per frame rather than once per window: every window in a frame is judged against the same list, and
+        // it is one small request that its own TTL usually skips anyway.
+        if (_verified is not null)
+            await _verified.RefreshAsync(cancellationToken).ConfigureAwait(false);
+
         var results = new List<ItemCheckResult>();
         foreach (LocatedWindow window in windows)
             results.Add(await CheckWindowAsync(frame, window, cancellationToken).ConfigureAwait(false));
 
         return results;
+    }
+
+    /// <summary>
+    /// Says so when the wiki has not marked this page "Verified for EQLegends".
+    ///
+    /// **Only when it is unverified, and it never blocks** (user, 2026-09-29). Verification attests that a *whole
+    /// page* is accurate — drops, quests and recipes this tool never reads — so the tool has no standing to demand
+    /// it, and with only 48 of 744 sampled item pages verified, making it a blocker would leave nearly every item
+    /// permanently unsettled. A message on the other branch was considered and rejected by the user for the reason
+    /// that decides it: an alert on *every* page, either "not yet verified" or "already verified", is an alert
+    /// everyone learns to ignore.
+    ///
+    /// **Silence when the list could not be read.** A false "this is unverified" would send the user to re-verify a
+    /// page that is already done — the same rule the icon check follows when it cannot see an icon.
+    /// </summary>
+    private void AddVerificationNotice(string pageTitle, List<string> warnings)
+    {
+        if (_verified?.IsVerified(pageTitle) is not false) return;
+
+        warnings.Add(
+            $"'{pageTitle}' is not marked \"Verified for EQLegends\" on the wiki. This tool cannot verify a page — " +
+            "that covers the whole page, including the parts it never reads — so once you are happy with all of it, " +
+            "open the page and type \"Verified\" into the notice at the bottom right.");
     }
 
     private async Task<ItemCheckResult> CheckWindowAsync(
@@ -169,6 +202,11 @@ public sealed class ItemCheckPipeline
             item.Name, fingerprint, _mapping.Version, CheckedItemsLedger.ItemKind, ReCheckAnyway);
 
         if (verdict == LedgerVerdict.AlreadyDone)
+        {
+            // Worth saying even here, where no wiki request happens: the list is local, so the answer is free, and an
+            // item settled weeks ago is exactly the one whose verification is most likely still outstanding.
+            AddVerificationNotice(_ledger.Find(item.Name)?.WikiPageTitle ?? item.Name, warnings);
+
             return new ItemCheckResult
             {
                 Status = ItemCheckStatus.AlreadyChecked,
@@ -180,6 +218,7 @@ public sealed class ItemCheckPipeline
                 Lore = lore,
                 Warnings = warnings,
             };
+        }
 
         try
         {
@@ -277,6 +316,8 @@ public sealed class ItemCheckPipeline
             warnings.Add(
                 "This item has a Lore tab that has not been captured. Switch to it and capture again so the lore " +
                 "can be checked too.");
+
+        AddVerificationNotice(wikiPage.Title, warnings);
 
         var result = new ItemCheckResult
         {

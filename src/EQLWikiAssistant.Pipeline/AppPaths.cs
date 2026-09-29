@@ -18,6 +18,10 @@ public static class AppPaths
     /// <summary>The user's edited wiki mapping, if they have one; the built-in defaults apply when absent.</summary>
     public static string MappingFile => Path.Combine(Root, "wiki-mapping.json");
 
+    /// <summary>The wiki's list of pages marked "Verified for EQLegends", cached so it can be answered offline and
+    /// on the ledger-skip path where no wiki request happens at all.</summary>
+    public static string VerifiedPagesFile => Path.Combine(Root, "verified-pages.json");
+
     /// <summary>Downloaded wiki icons, keyed by icon id. Static files, so no expiry.</summary>
     public static string IconCacheDirectory => Path.Combine(Root, "icon-cache");
 
