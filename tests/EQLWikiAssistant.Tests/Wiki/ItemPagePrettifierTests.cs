@@ -283,5 +283,62 @@ public class ItemPagePrettifierTests
             afterBlock?.AllFields().Select(f => $"{f.Label}={f.Value}").Order());
     }
 
+    // --- the trailing section ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// **`Mount Speed` and `Pet Illusion` go at the bottom, below a blank line** (user, 2026-09-28, after seeing
+    /// them rendered): they describe something the item summons or affects — the horse, your pet — not the item
+    /// itself. Which is also, now understood, why the game puts them below the effects rather than among the stats.
+    /// </summary>
+    [Fact]
+    public void PropertiesOfWhatTheItemSummonsGoBelowABlankLineAtTheBottom()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page(
+            "Mount Speed: Fast<br>\nSlot: AMMO<br>\nClass: ALL<br>\nRace: ALL<br>"));
+
+        Assert.True(result.IsSafe);
+        Assert.Contains("Slot: AMMO<br>\nClass: ALL<br>\nRace: ALL<br>\n\nMount Speed: Fast<br>", result.Formatted);
+    }
+
+    /// <summary>The separator is dropped when nothing follows it, so an ordinary item never ends in a stray blank
+    /// line.</summary>
+    [Fact]
+    public void AnItemWithNoTrailingSectionGetsNoBlankLine()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("Slot: AMMO<br>\nClass: ALL<br>"));
+
+        Assert.DoesNotContain("<br>\n\n", result.Formatted);
+        Assert.EndsWith("Class: ALL<br>\n}}</onlyinclude>\n\n[[Category:Waist]]", result.Formatted);
+    }
+
+    /// <summary>
+    /// **The formatter must not be frozen by its own blank line.** A blank line normally stops it reordering a
+    /// block, so without an exception for the separator it writes itself, formatting a page once would mean never
+    /// being able to format it again.
+    /// </summary>
+    [Fact]
+    public void TheSeparatorItWritesDoesNotStopItFormattingAgain()
+    {
+        PrettifyResult once = ItemPagePrettifier.Format(Page(
+            "Mount Speed: Fast<br>\nRace: ALL<br>\nSlot: AMMO<br>\nClass: ALL<br>"));
+        Assert.True(once.IsSafe);
+        Assert.Contains("\n\nMount Speed: Fast<br>", once.Formatted);
+
+        // Re-formatting the result must still reorder — here, by having nothing left to do — rather than refusing.
+        PrettifyResult twice = ItemPagePrettifier.Format(once.Formatted);
+        Assert.True(twice.IsSafe);
+        Assert.Equal(once.Formatted, twice.Formatted);
+        Assert.DoesNotContain(twice.Notes, n => n.Contains("blank line"));
+    }
+
+    /// <summary>...but a blank line anywhere else still stops it, since that one may be doing visible work.</summary>
+    [Fact]
+    public void ABlankLineElsewhereStillStopsIt()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("Slot: AMMO<br>\n\nAC: 10<br>\nClass: ALL<br>"));
+
+        Assert.Contains(result.Notes, n => n.Contains("blank line"));
+    }
+
     public static TheoryData<string> Pages => WikiFixtures.AllTitles();
 }

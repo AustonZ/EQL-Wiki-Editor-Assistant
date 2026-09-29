@@ -156,6 +156,15 @@ public sealed class WikiMapping
     public IReadOnlyList<IReadOnlyList<string>> StatsBlockLineOrder { get; init; } = [];
 
     /// <summary>
+    /// A sentinel entry in <see cref="StatsBlockLineOrder"/> meaning "a blank line here, if anything below it is
+    /// written". It separates fields that describe something *other than the item* — the horse a bridle summons,
+    /// the illusion a wand puts on your pet — from the item's own stats.
+    ///
+    /// Dropped when nothing follows it, so a statsblock never ends in a stray blank.
+    /// </summary>
+    public const string BlankLine = "(blank)";
+
+    /// <summary>
     /// The order the template's parameters are written in, for the formatting pass. A parameter the page carries
     /// that is not listed here keeps its relative position after the ones that are — an unrecognized parameter is
     /// somebody's content and gets preserved, not sorted into a place nobody chose.
@@ -337,15 +346,20 @@ public sealed class WikiMapping
                 ["Attack", "HP Regen", "Mana Regen", "Haste", "Clairvoyance", "Spell Dmg", "Heal Amount", "END Regen"],
                 ["Recommended level", "Required level"],
                 ["Effect"],
-                // Not in the blueprint — the property is newer than it. Effect-adjacent because that is what it is.
-                ["Pet Illusion"],
-                // Also newer than the blueprint, and also effect-adjacent: it comes from the same trailing region.
-                ["Mount Speed"],
                 ["Charges"],
                 ["Size", "WT"],
                 ["Weight Reduction", "Capacity", "Size Capacity", "Items"],
                 ["Class"],
                 ["Race"],
+
+                // **Below a blank line, at the very bottom: properties of something the item summons or affects,
+                // not of the item itself** (user, 2026-09-28, after seeing them rendered). `Mount Speed: Fast`
+                // describes the horse the bridle summons; `Pet Illusion: Murderbee` describes what your pet turns
+                // into. Separating them says so, and it is also — now understood — why the devs put them below the
+                // effects in the window rather than among the stats.
+                [BlankLine],
+                ["Mount Speed"],
+                ["Pet Illusion"],
             ],
             ParameterOrder =
             [

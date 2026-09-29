@@ -164,7 +164,7 @@ public static class ItemPagePrettifier
         while (lines.Count > 0 && lines[0].Kind == StatsLineKind.Blank) lines.RemoveAt(0);
         while (lines.Count > 0 && lines[^1].Kind == StatsLineKind.Blank) lines.RemoveAt(lines.Count - 1);
 
-        string? blocker = FindReorderBlocker(lines);
+        string? blocker = FindReorderBlocker(lines, TrailingLabels(mapping));
         if (blocker is not null)
         {
             // Left **completely** untouched, not merely unordered — normalizing the spacing of a line the tool does
@@ -182,12 +182,21 @@ public static class ItemPagePrettifier
         // is what caught that, which is the entire reason it exists.
         List<string> flags = [.. lines.SelectMany(l => l.Flags)];
         var output = new List<string>();
+        bool blankPending = false;
 
         foreach (IReadOnlyList<string> slot in mapping.StatsBlockLineOrder)
         {
+            if (slot is [WikiMapping.BlankLine])
+            {
+                // Held rather than written, so a statsblock whose trailing section is empty does not end in a stray
+                // blank line.
+                blankPending = true;
+                continue;
+            }
+
             if (slot is ["(flags)"])
             {
-                if (flags.Count > 0) output.Add(string.Join(", ", flags) + "<br>");
+                if (flags.Count > 0) Emit(string.Join(", ", flags) + "<br>");
                 continue;
             }
 
@@ -202,7 +211,13 @@ public static class ItemPagePrettifier
 
             if (onThisLine.Count == 0) continue;
             foreach (StatsField field in onThisLine) remaining.Remove(field);
-            output.Add(string.Join(FieldSeparator, onThisLine.Select(f => $"{f.Label}: {f.Value}")) + "<br>");
+            Emit(string.Join(FieldSeparator, onThisLine.Select(f => $"{f.Label}: {f.Value}")) + "<br>");
+        }
+
+        void Emit(string line)
+        {
+            if (blankPending) { output.Add(""); blankPending = false; }
+            output.Add(line);
         }
 
         // A label the blueprint does not name — `Range` and `Accuracy` are live examples the user is still settling
@@ -222,8 +237,40 @@ public static class ItemPagePrettifier
         return string.Join('\n', output);
     }
 
+    /// <summary>The labels the blueprint places below the blank-line separator, at the bottom of the block.</summary>
+    private static IReadOnlyList<string> TrailingLabels(WikiMapping mapping)
+    {
+        var labels = new List<string>();
+        bool past = false;
+        foreach (IReadOnlyList<string> slot in mapping.StatsBlockLineOrder)
+        {
+            if (slot is [WikiMapping.BlankLine]) { past = true; continue; }
+            if (past) labels.AddRange(slot);
+        }
+
+        return labels;
+    }
+
+    /// <summary>Whether every blank line in the block is the separator this formatter writes before the trailing
+    /// section — in which case the block is still one it laid out and may lay out again.</summary>
+    private static bool OnlyBlankIsTheTrailingSeparator(
+        List<StatsBlockLine> lines, IReadOnlyList<string> trailingLabels)
+    {
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].Kind != StatsLineKind.Blank) continue;
+
+            StatsBlockLine? next = lines.Skip(i + 1).FirstOrDefault(l => l.Kind != StatsLineKind.Blank);
+            if (next is null) return false;
+            if (!next.Fields.Any(f => trailingLabels.Contains(f.Label, StringComparer.OrdinalIgnoreCase)))
+                return false;
+        }
+
+        return true;
+    }
+
     /// <summary>Why a block cannot be safely reordered, or null when it can.</summary>
-    private static string? FindReorderBlocker(List<StatsBlockLine> lines)
+    private static string? FindReorderBlocker(List<StatsBlockLine> lines, IReadOnlyList<string> trailingLabels)
     {
         if (lines.FirstOrDefault(l => l.Kind == StatsLineKind.Unparsed) is { } unparsed)
             return $"'{unparsed.Text}' could not be read, and moving a line nobody could parse is how a formatter " +
@@ -238,7 +285,11 @@ public static class ItemPagePrettifier
                    "flag. Laying out a line the tool does not understand is how a formatter loses meaning, so the " +
                    "whole block was left as it is.";
 
-        if (lines.Any(l => l.Kind == StatsLineKind.Blank))
+        // A blank line is normally a reason to leave the block alone — it is a paragraph break that may be doing
+        // visible work. The exception is the one this formatter puts there itself, separating the trailing section
+        // (`Mount Speed`, `Pet Illusion`) from the item's own stats. Without the exception, formatting a block once
+        // would freeze it: the next run would see its own blank line and refuse to touch anything.
+        if (lines.Any(l => l.Kind == StatsLineKind.Blank) && !OnlyBlankIsTheTrailingSeparator(lines, trailingLabels))
             return "it has a blank line in the middle, which is a paragraph break that may be doing visible work.";
 
         // Counted across every line that carries a flag, not just flags-only lines, because the blueprint's own

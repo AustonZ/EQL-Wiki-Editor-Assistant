@@ -73,6 +73,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private FormattingProposal? _formatting;
     private string? _formattingOutcome;
     private CapturedImage? _loreImage;
+    private string _formattedWikitext = "";
 
     public ResultViewModel(ItemCheckResult result) => Load(result);
 
@@ -213,11 +214,13 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         set
         {
             _formatting = value;
+            _formattedWikitext = value?.Formatted ?? "";
             FormattingDiff.Clear();
             if (value is not null)
                 foreach (DiffLine line in WikitextDiff.Compute(value.Original, value.Formatted))
                     FormattingDiff.Add(new DiffLineViewModel(line));
 
+            OnPropertyChanged(nameof(FormattedWikitext));
             OnPropertyChanged(nameof(Formatting));
             OnPropertyChanged(nameof(HasFormatting));
             OnPropertyChanged(nameof(CanCommitFormatting));
@@ -225,6 +228,19 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     }
 
     public ObservableCollection<DiffLineViewModel> FormattingDiff { get; } = [];
+
+    /// <summary>
+    /// The formatted text the user is about to save, editable.
+    ///
+    /// **Editable for the same reason the data edit is**: the formatter has to put a field it has no rule for
+    /// *somewhere*, and the user may disagree — real case, a `Velocity` field somebody added to a bridle. What is
+    /// in the box is what gets written.
+    /// </summary>
+    public string FormattedWikitext
+    {
+        get => _formattedWikitext;
+        set => Set(ref _formattedWikitext, value);
+    }
 
     public bool HasFormatting => _formatting is not null;
 

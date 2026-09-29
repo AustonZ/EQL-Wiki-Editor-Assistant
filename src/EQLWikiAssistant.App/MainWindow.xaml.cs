@@ -292,7 +292,9 @@ public partial class MainWindow : Window
         view.IsBusy = true;
         try
         {
-            CommitResult commit = await _services.Pipeline.CommitFormattingAsync(proposal);
+            // What is in the box, not what the formatter proposed — the user may have repositioned something.
+            CommitResult commit = await _services.Pipeline.CommitFormattingAsync(
+                proposal with { Formatted = view.FormattedWikitext });
 
             view.FormattingOutcome = commit.Status switch
             {
@@ -322,6 +324,26 @@ public partial class MainWindow : Window
 
         view.Outcome = "Marked as checked — it will not come back unless the item itself changes.";
         StatusText.Text = $"'{view.ItemName}' marked as checked.";
+    }
+
+    /// <summary>
+    /// Sends the wheel to the page instead of letting a nested control eat it.
+    ///
+    /// A <see cref="System.Windows.Controls.DataGrid"/> brings its own <see cref="ScrollViewer"/>, which handles the
+    /// wheel whether or not it has anywhere to scroll — so the page under the cursor sat still (user, 2026-09-28).
+    /// Re-raising the event on the parent is the standard way out; the grid itself is set never to scroll, so
+    /// nothing is lost by taking the wheel off it.
+    /// </summary>
+    private void OnPassScrollToPage(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if (sender is not UIElement source) return;
+        e.Handled = true;
+
+        DetailScroller.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+        {
+            RoutedEvent = System.Windows.Input.Mouse.MouseWheelEvent,
+            Source = source,
+        });
     }
 
     private void OnOpenPageClick(object sender, RoutedEventArgs e)

@@ -147,7 +147,9 @@ public sealed class ItemCheckPipeline
         // Read from the frame, not the crop: ItemIconReader works in frame coordinates. It has to happen before the
         // ledger is consulted, because the icon is part of the fingerprint the ledger is keyed on.
         IconFingerprint? capturedIcon =
-            ItemIconReader.TryRead(frame, window, out IconFingerprint read) ? read : null;
+            ItemIconReader.TryRead(frame, window, out IconFingerprint read, out string? noIconBecause) ? read : null;
+        string? iconUnreadableNote =
+            noIconBecause is null ? null : $"The icon was not compared: {noIconBecause}.";
 
         _pendingLore.TryGetValue(item.Name, out string? lore);
         bool needsLore = window.HasLoreTab && lore is null;
@@ -173,7 +175,8 @@ public sealed class ItemCheckPipeline
         try
         {
             return await AnalyzeAgainstWikiAsync(
-                    item, crop, verdict, capturedIcon, lore, needsLore, fingerprint, warnings, cancellationToken)
+                    item, crop, verdict, capturedIcon, iconUnreadableNote, lore, needsLore, fingerprint, warnings,
+                    cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is MediaWikiException or HttpRequestException or TaskCanceledException)
@@ -198,6 +201,7 @@ public sealed class ItemCheckPipeline
         CapturedImage crop,
         LedgerVerdict verdict,
         IconFingerprint? capturedIcon,
+        string? iconUnreadableNote,
         string? lore,
         bool needsLore,
         string fingerprint,
@@ -257,7 +261,7 @@ public sealed class ItemCheckPipeline
         ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis, _mapping);
 
         (IconComparison? icon, string? iconNote) =
-            await CompareIconAsync(capturedIcon, page.IconId, cancellationToken).ConfigureAwait(false);
+            await CompareIconAsync(capturedIcon, iconUnreadableNote, page.IconId, cancellationToken).ConfigureAwait(false);
 
         if (needsLore)
             warnings.Add(
@@ -304,10 +308,10 @@ public sealed class ItemCheckPipeline
     /// stay silent: a false "wrong icon" sends the user hunting for a problem that is not there.
     /// </summary>
     private async Task<(IconComparison?, string?)> CompareIconAsync(
-        IconFingerprint? captured, string? iconId, CancellationToken cancellationToken)
+        IconFingerprint? captured, string? unreadableNote, string? iconId, CancellationToken cancellationToken)
     {
         if (_icons is null || _decoder is null) return (null, null);
-        if (captured is null) return (null, "The captured icon could not be read, so it was not compared.");
+        if (captured is null) return (null, unreadableNote);
         if (string.IsNullOrWhiteSpace(iconId))
             return (null, "The page has no lucy_img_ID, so there is no icon to compare against.");
 
@@ -462,6 +466,8 @@ public sealed class ItemCheckPipeline
                     previous.WindowImage!,
                     previous.LedgerVerdict,
                     previous.CapturedIcon,
+                    // The icon has not been re-read, so whatever was said about it still holds.
+                    previous.IconNote,
                     lore,
                     needsLore: lore is null && previous.NeedsLoreCapture,
                     fingerprint,

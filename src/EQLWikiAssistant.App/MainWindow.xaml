@@ -127,9 +127,13 @@
 
                     <TextBlock Text="What differs" Style="{StaticResource SectionHeading}"
                                Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}" />
+                    <!-- PreviewMouseWheel: a DataGrid has its own ScrollViewer, which swallows the wheel even when
+                         it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
                     <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
                               BorderBrush="#DDD" HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                              PreviewMouseWheel="OnPassScrollToPage"
                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Field" Binding="{Binding Field}" Width="1.2*" />
@@ -316,6 +320,16 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </Border>
+
+                        <!-- Editable for the same reason the data edit is: the formatter positions a field it has
+                             no rule for as best it can, and the user may want it somewhere else (user,
+                             2026-09-28). What is in this box is what gets saved. -->
+                        <Expander Header="Edit the formatted wikitext before saving" Margin="0,10,0,0">
+                            <TextBox Text="{Binding FormattedWikitext, UpdateSourceTrigger=PropertyChanged}"
+                                     AcceptsReturn="True" FontFamily="Consolas" FontSize="12" Height="260"
+                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                     Margin="0,6,0,0" />
+                        </Expander>
 
                         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                             <Button Content="Save the formatting" Click="OnCommitFormattingClick" Padding="14,5"

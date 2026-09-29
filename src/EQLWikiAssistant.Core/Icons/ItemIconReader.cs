@@ -32,15 +32,29 @@ public static class ItemIconReader
     /// strip to say anything. An icon check that cannot see the icon has to stay silent rather than report a
     /// mismatch — a false "wrong icon" would send the user hunting for a problem that is not there.
     /// </summary>
-    public static bool TryRead(CapturedImage image, LocatedWindow window, out IconFingerprint fingerprint)
+    public static bool TryRead(CapturedImage image, LocatedWindow window, out IconFingerprint fingerprint) =>
+        TryRead(image, window, out fingerprint, out _);
+
+    /// <param name="whyNot">Why no fingerprint was produced, when none was — so the user can be told the difference
+    /// between "there was nothing to read" and "it was read and is too dark to compare". Both are refusals, but only
+    /// one sounds like a defect, and a user looking at an icon they can plainly see deserves the accurate one.</param>
+    public static bool TryRead(
+        CapturedImage image, LocatedWindow window, out IconFingerprint fingerprint, out string? whyNot)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(window);
         fingerprint = new IconFingerprint([], 0, 0);
+        whyNot = null;
 
         // A Lore capture shows prose where the icon would be; an occluded window's bounds are only the tab's own
         // box. Measuring either would be measuring the wrong pixels.
-        if (window.PossiblyOccluded || window.ActiveTab != ItemWindowTab.Description) return false;
+        if (window.PossiblyOccluded || window.ActiveTab != ItemWindowTab.Description)
+        {
+            whyNot = window.PossiblyOccluded
+                ? "the window is partly covered, so the icon could not be located"
+                : "this is a Lore capture, which shows no icon";
+            return false;
+        }
 
         var region = new Rect(
             window.Bounds.X + IconStrip.X,
@@ -48,13 +62,24 @@ public static class ItemIconReader
             IconStrip.Width,
             IconStrip.Height);
 
-        if (!IconHasher.TryFingerprint(image, region, out fingerprint)) return false;
+        if (!IconHasher.TryFingerprint(image, region, out fingerprint))
+        {
+            whyNot = "there is too little artwork in the icon area to fingerprint";
+            return false;
+        }
 
         // A near-black sprite carries too little variation to tell one icon from another — `Nightmare Hide` is
         // almost entirely black with a faint outline, and comparing it produced a confident mismatch against its
         // own correct icon. Refusing to judge is the right answer for a check whose only job is to flag.
         if (fingerprint.IsComparable) return true;
 
+        // **Said precisely, because this one looks like a bug from the outside.** `Black Chain Bridle` is a dark
+        // sprite on the window's 16-grey: a user sees it perfectly well, while only 48 of its pixels clear the ink
+        // floor, against 545-795 for the icons beside it. The tool did read it and is declining to judge it, which
+        // is a different thing from failing to see it.
+        whyNot = $"the icon is too dark to compare — only {fingerprint.InkWidth}x{fingerprint.InkHeight} of faint " +
+                 $"artwork, with a contrast of {fingerprint.Contrast:F3} against the {IconFingerprint.MinimumContrast:F2} " +
+                 "needed. Nothing is wrong with it; the tool cannot tell two near-black icons apart, so it did not try";
         fingerprint = new IconFingerprint([], 0, 0);
         return false;
     }
