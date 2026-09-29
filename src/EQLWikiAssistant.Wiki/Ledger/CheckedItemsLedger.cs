@@ -103,6 +103,17 @@ public sealed class CheckedItemsLedger
     /// <summary>The kind key items use. Spells, monsters and quests get their own when they arrive.</summary>
     public const string ItemKind = "item";
 
+    /// <summary>
+    /// Whether an outcome means the item is settled. **Only <see cref="CheckOutcome.Matched"/> and
+    /// <see cref="CheckOutcome.Edited"/> do** — the others left something undone, so they must never let a capture
+    /// skip the wiki however recent and unchanged the row is.
+    ///
+    /// Public because the ledger view asks the same question (see <see cref="LedgerFilter.NeedsAttention"/>), and a
+    /// second copy of this rule is exactly the kind that drifts and quietly starts calling a flagged item done.
+    /// </summary>
+    public static bool MeansDone(CheckOutcome outcome) =>
+        outcome is CheckOutcome.Matched or CheckOutcome.Edited;
+
     private readonly Dictionary<string, LedgerEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly TimeProvider _time;
 
@@ -138,7 +149,7 @@ public sealed class CheckedItemsLedger
         // Flagged, Skipped and NotOnWiki are outcomes that left something undone, so they never skip the wiki
         // however recent they are. Checking this before the fingerprint matters: a flagged item whose data has not
         // changed is still flagged.
-        if (entry.Outcome is not (CheckOutcome.Matched or CheckOutcome.Edited)) return LedgerVerdict.Unresolved;
+        if (!MeansDone(entry.Outcome)) return LedgerVerdict.Unresolved;
 
         if (!string.Equals(entry.Fingerprint, fingerprint, StringComparison.Ordinal)) return LedgerVerdict.DataChanged;
         if (entry.MappingVersion != mappingVersion) return LedgerVerdict.MappingChanged;

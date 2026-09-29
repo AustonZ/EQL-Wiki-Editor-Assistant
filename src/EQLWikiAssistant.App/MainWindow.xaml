@@ -35,6 +35,9 @@
                 <CheckBox x:Name="ReCheckBox" Content="Re-check anyway" VerticalAlignment="Center" Margin="16,0,0,0"
                           Checked="OnReCheckChanged" Unchecked="OnReCheckChanged"
                           ToolTip="Ask the wiki even for items the ledger has already settled" />
+                <Button x:Name="LedgerButton" Click="OnLedgerClick" Padding="12,4" Margin="16,0,0,0"
+                        Content="Checked items…"
+                        ToolTip="Everything checked so far, and what is still waiting for a human" />
                 <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="16,0,0,0" Foreground="#666" />
 
                 <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a

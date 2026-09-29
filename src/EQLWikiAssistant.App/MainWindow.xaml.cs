@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 using EQLWikiAssistant.Capture;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
+using EQLWikiAssistant.Wiki.Ledger;
 
 namespace EQLWikiAssistant.App;
 
@@ -35,6 +36,7 @@ public partial class MainWindow : Window
         // Built off the UI thread: RapidOcrEngine loads three ONNX models in its constructor, which is seconds of a
         // frozen window if it happens here. The capture button stays disabled until it is ready.
         CaptureButton.IsEnabled = false;
+        LedgerButton.IsEnabled = false;
         StatusText.Text = "Loading the OCR models…";
         _ = StartUpAsync();
 
@@ -68,6 +70,7 @@ public partial class MainWindow : Window
             _services = await Task.Run(() => new AppServices());
             _services.Pipeline.ReCheckAnyway = ReCheckBox.IsChecked == true;
             CaptureButton.IsEnabled = true;
+            LedgerButton.IsEnabled = true;
             UpdateLedgerText();
             StatusText.Text = "Ready. Press the hotkey with an item window open in game.";
         }
@@ -91,6 +94,9 @@ public partial class MainWindow : Window
         if (_capturing || _services is null) return;
         _capturing = true;
         CaptureButton.IsEnabled = false;
+        // The ledger too: a capture writes rows, so a ledger view opened mid-capture would show some of them stale.
+        // The window being modal stops a capture starting while it is open; this is the same guard the other way.
+        LedgerButton.IsEnabled = false;
         BusyPanel.Visibility = Visibility.Visible;
 
         try
@@ -132,6 +138,7 @@ public partial class MainWindow : Window
         {
             _capturing = false;
             CaptureButton.IsEnabled = true;
+            LedgerButton.IsEnabled = true;
             BusyPanel.Visibility = Visibility.Collapsed;
         }
     }
@@ -357,8 +364,38 @@ public partial class MainWindow : Window
         Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 
-    private void UpdateLedgerText() =>
-        LedgerText.Text = _services is null ? "" : $"{_services.Ledger.Count} item(s) in the ledger";
+    /// <summary>
+    /// The ledger, and what it is still holding for a human.
+    ///
+    /// Modal, deliberately: the ledger is shared state that a capture writes to, so a view of it left open beside one
+    /// would show rows that were already wrong. See <see cref="LedgerWindow"/>.
+    /// </summary>
+    private void OnLedgerClick(object sender, RoutedEventArgs e)
+    {
+        if (_services is null) return;
+
+        new LedgerWindow(_services.Ledger, _services.Mapping.Version, _services.SaveLedgerAsync) { Owner = this }
+            .ShowDialog();
+
+        // A row may have been forgotten while it was open.
+        UpdateLedgerText();
+    }
+
+    /// <summary>Counts the unsettled rows alongside the total, because over a long session that is the number worth
+    /// glancing at — the total only ever grows.</summary>
+    private void UpdateLedgerText()
+    {
+        if (_services is null)
+        {
+            LedgerText.Text = "";
+            return;
+        }
+
+        LedgerSummary summary = LedgerSummary.Of(_services.Ledger.Entries);
+        LedgerText.Text = summary.NeedsAttention == 0
+            ? $"{summary.Total} checked"
+            : $"{summary.Total} checked · {summary.NeedsAttention} need attention";
+    }
 
     /// <summary>The capture is tightly packed top-down BGRA32, which is exactly <c>Bgra32</c>'s layout, so this is a
     /// copy rather than a conversion.</summary>

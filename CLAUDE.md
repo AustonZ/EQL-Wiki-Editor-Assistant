@@ -68,8 +68,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   because it is the only thing that depends on *both* the game side (`Core`) and the wiki side (`Wiki`), and neither
   of those may depend on it.
 - `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: `AppServices` (the composition root),
-  `MainWindow` (capture trigger + review/diff screen), `ResultViewModel`. Settings/mapping editor and ledger view
-  are still to come (milestones 6-7).
+  `MainWindow` (capture trigger + review/diff screen), `ResultViewModel`, `LedgerWindow`/`LedgerRowViewModel` (what
+  has been checked and what still wants a human). The settings/mapping editor is still to come (milestone 6).
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
 - `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
@@ -857,7 +857,34 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
   line with an unrelated one. Long unchanged runs fold away, because an item page can carry a `dropsfrom` table with
   nothing to do with the edit and a reviewer scrolling past it is a reviewer who stops reading.
 - **Still to come here**: logging in needs `WikiSpike login` once — there is no in-app credential dialog yet
-  (milestone 7), and no settings/mapping editor or ledger view (milestones 6-7).
+  (milestone 7), and no settings/mapping editor (milestone 6).
+
+**The ledger view (`App.LedgerWindow`, 2026-09-29).** What has been checked, and — the reason it exists — what is
+still waiting for a human. Built ahead of milestone 6 by the user's agreement, because over a long session the
+unsettled rows are the state that accumulates silently and nothing else surfaces them.
+- **It judges nothing.** "Would the next capture skip this?" is answered by calling `CheckedItemsLedger.Consult` with
+  the row's **own** fingerprint, which is exactly the question "if I captured this same, unchanged item again now,
+  would it skip the wiki?" — so the `Next capture` column is the production rule's own answer rather than a second
+  copy of it. That column is what explains a re-check the user did not expect; on the live ledger it correctly
+  separates `Fruit` and `Halas 10lb Meat Pie` ("mapping changed", both on mapping v1) from `Guise of the Deceived`
+  ("not settled" — also v1, but the outcome is checked first, which is the ordering `Consult` requires).
+- **`CheckedItemsLedger.MeansDone` was extracted rather than duplicated.** The "still needs attention" filter needs
+  the same `Matched or Edited` rule that decides whether a capture may skip the wiki, and a second copy is precisely
+  the kind that drifts and quietly starts calling a flagged item done. A test asserts the filter and the rule agree
+  across *every* `CheckOutcome`, so a new outcome cannot be settled by one and unsettled by the other.
+- **Searching and filtering live in `Wiki.Ledger.LedgerQuery`, not in the view model**, because the tests project
+  does not reference the WPF app — and because "which rows match" is a question about the ledger anyway. Search
+  covers the wiki page title as well as the item name, since the two legitimately differ (`Cell Key #5` living at
+  `Cell Key No. 5`) and the user may remember either.
+- **Modal, deliberately.** The ledger is shared state a capture writes to, so a view left open beside one would show
+  rows already wrong, and a "Forget" pressed against one would act on a row the pipeline had just replaced. The
+  capture path disables the button for the same reason from the other side.
+- "Forget" is the permanent form of "re-check anyway" (`CheckedItemsLedger.Remove`): the next capture treats the item
+  as new. Confirmed, but lightly — nothing on the wiki changes.
+- **No export.** The plan listed one; the ledger is already readable JSON in the user's own app-data, so the window
+  links to the file instead. An export would be a second copy of data that is not hidden.
+- Verified by screenshotting the rendered window in all three states — populated, filtered, and no-rows-match —
+  which is how three earlier UI bugs in this project were found and is the only way these are visible at all.
 
 **The lore two-capture flow (2026-09-28).** The window offers a Lore tab, so a lore-bearing item needs two captures.
 A Lore-tab window contributes its prose and nothing else (`LoreRecorded`); a Description capture of an item whose
