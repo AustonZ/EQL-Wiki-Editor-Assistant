@@ -234,17 +234,54 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
     {
         AddFormat(parameters);
         var uri = new Uri($"{_endpoint}?{await new FormUrlEncodedContent(parameters).ReadAsStringAsync(cancellationToken).ConfigureAwait(false)}");
-        using HttpResponseMessage response = await _http.GetAsync(uri, cancellationToken).ConfigureAwait(false);
-        return await ReadAsync(response, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            using HttpResponseMessage response = await _http.GetAsync(uri, cancellationToken).ConfigureAwait(false);
+            return await ReadAsync(response, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsUnreachable(ex, cancellationToken))
+        {
+            throw Unavailable(ex);
+        }
     }
 
     private async Task<JsonDocument> PostAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
     {
         AddFormat(parameters);
-        using HttpResponseMessage response = await _http
-            .PostAsync(_endpoint, new FormUrlEncodedContent(parameters), cancellationToken).ConfigureAwait(false);
-        return await ReadAsync(response, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            using HttpResponseMessage response = await _http
+                .PostAsync(_endpoint, new FormUrlEncodedContent(parameters), cancellationToken).ConfigureAwait(false);
+            return await ReadAsync(response, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsUnreachable(ex, cancellationToken))
+        {
+            throw Unavailable(ex);
+        }
     }
+
+    /// <summary>
+    /// Whether this failure means the wiki is unavailable rather than the request being wrong.
+    ///
+    /// **A cancellation the caller asked for is never one of these.** `HttpClient` reports its own timeout as a
+    /// <see cref="TaskCanceledException"/> too, which is indistinguishable by type — the token is what tells them
+    /// apart, so a user who cancels does not get told the wiki is down.
+    /// </summary>
+    private static bool IsUnreachable(Exception ex, CancellationToken cancellationToken) => ex switch
+    {
+        OperationCanceledException => !cancellationToken.IsCancellationRequested,
+        HttpRequestException => true,
+        MediaWikiException wiki => WikiUnavailableException.IsUnavailableCode(wiki.Code),
+        _ => false,
+    };
+
+    private WikiUnavailableException Unavailable(Exception ex) => new(
+        ex is MediaWikiException wiki
+            ? $"The wiki is unavailable ({wiki.Code}): {wiki.Message}"
+            : $"{_endpoint.Host} could not be reached: {ex.Message}",
+        ex);
 
     private static void AddFormat(Dictionary<string, string> parameters)
     {

@@ -347,11 +347,34 @@ public class ItemCheckPipelineTests
         Assert.Equal(CheckOutcome.Flagged, ledger.Find("Earring of Bashing")!.Outcome);
     }
 
-    /// <summary>The wiki being unreachable must not abandon the frame or record anything: nothing was checked.</summary>
+    /// <summary>
+    /// **An unreachable wiki aborts the whole frame** (user, 2026-09-29). This tool exists to compare captures
+    /// against the wiki, so without it there is nothing for the remaining windows to be checked against — and
+    /// degrading into one identical failure per item reads like a tool malfunction rather than an outage. It
+    /// reaches the caller, which says so once and stops.
+    /// </summary>
     [Fact]
-    public async Task AWikiFailureIsReportedWithoutARow()
+    public async Task AnUnreachableWikiAbortsTheFrameRatherThanFailingEachWindow()
     {
         var wiki = new FakeWiki { FailFetches = true };
+        var ledger = new CheckedItemsLedger();
+        var pipeline = new ItemCheckPipeline(wiki, new FakeLocator(Window(EarringLines)), ledger);
+
+        await Assert.ThrowsAsync<WikiUnavailableException>(() => pipeline.CheckAsync(BlankFrame()));
+
+        // Nothing was checked, so nothing is recorded — re-capturing once the wiki is back loses nothing.
+        Assert.Equal(0, ledger.Count);
+    }
+
+    /// <summary>
+    /// The other half of the rule: an error *about one page* is still per-window. The wiki answered, so the rest of
+    /// the frame has somewhere to be checked against and carries on — and still writes no row, because that window
+    /// was not checked either.
+    /// </summary>
+    [Fact]
+    public async Task AnErrorAboutOnePageStillOnlyFailsThatWindow()
+    {
+        var wiki = new FakeWiki { FetchError = new MediaWikiException("protectedpage", "That page is protected.") };
         var ledger = new CheckedItemsLedger();
         var pipeline = new ItemCheckPipeline(wiki, new FakeLocator(Window(EarringLines)), ledger);
 
@@ -699,10 +722,16 @@ public class ItemCheckPipelineTests
         public string? LastSummary { get; private set; }
         public bool FailFetches { get; init; }
 
+        /// <summary>An error about the page rather than about the wiki, for the per-window path.</summary>
+        public Exception? FetchError { get; init; }
+
         public Task<WikiPage?> FetchPageAsync(string title, CancellationToken cancellationToken = default)
         {
             Fetches++;
-            if (FailFetches) throw new HttpRequestException("the wiki is unreachable");
+            // What the real client throws when it cannot reach the wiki — the fake has to match, or the tests would
+            // be asserting against a contract nothing implements.
+            if (FailFetches) throw new WikiUnavailableException("eqlwiki.com could not be reached.");
+            if (FetchError is not null) throw FetchError;
             return Task.FromResult(Pages.GetValueOrDefault(title));
         }
 

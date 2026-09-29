@@ -705,6 +705,8 @@ measured.
 - **Not knowing is silence.** A list that could not be read answers null and the caller says nothing — a false "this
   is unverified" would send the user to re-verify a page already done. Same rule the icon check follows when it
   cannot see an icon. A missing list page (somebody renames it) is likewise "unknown", not "nothing is verified".
+  **That covers an error about the list; it does not cover the wiki being gone**, which aborts — see "An unreachable
+  wiki" below. Since the refresh runs first in a capture, it is also the tool's earliest notice of an outage.
 - Cached at `AppPaths.VerifiedPagesFile` with the list's revision id, refreshed at most every 5 minutes (matching the
   wiki's own `wgEQLEraStatusClientTtlSeconds`). The cache is what lets the **ledger-skip path** answer with no wiki
   request at all — and an already-checked item is the one most likely to still be waiting on verification.
@@ -859,6 +861,25 @@ edit, after the data edit**; see "Formatting is a separate edit" above for why t
   methodology as `grammar` and `analyze`, and how both of the above bugs were found. `prettyshow <in> <out>` writes
   one page's result so it can be diffed by eye, because a census says nothing about whether the layout is any good.
   Baseline (2026-09-28): **744 item pages, 0 refusals, 478 statsblocks left alone**, median size change +5 bytes.
+
+**An unreachable wiki aborts; an error about one page does not** (user, 2026-09-29). Two failures that look alike in
+a stack trace and want opposite responses, so they are now different types.
+- **`WikiUnavailableException` means there is nothing to carry on to.** This tool exists to compare captures against
+  the wiki, so if the wiki is gone every remaining step fails identically — and the old behaviour, one `Failed` row
+  per window under a cheerful "3 item windows checked", read like a tool malfunction rather than an outage. It
+  propagates out of `CheckAsync` and the commits, and the UI shows one critical dialog and stops. Nothing local is
+  recorded, so re-capturing once the wiki is back loses nothing. An explicit offline mode (queueing captures for
+  later) is a deliberate future feature, not this.
+- **`MediaWikiException` means the wiki answered**, about one page or one edit, so the frame carries on and only that
+  window fails — still with no ledger row, because that window was not checked either.
+- **The split is by what failed, not by where.** `MediaWikiClient` raises `WikiUnavailableException` for transport
+  failures, HTTP errors (a 503 is exactly this), and the API codes that describe the site rather than the request —
+  `readonly`, `maxlag`, `internal_api_error_*`.
+- **A cancellation the caller asked for is never an outage**, and this needs care: `HttpClient` reports *its own
+  timeout* as a `TaskCanceledException` too, so the two are indistinguishable by type. The token tells them apart, so
+  a user who cancels is not told the wiki is down.
+- The test fakes throw `WikiUnavailableException` for the same cases the real client does — a fake that throws
+  something nothing implements would leave the tests asserting against a contract that does not exist.
 
 **The pipeline (`Pipeline.ItemCheckPipeline`, milestone 5).** One captured frame in, one reviewable
 `ItemCheckResult` per item window out: locate → parse → eligibility → ledger → lookup → analyze → build the edit,

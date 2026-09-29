@@ -229,7 +229,10 @@ public sealed class ItemCheckPipeline
         }
         catch (Exception ex) when (ex is MediaWikiException or HttpRequestException or TaskCanceledException)
         {
-            // One unreachable page must not abandon the other windows in the frame — and must not write a ledger row
+            // A WikiUnavailableException is deliberately NOT caught here: if the wiki is gone there is nothing for
+            // the remaining windows to be checked against, so it aborts the frame instead of producing one identical
+            // failure per item (user, 2026-09-29).
+            // One page that fails on its own merits must not abandon the other windows in the frame — and must not write a ledger row
             // either, because nothing was checked.
             return new ItemCheckResult
             {

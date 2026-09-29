@@ -7,6 +7,7 @@ using EQLWikiAssistant.Capture;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
 using EQLWikiAssistant.Wiki.Ledger;
+using EQLWikiAssistant.Wiki.MediaWiki;
 
 namespace EQLWikiAssistant.App;
 
@@ -132,6 +133,12 @@ public partial class MainWindow : Window
                 1 => "1 item window checked.",
                 _ => $"{results.Count} item windows checked.",
             };
+        }
+        catch (WikiUnavailableException ex)
+        {
+            // The whole frame is abandoned, not degraded into one identical failure per item (user, 2026-09-29).
+            // Nothing local was recorded, so re-capturing once the wiki is back loses nothing.
+            ReportWikiUnavailable(ex, "Nothing was checked");
         }
         catch (Exception ex)
         {
@@ -280,6 +287,10 @@ public partial class MainWindow : Window
             if (commit.Status is CommitStatus.PageChangedSinceCheck or CommitStatus.Failed)
                 MessageBox.Show(this, commit.Error, "Nothing was written", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        catch (WikiUnavailableException ex)
+        {
+            ReportWikiUnavailable(ex, "The edit was not saved");
+        }
         finally
         {
             view.IsBusy = false;
@@ -322,6 +333,10 @@ public partial class MainWindow : Window
 
             if (commit.Status is CommitStatus.PageChangedSinceCheck or CommitStatus.Failed)
                 MessageBox.Show(this, commit.Error, "Nothing was written", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (WikiUnavailableException ex)
+        {
+            ReportWikiUnavailable(ex, "The formatting was not saved");
         }
         finally
         {
@@ -386,6 +401,25 @@ public partial class MainWindow : Window
 
     /// <summary>Counts the unsettled rows alongside the total, because over a long session that is the number worth
     /// glancing at — the total only ever grows.</summary>
+    /// <summary>
+    /// The wiki is gone — say so once, loudly, and stop.
+    ///
+    /// **A critical dialog rather than a status line** (user, 2026-09-29): this tool exists to compare captures
+    /// against the wiki, so without it there is nothing useful left to do, and quietly carrying on produces a screen
+    /// of identical failures that reads like a tool malfunction rather than an outage.
+    /// </summary>
+    private void ReportWikiUnavailable(WikiUnavailableException ex, string consequence)
+    {
+        StatusText.Text = $"{consequence} — {ex.Message}";
+        MessageBox.Show(
+            this,
+            $"{ex.Message}\n\n{consequence}. Nothing was written to the wiki, and nothing was recorded locally, so " +
+            "try again once the wiki is reachable.",
+            "The wiki is unavailable",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+    }
+
     private void UpdateLedgerText()
     {
         if (_services is null)

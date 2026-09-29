@@ -81,8 +81,10 @@ public sealed class VerifiedPages
     /// <summary>
     /// Re-reads the list if the copy in hand is older than <see cref="RefreshAfter"/>.
     ///
-    /// **A failure is swallowed deliberately.** An unreachable wiki leaves whatever was already known in place, and
-    /// the check carries on: whether somebody has ticked a box on a web page is not a reason to fail an item.
+    /// **An unreachable wiki propagates** (<see cref="WikiUnavailableException"/>), because the capture that follows
+    /// would fail on every page anyway — and since this runs first, it is the tool's earliest and cheapest notice
+    /// that the wiki is gone (user, 2026-09-29). An error *about this page* is a different matter and is swallowed:
+    /// whether somebody has ticked a box on a web page is not a reason to fail an item.
     /// </summary>
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {

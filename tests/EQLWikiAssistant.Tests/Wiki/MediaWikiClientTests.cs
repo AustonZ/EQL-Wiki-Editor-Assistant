@@ -220,6 +220,92 @@ public class MediaWikiClientTests
 
     /// <summary>Returns canned responses in order and records what was asked for — the query string for a GET, the
     /// form body for a POST, so an assertion can look at either without caring which verb was used.</summary>
+    // --- the wiki being unavailable ---------------------------------------------------------------------
+
+    /// <summary>
+    /// A transport failure is <see cref="WikiUnavailableException"/>, not a page-level error — the distinction the
+    /// pipeline uses to decide between aborting the frame and failing one window (user, 2026-09-29).
+    /// </summary>
+    [Fact]
+    public async Task ATransportFailureIsReportedAsTheWikiBeingUnavailable()
+    {
+        using var client = new MediaWikiClient(
+            new HttpClient(new ThrowingHandler(new HttpRequestException("No such host is known."))), Endpoint);
+
+        WikiUnavailableException ex =
+            await Assert.ThrowsAsync<WikiUnavailableException>(() => client.FetchPageAsync("Water Flask"));
+
+        Assert.Contains("eqlwiki.com", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>An HTTP error from the server is the same thing — a 503 is exactly the outage this guards.</summary>
+    [Fact]
+    public async Task AServerErrorIsReportedAsTheWikiBeingUnavailable()
+    {
+        var handler = new StubHandler(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+
+        await Assert.ThrowsAsync<WikiUnavailableException>(() => client.FetchPageAsync("Water Flask"));
+    }
+
+    /// <summary>MediaWiki's own maintenance mode describes the site, not the request.</summary>
+    [Fact]
+    public async Task ReadOnlyModeIsReportedAsTheWikiBeingUnavailable()
+    {
+        var handler = new StubHandler(Json("""{"error":{"code":"readonly","info":"The wiki is in read-only mode."}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+
+        await Assert.ThrowsAsync<WikiUnavailableException>(() => client.FetchPageAsync("Water Flask"));
+    }
+
+    /// <summary>An error about the request stays a plain <see cref="MediaWikiException"/>, so the pipeline still
+    /// treats it as one window's problem rather than an outage.</summary>
+    [Fact]
+    public async Task AnErrorAboutTheRequestStaysAnOrdinaryWikiError()
+    {
+        var handler = new StubHandler(Json("""{"error":{"code":"protectedpage","info":"That page is protected."}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+
+        MediaWikiException ex =
+            await Assert.ThrowsAsync<MediaWikiException>(() => client.FetchPageAsync("Water Flask"));
+
+        Assert.Equal("protectedpage", ex.Code);
+    }
+
+    /// <summary>
+    /// **A cancellation the caller asked for is not an outage.** `HttpClient` reports its own timeout as a
+    /// `TaskCanceledException` too, so the two are indistinguishable by type — the token is what tells them apart,
+    /// and a user who cancels must not be told the wiki is down.
+    /// </summary>
+    [Fact]
+    public async Task ACancellationTheCallerAskedForIsNotAnOutage()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        using var client = new MediaWikiClient(
+            new HttpClient(new ThrowingHandler(new TaskCanceledException())), Endpoint);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => client.FetchPageAsync("Water Flask", cancelled.Token));
+    }
+
+    /// <summary>Whereas the same exception with nobody having cancelled is `HttpClient`'s timeout — an outage.</summary>
+    [Fact]
+    public async Task ATimeoutWithNoCancellationIsAnOutage()
+    {
+        using var client = new MediaWikiClient(
+            new HttpClient(new ThrowingHandler(new TaskCanceledException())), Endpoint);
+
+        await Assert.ThrowsAsync<WikiUnavailableException>(() => client.FetchPageAsync("Water Flask"));
+    }
+
+    private sealed class ThrowingHandler(Exception thrown) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) => throw thrown;
+    }
+
     private sealed class StubHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
     {
         private int _next;

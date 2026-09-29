@@ -23,11 +23,13 @@ public class VerifiedPagesTests : IDisposable
         public string? Content { get; set; }
         public int Fetches { get; private set; }
         public bool Fail { get; set; }
+        public bool Unavailable { get; set; }
 
         public Task<WikiPage?> FetchPageAsync(string title, CancellationToken cancellationToken = default)
         {
             Fetches++;
-            if (Fail) throw new HttpRequestException("the wiki is unreachable");
+            if (Unavailable) throw new WikiUnavailableException("eqlwiki.com could not be reached.");
+            if (Fail) throw new MediaWikiException("badtitle", "that list page is unreadable");
             return Task.FromResult(Content is null
                 ? null
                 : new WikiPage(title, Content, 179774, DateTimeOffset.UnixEpoch));
@@ -109,10 +111,10 @@ public class VerifiedPagesTests : IDisposable
         Assert.Null(pages.IsVerified("Dragon Bone Bracelet"));
     }
 
-    /// <summary>An unreachable wiki keeps whatever was already known: whether somebody ticked a box on a web page is
-    /// not a reason to fail a capture.</summary>
+    /// <summary>An error *about this page* is swallowed: whether somebody ticked a box on a web page is not a reason
+    /// to fail a capture, and whatever was already known stays.</summary>
     [Fact]
-    public async Task KeepsWhatItHasWhenARefreshFails()
+    public async Task KeepsWhatItHasWhenTheListItselfCannotBeRead()
     {
         (VerifiedPages pages, FakeWiki wiki) = await LoadedAsync();
         wiki.Fail = true;
@@ -121,6 +123,20 @@ public class VerifiedPagesTests : IDisposable
         await pages.RefreshAsync();
 
         Assert.True(pages.IsVerified("Dragon Bone Bracelet"));
+    }
+
+    /// <summary>
+    /// **An unreachable wiki propagates.** This runs first in a capture, so it is the tool's earliest and cheapest
+    /// notice that the wiki is gone — and the capture that would follow is pointless anyway, since every page fetch
+    /// would fail the same way (user, 2026-09-29).
+    /// </summary>
+    [Fact]
+    public async Task AnUnreachableWikiPropagatesRatherThanBeingSwallowed()
+    {
+        var wiki = new FakeWiki { Unavailable = true };
+        var pages = new VerifiedPages(wiki, _cache);
+
+        await Assert.ThrowsAsync<WikiUnavailableException>(() => pages.RefreshAsync());
     }
 
     /// <summary>The TTL is what keeps this to one small request per session rather than one per capture.</summary>

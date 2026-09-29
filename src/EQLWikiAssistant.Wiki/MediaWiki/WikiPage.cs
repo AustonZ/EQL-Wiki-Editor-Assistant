@@ -43,3 +43,25 @@ public sealed class MediaWikiException(string code, string message) : Exception(
 {
     public string Code { get; } = code;
 }
+
+/// <summary>
+/// The wiki could not be reached, or answered that it is unavailable.
+///
+/// **Distinct from <see cref="MediaWikiException"/> because the right response is different** (user, 2026-09-29).
+/// A `MediaWikiException` means the wiki answered — about one page, one edit, one session — and the tool carries on
+/// with the rest. This means there is nothing to carry on *to*: the tool exists to compare captures against the wiki,
+/// so if the wiki is gone every remaining step would fail the same way. It aborts the whole chain and says so, rather
+/// than degrading into a screenful of identical per-item failures.
+///
+/// Raised for transport failures and HTTP errors, and for the API codes that mean the site itself is unavailable
+/// rather than the request being wrong. A genuine cancellation is never one of these.
+/// </summary>
+public sealed class WikiUnavailableException(string message, Exception? inner = null)
+    : Exception(message, inner)
+{
+    /// <summary>API error codes that describe the site rather than the request. `readonly` is MediaWiki's own
+    /// maintenance mode and `maxlag` means its replicas are behind — both are "come back shortly", not "your request
+    /// was wrong".</summary>
+    public static bool IsUnavailableCode(string code) =>
+        code is "readonly" or "maxlag" || code.StartsWith("internal_api_error", StringComparison.Ordinal);
+}
