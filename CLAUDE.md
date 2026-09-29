@@ -400,9 +400,23 @@ recorded an incomplete convention as the convention.
     Berserker, so it would skip the pages that need this most.
   - **A derivable category the capture does not imply is reported, never removed** — the item may have changed, or
     the page may know something the window cannot show.
-  - Measured impact on the corpus (2026-09-28): missing fields went from 49 to 377 across 40 pages, roughly 8
-    categories per page. The user expects more field-to-category rules soon unless the community adopts a template
-    that promotes more of the statsblock to real parameters.
+  - **A class category is only earned by something with a slot** (user, 2026-09-28). The category is named
+    `<Class> Equipment`, and a Water Flask is not warrior equipment however many classes may drink from it. The user
+    proposed this on the suspicion that food and other non-equipment carrying `Class: ALL` were inflating the count,
+    and the measurement agreed emphatically: of the 326 class categories the tool wanted to add, **323 were on items
+    with no slot at all** — food, drink, gems, tradeskill materials, containers, potions, quest tokens, every one of
+    them `Class: ALL` and gaining all sixteen. Three were on real equipment.
+    - Corpus impact: missing fields **377 → 54**, and pages already correct 2 → 5. What survives is the real signal:
+      `Adamantite Band` missing exactly Beastlord and Berserker, and one genuine `Warrior Equipment` gap.
+    - **It introduced no new false alarms**: `NeedsReview` stayed at 3, so no existing page carries a class category
+      on a slotless item that the rule would now question.
+    - **An unrecognized class code is still reported on a slotless item.** A new class turning up on a consumable is
+      still a new class, and the class list is walked either way.
+  - **The class field is not vestigial, even on slotless items** — worth knowing, because it looks that way. Real
+    captures: `Tiny Dagger` is `Class: ENC` and `Chilled Tundra Root` is `Class: RNG DRU`, neither with a slot. So
+    the field carries real restrictions on consumables; it is only the *Equipment* category that they do not earn.
+  - The user expects more field-to-category rules soon unless the community adopts a template that promotes more of
+    the statsblock to real parameters.
 - **`NONE` is to classes what `ANY` is to slots**: a real value with no category, neither emitted nor reported.
   `Guise of the Deceived` says `Class: NONE`, and reporting it would be a false alarm on every such item.
 - **The derived set is only ever a subset of a page's categories.** Real pages also carry zone names, `Quest Items`,

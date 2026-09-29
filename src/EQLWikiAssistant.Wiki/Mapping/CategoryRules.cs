@@ -106,6 +106,15 @@ public static class CategoryRules
         var categories = new List<string>();
         var unknown = new List<string>();
 
+        // **A class category is only earned by something that is actually equipment** — that is, something with a
+        // slot to equip it in (user, 2026-09-28). The category is named `<Class> Equipment`, and a Water Flask is
+        // not warrior equipment however many classes may drink from it.
+        //
+        // Measured before adopting it: of 326 class categories the tool wanted to add across the corpus, **323 were
+        // on items with no slot at all** — food, drink, gems, tradeskill materials, containers, potions, quest
+        // tokens — every one of them carrying `Class: ALL` and gaining all sixteen. Three were on real equipment.
+        // The rule removes essentially all of the noise and almost none of the signal.
+        bool isEquipment = wikiSlots.Any(s => s.Trim().Length > 0);
         bool allClasses = classCodes.Any(c => string.Equals(c, AllClasses, StringComparison.OrdinalIgnoreCase));
         IEnumerable<string> classNames = allClasses
             ? ClassNames.Values
@@ -119,7 +128,10 @@ public static class CategoryRules
                 return null;
             }).Where(n => n is not null).Select(n => n!);
 
-        categories.AddRange(classNames.Select(n => $"{n} Equipment").OrderBy(n => n, StringComparer.Ordinal));
+        // The class list is still walked when the item is not equipment, so an unrecognized code is still reported —
+        // a new class should surface whatever kind of item revealed it.
+        IReadOnlyList<string> classCategories = [.. classNames.Select(n => $"{n} Equipment").OrderBy(n => n, StringComparer.Ordinal)];
+        if (isEquipment) categories.AddRange(classCategories);
 
         foreach (string slot in wikiSlots)
         {

@@ -90,10 +90,11 @@ public class CategoryRulesTests
     public void ClassCodesBecomeEquipmentCategories()
     {
         IReadOnlyList<string> categories = CategoryRules.Derive(
-            ["WAR", "SHD", "SHM", "BST", "BER"], [], out IReadOnlyList<string> unrecognized);
+            ["WAR", "SHD", "SHM", "BST", "BER"], ["NECK"], out IReadOnlyList<string> unrecognized);
 
         Assert.Equal(
-            ["Beastlord Equipment", "Berserker Equipment", "Shadow Knight Equipment", "Shaman Equipment", "Warrior Equipment"],
+            ["Beastlord Equipment", "Berserker Equipment", "Shadow Knight Equipment", "Shaman Equipment",
+             "Warrior Equipment", "Neck"],
             categories);
         Assert.Empty(unrecognized);
     }
@@ -101,11 +102,39 @@ public class CategoryRulesTests
     [Fact]
     public void AllExpandsToEveryClass()
     {
-        IReadOnlyList<string> categories = CategoryRules.Derive([CategoryRules.AllClasses], [], out _);
+        IReadOnlyList<string> categories = CategoryRules.Derive([CategoryRules.AllClasses], ["NECK"], out _);
 
-        Assert.Equal(16, categories.Count);
         Assert.Contains("Bard Equipment", categories);
         Assert.Contains("Wizard Equipment", categories);
+        Assert.Equal(16, categories.Count(c => c.EndsWith(" Equipment", StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    /// **Only something with a slot earns a class category** (user, 2026-09-28). The category is named
+    /// `&lt;Class&gt; Equipment`, and a Water Flask is not warrior equipment however many classes may drink from it.
+    ///
+    /// Measured before adopting it: of 326 class categories the tool wanted to add across the corpus, **323 were on
+    /// items with no slot** — food, drink, gems, tradeskill materials, containers, potions, quest tokens, every one
+    /// carrying `Class: ALL` and gaining all sixteen. It removed essentially all the noise and none of the signal.
+    /// </summary>
+    [Fact]
+    public void AnItemWithNoSlotEarnsNoClassCategory()
+    {
+        IReadOnlyList<string> categories = CategoryRules.Derive(
+            [CategoryRules.AllClasses], [], out IReadOnlyList<string> unrecognized);
+
+        Assert.Empty(categories);
+        Assert.Empty(unrecognized);
+    }
+
+    /// <summary>...but an unrecognized class is still reported, whatever kind of item revealed it. A new class code
+    /// turning up on a consumable is still a new class code.</summary>
+    [Fact]
+    public void AnUnknownClassIsStillReportedOnASlotlessItem()
+    {
+        CategoryRules.Derive(["XYZ"], [], out IReadOnlyList<string> unrecognized);
+
+        Assert.Equal(["XYZ"], unrecognized);
     }
 
     /// <summary>The documented quirk: the slot is `FINGER`, the category is `Fingers`.</summary>
