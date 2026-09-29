@@ -79,7 +79,50 @@ public class ItemCheckPipelineTests
 
     private static string EarringPage() => WikiFixtures.Load("Earring of Bashing");
 
+    /// <summary>A page whose data agrees but which carries a defect the tool will not fix — here the missing
+    /// <c>&lt;onlyinclude&gt;</c> wrapper, which needs a human to decide what to enclose.</summary>
+    private static string AgreeingPageWithSomethingTheToolWillNotFix() =>
+        EarringPage().Replace("<onlyinclude>", "").Replace("</onlyinclude>", "");
+
     // --- the ledger rules -------------------------------------------------------------------------------
+
+    /// <summary>
+    /// **A page that agrees but left something undone is not done** (user, 2026-09-29, on `Dragon Bone Bracelet`).
+    ///
+    /// The review screen already listed the deferred item as "Not done" in its warning strip while the ledger
+    /// recorded `Matched` — the two saying opposite things about the same item, and the ledger's answer being the one
+    /// that decides whether it is ever raised again. Anything the tool declines has to keep coming back.
+    /// </summary>
+    [Fact]
+    public async Task APageThatAgreesButHasSomethingDeferredIsFlaggedNotMatched()
+    {
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines), AgreeingPageWithSomethingTheToolWillNotFix());
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.AlreadyCorrect, results[0].Status);
+        Assert.NotEmpty(results[0].Edit!.Deferred);
+        Assert.True(results[0].NeedsAttention);
+        Assert.Equal(CheckOutcome.Flagged, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    /// <summary>And being flagged means the next capture still goes to the wiki, which is the whole consequence of
+    /// getting the outcome right.</summary>
+    [Fact]
+    public async Task ADeferredItemIsStillFetchedOnTheNextCapture()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) =
+            Build(Window(EarringLines), AgreeingPageWithSomethingTheToolWillNotFix());
+
+        await pipeline.CheckAsync(BlankFrame());
+        int after = wiki.Fetches;
+
+        await pipeline.CheckAsync(BlankFrame());
+
+        Assert.True(wiki.Fetches > after);
+    }
+
 
     /// <summary>The headline property. A page that already agrees is recorded as matched, and capturing the same
     /// item again then costs **no wiki requests at all** — which is the only reason the ledger exists.</summary>

@@ -127,10 +127,20 @@ public sealed record ItemCheckResult
         Edit is { HasChanges: true } &&
         Page is not null;
 
-    /// <summary>Whether something here wants the user's judgement before the page is written — a field the analyzer
-    /// could not decide, a title defect, a suspect icon, or a name the capture itself could not agree on.</summary>
+    /// <summary>
+    /// Whether something here wants the user's judgement before the page is written — a field the analyzer could not
+    /// decide, something the editor declined to write, a title defect, a suspect icon, or a name the capture itself
+    /// could not agree on.
+    ///
+    /// **<see cref="ProposedEdit.Deferred"/> belongs here and was missing** (found by the user, 2026-09-29). Deferred
+    /// is by definition "the tool knew about this and did not do it": the review screen already listed each one as
+    /// "Not done", while a page that otherwise agreed was recorded `Matched` and never raised again — the screen and
+    /// the ledger saying opposite things about the same item. Anything the tool declines is exactly what must keep
+    /// coming back.
+    /// </summary>
     public bool NeedsAttention =>
         (Analysis?.Blockers.Any() ?? false) ||
+        Edit is { Deferred.Count: > 0 } ||
         Icon is { Matches: false } ||
         NeedsLoreCapture ||
         (Item?.TitleContentNameMismatch ?? false);

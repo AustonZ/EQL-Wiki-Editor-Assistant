@@ -147,16 +147,94 @@ public sealed class ItemPageDocument
     /// shows the value changing and nothing else. Throws if the parameter is absent: adding a parameter is a
     /// different operation with different placement questions, and silently appending one would put it somewhere
     /// the page author did not choose.</summary>
-    public ItemPageDocument WithParameter(string name, string newValue)
+    public ItemPageDocument WithParameter(
+        string name,
+        string newValue,
+        IReadOnlyList<string>? blueprintOrder = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(newValue);
 
-        TemplateParameter parameter = Template.Find(name)
-            ?? throw new InvalidOperationException($"The page has no |{name}= parameter to replace.");
+        if (Template.Find(name) is { } parameter)
+        {
+            (string lead, string trail) = SplitPadding(parameter.RawValue);
+            return Reparse(WikitextScanner.ReplaceValue(Wikitext, parameter, lead + newValue + trail));
+        }
 
-        (string lead, string trail) = SplitPadding(parameter.RawValue);
-        return Reparse(WikitextScanner.ReplaceValue(Wikitext, parameter, lead + newValue + trail));
+        // Without an order there is no basis for a position, so this still refuses rather than guessing — which is
+        // what it did in every case before the blueprint order was threaded through.
+        if (blueprintOrder is null)
+            throw new InvalidOperationException($"The page has no |{name}= parameter to replace.");
+
+        return Reparse(Insert(Wikitext, Template, name, newValue, blueprintOrder));
+    }
+
+    /// <summary>
+    /// Writes a parameter the page does not have, in the blueprint's order.
+    ///
+    /// **This is the minimal-edit rule's third case** (user, 2026-09-25): a parameter that does not exist has no line
+    /// to be changed in place, so it needs a position — and the blueprint supplies one, which is why this is derived
+    /// rather than invented. It matters in practice because a legacy page frequently has no <c>merchant_value</c> at
+    /// all: in original EverQuest a player could not easily learn an item's value, so nobody recorded one. EQL states
+    /// it outright in the window, so the tool can (user, 2026-09-29).
+    ///
+    /// **The anchor is the last parameter the blueprint puts _before_ this one, not the first it puts after.** Real
+    /// pages are not in blueprint order — `Dragon Bone Bracelet` opens with <c>|notes=</c>, which the blueprint puts
+    /// sixth — so anchoring on what comes after would have dropped the merchant value at the very top of the call.
+    /// Anchoring on what comes before lands it after <c>statsblock</c>, where a reader expects it. The two rules agree
+    /// on a page that *is* in blueprint order, and differ only on the messy ones, which is the case that matters here.
+    ///
+    /// **The separator is copied from the anchor rather than chosen**, so a page writing one parameter per line gets
+    /// another line and a single-line call stays on one line. Same principle as the rest of this file: the page's own
+    /// source is the truth, and nothing about a layout this tool did not create has to be understood.
+    /// </summary>
+    private static string Insert(
+        string wikitext,
+        TemplateCall template,
+        string name,
+        string value,
+        IReadOnlyList<string> blueprintOrder)
+    {
+        List<TemplateParameter> named =
+            [.. template.Parameters.Where(p => p.Name is not null && p.SegmentStart >= 0)];
+
+        // A call with no named parameters at all has no separator to copy and no anchor to sit beside; the only
+        // position left is just inside the closing braces.
+        if (named.Count == 0)
+            return wikitext[..(template.End - 2)] + $"|{name} = {value}" + wikitext[(template.End - 2)..];
+
+        int wanted = PositionIn(blueprintOrder, name);
+
+        TemplateParameter? precedes = wanted < 0
+            ? null
+            : named.LastOrDefault(p => PositionIn(blueprintOrder, p.Name!) is >= 0 and var i && i < wanted);
+
+        if (precedes is not null) return Splice(precedes.SegmentEnd, precedes);
+
+        TemplateParameter? follows = wanted < 0
+            ? null
+            : named.FirstOrDefault(p => PositionIn(blueprintOrder, p.Name!) > wanted);
+
+        // Nothing the blueprint places earlier, and nothing it places later either — a name the blueprint does not
+        // know at all. The end of the call is the one position that cannot be wrong about an order it has no place in.
+        return follows is not null
+            ? Splice(follows.SegmentStart, follows)
+            : Splice(named[^1].SegmentEnd, named[^1]);
+
+        string Splice(int at, TemplateParameter like)
+        {
+            string segment = wikitext[like.SegmentStart..like.SegmentEnd];
+            string separator = segment[segment.TrimEnd().Length..];
+            return wikitext[..at] + $"|{name} = {value}" + separator + wikitext[at..];
+        }
+    }
+
+    private static int PositionIn(IReadOnlyList<string> order, string name)
+    {
+        for (int i = 0; i < order.Count; i++)
+            if (string.Equals(order[i], name, StringComparison.Ordinal))
+                return i;
+        return -1;
     }
 
     /// <summary>
@@ -345,12 +423,17 @@ public sealed class ItemPageDocument
     /// there is no line to change and choosing a position is a judgement — <see cref="WithParameter"/> refuses it
     /// for the same reason.
     /// </summary>
-    public ItemPageDocument WithLore(string loreText)
+    public ItemPageDocument WithLore(string loreText, IReadOnlyList<string>? blueprintOrder = null)
     {
         ArgumentNullException.ThrowIfNull(loreText);
         if (!CanBeWrittenAsLore(loreText))
             throw new ArgumentException(
                 "This lore text contains characters that would change the template's meaning.", nameof(loreText));
+
+        // A page with no |notes= at all is the same missing-parameter case as merchant_value, and gets the same
+        // answer: the blueprint says where notes goes, so the wrapper can be written into a parameter created for it.
+        if (Template.Find("notes") is null && blueprintOrder is not null)
+            return WithParameter("notes", $"{{{{{LoreTemplateName}|{loreText}}}}}", blueprintOrder);
 
         TemplateParameter notes = Template.Find("notes")
             ?? throw new InvalidOperationException("The page has no |notes= parameter to write lore into.");

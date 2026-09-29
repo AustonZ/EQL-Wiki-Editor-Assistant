@@ -147,9 +147,23 @@ cleverer placement rule would go wrong on a messy page.
 - **Something entirely new goes on its own line**, placed **before the `Class:` line** so the diff reads naturally —
   the blueprint puts `Class` and `Race` last, so that position is derived rather than invented, and it falls back to
   appending when there is no `Class:` line. The follow-up reformatting puts it where it belongs.
-- **A template parameter that does not exist at all** is the third case, since there is no line to add it to: insert
-  it in the blueprint's parameter order. `ItemPageDocument.WithParameter` deliberately refuses to invent one, so
-  adding a parameter is its own operation with its own placement decision.
+- **A template parameter that does not exist at all** is the third case, since there is no line to add it to: it is
+  inserted in the blueprint's parameter order. **Corrected 2026-09-29 — this used to be deferred to the user and that
+  was wrong.** The old reasoning was that placement is a judgement `WithParameter` should not make; the answer is that
+  the blueprint already makes it, and the case is common rather than exotic. A legacy page usually has **no
+  `merchant_value` at all**, because legacy EverQuest gave a player no easy way to learn a value and so nobody
+  recorded one — EQL states it in the window outright, which is exactly the gap this tool exists to close (user,
+  2026-09-29, on `Dragon Bone Bracelet`). `WithParameter` still refuses when given no order: supplying the order is
+  what supplies the judgement.
+  - **The anchor is the last parameter the blueprint puts _before_ the new one, not the first it puts after**, and the
+    difference is only visible on a page whose own order is not the blueprint's — which is most of them.
+    `Dragon Bone Bracelet` opens with `|notes=`, sixth in the blueprint, so anchoring on what comes *after* would have
+    dropped the merchant value at the very top of the call. Anchoring on what comes before lands it after
+    `statsblock`. The two rules agree on a page already in blueprint order and differ only on the messy ones.
+  - **The separator is copied from the anchor rather than chosen**, so a page writing one parameter per line gets
+    another line and a single-line call stays on one line. The alignment is deliberately *not* matched — that is the
+    prettifier's job, and `NeedsReformatting` is set so it gets asked for.
+  - The same fix covers `focus_effect` and a `notes` parameter for lore; all three had the identical shape.
 
 **The `statsblock`-to-real-template migration is expected, and both shapes must work** (user, 2026-09-24). The
 user intends to make a case to the other editors for promoting most of `statsblock`'s contents to explicit
@@ -615,8 +629,15 @@ the compliance checker — which is what keeps "what would change" reviewable se
 - An effect line is matched to the existing one **by the effect's name**, so the right line is rewritten on a page
   carrying several.
 - `ProposedEdit.NeedsReformatting` is true when a line was added but not positioned — the precise trigger the
-  prettifier follow-up needs. `Deferred` carries what the tool declined: compliance it cannot fix, and a parameter
-  that does not exist yet (there is no line to change in place, and inventing a position is a judgement).
+  prettifier follow-up needs. `Deferred` carries what the tool declined — now only compliance it cannot fix, since a
+  missing parameter is written rather than deferred (see the minimal-edit rule above).
+- **Anything in `Deferred` makes the result need a human, and that was missing** (user, 2026-09-29). `Deferred` is by
+  definition "the tool knew about this and did not do it", so `ItemCheckResult.NeedsAttention` counts it. Without
+  that, the review screen listed each deferred item as "Not done" in its warning strip while the ledger recorded the
+  page `Matched` and never raised it again — **the screen and the ledger saying opposite things about the same
+  item**, with the ledger's answer being the one that decides whether it is ever looked at again. The UI's status
+  label agrees too: an `AlreadyCorrect` result that needs attention reads "Needs attention", because "Already
+  correct" sitting directly above a "Not done" warning is simply a false statement.
 - `tools/WikiSpike -- preview <screenshot>` runs the whole pipeline — locate, parse, eligibility, lookup, analyze,
   edit — and prints the proposed line diff. It exists so the edit can be judged against real pages before any UI
   does, the same reason `AccuracySpike` and `WikiSpike analyze` exist.
@@ -842,6 +863,14 @@ testable) and that it includes the two steps preview skipped, the ledger and the
 Capture reads an unfocused window fine, which is the whole reason a global hotkey is worth having.
 - **What is on screen is what gets saved.** The proposed wikitext is editable and the commit writes *that*, never
   `Edit.NewWikitext`. A review screen whose approve button saved something else would make the review meaningless.
+  - **And the save button follows the same text, which it did not** (user, 2026-09-29). `CanAct` was
+    `ItemCheckResult.CanCommit` — true only when the *tool* found changes — so on a page it judged already correct the
+    button stayed dead even after the user typed a correction of their own into the box. That is the same rule broken
+    from the other end: if the text differs from the page there is something to save, whoever wrote it. `CanAct` now
+    compares the on-screen text against `Edit.OriginalWikitext`.
+  - **A hand-written edit needs a hand-written summary.** The summary loads blank when the tool proposes nothing,
+    rather than inheriting its own "No changes" — which would be a false description of the revision — and `CanAct`
+    requires one, so the wiki cannot receive an unexplained edit.
 - **Warnings come first and are unmissable**, above the field table and the diff. A flagged gap is the product, so
   **every field the tool declined to decide is repeated in the warning strip** rather than living only as a row in
   the findings grid — the grid truncates, and these are precisely the items nobody has judged yet.

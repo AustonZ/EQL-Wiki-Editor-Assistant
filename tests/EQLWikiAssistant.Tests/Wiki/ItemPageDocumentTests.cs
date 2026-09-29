@@ -111,12 +111,92 @@ public class ItemPageDocumentTests
             document.WithParameter("notes", "Drink item").Wikitext);
     }
 
+    /// <summary>Without a blueprint order there is still no basis for a position, so it still refuses. Supplying the
+    /// order is what supplies the judgement.</summary>
     [Fact]
-    public void WithParameter_RefusesToInventAMissingParameter()
+    public void WithParameter_RefusesToInventAMissingParameterWithNoOrderToPlaceItBy()
     {
         ItemPageDocument document = ItemPageDocument.Parse(WikiFixtures.Load("Cloak of Scales"))!;
 
         Assert.Throws<InvalidOperationException>(() => document.WithParameter("merchant_value", "1p"));
+    }
+
+    private static readonly string[] BlueprintOrder =
+        ["itemname", "lucy_img_ID", "statsblock", "focus_effect", "merchant_value", "notes", "dropsfrom"];
+
+    [Fact]
+    public void WithParameter_WritesAMissingParameterInBlueprintOrder()
+    {
+        ItemPageDocument document = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname    = A\n|statsblock  = x\n|dropsfrom = y\n}}")!;
+
+        Assert.Equal(
+            "{{Itempage\n|itemname    = A\n|statsblock  = x\n|merchant_value = 1p\n|dropsfrom = y\n}}",
+            document.WithParameter("merchant_value", "1p", BlueprintOrder).Wikitext);
+    }
+
+    /// <summary>The separator is copied from the anchor rather than chosen, so a call written on one line stays on
+    /// one line — the tool must not impose a layout on a page that did not have it.</summary>
+    [Fact]
+    public void WithParameter_KeepsASingleLineCallOnOneLine()
+    {
+        ItemPageDocument document = ItemPageDocument.Parse("{{Itempage|itemname=A|statsblock=x|dropsfrom=y}}")!;
+
+        Assert.Equal(
+            "{{Itempage|itemname=A|statsblock=x|merchant_value = 1p|dropsfrom=y}}",
+            document.WithParameter("merchant_value", "1p", BlueprintOrder).Wikitext);
+    }
+
+    /// <summary>Nothing the blueprint places earlier is present, so the first parameter it places later is the
+    /// anchor and the new one goes in front of it.</summary>
+    [Fact]
+    public void WithParameter_GoesBeforeALaterParameterWhenNothingEarlierIsPresent()
+    {
+        ItemPageDocument document = ItemPageDocument.Parse("{{Itempage\n|notes = n\n|dropsfrom = y\n}}")!;
+
+        Assert.Equal(
+            "{{Itempage\n|itemname = A\n|notes = n\n|dropsfrom = y\n}}",
+            document.WithParameter("itemname", "A", BlueprintOrder).Wikitext);
+    }
+
+    /// <summary>A name the blueprint does not know has no order to respect, so it goes at the end — the one position
+    /// that cannot be wrong about an order it has no place in.</summary>
+    [Fact]
+    public void WithParameter_PutsAnUnknownParameterAtTheEnd()
+    {
+        ItemPageDocument document = ItemPageDocument.Parse("{{Itempage\n|itemname = A\n|statsblock = x\n}}")!;
+
+        Assert.Equal(
+            "{{Itempage\n|itemname = A\n|statsblock = x\n|invented = z\n}}",
+            document.WithParameter("invented", "z", BlueprintOrder).Wikitext);
+    }
+
+    /// <summary>The page outside the template call is untouched by an insertion, same as by a replacement.</summary>
+    [Fact]
+    public void WithParameter_InsertingLeavesTheRestOfThePageAlone()
+    {
+        string original = WikiFixtures.Load("Cloak of Scales");
+        ItemPageDocument document = ItemPageDocument.Parse(original)!;
+
+        string edited = document.WithParameter("merchant_value", "1p", BlueprintOrder).Wikitext;
+
+        Assert.Equal(original.Length + "|merchant_value = 1p\n".Length, edited.Length);
+        Assert.Equal(original, edited.Replace("|merchant_value = 1p\n", ""));
+    }
+
+    /// <summary>A page with no <c>notes</c> at all can still receive lore: it is the same missing-parameter case.</summary>
+    [Fact]
+    public void WithLore_CreatesTheNotesParameterWhenThePageHasNone()
+    {
+        ItemPageDocument document = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = A\n|statsblock = x\n|dropsfrom = y\n}}")!;
+
+        string edited = document.WithLore("A tale of old.", BlueprintOrder).Wikitext;
+
+        Assert.Contains("|notes = {{Item Lore|A tale of old.}}", edited);
+        Assert.True(
+            edited.IndexOf("|statsblock", StringComparison.Ordinal) <
+            edited.IndexOf("|notes", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -172,4 +252,30 @@ public class ItemPageDocumentTests
     [Fact]
     public void Lore_TrimsTheSpacingRealPagesPutAroundTheValue() =>
         Assert.Equal("Fishbone Earring.", ItemPageDocument.Parse(WikiFixtures.Load("Fishbone Earring"))!.Lore);
+
+    /// <summary>
+    /// The real page that exposed this (user, 2026-09-29). `Dragon Bone Bracelet` is a legacy import with no
+    /// `merchant_value` at all — the common case, since legacy EverQuest gave a player no easy way to learn a value.
+    /// Kept verbatim because the whole bug was about where the parameter lands on a page whose own order is not the
+    /// blueprint's: this one opens with `|notes=`, which the blueprint puts sixth.
+    /// </summary>
+    [Fact]
+    public void WithParameter_WritesMerchantValueIntoARealLegacyPage()
+    {
+        const string page =
+            "{{Classic Era}}\n<onlyinclude>{{Itempage\n|notes       = \n" +
+            "|itemname    = Dragon Bone Bracelet\n|lucy_img_ID = 505\n|statsblock  = \n" +
+            "Attunable<br>\nSlot: WRIST<br>\nAC: 4<br>\nSTR: +7  AGI: +7<br>\n" +
+            "WT: 0.1  Size: SMALL<br>\nClass: WAR PAL RNG SHD MNK BRD ROG BST BER<br>\nRace: ALL<br>\n" +
+            "|dropsfrom = \n\n[[Dreadlands]]\n\n* [[Gorenaire]]\n\n}}</onlyinclude>\n\n[[Category:Wrist]]";
+
+        string edited = ItemPageDocument.Parse(page)!
+            .WithParameter("merchant_value", "1p 2g 3s", BlueprintOrder).Wikitext;
+
+        Assert.Contains("Race: ALL<br>\n|merchant_value = 1p 2g 3s\n|dropsfrom = ", edited);
+
+        // Everything else survives byte for byte, including the aligned padding this edit deliberately does not
+        // match and the dropsfrom list and category outside the call.
+        Assert.Equal(page, edited.Replace("|merchant_value = 1p 2g 3s\n", ""));
+    }
 }

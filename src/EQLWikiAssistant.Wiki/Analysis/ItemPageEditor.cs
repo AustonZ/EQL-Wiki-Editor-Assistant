@@ -95,18 +95,14 @@ public static class ItemPageEditor
         {
             if (finding.Field == ItemPageAnalyzer.MerchantValueField && finding.Captured is { } merchantValue)
             {
-                if (edited.Template.Find(mapping.MerchantValueParameter) is null)
-                {
-                    // A parameter that does not exist has no line to be changed in place, and inventing a position
-                    // is a judgement WithParameter deliberately refuses to make. Left for the user rather than
-                    // guessed at.
-                    deferred.Add($"The page has no |{mapping.MerchantValueParameter}= parameter, so the merchant " +
-                                 $"value '{merchantValue}' could not be written. Add the parameter first.");
-                    continue;
-                }
-
-                edited = edited.WithParameter(mapping.MerchantValueParameter, merchantValue);
-                changes.Add($"merchant value {merchantValue}");
+                // **A missing parameter is written, not deferred** (user, 2026-09-29). This used to be left for the
+                // user on the grounds that placement is a judgement — but the blueprint makes that judgement, and
+                // the case is common rather than exotic: a legacy page usually has no merchant_value at all, because
+                // legacy EverQuest gave a player no easy way to learn a value. EQL states it in the window outright.
+                bool creating = edited.Template.Find(mapping.MerchantValueParameter) is null;
+                edited = edited.WithParameter(mapping.MerchantValueParameter, merchantValue, mapping.ParameterOrder);
+                changes.Add(creating ? $"added merchant value {merchantValue}" : $"merchant value {merchantValue}");
+                addedUnformattedLine |= creating;
             }
             else if (finding.Field == ItemPageAnalyzer.CategoryField && finding.Captured is { } category)
             {
@@ -120,29 +116,19 @@ public static class ItemPageEditor
             {
                 // Only ever reached for MissingOnWiki: the analyzer reports a *differing* lore as NeedsReview, so
                 // existing prose is never replaced. See AddLoreFinding for why that rule is narrower than the rest.
-                if (edited.Template.Find(mapping.NotesParameter) is null)
-                {
-                    deferred.Add($"The page has no |{mapping.NotesParameter}= parameter, so the item's lore could " +
-                                 "not be added. Add the parameter first.");
-                    continue;
-                }
-
-                edited = edited.WithLore(lore);
+                bool creating = edited.Template.Find(mapping.NotesParameter) is null;
+                edited = edited.WithLore(lore, mapping.ParameterOrder);
                 changes.Add("added the item's lore");
+                addedUnformattedLine |= creating;
             }
             else if (finding.Field.EndsWith(" Effect", StringComparison.Ordinal) &&
                      mapping.IsFocusEffect(finding.Field[..^" Effect".Length]) &&
                      finding.Captured is { } focus)
             {
-                if (edited.Template.Find(mapping.FocusEffectParameter) is null)
-                {
-                    deferred.Add($"The page has no |{mapping.FocusEffectParameter}= parameter, so the focus effect " +
-                                 $"'{focus}' could not be written. Add the parameter first.");
-                    continue;
-                }
-
-                edited = edited.WithParameter(mapping.FocusEffectParameter, focus);
-                changes.Add($"focus effect {focus}");
+                bool creating = edited.Template.Find(mapping.FocusEffectParameter) is null;
+                edited = edited.WithParameter(mapping.FocusEffectParameter, focus, mapping.ParameterOrder);
+                changes.Add(creating ? $"added focus effect {focus}" : $"focus effect {focus}");
+                addedUnformattedLine |= creating;
             }
         }
 

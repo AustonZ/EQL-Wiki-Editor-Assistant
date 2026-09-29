@@ -90,7 +90,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         ArgumentNullException.ThrowIfNull(result);
         Result = result;
         _wikitext = result.Edit?.NewWikitext ?? result.Page?.Wikitext ?? "";
-        _summary = result.Edit?.Summary ?? "";
+        // Left blank when the tool proposes nothing, rather than inheriting its "No changes" — if the user is
+        // hand-editing a page the tool judged correct, that summary would be a false description of the revision,
+        // and there is nothing to inherit. CanAct requires one, so it has to be typed.
+        _summary = result.Edit is { HasChanges: true } proposed ? proposed.Summary : "";
         _outcome = null;
         _formatting = null;
         _formattingOutcome = null;
@@ -177,7 +180,16 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public string ItemName => string.IsNullOrEmpty(Result.ItemName) ? "(unreadable window)" : Result.ItemName;
 
-    public string StatusText => Result.Status switch
+    public string StatusText => Result switch
+    {
+        // "Already correct" is a false statement about a page the tool declined to finish, and it sat directly above
+        // a warning strip saying "Not done" (user, 2026-09-29). The ledger records Flagged in this case; the label
+        // has to agree with it.
+        { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => "Needs attention",
+        _ => StatusTextFor(Result.Status),
+    };
+
+    private static string StatusTextFor(ItemCheckStatus status) => status switch
     {
         ItemCheckStatus.Occluded => "Occluded",
         ItemCheckStatus.Ineligible => "Not eligible",
@@ -188,14 +200,15 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         ItemCheckStatus.AlreadyCorrect => "Already correct",
         ItemCheckStatus.EditProposed => "Edit proposed",
         ItemCheckStatus.Failed => "Failed",
-        _ => Result.Status.ToString(),
+        _ => status.ToString(),
     };
 
-    public Brush StatusBrush => Result.Status switch
+    public Brush StatusBrush => Result switch
     {
-        ItemCheckStatus.AlreadyCorrect or ItemCheckStatus.AlreadyChecked => Brushes.SeaGreen,
-        ItemCheckStatus.EditProposed => Brushes.DarkOrange,
-        ItemCheckStatus.Failed or ItemCheckStatus.Occluded => Brushes.Firebrick,
+        { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Brushes.Firebrick,
+        { Status: ItemCheckStatus.AlreadyCorrect or ItemCheckStatus.AlreadyChecked } => Brushes.SeaGreen,
+        { Status: ItemCheckStatus.EditProposed } => Brushes.DarkOrange,
+        { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded } => Brushes.Firebrick,
         _ => Brushes.DimGray,
     };
 
@@ -296,13 +309,22 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public string Wikitext
     {
         get => _wikitext;
-        set => Set(ref _wikitext, value);
+        set
+        {
+            Set(ref _wikitext, value);
+            // Typing a correction into a page the tool judged correct is what makes saving possible at all.
+            OnPropertyChanged(nameof(CanAct));
+        }
     }
 
     public string Summary
     {
         get => _summary;
-        set => Set(ref _summary, value);
+        set
+        {
+            Set(ref _summary, value);
+            OnPropertyChanged(nameof(CanAct));
+        }
     }
 
     /// <summary>What happened when the user committed or skipped — shown in place of the buttons afterwards, so a
@@ -336,7 +358,23 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool CanAct => Result.CanCommit && !HasOutcome && !IsBusy;
+    /// <summary>
+    /// Whether "Save to the wiki" does anything.
+    ///
+    /// **The condition is what is on screen, not what the tool proposed** (user, 2026-09-29). It used to be
+    /// <c>Result.CanCommit</c>, which is true only when the *tool* found changes — so on a page it judged already
+    /// correct the button stayed dead even after the user typed a correction of their own into the wikitext box. That
+    /// contradicts the one rule this screen owes: what is on screen is what gets saved. If the text differs from the
+    /// page, there is something to save, whoever wrote it.
+    ///
+    /// The summary must be filled in too. For a tool-proposed edit it always is; for a hand-written one there is
+    /// nothing to inherit, and the wiki should not receive an unexplained revision.
+    /// </summary>
+    public bool CanAct =>
+        !HasOutcome && !IsBusy &&
+        Result.Page is not null && Result.Edit is not null &&
+        !string.IsNullOrWhiteSpace(_summary) &&
+        !string.Equals(_wikitext, Result.Edit.OriginalWikitext, StringComparison.Ordinal);
 
     /// <summary>Skipping is available for anything that reached the wiki but was not settled — including a page the
     /// tool would not touch — so the user can record "I looked, not now".</summary>

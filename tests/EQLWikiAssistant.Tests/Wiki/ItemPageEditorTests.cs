@@ -170,13 +170,61 @@ public class ItemPageEditorTests
     /// <summary>A parameter that does not exist has no line to change in place, and inventing a position is a
     /// judgement the tool declines — so it is deferred to the user rather than guessed at.</summary>
     [Fact]
-    public void AMissingParameterIsDeferredRatherThanInvented()
+    public void AMissingParameterIsWrittenInTheBlueprintsOrder()
     {
         ProposedEdit edit = Edit(
             Captured(name: "Cloak of Scales", merchantValue: "2 gold 4 silver"), "Cloak of Scales");
 
-        Assert.DoesNotContain("merchant_value", edit.NewWikitext);
-        Assert.Contains(edit.Deferred, d => d.Contains("merchant_value") && d.Contains("Add the parameter first"));
+        Assert.Contains("|merchant_value = 2g 4s", edit.NewWikitext);
+        Assert.Empty(edit.Deferred);
+
+        // The blueprint puts merchant_value after statsblock and before dropsfrom, and that is where it lands even
+        // though this page's own parameters are not in blueprint order (it opens with |notes=).
+        int statsblock = edit.NewWikitext.IndexOf("|statsblock", StringComparison.Ordinal);
+        int merchant = edit.NewWikitext.IndexOf("|merchant_value", StringComparison.Ordinal);
+        int dropsfrom = edit.NewWikitext.IndexOf("|dropsfrom", StringComparison.Ordinal);
+        Assert.True(statsblock < merchant && merchant < dropsfrom);
+    }
+
+    /// <summary>The anchor is what the blueprint places *before* the new parameter, not what it places after —
+    /// which only shows on a page whose own order differs from the blueprint's. `Cloak of Scales` opens with
+    /// `|notes=`, sixth in the blueprint, so anchoring on the first later parameter would drop the merchant value at
+    /// the very top of the call instead of after the statsblock.</summary>
+    [Fact]
+    public void ANewParameterIsNotDraggedToTheTopByAnOutOfOrderPage()
+    {
+        ProposedEdit edit = Edit(
+            Captured(name: "Cloak of Scales", merchantValue: "2 gold 4 silver"), "Cloak of Scales");
+
+        Assert.True(
+            edit.NewWikitext.IndexOf("|notes", StringComparison.Ordinal) <
+            edit.NewWikitext.IndexOf("|merchant_value", StringComparison.Ordinal));
+    }
+
+    /// <summary>Adding a parameter is adding a line the tool did not position, so the formatting follow-up is what
+    /// aligns it — the same composition every other new line uses.</summary>
+    [Fact]
+    public void AddingAParameterAsksForTheFormattingPass()
+    {
+        ProposedEdit edit = Edit(
+            Captured(name: "Cloak of Scales", merchantValue: "2 gold 4 silver"), "Cloak of Scales");
+
+        Assert.True(edit.NeedsReformatting);
+    }
+
+    /// <summary>The whole point of the minimal-edit rule: inserting a parameter must not disturb one byte of the
+    /// rest of the page, including the aligned padding it deliberately does not match.</summary>
+    [Fact]
+    public void InsertingAParameterLeavesEveryOtherLineByteForByte()
+    {
+        ProposedEdit edit = Edit(
+            Captured(name: "Cloak of Scales", merchantValue: "2 gold 4 silver"), "Cloak of Scales");
+
+        string[] before = edit.OriginalWikitext.Split('\n');
+        string[] after = edit.NewWikitext.Split('\n');
+
+        Assert.Equal(before.Length + 1, after.Length);
+        Assert.Equal(before, after.Where(l => !l.StartsWith("|merchant_value", StringComparison.Ordinal)));
     }
 
     /// <summary>Compliance the tool cannot fix is reported, never attempted. `Cloak of Scales` has no
