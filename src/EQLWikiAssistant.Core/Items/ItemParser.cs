@@ -50,7 +50,7 @@ public static class ItemParser
     public static ParsedItem Parse(IReadOnlyList<OcrLine> lines, ItemWindowTab activeTab = ItemWindowTab.Description)
     {
         var warnings = new List<string>();
-        List<List<OcrLine>> rows = GroupIntoRows(lines).Where(HasAnyAlphanumeric).ToList();
+        List<List<OcrLine>> rows = JoinWrappedRows([.. GroupIntoRows(lines).Where(HasAnyAlphanumeric)]);
         int i = 0;
 
         if (rows.Count == 0)
@@ -212,10 +212,26 @@ public static class ItemParser
 
             text = remainder;
             Match level = Regex.Match(inner, @"^Req(?:uired)?\.?\s*Level\s*:?\s*(?<level>\d+)$", RegexOptions.IgnoreCase);
+            Match cast = Regex.Match(inner, @"^Cast(?:ing)?\s*Time\s*:?\s*(?<time>.+)$", RegexOptions.IgnoreCase);
+
             if (level.Success)
+            {
                 modifiers.Insert(0, new KeyValuePair<string, string>("Required Level", level.Groups["level"].Value));
+            }
+            else if (cast.Success)
+            {
+                // **A cast time reaches us two ways at once on some items**, exactly as a required level does.
+                // `Petamorph Wand: Murderbee` writes `(Casting Time: 5.0)(Can Equip)` in the parenthetical *and*
+                // `Cast Time: 5.0 seconds` on its own sub-line; left as a condition it rendered twice in the wiki
+                // line. Normalizing it into the modifier both forms already share means nothing downstream has to
+                // know which way the game said it — the same treatment, and the same reason, as Required Level.
+                if (!modifiers.Any(m => string.Equals(m.Key, "Cast Time", StringComparison.OrdinalIgnoreCase)))
+                    modifiers.Insert(0, new KeyValuePair<string, string>("Cast Time", cast.Groups["time"].Value.Trim()));
+            }
             else
+            {
                 conditions.Insert(0, inner);
+            }
         }
 
         // OCR sometimes detects an effect's trailing parenthetical as its own fragment and leaves the open paren
@@ -242,6 +258,43 @@ public static class ItemParser
         int threshold = Math.Max(2, itemBaseName.Length / 6);
         return !EditDistance.IsCloseMatch(slot.Name, itemBaseName, threshold);
     }
+
+    /// <summary>
+    /// Rejoins a row the game wrapped mid-parenthetical onto the row above it.
+    ///
+    /// **Measured on a real window, not anticipated.** `Petamorph Wand: Murderbee` shows
+    /// <c>Click Effect: Summon Familiar: Murderbee (Casting Time: 5.0)(Can Equip)</c>, which is wider than the
+    /// window, so the game breaks it after <c>(Can</c> and puts <c>Equip)</c> on the next row. Parsed as two rows
+    /// that produced a condition of <c>Can</c>, an unparsed <c>Equip)</c>, and — worst — a *rendered wiki line* with
+    /// the condition truncated. An edit that writes `(Clicky, Can, ...)` to a public wiki is exactly the silently
+    /// wrong output this project exists to avoid.
+    ///
+    /// **An unclosed parenthesis is what identifies it**, rather than anything about position or width. The game
+    /// never leaves one open within a row, so a row with more <c>(</c> than <c>)</c> is unfinished by definition and
+    /// the next row is its continuation. That is a fact about balanced text, not a guess about layout, and it
+    /// cannot mistake a genuine new field for a continuation — a new field would not follow an open bracket.
+    ///
+    /// Joined with a single space, because the game breaks at a word boundary.
+    /// </summary>
+    private static List<List<OcrLine>> JoinWrappedRows(List<List<OcrLine>> rows)
+    {
+        var joined = new List<List<OcrLine>>();
+
+        foreach (List<OcrLine> row in rows)
+        {
+            if (joined.Count > 0 && HasUnclosedBracket(JoinRow(joined[^1])))
+            {
+                joined[^1] = [.. joined[^1], .. row];
+                continue;
+            }
+
+            joined.Add(row);
+        }
+
+        return joined;
+    }
+
+    private static bool HasUnclosedBracket(string text) => text.Count(c => c == '(') > text.Count(c => c == ')');
 
     private static List<List<OcrLine>> GroupIntoRows(IReadOnlyList<OcrLine> lines)
     {

@@ -65,6 +65,60 @@ public class ItemParserTests
         L("Focus Effect Reagent Conservation II", 12, 469),
     ];
 
+    /// <summary>
+    /// A verbatim capture of `Petamorph Wand: Murderbee`, whose effect line is wider than the window, so the game
+    /// wraps it: <c>...(Casting Time: 5.0)(Can</c> then <c>Equip)</c> on the next row. Found by the user testing the
+    /// app, and it produced a *rendered wiki line* reading `(Clicky, Can, ...)` — a truncated condition written to a
+    /// public wiki, which is the silently-wrong output this project exists to avoid.
+    /// </summary>
+    private static readonly OcrLine[] WrappedEffectLines =
+    [
+        L("Petamorph Wand: Murderbee", 993, 470),
+        L("Description", 942, 491),
+        L("Lore", 1150, 493),
+        L("Petamorph Wand: Murderbee", 933, 522),
+        L("No Trade, Attunable, Heirloom", 933, 538),
+        L("Class: ALL", 933, 554),
+        L("Race: ALL", 933, 570),
+        L("Ammo", 933, 586),
+        L("Size:", 883, 666),
+        L("SMALL", 955, 666),
+        L("Weight:", 883, 682),
+        L("0.9", 976, 682),
+        L("Click Effect: Summon Familiar: Murderbee (Casting Time: 5.0)(Can", 883, 768),
+        L("Equip)", 883, 782),
+        L("Cast Time: 5.0 seconds", 895, 796),
+        L("Cooldown: 10 seconds", 895, 810),
+    ];
+
+    /// <summary>An unclosed bracket is what identifies the wrap: the game never leaves one open within a row, so
+    /// that row is unfinished by definition and the next one continues it.</summary>
+    [Fact]
+    public void Parse_WrappedEffectLine_RejoinsTheCondition()
+    {
+        ParsedItem item = ItemParser.Parse(WrappedEffectLines);
+
+        EffectEntry effect = Assert.Single(item.Effects);
+        Assert.Equal("Summon Familiar: Murderbee", effect.Name);
+        Assert.Equal(["Can Equip"], effect.Conditions);
+        Assert.DoesNotContain(item.Warnings, w => w.Contains("Equip)"));
+    }
+
+    /// <summary>
+    /// This item states its cast time twice — once inside the parenthetical and once as a sub-line — so leaving the
+    /// parenthetical one as a condition rendered `Casting Time: 5.0` twice in the wiki line. It is normalized into
+    /// the modifier both forms share, exactly as a required level already was.
+    /// </summary>
+    [Fact]
+    public void Parse_CastTimeStatedTwice_IsNormalizedToOneModifier()
+    {
+        ParsedItem item = ItemParser.Parse(WrappedEffectLines);
+
+        EffectEntry effect = Assert.Single(item.Effects);
+        Assert.DoesNotContain(effect.Conditions, c => c.Contains("Casting Time", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("5.0 seconds", effect.Modifiers.Single(m => m.Key == "Cast Time").Value);
+    }
+
     [Fact]
     public void Parse_RealBracerCapture_ExtractsCoreFields()
     {

@@ -133,8 +133,23 @@
                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Field" Binding="{Binding Field}" Width="1.2*" />
-                            <DataGridTextColumn Header="In game" Binding="{Binding Captured}" Width="1.5*" />
-                            <DataGridTextColumn Header="On the wiki" Binding="{Binding OnWiki}" Width="1.5*" />
+                            <!-- Template columns so the compared values wrap. As text columns they truncated, which
+                                 hid the very thing the row exists to show — an effect line or a lore paragraph is
+                                 far wider than a cell. -->
+                            <DataGridTemplateColumn Header="In game" Width="1.6*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Captured}" TextWrapping="Wrap" Margin="2,3" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="On the wiki" Width="1.6*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding OnWiki}" TextWrapping="Wrap" Margin="2,3" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Verdict" Binding="{Binding Verdict}" Width="Auto" />
                             <!-- A template column so the note wraps. As a text column it truncated mid-sentence,
                                  which loses the part explaining *why* the tool concluded what it did. -->

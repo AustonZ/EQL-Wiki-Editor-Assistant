@@ -307,7 +307,13 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     private static IEnumerable<string> BuildWarnings(ItemCheckResult result)
     {
-        foreach (string warning in result.Warnings) yield return warning;
+        foreach (string warning in result.Warnings)
+        {
+            // The lore section says this, with a button to act on it. Repeating it up here was noise once lore got
+            // a region of its own (user, 2026-09-28).
+            if (result.NeedsLoreCapture && warning.Contains("Lore tab", StringComparison.Ordinal)) continue;
+            yield return warning;
+        }
 
         // Every field the tool declined to decide, in the warning strip rather than only as a row in the findings
         // table. The table truncates, and these are precisely the items nobody has judged yet — the tool has said
