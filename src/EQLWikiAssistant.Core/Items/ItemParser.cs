@@ -633,9 +633,41 @@ public static class ItemParser
                 continue;
             }
 
-            if (text.Length > 0)
+            if (text.Length > 0 && !IsKnownInformationalText(text))
                 warnings.Add($"Unparsed line in stat block: \"{text}\"");
             i++;
         }
     }
+
+    /// <summary>
+    /// Developer help text the window shows but the wiki does not record — matched by rule, and dropped silently.
+    ///
+    /// **The game puts explanatory prose in the same region as real fields**, below the effects, because there was
+    /// nowhere else to put it. So this region is a mixture: `Mount Speed: Fast` is a genuine stat the wiki wants,
+    /// while the sentence explaining what `Placeable` means is not. The user's call (2026-09-28) is to carry rules
+    /// for the lines we know and *warn* about the ones we do not, rather than either guessing or dumping the whole
+    /// region into the statsblock for a human to sort out.
+    ///
+    /// **Recognized by text, not by position, because position does not work.** Measured on real captures: the gap
+    /// between an exaltation row and an effect row is 26px, while a one-blank-line separator before this text is
+    /// 28px. Two pixels apart on a signal that already varies between 14, 23, 26, 28 and 42 — no threshold survives
+    /// it, and the separator is not even consistent (a pet illusion's text sits two blank lines down, a mount's one).
+    ///
+    /// **Prefix matches, deliberately.** The tail of these sentences is ordinary prose, where the reader's `l`/`I`
+    /// resolution is least reliable — a real capture reads "Changes your pet to Iook Iike a Dark Elf." Anchoring on
+    /// the opening words keeps the rule working regardless.
+    ///
+    /// Anything here that is *not* recognized still warns, which is the point: a new kind of trailing text should
+    /// reach the user rather than being quietly dropped or quietly written.
+    /// </summary>
+    private static bool IsKnownInformationalText(string text) =>
+        KnownInformationalText.Any(prefix => text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    private static readonly string[] KnownInformationalText =
+    [
+        // What the `Placeable` flag means, on every placeable item.
+        "This item is placeable in",
+        // What a pet illusion does, below the effect that grants it.
+        "Changes your pet to",
+    ];
 }

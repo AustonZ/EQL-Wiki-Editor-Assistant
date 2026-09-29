@@ -369,13 +369,26 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   `Recommended level`, `Required level`) and omits several the game does (`Range`, `Accuracy`, `Type`, `Items`),
   plus `Worn` and `Can Equip` in the effect parenthetical.
 
-**The item window's trailing section (user, 2026-09-28).** Below the effects, the game shows only two things: the
-merchant value, and occasional developer help/informative text, **always separated from the effects by two blank
-lines**. **Nothing below the effects section ever belongs in the statsblock.** The editors' practice is to decide by
-hand whether that text is worth keeping, usually folding it into `notes`.
-- Real examples, both on pet illusion items: `Changes your pet to look like a Dark Elf.` and `Convert to Guise of the
-  Deceiver`. The parser currently reports them as unreadable statsblock lines, which is honest but noisy, and a
-  trailing-section rule would let them be surfaced as *informative text* instead. Not yet implemented.
+**The item window's trailing region.** Below the effects the game mixes real fields with developer help text,
+because there was nowhere else to put either. **Handled by rules on what a line *says*, never on where it sits.**
+- **Two earlier claims here were wrong and are corrected** (user, 2026-09-28, reversing their own first account
+  after finding mounts): it is *not* true that nothing below the effects belongs in the statsblock —
+  `Mount Speed: Fast` is real data and is now a mapped stat — and the separator is *not* always two blank lines: a
+  pet illusion's text sits two below its effect, a mount's speed one below, then one more before the help text.
+- **Position cannot identify this region, and the measurement is decisive.** On real captures the gaps between
+  consecutive body rows run 14, 23, 26, 28 and 42px: **exaltation → effect is 26px and a one-blank-line separator is
+  28px.** Two pixels apart on a signal that already varies, with an inconsistent separator on top. Any threshold
+  would misfire, which is why the rules match text instead.
+- **Known lines are acted on; unknown ones warn.** That split is the user's call, against both alternatives they
+  weighed — guessing, or dumping the whole region into the statsblock for a human to sort out. `ItemParser`'s
+  `KnownInformationalText` carries the drop-silently rules, matched on the opening words because the tail of a
+  sentence is where the reader's `l`/`I` resolution is least reliable (a real capture reads `Changes your pet to
+  Iook Iike a Dark Elf.`). Adding a rule is one line.
+  - Recognized and dropped: `This item is placeable in ...` (what the Placeable flag means, on every placeable
+    item) and `Changes your pet to ...` (what a pet illusion does).
+  - Kept as data: `Mount Speed` (`Fast`, `AA Speed or Highest`).
+  - Still warns, correctly: `Convert to Guise of the Deceiver` — and the editors *do* record conversions by hand in
+    `notes`, so reaching the user is the right outcome rather than a gap.
 - **The window can be too short to show everything**, in two ways. The effects and info section can become
   scrollable; past that, content is simply clipped with no scrollbar at all. **Detecting the clipped case is not
   worth it** — there is no reliable signal and the game normally expands the window to avoid it, so it is the user's

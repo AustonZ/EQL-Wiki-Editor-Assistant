@@ -68,8 +68,11 @@ public sealed class WikiMapping
     /// **2** (2026-09-28): categories are now derived and written at all, pet illusion became a mapped field, the
     /// parameter order and two statsblock line positions were added. Rows written under 1 would have been treated
     /// as settled while missing every category the tool would now add.
+    ///
+    /// **3** (2026-09-28): `Mount Speed` became a mapped stat, so mounts checked under 2 would be settled while
+    /// missing it.
     /// </summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -299,6 +302,11 @@ public sealed class WikiMapping
         map[Core.Items.ItemParser.PetIllusionLabel] =
             new StatMapping(Core.Items.ItemParser.PetIllusionLabel, "Pet Illusion", StatDisposition.Stored);
 
+        // A real stat that happens to live in the window's trailing region, below the effects, alongside developer
+        // help text that is *not* data (user, 2026-09-28: "this seems like a legitimate stat for the statsblock").
+        // Values seen: `Fast`, `AA Speed or Highest`. One wiki page already writes it by hand.
+        map["Mount Speed"] = new StatMapping("Mount Speed", "Mount Speed", StatDisposition.Stored);
+
         return new WikiMapping
         {
             Stats = map,
@@ -331,6 +339,8 @@ public sealed class WikiMapping
                 ["Effect"],
                 // Not in the blueprint — the property is newer than it. Effect-adjacent because that is what it is.
                 ["Pet Illusion"],
+                // Also newer than the blueprint, and also effect-adjacent: it comes from the same trailing region.
+                ["Mount Speed"],
                 ["Charges"],
                 ["Size", "WT"],
                 ["Weight Reduction", "Capacity", "Size Capacity", "Items"],
