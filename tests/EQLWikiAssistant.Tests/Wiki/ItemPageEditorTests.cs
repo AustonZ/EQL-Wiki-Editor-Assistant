@@ -221,8 +221,10 @@ public class ItemPageEditorTests
     {
         ProposedEdit edit = Edit(Captured(stats: [new("AC", "6")]), "Earring of Bashing");
 
-        Assert.Contains("AC 6", edit.Summary);
-        Assert.StartsWith("Updated from in-game data:", edit.Summary);
+        // The summary names the changes and nothing else: "updated from in-game data" is assumed, and a prefix only
+        // pushes the part that matters off the end of a history listing. (This capture carries no flags, so losing
+        // the flags line is a real second change and belongs in the summary.)
+        Assert.Equal("removed the flags line, AC 6", edit.Summary);
     }
 
     /// <summary>Every fixture must survive an edit that changes nothing about it — the same byte-for-byte property

@@ -78,6 +78,10 @@ public sealed record ItemCheckResult
 
     public ItemPageLookupResult? Lookup { get; init; }
 
+    /// <summary>The captured icon's fingerprint, kept so the item can be re-analyzed when its lore arrives from a
+    /// second capture without re-reading pixels that have not changed.</summary>
+    public Core.Icons.IconFingerprint? CapturedIcon { get; init; }
+
     public ItemPageAnalysis? Analysis { get; init; }
 
     public ProposedEdit? Edit { get; init; }

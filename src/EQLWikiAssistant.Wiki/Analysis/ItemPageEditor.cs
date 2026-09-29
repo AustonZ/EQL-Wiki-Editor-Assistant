@@ -15,11 +15,17 @@ public sealed record ProposedEdit(
 {
     public bool HasChanges => !string.Equals(OriginalWikitext, NewWikitext, StringComparison.Ordinal);
 
-    /// <summary>A one-line edit summary for the wiki's history.</summary>
+    /// <summary>
+    /// A one-line edit summary for the wiki's history.
+    ///
+    /// **It names the changes and nothing else** (user, 2026-09-28). An earlier version prefixed every summary with
+    /// "Updated from in-game data:", which is assumed — nobody should be writing item data they did not see in game
+    /// — so it only made the summary longer and pushed the part that matters off the end of a history listing.
+    /// </summary>
     public string Summary =>
         Changes.Count == 0
             ? "No changes"
-            : $"Updated from in-game data: {string.Join(", ", Changes.Take(4))}" +
+            : string.Join(", ", Changes.Take(4)) +
               (Changes.Count > 4 ? $" and {Changes.Count - 4} more" : "");
 }
 

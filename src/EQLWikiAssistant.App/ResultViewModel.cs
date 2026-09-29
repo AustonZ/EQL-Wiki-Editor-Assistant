@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Items;
+using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
 using EQLWikiAssistant.Wiki.Analysis;
 
@@ -70,32 +72,84 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private bool _isBusy;
     private FormattingProposal? _formatting;
     private string? _formattingOutcome;
+    private CapturedImage? _loreImage;
 
-    public ResultViewModel(ItemCheckResult result)
+    public ResultViewModel(ItemCheckResult result) => Load(result);
+
+    /// <summary>
+    /// Replaces everything this entry shows, in place.
+    ///
+    /// **In place rather than by swapping the object**, because the list now accumulates across captures (user,
+    /// 2026-09-28) — re-capturing an item, or feeding it lore from the second capture, updates the entry the user is
+    /// already looking at instead of adding a duplicate or losing their selection.
+    /// </summary>
+    [MemberNotNull(nameof(Result), nameof(_wikitext), nameof(_summary))]
+    public void Load(ItemCheckResult result)
     {
+        ArgumentNullException.ThrowIfNull(result);
         Result = result;
         _wikitext = result.Edit?.NewWikitext ?? result.Page?.Wikitext ?? "";
         _summary = result.Edit?.Summary ?? "";
+        _outcome = null;
+        _formatting = null;
+        _formattingOutcome = null;
 
-        Diff = new ObservableCollection<DiffLineViewModel>(
-            result.Edit is null
-                ? []
-                : WikitextDiff.Compute(result.Edit.OriginalWikitext, result.Edit.NewWikitext)
-                    .Select(l => new DiffLineViewModel(l)));
+        Replace(Diff, result.Edit is null
+            ? []
+            : WikitextDiff.Compute(result.Edit.OriginalWikitext, result.Edit.NewWikitext)
+                .Select(l => new DiffLineViewModel(l)));
+        Replace(Findings, result.Analysis?.Findings
+            .Where(f => f.IsChange || f.Blocks)
+            .Select(f => new FindingViewModel(f)) ?? []);
+        Replace(Warnings, BuildWarnings(result));
+        FormattingDiff.Clear();
 
-        Findings = new ObservableCollection<FindingViewModel>(
-            result.Analysis?.Findings
-                .Where(f => f.IsChange || f.Blocks)
-                .Select(f => new FindingViewModel(f)) ?? []);
-
-        Warnings = new ObservableCollection<string>(BuildWarnings(result));
+        // Everything on this object is derived from Result, so the simplest correct notification is "all of it".
+        OnPropertyChanged(null);
     }
 
-    public ItemCheckResult Result { get; }
+    private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> items)
+    {
+        target.Clear();
+        foreach (T item in items) target.Add(item);
+    }
 
-    public ObservableCollection<DiffLineViewModel> Diff { get; }
-    public ObservableCollection<FindingViewModel> Findings { get; }
-    public ObservableCollection<string> Warnings { get; }
+    public ItemCheckResult Result { get; private set; }
+
+    public ObservableCollection<DiffLineViewModel> Diff { get; } = [];
+    public ObservableCollection<FindingViewModel> Findings { get; } = [];
+    public ObservableCollection<string> Warnings { get; } = [];
+
+    /// <summary>The Lore-tab capture of this item, when the user has taken one — shown beside the Description
+    /// capture rather than replacing it.</summary>
+    public CapturedImage? LoreImage
+    {
+        get => _loreImage;
+        set
+        {
+            _loreImage = value;
+            OnPropertyChanged(nameof(LoreImage));
+            OnPropertyChanged(nameof(HasLoreImage));
+        }
+    }
+
+    public bool HasLoreImage => _loreImage is not null;
+
+    /// <summary>The lore read from the game, once a Lore-tab capture has been merged in.</summary>
+    public string? CapturedLore => Result.Lore;
+
+    public bool HasCapturedLore => !string.IsNullOrWhiteSpace(Result.Lore);
+
+    /// <summary>True while this item is waiting for its Lore tab to be captured — what the lore section's prompt
+    /// hangs off.</summary>
+    public bool WantsLoreCapture => Result.NeedsLoreCapture;
+
+    /// <summary>Whether the lore section has anything at all to show.</summary>
+    public bool HasLoreSection => WantsLoreCapture || HasCapturedLore;
+
+    /// <summary>Lore captured with nothing on the page to weigh it against — so it is simply shown, and the edit
+    /// will add it. The comparison panel handles the case where the page has its own.</summary>
+    public bool HasCapturedLoreOnly => HasCapturedLore && !HasLoreToCompare;
 
     public string ItemName => string.IsNullOrEmpty(Result.ItemName) ? "(unreadable window)" : Result.ItemName;
 

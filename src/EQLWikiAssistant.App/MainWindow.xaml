@@ -27,6 +27,14 @@
                           Checked="OnReCheckChanged" Unchecked="OnReCheckChanged"
                           ToolTip="Ask the wiki even for items the ledger has already settled" />
                 <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="16,0,0,0" Foreground="#666" />
+
+                <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a
+                     status line were too quiet to read as "working" (user, 2026-09-28). -->
+                <StackPanel x:Name="BusyPanel" Orientation="Horizontal" Margin="20,0,0,0" Visibility="Collapsed">
+                    <ProgressBar IsIndeterminate="True" Width="150" Height="12" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BusyLabel" VerticalAlignment="Center" Margin="10,0,0,0"
+                               Foreground="#1B4A75" FontWeight="SemiBold" />
+                </StackPanel>
             </StackPanel>
         </Border>
 
@@ -52,14 +60,27 @@
                      HorizontalContentAlignment="Stretch" BorderThickness="0,0,1,0" BorderBrush="#DDD">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Margin="2,5">
-                            <TextBlock Text="{Binding ItemName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontSize="11" />
-                                <TextBlock Text="  •  done" FontSize="11" Foreground="Gray"
-                                           Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
+                        <Grid Margin="2,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{Binding ItemName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontSize="11" />
+                                    <TextBlock Text="  •  done" FontSize="11" Foreground="Gray"
+                                               Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
+                                    <TextBlock Text="  •  lore" FontSize="11" Foreground="Gray"
+                                               Visibility="{Binding HasCapturedLore, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
+                            <!-- The list accumulates across captures, so finishing with an item has to be an
+                                 explicit act rather than something the next capture does for you. -->
+                            <Button Grid.Column="1" Content="✕" Click="OnCloseResultClick" Padding="6,0"
+                                    BorderThickness="0" Background="Transparent" Foreground="#999"
+                                    VerticalAlignment="Top" ToolTip="Close this item" />
+                        </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
@@ -132,14 +153,41 @@
                         </DataGrid.RowStyle>
                     </DataGrid>
 
-                    <!-- Lore gets its own panel because it is the one field a grid cell cannot show: it is a
-                         paragraph, and the decision is a judgement about prose the user has to actually read. The
-                         tool never overwrites it, so this is purely "do you still like what the page says?". -->
+                    <!-- One lore region, always in the same place: the prompt to capture the Lore tab, the lore once
+                         captured, and the comparison against the page all live here rather than the lore capture
+                         taking over the whole screen (user, 2026-09-28). -->
+                    <StackPanel Visibility="{Binding HasLoreSection, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Lore" Style="{StaticResource SectionHeading}" />
+
+                        <!-- Waiting for the second capture. The button just captures again, so the user switches
+                             tab in game and clicks here — or presses the same hotkey. -->
+                        <Border Visibility="{Binding WantsLoreCapture, Converter={StaticResource BoolToVis}}"
+                                Background="#FFF8E1" BorderBrush="#F0D48A" BorderThickness="1" CornerRadius="3"
+                                Padding="10,7">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#5D4200"
+                                           Text="This item has a Lore tab that has not been captured yet. Switch to it in game, then:" />
+                                <Button Content="Capture the Lore tab" Click="OnCaptureClick" Padding="12,4"
+                                        Margin="10,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Captured, and the page has none to compare against — it will be added by the edit. -->
+                        <Border Visibility="{Binding HasCapturedLoreOnly, Converter={StaticResource BoolToVis}}"
+                                BorderBrush="#DDD" BorderThickness="1" CornerRadius="3" Padding="8">
+                            <StackPanel>
+                                <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="#555"
+                                           Margin="0,0,0,4" />
+                                <TextBlock Text="{Binding CapturedLore}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- The comparison, when the page already has lore of its own. The tool never overwrites it, so
+                         this is purely "do you still like what the page says?". -->
                     <StackPanel Visibility="{Binding HasLoreToCompare, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="Lore — check you are happy with the page's wording"
-                                   Style="{StaticResource SectionHeading}" />
-                        <TextBlock TextWrapping="Wrap" Foreground="#555" Margin="0,0,0,6"
-                                   Text="These differ. The tool does not overwrite lore, so the page keeps its own wording unless you change it by hand." />
+                        <TextBlock TextWrapping="Wrap" Foreground="#555" Margin="0,6,0,6"
+                                   Text="The page's lore and the captured lore differ. The tool does not overwrite lore, so the page keeps its own wording unless you change it by hand." />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -264,7 +312,12 @@
                     </StackPanel>
 
                     <TextBlock Text="What was captured" Style="{StaticResource SectionHeading}" />
-                    <Image x:Name="WindowImage" Stretch="None" HorizontalAlignment="Left" Margin="0,2,0,0" />
+                    <StackPanel Orientation="Horizontal">
+                        <Image x:Name="WindowImage" Stretch="None" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <!-- The Lore capture sits beside the Description one rather than replacing it, so both
+                             halves of a two-capture item stay visible together. -->
+                        <Image x:Name="LoreImage" Stretch="None" VerticalAlignment="Top" Margin="12,2,0,0" />
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

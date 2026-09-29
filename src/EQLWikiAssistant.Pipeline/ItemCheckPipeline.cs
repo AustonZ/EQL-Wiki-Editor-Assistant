@@ -274,6 +274,7 @@ public sealed class ItemCheckPipeline
             Lookup = lookup,
             Analysis = analysis,
             Edit = edit,
+            CapturedIcon = capturedIcon,
             Icon = icon,
             IconNote = iconNote,
             Page = wikiPage,
@@ -433,6 +434,45 @@ public sealed class ItemCheckPipeline
         RecordLedgerEntry(
             result.ItemName, result.Page?.Title, CheckOutcome.Skipped, result.Page?.RevisionId,
             FingerprintOf(result), note);
+    }
+
+    /// <summary>
+    /// Re-runs the wiki half of the pipeline for an item already checked, picking up anything learned since —
+    /// in practice, lore from the second capture of the two-capture flow.
+    ///
+    /// **It exists so the lore capture joins the item already on screen instead of arriving as its own result.**
+    /// The parsed item and its icon have not changed, so nothing is re-read from pixels; only the comparison against
+    /// the page is redone, now with a complete capture. Without this the user would have to capture the Description
+    /// tab a second time for the lore to reach the edit.
+    /// </summary>
+    public async Task<ItemCheckResult> ReanalyzeAsync(
+        ItemCheckResult previous, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(previous);
+        if (previous.Item is not { } item)
+            throw new InvalidOperationException("This result has no parsed item, so there is nothing to re-analyze.");
+
+        _pendingLore.TryGetValue(item.Name, out string? lore);
+        string fingerprint = ItemFingerprint.Compute(item, previous.CapturedIcon, lore);
+
+        try
+        {
+            return await AnalyzeAgainstWikiAsync(
+                    item,
+                    previous.WindowImage!,
+                    previous.LedgerVerdict,
+                    previous.CapturedIcon,
+                    lore,
+                    needsLore: lore is null && previous.NeedsLoreCapture,
+                    fingerprint,
+                    [.. item.Warnings],
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is MediaWikiException or HttpRequestException or TaskCanceledException)
+        {
+            return previous with { Status = ItemCheckStatus.Failed, Error = ex.Message };
+        }
     }
 
     /// <summary>

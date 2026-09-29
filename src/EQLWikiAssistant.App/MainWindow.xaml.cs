@@ -42,7 +42,14 @@ public partial class MainWindow : Window
         {
             _hotKey = new GlobalHotKey(HotKeyModifiers.Control | HotKeyModifiers.Shift, VkE);
             // The hotkey runs its own message-only window on its own thread, so this arrives off the UI thread.
-            _hotKey.Pressed += (_, _) => Dispatcher.Invoke(() => _ = CaptureAsync());
+            _hotKey.Pressed += (_, _) => Dispatcher.Invoke(() =>
+            {
+                // Front first, so the capture's progress and its result are both visible without alt-tabbing. The
+                // game window is captured from the frame grabbed inside CaptureAsync, which reads it unfocused, so
+                // stealing focus here cannot spoil the capture.
+                ComeToTheFront();
+                _ = CaptureAsync();
+            });
             HotKeyLabel.Text = "Hotkey: Ctrl+Shift+E";
         }
         catch (Exception ex)
@@ -84,10 +91,12 @@ public partial class MainWindow : Window
         if (_capturing || _services is null) return;
         _capturing = true;
         CaptureButton.IsEnabled = false;
+        BusyPanel.Visibility = Visibility.Visible;
 
         try
         {
-            StatusText.Text = "Capturing the game window…";
+            BusyLabel.Text = "Capturing the game window…";
+            StatusText.Text = BusyLabel.Text;
             (CapturedImage? frame, string? problem) = await _services.CaptureGameWindowAsync();
             if (frame is null)
             {
@@ -95,13 +104,13 @@ public partial class MainWindow : Window
                 return;
             }
 
-            StatusText.Text = "Reading the item windows and checking them against the wiki…";
+            BusyLabel.Text = "Reading the item windows and checking them against the wiki…";
+            StatusText.Text = BusyLabel.Text;
             IReadOnlyList<ItemCheckResult> results = await _services.Pipeline.CheckAsync(frame);
 
-            _results.Clear();
-            foreach (ItemCheckResult result in results) _results.Add(new ResultViewModel(result));
-
-            if (_results.Count > 0) ResultsList.SelectedIndex = 0;
+            // Results accumulate across captures rather than replacing each other (user, 2026-09-28), so an item
+            // just updated stays on screen to refer back to while working on the next one. Closing one is explicit.
+            foreach (ItemCheckResult result in results) await MergeAsync(result);
 
             // The ledger is written after a batch rather than per row — it is saved whole, and a check can settle a
             // page that already agreed without the user doing anything.
@@ -123,10 +132,80 @@ public partial class MainWindow : Window
         {
             _capturing = false;
             CaptureButton.IsEnabled = true;
+            BusyPanel.Visibility = Visibility.Collapsed;
         }
     }
 
-    private void OnResultSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    /// <summary>
+    /// Brings this window to the front (user, 2026-09-28), so pressing the hotkey in game puts the result in view
+    /// without alt-tabbing.
+    ///
+    /// <see cref="Window.Activate"/> alone is unreliable: Windows refuses foreground changes from a process the user
+    /// is not interacting with. Flicking <see cref="Window.Topmost"/> is the long-standing way to ask anyway, and it
+    /// leaves the window ordinary afterwards rather than permanently pinned above the game.
+    /// </summary>
+    private void ComeToTheFront()
+    {
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+
+        Activate();
+        Topmost = true;
+        Topmost = false;
+        Focus();
+    }
+
+    /// <summary>
+    /// Folds one capture into the list: a Lore capture joins the item it belongs to, a re-capture refreshes the
+    /// entry already on screen, and anything else is added.
+    /// </summary>
+    private async Task MergeAsync(ItemCheckResult result)
+    {
+        ResultViewModel? existing = string.IsNullOrEmpty(result.ItemName)
+            ? null
+            : _results.FirstOrDefault(
+                v => string.Equals(v.Result.ItemName, result.ItemName, StringComparison.OrdinalIgnoreCase));
+
+        // The Lore tab is a second view of an item, not a second item. It joins the entry that is waiting for it,
+        // and the analysis is redone so the lore actually reaches the proposed edit.
+        if (result.Status == ItemCheckStatus.LoreRecorded && existing is not null && _services is not null)
+        {
+            BusyLabel.Text = $"Adding the lore to {existing.ItemName}…";
+            ItemCheckResult updated = await _services.Pipeline.ReanalyzeAsync(existing.Result);
+            existing.Load(updated);
+            existing.LoreImage = result.WindowImage;
+            ResultsList.SelectedItem = existing;
+            ShowSelected();
+            return;
+        }
+
+        if (existing is not null)
+        {
+            // Re-capturing an item the user already has open updates it rather than adding a duplicate; a lore
+            // capture taken earlier stays attached, since it is still the same item.
+            CapturedImage? lore = existing.LoreImage;
+            existing.Load(result);
+            existing.LoreImage = lore;
+            ResultsList.SelectedItem = existing;
+            ShowSelected();
+            return;
+        }
+
+        var view = new ResultViewModel(result);
+        _results.Add(view);
+        ResultsList.SelectedItem = view;
+        ShowSelected();
+    }
+
+    private void OnCloseResultClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as System.Windows.Controls.Button)?.DataContext is not ResultViewModel view) return;
+        _results.Remove(view);
+        if (_results.Count > 0 && ResultsList.SelectedItem is null) ResultsList.SelectedIndex = 0;
+    }
+
+    private void OnResultSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => ShowSelected();
+
+    private void ShowSelected()
     {
         // Collapsed rather than left to the bindings: with no selection there is no DataContext for them to resolve
         // against, so each `Visibility` falls back to Visible and the whole empty scaffold renders.
@@ -134,9 +213,9 @@ public partial class MainWindow : Window
         DetailScroller.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
         EmptyState.Visibility = selected ? Visibility.Collapsed : Visibility.Visible;
 
-        WindowImage.Source = ResultsList.SelectedItem is ResultViewModel { Result.WindowImage: { } image }
-            ? ToBitmap(image)
-            : null;
+        var view = ResultsList.SelectedItem as ResultViewModel;
+        WindowImage.Source = view?.Result.WindowImage is { } image ? ToBitmap(image) : null;
+        LoreImage.Source = view?.LoreImage is { } lore ? ToBitmap(lore) : null;
     }
 
     private async void OnCommitClick(object sender, RoutedEventArgs e)
