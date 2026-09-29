@@ -151,6 +151,14 @@ public sealed class ItemCheckPipeline
         string? iconUnreadableNote =
             noIconBecause is null ? null : $"The icon was not compared: {noIconBecause}.";
 
+        // Cropped whatever the verdict: the review screen shows it beside the wiki's copy so the user can settle by
+        // eye anything the comparison declines or gets wrong.
+        CapturedImage? iconCrop = window.ActiveTab == ItemWindowTab.Description
+            ? frame.Crop(new Rect(
+                window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
+                ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height))
+            : null;
+
         _pendingLore.TryGetValue(item.Name, out string? lore);
         bool needsLore = window.HasLoreTab && lore is null;
 
@@ -175,7 +183,7 @@ public sealed class ItemCheckPipeline
         try
         {
             return await AnalyzeAgainstWikiAsync(
-                    item, crop, verdict, capturedIcon, iconUnreadableNote, lore, needsLore, fingerprint, warnings,
+                    item, crop, verdict, capturedIcon, iconCrop, iconUnreadableNote, lore, needsLore, fingerprint, warnings,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -201,6 +209,7 @@ public sealed class ItemCheckPipeline
         CapturedImage crop,
         LedgerVerdict verdict,
         IconFingerprint? capturedIcon,
+        CapturedImage? iconCrop,
         string? iconUnreadableNote,
         string? lore,
         bool needsLore,
@@ -260,7 +269,7 @@ public sealed class ItemCheckPipeline
             lore is null ? item : item with { Lore = lore }, page, wikiPage.Title, _mapping);
         ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis, _mapping);
 
-        (IconComparison? icon, string? iconNote) =
+        (IconComparison? icon, string? iconNote, CapturedImage? wikiIcon) =
             await CompareIconAsync(capturedIcon, iconUnreadableNote, page.IconId, cancellationToken).ConfigureAwait(false);
 
         if (needsLore)
@@ -279,6 +288,8 @@ public sealed class ItemCheckPipeline
             Analysis = analysis,
             Edit = edit,
             CapturedIcon = capturedIcon,
+            CapturedIconImage = iconCrop,
+            WikiIconImage = wikiIcon,
             Icon = icon,
             IconNote = iconNote,
             Page = wikiPage,
@@ -307,13 +318,12 @@ public sealed class ItemCheckPipeline
     /// Every "cannot judge" path returns a note rather than a verdict. An icon check that cannot see the icon has to
     /// stay silent: a false "wrong icon" sends the user hunting for a problem that is not there.
     /// </summary>
-    private async Task<(IconComparison?, string?)> CompareIconAsync(
+    private async Task<(IconComparison?, string?, CapturedImage?)> CompareIconAsync(
         IconFingerprint? captured, string? unreadableNote, string? iconId, CancellationToken cancellationToken)
     {
-        if (_icons is null || _decoder is null) return (null, null);
-        if (captured is null) return (null, unreadableNote);
+        if (_icons is null || _decoder is null) return (null, null, null);
         if (string.IsNullOrWhiteSpace(iconId))
-            return (null, "The page has no lucy_img_ID, so there is no icon to compare against.");
+            return (null, "The page has no lucy_img_ID, so there is no icon to compare against.", null);
 
         byte[]? bytes;
         try
@@ -322,10 +332,10 @@ public sealed class ItemCheckPipeline
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException)
         {
-            return (null, $"The icon could not be fetched: {ex.Message}");
+            return (null, $"The icon could not be fetched: {ex.Message}", null);
         }
 
-        if (bytes is null) return (null, $"The wiki has no File:item_{iconId}.png yet.");
+        if (bytes is null) return (null, $"The wiki has no File:item_{iconId}.png yet.", null);
 
         CapturedImage wikiIcon;
         try
@@ -336,17 +346,20 @@ public sealed class ItemCheckPipeline
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return (null, $"The wiki's icon {iconId} could not be decoded: {ex.Message}");
+            return (null, $"The wiki's icon {iconId} could not be decoded: {ex.Message}", null);
         }
 
         if (!IconHasher.TryFingerprint(
                 wikiIcon, new Rect(0, 0, wikiIcon.Width, wikiIcon.Height), out IconFingerprint onWiki))
-            return (null, $"The wiki's icon {iconId} has too little ink to compare.");
+            return (null, $"The wiki's icon {iconId} has too little ink to compare.", wikiIcon);
 
         if (!onWiki.IsComparable)
-            return (null, $"The wiki's icon {iconId} is too low-contrast to judge — see IconFingerprint.MinimumContrast.");
+            return (null, $"The wiki's icon {iconId} is too low-contrast to judge — compare them by eye below.", wikiIcon);
 
-        return (new IconComparison(iconId!, captured, onWiki, captured.CorrelationDistanceTo(onWiki)), null);
+        // The wiki image comes back even when the capture could not be fingerprinted, so the user can still see both.
+        return captured is null
+            ? (null, unreadableNote, wikiIcon)
+            : (new IconComparison(iconId!, captured, onWiki, captured.CorrelationDistanceTo(onWiki)), null, wikiIcon);
     }
 
     /// <summary>
@@ -466,6 +479,7 @@ public sealed class ItemCheckPipeline
                     previous.WindowImage!,
                     previous.LedgerVerdict,
                     previous.CapturedIcon,
+                    previous.CapturedIconImage,
                     // The icon has not been re-read, so whatever was said about it still holds.
                     previous.IconNote,
                     lore,

@@ -82,6 +82,18 @@ public sealed record ItemCheckResult
     /// second capture without re-reading pixels that have not changed.</summary>
     public Core.Icons.IconFingerprint? CapturedIcon { get; init; }
 
+    /// <summary>
+    /// The two icons themselves, for the user to compare by eye.
+    ///
+    /// **Carried whether or not the check reached a verdict** (user, 2026-09-28). The comparison is perceptual and
+    /// has limits — it declines near-black sprites and occasionally flags a good one — and every one of those
+    /// outcomes is cheap to resolve if the user can simply look at the two images, and expensive if they cannot.
+    /// It also makes a wrong "match" visible, which no amount of threshold tuning can.
+    /// </summary>
+    public CapturedImage? CapturedIconImage { get; init; }
+
+    public CapturedImage? WikiIconImage { get; init; }
+
     public ItemPageAnalysis? Analysis { get; init; }
 
     public ProposedEdit? Edit { get; init; }

@@ -77,9 +77,21 @@ public sealed record IconFingerprint(byte[] Signature, int InkWidth, int InkHeig
         }
     }
 
-    /// <summary>Below this there is not enough variation in the sprite to tell one icon from another. Measured: the
-    /// icons that defeated the comparison sit under 0.06, while ordinary ones are well above it.</summary>
-    public const double MinimumContrast = 0.06;
+    /// <summary>
+    /// Below this there is not enough variation in the sprite to tell one icon from another.
+    ///
+    /// **Lowered from 0.06 to 0.02 (2026-09-28), measured across every pair in the corpus** — 88 items against 76
+    /// distinct wiki icons, 6,688 pairs. At 0.06 the gate was refusing icons that compare perfectly well: six dark
+    /// ones become judgeable at 0.02 and five of them match their own artwork at 0.017-0.067, against a 0.13
+    /// threshold. `Black Chain Bridle` is the case that prompted it — a user can see the icon plainly while only 48
+    /// of its pixels clear the ink floor.
+    ///
+    /// The sixth is `Nightmare Hide`, which still misreads as a mismatch at 0.22 — the very icon the gate was built
+    /// for. **That is now an acceptable cost because the review screen shows both icons side by side**, so a false
+    /// alert costs a glance rather than a hunt. The old reasoning — "an alert nobody can act on is worse than no
+    /// alert" — was sound only while the user could not see what the tool was comparing.
+    /// </summary>
+    public const double MinimumContrast = 0.02;
 
     /// <summary>Whether this fingerprint carries enough signal to be worth comparing at all.</summary>
     public bool IsComparable => Signature.Length > 0 && Contrast >= MinimumContrast;

@@ -216,6 +216,11 @@ public partial class MainWindow : Window
         var view = ResultsList.SelectedItem as ResultViewModel;
         WindowImage.Source = view?.Result.WindowImage is { } image ? ToBitmap(image) : null;
         LoreImage.Source = view?.LoreImage is { } lore ? ToBitmap(lore) : null;
+
+        // The wiki's icon is a 40x40 file and the game draws its own at roughly 1.1x, so both are shown at 4x —
+        // large enough to compare by eye, which is the whole reason they are here.
+        CapturedIconImage.Source = view?.Result.CapturedIconImage is { } shot ? ToBitmap(shot, 4) : null;
+        WikiIconImage.Source = view?.Result.WikiIconImage is { } wiki ? ToBitmap(wiki, 4) : null;
     }
 
     private async void OnCommitClick(object sender, RoutedEventArgs e)
@@ -357,10 +362,20 @@ public partial class MainWindow : Window
 
     /// <summary>The capture is tightly packed top-down BGRA32, which is exactly <c>Bgra32</c>'s layout, so this is a
     /// copy rather than a conversion.</summary>
-    private static BitmapSource ToBitmap(CapturedImage image) =>
-        BitmapSource.Create(
+    private static BitmapSource ToBitmap(CapturedImage image, int magnify = 1)
+    {
+        BitmapSource bitmap = BitmapSource.Create(
             image.Width, image.Height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null,
             image.Pixels, image.Width * 4);
+
+        if (magnify <= 1) return bitmap;
+
+        // Nearest-neighbour, so a magnified icon shows the artwork rather than a blurred guess at it — the user is
+        // being asked to compare two sprites, and interpolation would invent detail in both.
+        var scaled = new TransformedBitmap(bitmap, new System.Windows.Media.ScaleTransform(magnify, magnify));
+        scaled.Freeze();
+        return scaled;
+    }
 
     protected override void OnClosed(EventArgs e)
     {

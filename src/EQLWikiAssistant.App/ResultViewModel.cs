@@ -136,6 +136,29 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public bool HasLoreImage => _loreImage is not null;
 
+    /// <summary>Whether there is anything to show in the icon section — at least one of the two images.</summary>
+    public bool HasIcons => Result.CapturedIconImage is not null || Result.WikiIconImage is not null;
+
+    /// <summary>What the comparison concluded, in words, including when it declined to conclude anything. The
+    /// images are shown regardless, so this is a starting point for the user's own look rather than a verdict they
+    /// have to take on trust.</summary>
+    public string IconVerdict => Result.Icon switch
+    {
+        { Matches: true } icon => $"These look like the same artwork (difference {icon.Distance:F3}, " +
+                                  $"threshold {IconFingerprint.SameIconThreshold:F2}). Check by eye if you like.",
+        { Matches: false } icon => $"These do not look like the same artwork (difference {icon.Distance:F3}, " +
+                                   $"threshold {IconFingerprint.SameIconThreshold:F2}). The tool never changes an " +
+                                   "icon id — decide which side is wrong.",
+        _ => Result.IconNote ?? "The icons were not compared.",
+    };
+
+    public Brush IconVerdictBrush => Result.Icon switch
+    {
+        { Matches: true } => Brushes.SeaGreen,
+        { Matches: false } => Brushes.Firebrick,
+        _ => Brushes.DimGray,
+    };
+
     /// <summary>The lore read from the game, once a Lore-tab capture has been merged in.</summary>
     public string? CapturedLore => Result.Lore;
 

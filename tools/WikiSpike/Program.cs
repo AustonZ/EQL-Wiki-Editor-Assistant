@@ -1,3 +1,4 @@
+using EQLWikiAssistant.Capture;
 using EQLWikiAssistant.TestSupport;
 using EQLWikiAssistant.Wiki.MediaWiki;
 using EQLWikiAssistant.Core.Icons;
@@ -47,7 +48,7 @@ switch (args[0])
     case "analyze": return await AnalyzeCorpusAsync();
     case "prettify": return await PrettifyCorpusAsync();
     case "prettyshow": return ShowPrettified();
-    case "icons": return await CompareIconsAsync();
+    case "icons": return args.Contains("--corpus") ? await MeasureIconsAcrossCorpusAsync() : await CompareIconsAsync();
     case "icondiff": return await DiffIconPixelsAsync();
     case "preview": return await PreviewEditsAsync();
     case "login": return Login();
@@ -890,5 +891,66 @@ int ShowPrettified()
     File.WriteAllText(args[2], result.Formatted);
     foreach (string note in result.Notes) Console.WriteLine($"note: {note}");
     foreach (string refusal in result.Refusals) Console.WriteLine($"REFUSED: {refusal}");
+    return 0;
+}
+
+// Measures the icon comparison across every sample, with the contrast gate *off*, printing one row per judged pair
+// so a threshold can be chosen from data rather than from a single example. Same-item pairs should score low and
+// control pairs high; the gate and the match threshold are then whatever separates them with zero false matches.
+async Task<int> MeasureIconsAcrossCorpusAsync()
+{
+    using var rapid = new RapidOcrEngine();
+    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+    using MediaWikiClient client = MediaWikiClient.Create(endpoint);
+    using var http = new HttpClient();
+    http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
+    var cache = new IconCache(
+        Path.Combine(RepoPaths.LocalDataDirectory, "icon-cache"), new WikiIconSource(http, endpoint));
+    var decoder = new WindowsImageDecoder();
+
+    // One entry per distinct item: the corpus captures several of them more than once.
+    var captured = new Dictionary<string, (IconFingerprint Icon, string IconId)>(StringComparer.Ordinal);
+    var wikiIcons = new Dictionary<string, IconFingerprint>(StringComparer.Ordinal);
+
+    foreach (string file in Directory.EnumerateFiles(RepoPaths.SamplesDirectory, "*.png").OrderBy(f => f))
+    {
+        CapturedImage image = await ImageFile.LoadAsync(file);
+        foreach (LocatedWindow window in await ItemWindowLocator.LocateAsync(image, ocr))
+        {
+            if (window.PossiblyOccluded || window.ActiveTab != ItemWindowTab.Description) continue;
+
+            // Deliberately *not* ItemIconReader.TryRead: that applies the contrast gate this run exists to measure.
+            var region = new Rect(
+                window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
+                ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height);
+            if (!IconHasher.TryFingerprint(image, region, out IconFingerprint icon)) continue;
+
+            ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+            if (captured.ContainsKey(item.Name)) continue;
+
+            ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
+            if (lookup.Outcome != LookupOutcome.Found) continue;
+            if (ItemPageDocument.Parse(lookup.Page!.Wikitext)?.IconId is not { Length: > 0 } iconId) continue;
+            if (await cache.GetAsync(iconId) is not { } bytes) continue;
+
+            CapturedImage wikiIcon = await decoder.DecodeAsync(bytes);
+            if (!IconHasher.TryFingerprint(wikiIcon, new Rect(0, 0, wikiIcon.Width, wikiIcon.Height), out IconFingerprint onWiki))
+                continue;
+
+            captured[item.Name] = (icon, iconId);
+            wikiIcons[iconId] = onWiki;
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("pair\tkind\tcapturedContrast\twikiContrast\tcorrelation");
+    foreach ((string name, (IconFingerprint icon, string iconId)) in captured)
+        foreach ((string otherId, IconFingerprint other) in wikiIcons)
+            Console.WriteLine(
+                $"{name} vs {otherId}\t{(otherId == iconId ? "same" : "control")}\t" +
+                $"{icon.Contrast:F4}\t{other.Contrast:F4}\t{icon.CorrelationDistanceTo(other):F4}");
+
+    Console.WriteLine();
+    Console.WriteLine($"{captured.Count} item(s) with both icons readable; {wikiIcons.Count} distinct wiki icon(s).");
     return 0;
 }

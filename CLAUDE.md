@@ -713,10 +713,22 @@ wrong or the capture caught something odd, and choosing one is a human's call.
   confident mismatch against the item's *own* correct icon. `IconFingerprint.IsComparable` gates on signature
   standard deviation (0.06), and `ItemIconReader` refuses to return a fingerprint below it — an alert nobody can act
   on is worse than no alert.
-- **The threshold was measured, not chosen**: 0.13 is the last point with **zero false matches**. With the contrast
-  gate, that leaves **2 false alerts out of the 75 pairs it is willing to judge, under 3%** (5 of 80 are skipped as
-  too dark; 18 of the 134 controls likewise). A false mismatch costs a glance; a false match silently blesses a
-  wrong icon, which is the failure this project exists to avoid.
+- **The threshold was measured, not chosen**: 0.13. **Correction (2026-09-28): the earlier claim here that it is
+  "the last point with zero false matches" was true only of the small control set it was measured on** (134
+  controls). Re-measured properly with `WikiSpike icons --corpus` — every captured icon against every distinct wiki
+  icon, **6,688 pairs from 88 items and 76 icons** — 0.13 admits **6 false matches**, the closest at 0.053. Several
+  look like genuinely similar artwork rather than comparison failures (a mask scoring against another mask's icon).
+- **And no threshold fixes it, which is the part worth knowing.** `Black Chain Bridle` matches its *own* artwork at
+  0.067 — worse than the nearest control pair at 0.053. The measure cannot separate those two cases, so tightening
+  the threshold to eliminate false matches would reject real ones. 0.13 stays, and the images are shown instead.
+- **The contrast gate came down from 0.06 to 0.02 on the same measurement.** At 0.06 it refused icons that compare
+  perfectly well: six dark ones become judgeable at 0.02, and five match their own artwork at 0.017-0.067. The
+  sixth, `Nightmare Hide`, still misreads at 0.22 — the very icon the gate was built for.
+- **What makes those costs acceptable is that the review screen now shows both icons side by side, always** (user,
+  2026-09-28). The old reasoning — "an alert nobody can act on is worse than no alert" — held only while the user
+  could not see what the tool was comparing. A false alert is now a glance, and a false *match* is visible too,
+  which no amount of threshold tuning achieves. A false match silently blessing a wrong icon remains the failure
+  this project most wants to avoid; showing the artwork is a better defence against it than a number.
 - **The cache** keeps each `File:item_<ID>.png` on disk, keyed by id, and is consulted before any network call —
   icons are static and heavily shared (three corpus breastplates all use id 624, so three items cost one download).
   No expiry; "clear icon cache" / "re-download this icon" belong in Settings. A **missing** icon is cached too, with
