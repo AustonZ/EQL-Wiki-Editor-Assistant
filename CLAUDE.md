@@ -938,7 +938,20 @@ body by pattern-matching each row, since the body's actual field set varies a lo
 - **A required level reaches us two different ways, and is normalized to one.** Click effects put it on its own
   sub-line (`Required Level: 40`); proc/combat effects fold it into the parenthetical (`Ykesha (Req Level 37)`).
   Both land in `Modifiers` under `Required Level`, so nothing downstream has to know which style the game used
-  for a given effect. Only that one qualifier is hoisted out of the parentheses; anything else stays a condition.
+  for a given effect.
+- **Cast time is the second such qualifier** (2026-09-28) — **correcting an earlier note here that called required
+  level the only one**. `Petamorph Wand: Murderbee` states it *both* ways at once, writing
+  `(Casting Time: 5.0)(Can Equip)` in the parenthetical and `Cast Time: 5.0 seconds` on a sub-line; left as a
+  condition it rendered `Casting Time: 5.0` twice in the wiki line. It is hoisted into `Modifiers["Cast Time"]`
+  unless a sub-line already supplied one. Everything else still stays a condition.
+- **A line the game wraps is rejoined before parsing, and an unclosed bracket is what identifies it.** The same item
+  has an effect line wider than the window, so the game breaks it after `(Can` and puts `Equip)` on the next row —
+  which parsed as a condition of `Can`, an unparsed `Equip)`, and a *rendered wiki line* carrying the truncated
+  condition. The game never leaves a bracket open within a row, so a row with more `(` than `)` is unfinished by
+  definition and the next row continues it. That is a fact about balanced text rather than a guess about layout, and
+  it cannot mistake a new field for a continuation, since a new field would not follow an open bracket. Found by the
+  user testing the app, not by the corpus — which is worth knowing, because the corpus's 2094 fields did not contain
+  a wrapped line.
 
 **The Lore tab is a different view, not a variant of the Description layout.** It has no repeated content-area
 name and no stat block — just the lore prose — so a Lore capture yields a `ParsedItem` with `Name` (from the
