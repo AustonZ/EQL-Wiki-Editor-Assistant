@@ -1,3 +1,6 @@
+using System.Text.RegularExpressions;
+using EQLWikiAssistant.Wiki.Mapping;
+
 namespace EQLWikiAssistant.Wiki.Wikitext;
 
 /// <summary>
@@ -100,6 +103,40 @@ public sealed class ItemPageDocument
             return calls[0].Parameters.FirstOrDefault(p => p.Index == 1)?.Value;
         }
     }
+
+    /// <summary>
+    /// The page's <c>[[Category:...]]</c> names, in the order they appear.
+    ///
+    /// Categories sit *outside* the template call, at the end of the page, so they are read from the whole wikitext
+    /// rather than from a parameter — the second thing after the era banner that this layer touches beyond the
+    /// <c>{{Itempage}}</c> call.
+    /// </summary>
+    public IReadOnlyList<string> Categories =>
+        [.. CategoryPattern.Matches(Wikitext).Select(m => m.Groups["name"].Value.Trim())];
+
+    /// <summary>
+    /// Adds a category at the end of the page if it is not already there.
+    ///
+    /// **Only ever adds.** Removing one would mean deciding that somebody else's category is wrong, and a page's
+    /// categories include plenty the tool cannot derive — zone names, `Quest Items`, `Fashion:` entries. See
+    /// <see cref="CategoryRules.IsDerivable"/> for what the tool considers its own territory.
+    /// </summary>
+    public ItemPageDocument WithCategory(string category)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+        string trimmed = category.Trim();
+
+        if (Categories.Any(c => string.Equals(c, trimmed, StringComparison.OrdinalIgnoreCase))) return this;
+
+        string text = Wikitext.TrimEnd('\n', '\r');
+        // On its own line, after whatever is already there. A page ending in categories gains one more in the run;
+        // a page with none gets a blank line first, which is what every real page does.
+        string separator = CategoryPattern.IsMatch(text) ? "\n" : "\n\n";
+        return Reparse(text + separator + $"[[Category:{trimmed}]]");
+    }
+
+    private static readonly Regex CategoryPattern =
+        new(@"\[\[\s*Category\s*:\s*(?<name>[^\]|]+?)\s*(\|[^\]]*)?\]\]", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>True if the page still carries the "lore not filled in" placeholder.</summary>
     public bool HasLoreMissingPlaceholder =>

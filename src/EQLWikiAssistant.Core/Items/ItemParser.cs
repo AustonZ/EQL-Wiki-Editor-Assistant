@@ -171,7 +171,7 @@ public static class ItemParser
         return new ParsedItem(
             contentName, level, nameMismatch,
             flags, classes, races, slots,
-            stats, exaltations, effects, merchantValue, Lore: null, warnings);
+            WithoutRepeatedStats(stats), exaltations, effects, merchantValue, Lore: null, warnings);
     }
 
     /// <summary>The Lore tab is a different view of the same window, not a variant of the Description layout:
@@ -295,6 +295,66 @@ public static class ItemParser
     }
 
     private static bool HasUnclosedBracket(string text) => text.Count(c => c == '(') > text.Count(c => c == ')');
+
+    /// <summary>
+    /// Turns the game's <c>Effect: Pet Illusion: &lt;appearance&gt; (Casting Time: &lt;time&gt;)</c> into a plain
+    /// <c>Pet Illusion</c> field holding the appearance.
+    ///
+    /// **A game-side encoding quirk, normalized here rather than in the wiki mapping**, which is where this
+    /// codebase already puts "the game says one thing two different ways" (see the required level and cast time
+    /// qualifiers above). The user's read is that representing a pet illusion as a bare <c>Effect:</c> line was a
+    /// hack around a legacy system; either way it is the game's spelling of the property, not the wiki's, so the
+    /// parser is what should know about it. Everything downstream then sees an ordinary labelled field, and the
+    /// mapping translates it like any other.
+    ///
+    /// The casting time is dropped because it is not part of what the wiki records — <c>Pet Illusion: Dark Elf</c>
+    /// is the whole value (user, 2026-09-28).
+    ///
+    /// **A bare <c>Effect:</c> line that is *not* a pet illusion is left exactly as it is**, to be reported as an
+    /// unmapped field. Only three items in the game have this property today, and inventing a reading for the next
+    /// unfamiliar shape is how a tool writes something nobody sanctioned.
+    /// </summary>
+    private static KeyValuePair<string, string> NormalizePetIllusion(string label, string value)
+    {
+        if (!string.Equals(label.Trim(), "Effect", StringComparison.OrdinalIgnoreCase))
+            return new KeyValuePair<string, string>(label, value);
+
+        Match illusion = Regex.Match(
+            value.Trim(),
+            @"^Pet\s+Illusion\s*:\s*(?<appearance>.+?)\s*(?:\(\s*Cast(?:ing)?\s*Time\s*:?[^)]*\))?$",
+            RegexOptions.IgnoreCase);
+
+        return illusion.Success
+            ? new KeyValuePair<string, string>(PetIllusionLabel, illusion.Groups["appearance"].Value.Trim())
+            : new KeyValuePair<string, string>(label, value);
+    }
+
+    /// <summary>The field a pet illusion normalizes to. Public so the wiki mapping and the category rules can name
+    /// the same thing without repeating the string.</summary>
+    public const string PetIllusionLabel = "Pet Illusion";
+
+    /// <summary>
+    /// Drops a field the window stated twice with the same value.
+    ///
+    /// **Measured on a real item, not anticipated.** `Guise of the Deceived` shows its effect, then repeats the
+    /// effect's name as the header of a description block below it:
+    /// <code>
+    /// Effect: Pet Illusion: Dark Elf (Casting Time: 6.0)
+    /// Pet Illusion: Dark Elf
+    /// Changes your pet to look like a Dark Elf.
+    /// </code>
+    /// The header is an ordinary <c>Label: Value</c> line, so it parsed as a second field and would have written the
+    /// statsblock line twice.
+    ///
+    /// **Only an exact repeat is dropped** — same label *and* same value. Two different values under one label is a
+    /// real disagreement the window is showing, and silently keeping one of them would be the tool choosing; that
+    /// case still reaches the caller as two fields for the comparison to notice.
+    /// </summary>
+    private static List<KeyValuePair<string, string>> WithoutRepeatedStats(List<KeyValuePair<string, string>> stats)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return [.. stats.Where(s => seen.Add($"{s.Key}\u0000{s.Value}"))];
+    }
 
     private static List<List<OcrLine>> GroupIntoRows(IReadOnlyList<OcrLine> lines)
     {
@@ -532,7 +592,7 @@ public static class ItemParser
             string text = row[i].Text.Trim();
             if (TryParseSelfContainedLabelValue(text, out string selfLabel, out string selfValue))
             {
-                stats.Add(new KeyValuePair<string, string>(selfLabel, selfValue));
+                stats.Add(NormalizePetIllusion(selfLabel, selfValue));
                 i++;
                 continue;
             }

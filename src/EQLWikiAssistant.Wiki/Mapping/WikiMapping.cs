@@ -281,6 +281,13 @@ public sealed class WikiMapping
             "Whether the bag is open or closed. Already implied by the other container fields the wiki does store " +
             "(Capacity, Size Capacity), so it adds nothing (user, 2026-09-25).");
 
+        // The game encodes this as a bare `Effect: Pet Illusion: <appearance> (Casting Time: N)` line, which
+        // `ItemParser` normalizes to a plain field before anything here sees it — the odd spelling is the game's,
+        // not the wiki's. The wiki records just the appearance; the casting time is not part of the value
+        // (user, 2026-09-28). Only three items in the game have this today.
+        map[Core.Items.ItemParser.PetIllusionLabel] =
+            new StatMapping(Core.Items.ItemParser.PetIllusionLabel, "Pet Illusion", StatDisposition.Stored);
+
         return new WikiMapping
         {
             Stats = map,
@@ -311,6 +318,8 @@ public sealed class WikiMapping
                 ["Attack", "HP Regen", "Mana Regen", "Haste", "Clairvoyance", "Spell Dmg", "Heal Amount", "END Regen"],
                 ["Recommended level", "Required level"],
                 ["Effect"],
+                // Not in the blueprint — the property is newer than it. Effect-adjacent because that is what it is.
+                ["Pet Illusion"],
                 ["Charges"],
                 ["Size", "WT"],
                 ["Weight Reduction", "Capacity", "Size Capacity", "Items"],

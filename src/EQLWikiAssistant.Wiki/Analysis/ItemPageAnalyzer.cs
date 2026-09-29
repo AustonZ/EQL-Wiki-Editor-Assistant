@@ -55,6 +55,7 @@ public static class ItemPageAnalyzer
     public const string PageTitleField = "page title";
     public const string MerchantValueField = "merchant_value";
     public const string LoreField = "lore";
+    public const string CategoryField = "category";
     public const string FlagsField = "flags";
     public const string LegacyFlagsField = "flags (legacy)";
     public const string FlagProseField = "flags (descriptive text)";
@@ -94,6 +95,7 @@ public static class ItemPageAnalyzer
         // Slots go through the mapping: the wiki writes them in caps, and its `FINGER` is the game's `Fingers`.
         AddListFinding(findings, SlotsField, [.. captured.Slots.Select(mapping.ToWikiSlot)], block);
         AddStatFindings(findings, captured, block, mapping);
+        AddCategoryFindings(findings, captured, page, mapping);
         AddEffectFindings(findings, captured, page, block, mapping);
         NormalizeSignsIfTheEditWouldBeInconsistent(findings);
 
@@ -156,6 +158,40 @@ public static class ItemPageAnalyzer
 
     private static string CollapseWhitespace(string text) =>
         string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+    /// <summary>
+    /// Compares the categories a capture implies against the ones the page carries.
+    ///
+    /// **Only categories implied by a *property* are proposed, not the class and slot ones** — a deliberately
+    /// narrow start. `CategoryRules` can derive all three, but adding the class set would propose sixteen new lines
+    /// on any page missing them, which is a large unasked-for edit on pages this tool is otherwise only correcting
+    /// a value on. A property category like `Pet Illusion Items` is different in kind: it is how anyone finds the
+    /// three items in the game that have the property at all, and no page can have it without the tool noticing the
+    /// property first.
+    ///
+    /// **Nothing is ever removed.** A page's categories include plenty the tool cannot derive — zone names,
+    /// `Quest Items`, `Fashion:` entries — and deciding somebody else's category is wrong is not this pass's call.
+    /// </summary>
+    private static void AddCategoryFindings(
+        List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page, WikiMapping mapping)
+    {
+        string[] wikiLabels =
+        [
+            .. captured.Stats
+                .Select(s => mapping.FindStat(s.Key)?.WikiLabel)
+                .Where(l => l is not null)
+                .Select(l => l!),
+        ];
+
+        IReadOnlyList<string> wanted = CategoryRules.Derive([], [], out _, wikiLabels);
+        IReadOnlyList<string> onPage = page.Categories;
+
+        foreach (string category in wanted)
+            if (!onPage.Any(c => string.Equals(c, category, StringComparison.OrdinalIgnoreCase)))
+                findings.Add(new FieldFinding(
+                    CategoryField, FieldVerdict.MissingOnWiki, category, null,
+                    $"The item has a property this category exists to collect, and the page is not in it."));
+    }
 
     private static void AddNameFindings(
         List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page, string pageTitle)

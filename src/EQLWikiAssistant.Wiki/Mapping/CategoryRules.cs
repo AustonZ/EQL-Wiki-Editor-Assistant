@@ -68,6 +68,18 @@ public static class CategoryRules
     public const string AllClasses = "ALL";
 
     /// <summary>
+    /// Categories implied by a *field* rather than by a class or a slot, keyed by the wiki's label for it.
+    ///
+    /// `Pet Illusion Items` is the first (user, 2026-09-28). Only three items in the game carry a pet illusion
+    /// today, which is exactly why the category matters: it is how anyone finds them.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> FieldCategories =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Pet Illusion"] = "Pet Illusion Items",
+        };
+
+    /// <summary>
     /// The category names implied by a capture's class list and slots, in the blueprint's order (classes
     /// alphabetically, then slots).
     /// </summary>
@@ -76,10 +88,14 @@ public static class CategoryRules
     /// <see cref="WikiMapping.ToWikiSlot"/> first, since the game says `Fingers` where the wiki says `FINGER`.</param>
     /// <param name="unrecognized">Codes and slots with no category, so the caller can report them rather than
     /// silently producing a short list. A new class or slot should surface, not vanish.</param>
+    /// <param name="wikiFieldLabels">The wiki's labels for the fields the capture produced, for categories implied
+    /// by a property rather than by a class or slot — see <see cref="FieldCategories"/>. Unknown labels are ignored
+    /// rather than reported: most fields imply no category, so reporting them would be pure noise.</param>
     public static IReadOnlyList<string> Derive(
         IReadOnlyList<string> classCodes,
         IReadOnlyList<string> wikiSlots,
-        out IReadOnlyList<string> unrecognized)
+        out IReadOnlyList<string> unrecognized,
+        IReadOnlyList<string>? wikiFieldLabels = null)
     {
         ArgumentNullException.ThrowIfNull(classCodes);
         ArgumentNullException.ThrowIfNull(wikiSlots);
@@ -106,6 +122,10 @@ public static class CategoryRules
             else if (!string.Equals(slot.Trim(), "ANY", StringComparison.OrdinalIgnoreCase)) unknown.Add(slot.Trim());
         }
 
+        foreach (string label in wikiFieldLabels ?? [])
+            if (FieldCategories.TryGetValue(label.Trim(), out string? category) && !categories.Contains(category))
+                categories.Add(category);
+
         unrecognized = unknown;
         return categories;
     }
@@ -118,6 +138,7 @@ public static class CategoryRules
         ArgumentNullException.ThrowIfNull(category);
         string trimmed = category.Trim();
         return SlotCategories.Values.Contains(trimmed, StringComparer.OrdinalIgnoreCase)
+            || FieldCategories.Values.Contains(trimmed, StringComparer.OrdinalIgnoreCase)
             || (trimmed.EndsWith(" Equipment", StringComparison.OrdinalIgnoreCase)
                 && ClassNames.Values.Contains(trimmed[..^" Equipment".Length], StringComparer.OrdinalIgnoreCase));
     }

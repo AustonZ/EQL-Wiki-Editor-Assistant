@@ -108,6 +108,14 @@ public static class ItemPageEditor
                 edited = edited.WithParameter(mapping.MerchantValueParameter, merchantValue);
                 changes.Add($"merchant value {merchantValue}");
             }
+            else if (finding.Field == ItemPageAnalyzer.CategoryField && finding.Captured is { } category)
+            {
+                // Categories live outside the template call, at the end of the page — the second thing this editor
+                // touches beyond it, after the era banner, and for the same reason: it is page furniture rather than
+                // item data. Only ever added; see ItemPageDocument.WithCategory.
+                edited = edited.WithCategory(category);
+                changes.Add($"added [[Category:{category}]]");
+            }
             else if (finding.Field == ItemPageAnalyzer.LoreField && finding.Captured is { } lore)
             {
                 // Only ever reached for MissingOnWiki: the analyzer reports a *differing* lore as NeedsReview, so
@@ -146,7 +154,8 @@ public static class ItemPageEditor
                 if (finding.Captured is not { } wanted) continue;
                 if (finding.Field is ItemPageAnalyzer.MerchantValueField or ItemPageAnalyzer.PageTitleField
                     or ItemPageAnalyzer.ItemNameField or ItemPageAnalyzer.FlagProseField
-                    or ItemPageAnalyzer.LoreField) continue; // all written as template parameters, above
+                    or ItemPageAnalyzer.LoreField
+                    or ItemPageAnalyzer.CategoryField) continue; // all written outside the statsblock, above
 
                 if (finding.Field == ItemPageAnalyzer.FlagsField)
                 {
