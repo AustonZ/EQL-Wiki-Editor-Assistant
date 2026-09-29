@@ -401,6 +401,26 @@ public class ItemPageAnalyzerTests
         Assert.Contains("functional fix", finding.Explanation);
     }
 
+    /// <summary>
+    /// **The two sides of a finding must be the same kind of thing**, since a review screen puts them in adjacent
+    /// columns for a human to compare. The wiki side of an effect used to be reported without its `Effect:` label
+    /// while the captured side kept it, so the screen showed a missing label as though *that* were the difference
+    /// and drew the eye away from the real one — a missing cooldown (user, 2026-09-28).
+    /// </summary>
+    [Fact]
+    public void BothSidesOfAnEffectFindingAreWholeLines()
+    {
+        ParsedItem captured = Captured(name: "Fishbone Earring") with
+        {
+            Effects = [new EffectEntry("Worn", "Enduring Breath", [], [])],
+        };
+
+        FieldFinding finding = Analyze(captured, "Fishbone Earring").Find("Worn Effect")!;
+
+        Assert.StartsWith("Effect: ", finding.Captured);
+        Assert.StartsWith("Effect: ", finding.OnWiki);
+    }
+
     [Fact]
     public void AnEffectAlreadyInTheModernFormMatches()
     {

@@ -520,13 +520,20 @@ public static class ItemPageAnalyzer
 
             string wanted = render.Line!;
 
+            // **Both sides are reported as the whole line, label included** (user, 2026-09-28). The comparison
+            // always prefixed the label before matching, but only the captured side carried it into the finding —
+            // so a review screen showed `Effect: ...` against `[[...]]` and the missing `Effect:` read as the
+            // difference, drawing the eye away from the real one. `FieldFinding` documents these two as "the
+            // rendered forms being compared", and they have to actually be that.
+            string? existingLine = existing.Value is null ? null : $"{EffectLine.WikiLabel}: {existing.Value}";
+
             if (existing.Value is null)
                 findings.Add(new FieldFinding(field, FieldVerdict.MissingOnWiki, wanted, null));
-            else if (string.Equals($"{EffectLine.WikiLabel}: {existing.Value}", wanted, StringComparison.Ordinal))
-                findings.Add(new FieldFinding(field, FieldVerdict.Matches, wanted, existing.Value));
+            else if (string.Equals(existingLine, wanted, StringComparison.Ordinal))
+                findings.Add(new FieldFinding(field, FieldVerdict.Matches, wanted, existingLine));
             else
                 findings.Add(new FieldFinding(
-                    field, FieldVerdict.Differs, wanted, existing.Value,
+                    field, FieldVerdict.Differs, wanted, existingLine,
                     EffectLine.HasTooltipLink(existing.Value)
                         ? null
                         : "The existing link is the legacy [[Name]] form, which gets no tooltip. Rewriting it to " +
