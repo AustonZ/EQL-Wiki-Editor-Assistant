@@ -6921,6 +6921,214 @@
       ]
     },
     {
+      "file": "13c-trailing-text.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Unholy Steed",
+          "level": 2,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable",
+            "Free Storage"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Ammo"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Mount Speed",
+              "value": "AA Speed or Highest"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click",
+              "name": "Unholy Steed"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Click",
+              "name": "Death Charger",
+              "conditions": [
+                "Can Equip"
+              ],
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Guise of the Deceived",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "NONE"
+          ],
+          "races": [
+            "NONE"
+          ],
+          "slots": [
+            "Face"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Pet Illusion",
+              "value": "Dark Elf"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "warningCount": 1
+        },
+        {
+          "occluded": false,
+          "name": "Petamorph Wand: Murderbee",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Attunable",
+            "Heirloom"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Ammo"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.9"
+            },
+            {
+              "label": "Pet Illusion",
+              "value": "Murderbee"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Click",
+              "name": "Summon Familiar: Murderbee",
+              "conditions": [
+                "Can Equip"
+              ],
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "5.0 seconds"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "10 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Black Chain Bridle",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Ammo"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Mount Speed",
+              "value": "Fast"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Click",
+              "name": "Summon Horse",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "3.0 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "notepad-with-all-glyphs.png",
       "verified": true,
       "windows": []
