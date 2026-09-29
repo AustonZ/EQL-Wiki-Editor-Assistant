@@ -6922,7 +6922,7 @@
     },
     {
       "file": "13c-trailing-text.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
