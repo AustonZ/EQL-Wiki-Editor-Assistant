@@ -369,11 +369,42 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   `Recommended level`, `Required level`) and omits several the game does (`Range`, `Accuracy`, `Type`, `Items`),
   plus `Worn` and `Can Equip` in the effect parenthetical.
 
+**The item window's trailing section (user, 2026-09-28).** Below the effects, the game shows only two things: the
+merchant value, and occasional developer help/informative text, **always separated from the effects by two blank
+lines**. **Nothing below the effects section ever belongs in the statsblock.** The editors' practice is to decide by
+hand whether that text is worth keeping, usually folding it into `notes`.
+- Real examples, both on pet illusion items: `Changes your pet to look like a Dark Elf.` and `Convert to Guise of the
+  Deceiver`. The parser currently reports them as unreadable statsblock lines, which is honest but noisy, and a
+  trailing-section rule would let them be surfaced as *informative text* instead. Not yet implemented.
+- **The window can be too short to show everything**, in two ways. The effects and info section can become
+  scrollable; past that, content is simply clipped with no scrollbar at all. **Detecting the clipped case is not
+  worth it** — there is no reliable signal and the game normally expands the window to avoid it, so it is the user's
+  responsibility. Detecting the *scrollbar* would be possible and is deliberately parked: the user weighed the added
+  complexity against the benefit and decided to revisit once the tool has seen real use. See "Future features".
+
 **Derived categories (`Wiki.Mapping.CategoryRules`).** Which `[[Category:...]]` lines an item's classes and slots
 imply — 16 class categories (`BRD` → `Bard Equipment`) and 18 slot categories, both taken verbatim from the
 blueprint rather than from sampling pages. **Sampling would have been wrong here**: `Golden Efreeti Boots` says
 `Class: ALL` but lists only 14 of the 16 class categories, predating Beastlord and Berserker, so a census would have
 recorded an incomplete convention as the convention.
+- **Every derivable category is compared and written, and it belongs to the data pass** (user, 2026-09-28,
+  overruling a narrower first cut of mine that proposed only property categories): *"Categories affect item
+  discoverability, so it is important for them to be accurate."* The case that settles it is the P1999 import — EQL
+  added Beastlord and Berserker, which P1999 never had, so **every imported item saying `Class: ALL` is missing
+  those two categories** and is invisible to anyone browsing them. A page missing categories is a page nobody can
+  find, which is worse than a large diff.
+  - **Not the formatting pass, though it is arguably a lint**, for two reasons either of which is sufficient: the
+    formatter's licence to rearrange pages is that it *proves* it changed nothing about what they say, and adding a
+    category changes what a page says — its own verification would refuse the edit. And the formatter declines to
+    touch a statsblock carrying legacy flags, which is exactly the P1999-imported set missing Beastlord and
+    Berserker, so it would skip the pages that need this most.
+  - **A derivable category the capture does not imply is reported, never removed** — the item may have changed, or
+    the page may know something the window cannot show.
+  - Measured impact on the corpus (2026-09-28): missing fields went from 49 to 377 across 40 pages, roughly 8
+    categories per page. The user expects more field-to-category rules soon unless the community adopts a template
+    that promotes more of the statsblock to real parameters.
+- **`NONE` is to classes what `ANY` is to slots**: a real value with no category, neither emitted nor reported.
+  `Guise of the Deceived` says `Class: NONE`, and reporting it would be a false alarm on every such item.
 - **The derived set is only ever a subset of a page's categories.** Real pages also carry zone names, `Quest Items`,
   `Focus Items`, `Inventory Items` and `Fashion:` entries, none of them derivable from an item window.
   `CategoryRules.IsDerivable` is what marks the tool's own territory; everything else is preserved untouched.

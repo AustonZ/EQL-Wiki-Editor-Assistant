@@ -126,6 +126,16 @@ public class CategoryRulesTests
         Assert.Empty(unrecognized);
     }
 
+    /// <summary>`NONE` is the class-side equivalent: a real value meaning no class can use the item, with no
+    /// category of its own. Reporting it would be a false alarm on every such item, and real ones exist — `Guise of
+    /// the Deceived` says `Class: NONE`.</summary>
+    [Fact]
+    public void TheNoneClassContributesNoCategoryAndIsNotAnError()
+    {
+        Assert.Empty(CategoryRules.Derive(["NONE"], [], out IReadOnlyList<string> unrecognized));
+        Assert.Empty(unrecognized);
+    }
+
     /// <summary>A class or slot with no category surfaces rather than silently shortening the list — the same rule
     /// as an unmapped stat, and for the same reason: a new one is how a game patch announces itself.</summary>
     [Fact]

@@ -119,20 +119,61 @@ public class PetIllusionTests
     }
 
     /// <summary>
-    /// **Class and slot categories are deliberately not proposed yet**, though `CategoryRules` can derive them.
-    /// Adding the class set would put sixteen new lines on any page missing them — a large unasked-for edit on a
-    /// page the tool is otherwise only correcting one value on. A property category is different in kind: nothing
-    /// can carry it without the tool having read the property first.
+    /// **Class and slot categories are proposed too** (user, 2026-09-28): categories are how items are found, and
+    /// the P1999 import left every `Class: ALL` item missing Beastlord and Berserker, which EQL added and P1999
+    /// never had. A page missing categories is a page nobody can find.
     /// </summary>
     [Fact]
-    public void ClassAndSlotCategoriesAreNotProposed()
+    public void ClassAndSlotCategoriesAreProposed()
     {
-        ParsedItem item = Parse("AC: 10");
+        ParsedItem item = ItemParser.Parse(
+        [
+            L("Amulet", 96, 0), L("Description", 170, 18), L("Amulet", 62, 49),
+            L("No Trade", 61, 64), L("Class: WAR", 61, 78), L("Race: ALL", 60, 95), L("Neck", 61, 113),
+        ]);
         ItemPageDocument page = Page("Class: WAR<br>\nSlot: NECK<br>");
 
-        ProposedEdit edit = ItemPageEditor.BuildEdit(page, ItemPageAnalyzer.Analyze(item, page, "Guise of the Deceived"));
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, ItemPageAnalyzer.Analyze(item, page, "Amulet"));
 
-        Assert.DoesNotContain("[[Category:Warrior Equipment]]", edit.NewWikitext);
-        Assert.DoesNotContain("[[Category:Neck]]", edit.NewWikitext);
+        Assert.Contains("[[Category:Warrior Equipment]]", edit.NewWikitext);
+        Assert.Contains("[[Category:Neck]]", edit.NewWikitext);
+    }
+
+    /// <summary>The case that decided it: an imported `Class: ALL` item gets the two classes P1999 never had.</summary>
+    [Fact]
+    public void AnAllClassesItemGetsBeastlordAndBerserker()
+    {
+        ParsedItem item = ItemParser.Parse(
+        [
+            L("Amulet", 96, 0), L("Description", 170, 18), L("Amulet", 62, 49),
+            L("No Trade", 61, 64), L("Class: ALL", 61, 78), L("Race: ALL", 60, 95), L("Neck", 61, 113),
+        ]);
+        ItemPageDocument page = Page("Class: ALL<br>", "\n\n[[Category:Warrior Equipment]]");
+
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, ItemPageAnalyzer.Analyze(item, page, "Amulet"));
+
+        Assert.Contains("[[Category:Beastlord Equipment]]", edit.NewWikitext);
+        Assert.Contains("[[Category:Berserker Equipment]]", edit.NewWikitext);
+        // Already present, so not added twice.
+        Assert.Equal(1, edit.NewWikitext.Split("[[Category:Warrior Equipment]]").Length - 1);
+    }
+
+    /// <summary>A derivable category the capture does not imply is reported, never removed — the item may have
+    /// changed, or the page may know something the window does not.</summary>
+    [Fact]
+    public void AnUnexpectedDerivableCategoryIsReportedNotRemoved()
+    {
+        ParsedItem item = ItemParser.Parse(
+        [
+            L("Amulet", 96, 0), L("Description", 170, 18), L("Amulet", 62, 49),
+            L("No Trade", 61, 64), L("Class: WAR", 61, 78), L("Race: ALL", 60, 95), L("Neck", 61, 113),
+        ]);
+        ItemPageDocument page = Page("Class: WAR<br>", "\n\n[[Category:Cleric Equipment]]");
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(item, page, "Amulet");
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis);
+
+        Assert.Contains(analysis.Blockers, f => f.OnWiki == "Cleric Equipment");
+        Assert.Contains("[[Category:Cleric Equipment]]", edit.NewWikitext);
     }
 }

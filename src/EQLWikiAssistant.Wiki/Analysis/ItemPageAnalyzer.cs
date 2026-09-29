@@ -160,17 +160,24 @@ public static class ItemPageAnalyzer
         string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     /// <summary>
-    /// Compares the categories a capture implies against the ones the page carries.
+    /// Compares the categories a capture implies — classes, slots and properties — against the ones the page carries.
     ///
-    /// **Only categories implied by a *property* are proposed, not the class and slot ones** — a deliberately
-    /// narrow start. `CategoryRules` can derive all three, but adding the class set would propose sixteen new lines
-    /// on any page missing them, which is a large unasked-for edit on pages this tool is otherwise only correcting
-    /// a value on. A property category like `Pet Illusion Items` is different in kind: it is how anyone finds the
-    /// three items in the game that have the property at all, and no page can have it without the tool noticing the
-    /// property first.
+    /// **Every derivable category is proposed, not just the interesting ones** (user, 2026-09-28, overruling a
+    /// narrower first cut of mine): *"Categories affect item discoverability, so it is important for them to be
+    /// accurate."* The concrete case that settles it is the P1999 import — EQL added Beastlord and Berserker, which
+    /// P1999 did not have, so **every imported item saying `Class: ALL` is missing those two categories** and is
+    /// invisible to anyone browsing them. A page missing sixteen categories is a page nobody can find, which is a
+    /// worse problem than a large diff.
+    ///
+    /// **This belongs to the data pass and not to the formatting pass**, though it is arguably a lint. Two reasons,
+    /// either sufficient: the formatter's licence to rearrange pages is that it *proves* it changed nothing about
+    /// what they say, and adding a category changes what the page says — its own verification would refuse the
+    /// edit. And the formatter declines to touch a statsblock carrying legacy flags, which is exactly the
+    /// P1999-imported set that is missing Beastlord and Berserker; it would skip the pages that need this most.
     ///
     /// **Nothing is ever removed.** A page's categories include plenty the tool cannot derive — zone names,
     /// `Quest Items`, `Fashion:` entries — and deciding somebody else's category is wrong is not this pass's call.
+    /// A derivable category the capture does *not* imply is reported for a human rather than deleted.
     /// </summary>
     private static void AddCategoryFindings(
         List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page, WikiMapping mapping)
@@ -183,14 +190,35 @@ public static class ItemPageAnalyzer
                 .Select(l => l!),
         ];
 
-        IReadOnlyList<string> wanted = CategoryRules.Derive([], [], out _, wikiLabels);
+        IReadOnlyList<string> wanted = CategoryRules.Derive(
+            captured.Classes,
+            [.. captured.Slots.Select(mapping.ToWikiSlot)],
+            out IReadOnlyList<string> unrecognized,
+            wikiLabels);
+
         IReadOnlyList<string> onPage = page.Categories;
 
         foreach (string category in wanted)
             if (!onPage.Any(c => string.Equals(c, category, StringComparison.OrdinalIgnoreCase)))
                 findings.Add(new FieldFinding(
                     CategoryField, FieldVerdict.MissingOnWiki, category, null,
-                    $"The item has a property this category exists to collect, and the page is not in it."));
+                    "The item's classes, slot or properties put it in this category, and the page is not in it."));
+
+        // A derivable category the page has but the capture does not imply. Reported, never removed: the item may
+        // have changed, or the page may know something the window does not.
+        foreach (string category in onPage)
+            if (CategoryRules.IsDerivable(category) &&
+                !wanted.Any(w => string.Equals(w, category, StringComparison.OrdinalIgnoreCase)))
+                findings.Add(new FieldFinding(
+                    CategoryField, FieldVerdict.NeedsReview, null, category,
+                    $"The page is in [[Category:{category}]], but nothing in the capture implies it. The tool does " +
+                    "not remove categories — check whether the item changed or the category is wrong."));
+
+        foreach (string unknown in unrecognized)
+            findings.Add(new FieldFinding(
+                CategoryField, FieldVerdict.NeedsReview, unknown, null,
+                $"'{unknown}' is a class or slot the tool has no category for — possibly new. No category was " +
+                "guessed at; add it to the category rules."));
     }
 
     private static void AddNameFindings(

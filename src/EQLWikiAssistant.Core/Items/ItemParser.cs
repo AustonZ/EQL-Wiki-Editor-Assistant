@@ -95,9 +95,9 @@ public static class ItemParser
         var classes = new List<string>();
         if (i < rows.Count && RowStartsWithLabel(rows[i], "Class"))
         {
-            classes.AddRange(SplitList(ValueAfterLabel(JoinRow(rows[i++]), "Class"), ' '));
+            classes.AddRange(UpperCodes(SplitList(ValueAfterLabel(JoinRow(rows[i++]), "Class"), ' ')));
             while (i < rows.Count && LooksLikeCodeListContinuation(rows[i]))
-                classes.AddRange(SplitList(JoinRow(rows[i++]), ' '));
+                classes.AddRange(UpperCodes(SplitList(JoinRow(rows[i++]), ' ')));
         }
         else
         {
@@ -107,9 +107,9 @@ public static class ItemParser
         var races = new List<string>();
         if (i < rows.Count && RowStartsWithLabel(rows[i], "Race"))
         {
-            races.AddRange(SplitList(ValueAfterLabel(JoinRow(rows[i++]), "Race"), ' '));
+            races.AddRange(UpperCodes(SplitList(ValueAfterLabel(JoinRow(rows[i++]), "Race"), ' ')));
             while (i < rows.Count && LooksLikeCodeListContinuation(rows[i]))
-                races.AddRange(SplitList(JoinRow(rows[i++]), ' '));
+                races.AddRange(UpperCodes(SplitList(JoinRow(rows[i++]), ' ')));
         }
         else
         {
@@ -436,6 +436,17 @@ public static class ItemParser
         FieldLabelLexicon.TryMatchPrefixLabel(text, [label], out _, out string remainder);
         return remainder;
     }
+
+    /// <summary>
+    /// Upper-cases class and race codes, which are an enum in everything but spelling.
+    ///
+    /// The game writes every one of them in caps — `WAR`, `CLR`, `ALL` — with a single exception: an item usable by
+    /// nobody says `None`. Left alone, that one token would compare unequal to the same token written the way all
+    /// its siblings are, which is a difference in spelling rather than in meaning (user, 2026-09-28). Nothing else
+    /// is touched: this is a fixed vocabulary of short codes, not payload text.
+    /// </summary>
+    private static IEnumerable<string> UpperCodes(IEnumerable<string> codes) =>
+        codes.Select(c => c.ToUpperInvariant());
 
     private static IEnumerable<string> SplitList(string text, char separator = ',') =>
         text.Split(separator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);

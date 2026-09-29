@@ -6577,10 +6577,10 @@
           "titleContentNameMismatch": false,
           "flags": [],
           "classes": [
-            "None"
+            "NONE"
           ],
           "races": [
-            "None"
+            "NONE"
           ],
           "slots": [],
           "stats": [
@@ -6761,7 +6761,7 @@
     },
     {
       "file": "13a-wrapped-effect-line.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -6822,7 +6822,7 @@
     },
     {
       "file": "13b-pet-illusion.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
@@ -6888,10 +6888,10 @@
             "No Trade"
           ],
           "classes": [
-            "None"
+            "NONE"
           ],
           "races": [
-            "None"
+            "NONE"
           ],
           "slots": [
             "Face"

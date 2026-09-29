@@ -67,6 +67,9 @@ public static class CategoryRules
     /// <summary>The token the game uses for "every class", which expands to all of them.</summary>
     public const string AllClasses = "ALL";
 
+    /// <summary>The token for "no class can use this" — a real value with no category, like `ANY` for slots.</summary>
+    public const string NoClasses = "NONE";
+
     /// <summary>
     /// Categories implied by a *field* rather than by a class or a slot, keyed by the wiki's label for it.
     ///
@@ -109,7 +112,10 @@ public static class CategoryRules
             : classCodes.Select(code =>
             {
                 if (ClassNames.TryGetValue(code.Trim(), out string? name)) return name;
-                unknown.Add(code.Trim());
+                // `NONE` is a real value meaning no class can use the item — it has no category of its own and is
+                // not an unknown code, so it is neither emitted nor reported. Same shape as `ANY` for slots below,
+                // and for the same reason: reporting it would be a false alarm on every such item.
+                if (!string.Equals(code.Trim(), NoClasses, StringComparison.OrdinalIgnoreCase)) unknown.Add(code.Trim());
                 return null;
             }).Where(n => n is not null).Select(n => n!);
 
