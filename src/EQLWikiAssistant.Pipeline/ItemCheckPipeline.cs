@@ -350,6 +350,10 @@ public sealed class ItemCheckPipeline
             Lore = lore,
             NeedsLoreCapture = needsLore,
             Warnings = warnings,
+
+            // Only when the data already agrees. A page the tool wants to change is one whose formatting would be
+            // rebuilt by that change anyway, and offering both at once would bury the data diff under a reflow.
+            Formatting = edit.HasChanges ? null : PrepareFormatting(wikiPage).Proposal,
         };
 
         // A page that already agrees is settled here and now — there is nothing for the user to approve. Anything
@@ -560,6 +564,31 @@ public sealed class ItemCheckPipeline
     /// to format — with the formatter's own notes either way, because "why is this page still untidy" is a question
     /// the user will have and the answer is usually "it still carries legacy flags".
     /// </summary>
+    /// <summary>
+    /// Runs the formatter over a page already in hand, with no wiki request.
+    ///
+    /// **For the cases where nothing is being written** (user, 2026-09-29): a page that already matches the capture,
+    /// and one the user has settled by hand. Both leave the page untouched, so the copy just fetched *is* the current
+    /// one and re-reading it would be a request for nothing — unlike after a commit, where MediaWiki normalizes what
+    /// was saved and the formatter has to see the result.
+    ///
+    /// **Deliberately not offered after "Skip for now".** Skipping means the data question is unanswered, and the
+    /// whole reason formatting runs second is that the formatter should never have to understand a page the data pass
+    /// has not modernized yet.
+    /// </summary>
+    public (FormattingProposal? Proposal, IReadOnlyList<string> Notes) PrepareFormatting(WikiPage page)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+
+        PrettifyResult formatting = ItemPagePrettifier.Format(page.Wikitext, _mapping);
+        if (!formatting.IsSafe) return (null, formatting.Refusals);
+        if (!formatting.Changed) return (null, formatting.Notes);
+
+        return (
+            new FormattingProposal(page.Title, page.Wikitext, formatting.Formatted, formatting.Notes, page.Timestamp),
+            formatting.Notes);
+    }
+
     public async Task<(FormattingProposal? Proposal, IReadOnlyList<string> Notes)> PrepareFormattingAsync(
         string title, CancellationToken cancellationToken = default)
     {
@@ -568,16 +597,7 @@ public sealed class ItemCheckPipeline
         try
         {
             WikiPage? current = await _wiki.FetchPageAsync(title, cancellationToken).ConfigureAwait(false);
-            if (current is null) return (null, []);
-
-            PrettifyResult formatting = ItemPagePrettifier.Format(current.Wikitext, _mapping);
-            if (!formatting.IsSafe) return (null, formatting.Refusals);
-            if (!formatting.Changed) return (null, formatting.Notes);
-
-            return (
-                new FormattingProposal(
-                    current.Title, current.Wikitext, formatting.Formatted, formatting.Notes, current.Timestamp),
-                formatting.Notes);
+            return current is null ? (null, []) : PrepareFormatting(current);
         }
         catch (Exception ex) when (ex is MediaWikiException or HttpRequestException or TaskCanceledException)
         {
@@ -656,8 +676,17 @@ public sealed class ItemCheckPipeline
     /// <summary>The captured icon is deliberately left out here: this recomputes the fingerprint for a row being
     /// written after the fact, and the icon reading is not carried on the result. A row whose fingerprint omits the
     /// icon simply invalidates itself on the next capture, which errs toward re-checking.</summary>
+    /// <summary>
+    /// The fingerprint to record for a result the user acted on.
+    ///
+    /// **It must include the captured icon, and passing null here was a real bug** (found by the user, 2026-09-29).
+    /// <see cref="CheckWindowAsync"/> computes the fingerprint *with* the icon, so a row written without one could
+    /// never match the next capture of the same unchanged item: every item settled by a commit, by hand, or by
+    /// skipping came back on every capture forever, exactly as if it had never been seen. That silently defeated the
+    /// ledger for the two outcomes the user reaches most.
+    /// </summary>
     private static string FingerprintOf(ItemCheckResult result) =>
-        result.Item is null ? "" : ItemFingerprint.Compute(result.Item, null, result.Lore);
+        result.Item is null ? "" : ItemFingerprint.Compute(result.Item, result.CapturedIcon, result.Lore);
 
     private void RecordLedgerEntry(
         string itemName,

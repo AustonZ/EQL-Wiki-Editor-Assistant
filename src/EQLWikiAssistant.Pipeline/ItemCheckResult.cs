@@ -108,6 +108,16 @@ public sealed record ItemCheckResult
 
     public ProposedEdit? Edit { get; init; }
 
+    /// <summary>
+    /// The formatting the page would want, when the page already matches the capture (user, 2026-09-29).
+    ///
+    /// **Offered without anything being written**, because a page whose data is right can still be laid out wrongly,
+    /// and there is otherwise no moment at which the user would be shown that. It costs no request: the page was just
+    /// fetched, and nothing has changed it since. For a page the tool is proposing to edit, this stays null until the
+    /// user settles the data question one way or the other — by committing, or by saying the wiki is right.
+    /// </summary>
+    public FormattingProposal? Formatting { get; init; }
+
     public IconComparison? Icon { get; init; }
 
     /// <summary>Why the icon could not be compared, when it could not — a Lore capture, an unuploaded file, a page

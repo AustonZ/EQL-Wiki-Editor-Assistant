@@ -367,6 +367,12 @@ public partial class MainWindow : Window
 
         view.Outcome = "Marked as checked — it will not come back unless the item itself changes.";
         StatusText.Text = $"'{view.ItemName}' marked as checked.";
+
+        // Settling the data question is what makes formatting safe to offer (user, 2026-09-29): the page is one the
+        // user has just said is right, so the formatter is not being asked to understand data nobody has vouched for.
+        // No request — the page was fetched by the check and nothing has changed it since.
+        if (view.Result.Page is { } page)
+            view.Formatting = _services.Pipeline.PrepareFormatting(page).Proposal;
     }
 
     /// <summary>

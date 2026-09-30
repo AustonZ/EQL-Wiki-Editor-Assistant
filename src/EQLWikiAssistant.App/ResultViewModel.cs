@@ -110,6 +110,11 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         Replace(Warnings, BuildWarnings(result));
         FormattingDiff.Clear();
 
+        // Through the property, not the field, so its diff gets built. A page that already matches arrives with its
+        // formatting proposal already worked out — the check had the page in hand, so it cost nothing. For one the
+        // tool wants to edit this stays null until the user settles the data question.
+        Formatting = result.Formatting;
+
         // Everything on this object is derived from Result, so the simplest correct notification is "all of it".
         OnPropertyChanged(null);
     }

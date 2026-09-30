@@ -1,4 +1,5 @@
 using EQLWikiAssistant.Core.Locate;
+using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
 using EQLWikiAssistant.Tests.Wiki;
@@ -59,6 +60,32 @@ public class ItemCheckPipelineTests
     /// blank frame simply has no icon to read, which is an outcome the pipeline already handles.</summary>
     private static CapturedImage BlankFrame(int width = 500, int height = 700) =>
         new(width, height, new byte[width * height * 4]);
+
+    /// <summary>
+    /// A frame with readable artwork where the icon sits, so <see cref="ItemCheckResult.CapturedIcon"/> is not null.
+    ///
+    /// **Needed because a blank frame makes fingerprint bugs invisible**: with no icon, a fingerprint computed with
+    /// one and a fingerprint computed without one are identical, so a test on <see cref="BlankFrame"/> passes whether
+    /// or not the icon is included. That is exactly how the ledger bug of 2026-09-29 went uncaught. The pattern only
+    /// has to clear the ink floor and carry enough variation to be comparable; it is not meant to resemble an item.
+    /// </summary>
+    private static CapturedImage FrameWithIcon(int width = 500, int height = 700)
+    {
+        var pixels = new byte[width * height * 4];
+        Rect strip = ItemIconReader.IconStrip;
+
+        for (int y = 0; y < strip.Height; y++)
+            for (int x = 0; x < strip.Width; x++)
+            {
+                int offset = ((strip.Y + y) * width + strip.X + x) * 4;
+                pixels[offset] = (byte)(40 + x * 4 % 200);       // B
+                pixels[offset + 1] = (byte)(60 + y * 3 % 180);   // G
+                pixels[offset + 2] = (byte)(80 + (x + y) % 160); // R
+                pixels[offset + 3] = 255;
+            }
+
+        return new CapturedImage(width, height, pixels);
+    }
 
     private static LocatedWindow Window(
         IReadOnlyList<OcrLine> lines,
@@ -125,6 +152,119 @@ public class ItemCheckPipelineTests
         // Asserted non-null on both sides: comparing two nulls is exactly the bug passing itself off as a fix.
         Assert.NotNull(first[0].CapturedIconImage);
         Assert.Same(first[0].CapturedIconImage, again.CapturedIconImage);
+    }
+
+    /// <summary>
+    /// **The round trip the ledger exists for, through a user action** (bug found by the user, 2026-09-29). Settling
+    /// an item by hand must make the next capture of that unchanged item skip the wiki — and it did not, because the
+    /// fingerprint written by the action omitted the captured icon while the one computed by the next capture
+    /// included it, so the two could never match. Every hand-settled item came back forever.
+    ///
+    /// The existing ledger tests all went through the automatic-match path, which computes its fingerprint
+    /// differently, so none of them covered this.
+    /// </summary>
+    [Fact]
+    public async Task AnItemSettledByHandIsNotCheckedAgain()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines), UntidyPage());
+
+        IReadOnlyList<ItemCheckResult> first = await pipeline.CheckAsync(FrameWithIcon());
+        Assert.NotNull(first[0].CapturedIcon);   // or this test cannot see the bug it exists for
+        pipeline.RecordCheckedByHand(first[0]);
+        Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
+
+        int after = wiki.Fetches;
+        IReadOnlyList<ItemCheckResult> again = await pipeline.CheckAsync(FrameWithIcon());
+
+        Assert.Equal(ItemCheckStatus.AlreadyChecked, again[0].Status);
+        Assert.Equal(after, wiki.Fetches);
+    }
+
+    /// <summary>The same round trip through a commit, which shared the same broken fingerprint.</summary>
+    [Fact]
+    public async Task AnItemCommittedIsNotCheckedAgain()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines), UntidyPage());
+
+        IReadOnlyList<ItemCheckResult> first = await pipeline.CheckAsync(FrameWithIcon());
+        Assert.NotNull(first[0].CapturedIcon);   // or this test cannot see the bug it exists for
+        await pipeline.CommitAsync(first[0], first[0].Edit!.NewWikitext, "test");
+        Assert.Equal(CheckOutcome.Edited, ledger.Find("Earring of Bashing")!.Outcome);
+
+        int after = wiki.Fetches;
+        IReadOnlyList<ItemCheckResult> again = await pipeline.CheckAsync(FrameWithIcon());
+
+        Assert.Equal(ItemCheckStatus.AlreadyChecked, again[0].Status);
+        Assert.Equal(after, wiki.Fetches);
+    }
+
+    // --- formatting offered without a data edit ---------------------------------------------------------
+
+    /// <summary>
+    /// **A page that already agrees still gets its formatting checked** (user, 2026-09-29). There is otherwise no
+    /// moment at which a user would be shown that a page whose data is right is laid out wrongly. It costs no
+    /// request: the page was just fetched and nothing has changed it since.
+    /// </summary>
+    [Fact]
+    public async Task APageThatAlreadyMatchesIsStillOfferedItsFormatting()
+    {
+        // The real `Earring of Bashing` fixture: its data matches this capture exactly (the ledger test above
+        // relies on that), and the prettifier still has work to do on it — notes out of blueprint order, Size and
+        // WT the wrong way round, padding unaligned. Exactly the case this feature exists for.
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) =
+            Build(Window(EarringLines), EarringPage());
+
+        int before = wiki.Fetches;
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.AlreadyCorrect, results[0].Status);
+        Assert.NotNull(results[0].Formatting);
+        Assert.Equal(before + 1, wiki.Fetches); // the page's own fetch, and nothing more
+    }
+
+    /// <summary>A page the tool wants to change does not get one yet: that edit rebuilds the layout anyway, and
+    /// offering both at once would bury the data diff under a reflow.</summary>
+    [Fact]
+    public async Task APageWithAProposedEditIsNotOfferedFormattingYet()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines), UntidyPage());
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.EditProposed, results[0].Status);
+        Assert.Null(results[0].Formatting);
+    }
+
+    /// <summary>Formatting a page already in hand asks the wiki for nothing — the whole reason it can be offered on
+    /// a match without making captures slower.</summary>
+    [Fact]
+    public async Task PreparingFormattingFromAPageInHandMakesNoRequest()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), EarringPage());
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        int before = wiki.Fetches;
+        (FormattingProposal? proposal, _) = pipeline.PrepareFormatting(results[0].Page!);
+
+        Assert.NotNull(proposal);
+        Assert.Equal(before, wiki.Fetches);
+    }
+
+    /// <summary>**Skipping never offers formatting**, and that is the data-before-formatting rule rather than an
+    /// oversight: skipping leaves the data question unanswered, and the formatter must never be asked to lay out a
+    /// page the data pass has not modernized (user, 2026-09-29).</summary>
+    [Fact]
+    public async Task SkippingLeavesTheFormattingAlone()
+    {
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(EarringLines), UntidyPage());
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        pipeline.RecordSkipped(results[0]);
+
+        Assert.Equal(CheckOutcome.Skipped, ledger.Find("Earring of Bashing")!.Outcome);
+        Assert.Null(results[0].Formatting);
     }
 
     // --- verification (reported, never enforced) --------------------------------------------------------

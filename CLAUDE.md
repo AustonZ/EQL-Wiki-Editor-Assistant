@@ -675,6 +675,17 @@ skips the wiki fetch entirely.
 - **`WikiPageTitle` is recorded separately from the item name**, because the two legitimately differ: an item whose
   in-game name cannot be a MediaWiki title (`Cell Key #5`) lives at a name a human chose (`Cell Key No. 5`), and
   without recording it every future capture looks unhandled.
+- **Every path that records a row must compute the fingerprint the same way, and one did not** (bug found by the
+  user, 2026-09-29). `CheckWindowAsync` computes it *with* the captured icon; `FingerprintOf` — used by
+  `CommitAsync`, `RecordSkipped` and `RecordCheckedByHand` — passed `null` for it. A row written that way could never
+  match the next capture of the same unchanged item, so **every item settled by a commit or by hand came back on
+  every capture forever**, exactly as if it had never been seen. The ledger was silently defeated for the two
+  outcomes the user reaches most.
+  - **The existing tests could not have caught it, and that is the lesson.** They all went through the
+    automatic-match path, which uses the real fingerprint; and they ran against a blank frame, where there is no icon
+    to read — so a fingerprint computed with one and without one are *identical* and the assertion passes either way.
+    `FrameWithIcon()` exists for this: it paints the icon strip so `CapturedIcon` is non-null, and the round-trip
+    tests assert that before anything else. A test that cannot fail against the bug is not a test.
 - **The fingerprint (`Core.Items.ItemFingerprint`) covers what an edit depends on and nothing else.** Lists are
   sorted, because a class list is a set and the window's emission order must not invalidate a row. The captured
   level is included so a future version that processes levelled items can never confuse `+0` with `+7`. **Parser
@@ -854,6 +865,16 @@ edit, after the data edit**; see "Formatting is a separate edit" above for why t
     normalizes a saved page, so formatting our own submission would propose an edit against a revision that does not
     exist. It also makes `PrepareFormattingAsync` usable on its own, for a page nobody has just edited.
   - **A failure here never fails the data commit**: the formatting is an extra, and the user can run it again.
+  - **It is also offered where nothing is written** (user, 2026-09-29): a page whose data already matches, and one the
+    user has settled with "the wiki is right". Otherwise there is no moment at which a user is shown that a page whose
+    data is correct is laid out wrongly — `Tuft of Polar Bear Fur` is a real example. Both use
+    `PrepareFormatting(page)`, which takes the page already fetched and makes **no request**: nothing has changed it
+    since, unlike after a commit where MediaWiki normalizes what was saved and the formatter must see the result.
+  - **"Skip for now" deliberately offers nothing**, and that is the data-before-formatting rule rather than an
+    oversight: skipping leaves the data question unanswered, so the formatter would be laying out a page the data pass
+    has not modernized — the exact situation the settled order exists to prevent. A page with a *proposed* edit gets
+    none either, until the user settles that edit one way or the other; offering both at once would bury the data diff
+    under a reflow.
   - **The two passes compose the right way round on a legacy page, which is the clearest argument for the settled
     data-first order.** Before the data edit the formatter refuses to touch such a statsblock; the data edit replaces
     the legacy flags line with what the game actually says, and only then is the page one the formatter understands

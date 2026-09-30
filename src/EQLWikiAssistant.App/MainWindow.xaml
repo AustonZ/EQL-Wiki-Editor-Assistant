@@ -312,8 +312,10 @@
                             <StackPanel>
                                 <TextBlock FontWeight="SemiBold" Foreground="#1B4A75"
                                            Text="The page can also be tidied — as a separate edit" />
+                                <!-- Worded for both cases: after a data edit, and on a page whose data already
+                                     agreed, where there is no edit above to keep readable (user, 2026-09-29). -->
                                 <TextBlock TextWrapping="Wrap" Foreground="#33618C" Margin="0,3,0,0"
-                                           Text="Laid out to the Item Page Blueprint, with no data changes. Committing this separately keeps the edit above readable in the page's history." />
+                                           Text="Laid out to the Item Page Blueprint. It changes nothing about what the page says, and stays its own commit so that a reflow never hides a data change in the page's history." />
                             </StackPanel>
                         </Border>
 
