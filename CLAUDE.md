@@ -217,6 +217,12 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
   `EXPENDABLE` have no modern counterpart at all, and classic `LORE ITEM` (carry only one) is a different property
   from `Lore Equipped` (equip only one), so "translating" one would invent an equivalence. The flags line is
   regenerated from the captured window, not reconciled with what the page had.
+  - **Order is not part of what a flags line means** (user, 2026-09-29). `Brell's Girdle` writes
+    `Attunable, Lore Equipped` where the game lists them in its own order; comparing the line as an ordered sequence
+    called that a difference and would have rewritten a correct line — and taught the user that flag findings are
+    noise. `ItemPageAnalyzer.SameFlags` compares as a **multiset** (sorted, case-insensitive), so a page that
+    genuinely repeats a flag is still a difference, and a match leaves the line exactly as the page wrote it. Whether
+    alphabetical order is the house style is a formatting question, not a data one.
   - **The flag vocabulary is open-ended, and flags are copied through blindly — do not build a known-flags list**
     (user, 2026-09-24). Whatever the game displays is exactly what the wiki should say, *whether or not the tool
     knows what it means*. The 101 verified windows happen to contain only `No Trade`, `Lore Equipped`,
@@ -904,6 +910,12 @@ testable) and that it includes the two steps preview skipped, the ledger and the
   lore difference the user was warned of on the same screen, so a commit on an item that still `NeedsAttention`
   records **`Flagged`**, not `Edited` — it keeps coming back. This has to match the rule a page that already agrees
   follows, or the outcome would depend on whether some unrelated stat happened to change too.
+- **`RecordCheckedByHand` is offered alongside a proposed edit too, not only for a flagged item** (user, 2026-09-29,
+  on `Eyerazzia`). Requiring `NeedsAttention` quietly assumed the tool's proposal is always the one to take. It is
+  not: that page's damage bonus was deliberately annotated with the character level it applies at — damage bonus
+  varies by level, which the tool is oblivious to by design — so the user wants to **keep the wiki's value**. Without
+  this the only choices were to overwrite their annotation or to skip, and `Skipped` never settles, so the item would
+  return on every capture forever.
 - **`RecordCheckedByHand` is the only way a flagged item becomes done**, and it has to exist: otherwise an item whose
   page the user has decided is *correct* (most often lore the wiki states better than the game does) re-fetches on
   every capture forever, and the only other escape would be making the tool overwrite the very thing the user just
@@ -965,6 +977,13 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
   whether an edit is surgical, but it collapsed duplicate lines (real statsblocks repeat `<br>`) and paired a changed
   line with an unrelated one. Long unchanged runs fold away, because an item page can carry a `dropsfrom` table with
   nothing to do with the edit and a reviewer scrolling past it is a reviewer who stops reading.
+- **Debug builds archive each captured frame** (`App.DebugCaptureArchive`, user 2026-09-29), named after the items in
+  it, so a bug can be reported by naming an item rather than by keeping it in the game. The list entry's tooltip
+  carries the path.
+  - **Debug only, and never inside the repository.** A frame is a full screenshot and can hold character names, other
+    players' names and chat — the reason `samples/` is gitignored and the reason the pipeline otherwise keeps every
+    frame in memory. These go to `%APPDATA%\EQLWikiAssistant\debug-captures`, outside any working copy, so no commit
+    can pick one up by accident. A release build writes nothing, and the newest 50 are kept.
 - **Still to come here**: logging in needs `WikiSpike login` once — there is no in-app credential dialog yet
   (milestone 7), and no settings/mapping editor (milestone 6).
 

@@ -332,7 +332,7 @@ public static class ItemPageAnalyzer
         }
 
         string[] current = [.. onWiki.Where(f => !IsLegacyFlag(f) && !prose.Contains(f))];
-        if (current.SequenceEqual(wanted, StringComparer.OrdinalIgnoreCase))
+        if (SameFlags(current, wanted))
             findings.Add(new FieldFinding(FlagsField, FieldVerdict.Matches, string.Join(", ", wanted), string.Join(", ", current)));
         else if (current.Length == 0 && wanted.Count > 0)
             findings.Add(new FieldFinding(FlagsField, FieldVerdict.MissingOnWiki, string.Join(", ", wanted), null));
@@ -347,6 +347,21 @@ public static class ItemPageAnalyzer
         flag.Any(char.IsLetter) && flag.Where(char.IsLetter).All(char.IsUpper);
 
     /// <summary>The flags line is the first line of the block carrying unlabelled tokens and no fields.</summary>
+    /// <summary>
+    /// Whether two flag lines say the same thing. **Order is not part of what a flags line means** (user,
+    /// 2026-09-29): `Brell's Girdle` lists its flags alphabetically where the game lists them in its own order, and
+    /// calling that a difference would rewrite a correct line — and, worse, teach the user that flag findings are
+    /// noise.
+    ///
+    /// Compared as a multiset rather than a set, so a page that genuinely repeats a flag is still a difference. A
+    /// match here means the finding is <see cref="FieldVerdict.Matches"/>, so the editor leaves the line exactly as
+    /// the page wrote it; whether alphabetical order is the house style is a formatting question, not a data one.
+    /// </summary>
+    private static bool SameFlags(IReadOnlyList<string> a, IReadOnlyList<string> b) =>
+        a.Count == b.Count &&
+        a.Order(StringComparer.OrdinalIgnoreCase)
+            .SequenceEqual(b.Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+
     private static IReadOnlyList<string> ReadFlagLine(StatsBlock block) =>
         block.Lines.FirstOrDefault(l => l.Kind == StatsLineKind.Flags)?.Flags ?? [];
 

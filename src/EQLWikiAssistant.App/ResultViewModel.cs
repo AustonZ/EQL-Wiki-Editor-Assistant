@@ -75,6 +75,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private string? _formattingOutcome;
     private CapturedImage? _loreImage;
     private string _formattedWikitext = "";
+    private string? _captureFile;
 
     public ResultViewModel(ItemCheckResult result) => Load(result);
 
@@ -320,13 +321,21 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public bool HasFormattingOutcome => !string.IsNullOrEmpty(_formattingOutcome);
 
     /// <summary>
-    /// Whether the user can settle this item by hand. Offered whenever something wants a human, because that is the
-    /// only thing standing between the item and "done" — the tool has already concluded everything it is willing to.
-    /// Not offered once an edit is pending, since saving it is the action that matters then.
+    /// Whether the user can settle this item by hand, recording it as matched against this capture so it stops
+    /// coming back.
+    ///
+    /// **Offered alongside a proposed edit too** (user, 2026-09-29, on `Eyerazzia`). It used to require
+    /// <see cref="ItemCheckResult.NeedsAttention"/>, on the reasoning that with an edit pending saving it is the
+    /// action that matters — which quietly assumed the tool's proposal is always the one to take. It is not: that
+    /// page's damage bonus was deliberately annotated with the character level it applies at, something the tool is
+    /// oblivious to by design, so the user wants to *keep the wiki's value*. Without this the only options were to
+    /// overwrite their annotation or to skip, and skipping never settles — the item would return on every capture
+    /// forever.
     /// </summary>
     public bool CanMarkChecked =>
-        !HasOutcome && !IsBusy && Result.NeedsAttention &&
-        Result.Status is ItemCheckStatus.AlreadyCorrect or ItemCheckStatus.EditProposed;
+        !HasOutcome && !IsBusy &&
+        (Result.Status == ItemCheckStatus.EditProposed ||
+         (Result.Status == ItemCheckStatus.AlreadyCorrect && Result.NeedsAttention));
 
     /// <summary>What the user is about to save. Editable, and what <c>Commit</c> writes.</summary>
     public string Wikitext
@@ -367,6 +376,20 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     }
 
     public bool HasOutcome => !string.IsNullOrEmpty(_outcome);
+
+    /// <summary>Where the frame this item came from was archived, in debug builds. Shown as the list entry's tooltip
+    /// so a bug can be reported by pointing at the item — see <see cref="DebugCaptureArchive"/>.</summary>
+    public string? CaptureFile
+    {
+        get => _captureFile;
+        set
+        {
+            Set(ref _captureFile, value);
+            OnPropertyChanged(nameof(CaptureTip));
+        }
+    }
+
+    public string? CaptureTip => _captureFile is null ? null : $"Captured frame: {_captureFile}";
 
     public bool IsBusy
     {

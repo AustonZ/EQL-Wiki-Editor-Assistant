@@ -116,6 +116,59 @@ public class ItemPageAnalyzerTests
         Assert.DoesNotContain(analysis.Findings, f => f.Verdict == FieldVerdict.NeedsReview && f.Field == ItemPageAnalyzer.FlagsField);
     }
 
+    /// <summary>
+    /// **Flag order is not part of what a flags line means** (user, 2026-09-29, on `Brell's Girdle`): the page lists
+    /// them alphabetically and the game in its own order. Calling that a difference would rewrite a correct line, and
+    /// would teach the user that flag findings are noise.
+    /// </summary>
+    [Fact]
+    public void FlagsInADifferentOrderStillMatch()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Brell's Girdle\n|statsblock = \nAttunable, Lore Equipped<br>\n}}")!;
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Brell's Girdle", flags: ["Lore Equipped", "Attunable"]),
+            page,
+            "Brell's Girdle");
+
+        Assert.Equal(FieldVerdict.Matches, analysis.Find(ItemPageAnalyzer.FlagsField)!.Verdict);
+    }
+
+    /// <summary>And matching means the line is left exactly as the page wrote it — whether alphabetical order is the
+    /// house style is a formatting question, not a data one.</summary>
+    [Fact]
+    public void ReorderedFlagsProduceNoEdit()
+    {
+        const string wikitext =
+            "{{Itempage\n|itemname = Brell's Girdle\n|statsblock = \nAttunable, Lore Equipped<br>\n" +
+            "Class: ALL<br>\nRace: ALL<br>\n}}";
+        ItemPageDocument page = ItemPageDocument.Parse(wikitext)!;
+        ParsedItem captured = Captured(
+            name: "Brell's Girdle",
+            flags: ["Lore Equipped", "Attunable"],
+            classes: ["ALL"],
+            races: ["ALL"]);
+
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, ItemPageAnalyzer.Analyze(captured, page, "Brell's Girdle"));
+
+        Assert.Contains("Attunable, Lore Equipped<br>", edit.NewWikitext);
+    }
+
+    /// <summary>A genuinely repeated flag is still a difference — the comparison is a multiset, not a set, so a page
+    /// defect does not hide behind order-insensitivity.</summary>
+    [Fact]
+    public void ARepeatedFlagIsStillADifference()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Odd Thing\n|statsblock = \nNo Trade, No Trade<br>\n}}")!;
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Odd Thing", flags: ["No Trade"]), page, "Odd Thing");
+
+        Assert.Equal(FieldVerdict.Differs, analysis.Find(ItemPageAnalyzer.FlagsField)!.Verdict);
+    }
+
     /// <summary>Legacy flags are dropped rather than translated: LORE ITEM (carry one) is a different property from
     /// Lore Equipped (equip one), and MAGIC ITEM has no counterpart at all.</summary>
     [Fact]

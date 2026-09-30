@@ -115,9 +115,17 @@ public partial class MainWindow : Window
             StatusText.Text = BusyLabel.Text;
             IReadOnlyList<ItemCheckResult> results = await _services.Pipeline.CheckAsync(frame);
 
+            // Debug builds keep the frame, named after what was in it, so a bug can be reported by naming an item
+            // rather than by keeping it in the game. Release builds write nothing — see DebugCaptureArchive.
+            string? archived = DebugCaptureArchive.Save(frame, results.Select(r => r.ItemName));
+
             // Results accumulate across captures rather than replacing each other (user, 2026-09-28), so an item
             // just updated stays on screen to refer back to while working on the next one. Closing one is explicit.
-            foreach (ItemCheckResult result in results) await MergeAsync(result);
+            foreach (ItemCheckResult result in results)
+            {
+                await MergeAsync(result);
+                if (archived is not null && Find(result) is { } view) view.CaptureFile = archived;
+            }
 
             // The ledger is written after a batch rather than per row — it is saved whole, and a check can settle a
             // page that already agreed without the user doing anything.
@@ -212,6 +220,11 @@ public partial class MainWindow : Window
         ResultsList.SelectedItem = view;
         ShowSelected();
     }
+
+    /// <summary>The entry showing this item, if it is still on screen.</summary>
+    private ResultViewModel? Find(ItemCheckResult result) =>
+        _results.FirstOrDefault(
+            v => string.Equals(v.Result.ItemName, result.ItemName, StringComparison.OrdinalIgnoreCase));
 
     private void OnCloseResultClick(object sender, RoutedEventArgs e)
     {

@@ -278,6 +278,12 @@ public sealed class ItemCheckPipeline
                 WindowImage = crop,
                 LedgerVerdict = verdict,
                 Lookup = lookup,
+                // The captured icon belongs here too: there is no wiki icon to compare against, but an item with no
+                // page is precisely the one whose artwork the user has to look at — it is how they choose its
+                // lucy_img_ID when they create the page. Dropping it left the one case with nothing to show.
+                CapturedIcon = capturedIcon,
+                CapturedIconImage = iconCrop,
+                IconNote = iconUnreadableNote,
                 Lore = lore,
                 NeedsLoreCapture = needsLore,
                 Warnings = warnings,
@@ -297,6 +303,9 @@ public sealed class ItemCheckPipeline
                 WindowImage = crop,
                 LedgerVerdict = verdict,
                 Lookup = lookup,
+                CapturedIcon = capturedIcon,
+                CapturedIconImage = iconCrop,
+                IconNote = iconUnreadableNote,
                 Page = wikiPage,
                 Warnings =
                 [

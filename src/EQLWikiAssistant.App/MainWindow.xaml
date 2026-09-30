@@ -72,7 +72,7 @@
                      HorizontalContentAlignment="Stretch" BorderThickness="0,0,1,0" BorderBrush="#DDD">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Grid Margin="2,5">
+                        <Grid Margin="2,5" ToolTip="{Binding CaptureTip}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -293,9 +293,10 @@
                          decided is correct stays flagged and re-fetches on every capture forever. -->
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
                                 Visibility="{Binding CanMarkChecked, Converter={StaticResource BoolToVis}}">
-                        <Button Content="Looks right — mark as checked" Click="OnMarkCheckedClick" Padding="14,5" />
+                        <Button Content="The wiki is right — mark as checked" Click="OnMarkCheckedClick" Padding="14,5" />
                         <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Foreground="#666" TextWrapping="Wrap"
-                                   Text="Settles what is flagged above, without changing the page, so this item stops coming back." />
+                                   MaxWidth="520"
+                                   Text="Records this item as matched without changing the page — for a value the page states better than the game does, or anything flagged above that you have judged yourself. It stops coming back unless the item itself changes." />
                     </StackPanel>
 
                     <TextBlock Text="{Binding Outcome}" Foreground="SeaGreen" FontWeight="SemiBold"
