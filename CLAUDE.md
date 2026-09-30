@@ -569,17 +569,21 @@ recorded an incomplete convention as the convention.
   reported 300 differing fields and "76 of 85 pages are stale", when a levelled item's stats are *legitimately*
   higher than the wiki's level-0 figures (Bladestopper +7 shows AC 43 against a correct 25). Filtering to eligible
   items dropped that to 19.
-- **Baseline on the verified corpus, re-measured 2026-09-28**, eligible items only: 41 of 90 distinct captures are
-  eligible (the rest are levelled), 38 have pages, **5 pages already correct and 33 would change** — 260 fields
-  match, 28 differ, 49 are missing on the wiki, 2 unverifiable, 2 need review (the two food-prose lines, which are
-  human-by-design), plus 14 compliance findings the tool fixes (12 era banners, 2 lore placeholders). The differences
-  are dominated by legacy flag lines being dropped, plus real staleness and four `merchant_value` corrections. It
-  also caught a typo on a live page (`Lore Equpped`).
+- **Baseline on the verified corpus, re-measured 2026-09-29**, eligible items only: 44 of 94 distinct captures are
+  eligible (the rest are levelled), 41 have pages, **8 pages already correct and 33 would change** — 285 fields
+  match, 27 differ, 49 are missing on the wiki, 3 unverifiable, 3 need review (the two food-prose lines, which are
+  human-by-design, plus one category), plus 13 compliance findings the tool fixes (11 era banners, 2 lore
+  placeholders). The differences are dominated by legacy flag lines being dropped, plus real staleness and several
+  `merchant_value` corrections. It also caught a typo on a live page (`Lore Equpped`).
+  - **This drifted from 2026-09-28's "5 already correct and 33 would change" because the user was editing the live
+    wiki with the tool that day**, not because anything in the code moved: three pages that did not exist now do (so
+    41 pages are analyzed rather than 38, which is most of the +25 matched fields), and three more are now correct.
+    `changed` held at 33 throughout.
   - **The earlier "9 already correct and 29 would change" here was stale**, not a regression: it survived an update
     that refreshed the field counts around it. Verified by re-running `analyze` at the commit before milestone 5's
     pipeline work and getting the same 5/33, so nothing in that work moved it. Worth knowing because the split is
     the number that *looks* like a regression when a rule changes — check it against a previous commit before
-    believing it.
+    believing it, and against what the user has been editing.
 
 **Template compliance (`Wiki.Analysis.ComplianceChecker`).** What a page gets wrong on its own terms, independent of
 any capture. **Compliance changes what the page *says*; formatting changes only how it reads** — the latter belongs
@@ -644,6 +648,21 @@ the compliance checker — which is what keeps "what would change" reviewable se
 - `ProposedEdit.NeedsReformatting` is true when a line was added but not positioned — the precise trigger the
   prettifier follow-up needs. `Deferred` carries what the tool declined — now only compliance it cannot fix, since a
   missing parameter is written rather than deferred (see the minimal-edit rule above).
+- **The edit summary names what changed, never the values, and no longer truncates** (user, 2026-09-29). A legacy page
+  read `removed the lore placeholder, set {{Classic Era}}, added merchant value 8p 5g 7s 1c, flags Lore Equipped,
+  Attunable, Placeable and 2 more` — longer than a human would write *and* cut off before the end, on an edit whose
+  honest description is "Updated for EQL". The values were the whole problem: **the wiki's own diff shows them**, so
+  repeating them bought nothing and cost the four-item cap. `EditChange` is therefore a kind (`Removed`/`Added`/
+  `Updated`) plus the *name* of what changed, and `Summary` groups by verb —
+  `removed lore placeholder; added era, Type; updated merchant value, flags`.
+  - **Grouping is what makes listing everything affordable**, which is the user's stated preference: the tool can
+    enumerate cheaply, so it should. Three grouped nouns are shorter than one of the old entries.
+  - Repeats collapse deliberately. Every added category is its own `EditChange`, and a `Class: ALL` item earns
+    sixteen — a summary listing them individually would be back where it started, so they read as `categories` once.
+  - Measured on the corpus rather than judged on one example (`WikiSpike analyze`, which now censuses summaries):
+    **33 edits, median 25 characters, longest 72.** The old cap existed because nothing else bounded the length; with
+    it gone, `SummaryLimit` (450, under MediaWiki's 500-character comment truncation) is the only guard, and the
+    corpus says it is nowhere near being reached.
 - **Anything in `Deferred` makes the result need a human, and that was missing** (user, 2026-09-29). `Deferred` is by
   definition "the tool knew about this and did not do it", so `ItemCheckResult.NeedsAttention` counts it. Without
   that, the review screen listed each deferred item as "Not done" in its warning strip while the ledger recorded the
@@ -1615,7 +1634,8 @@ dotnet run --project tools/WikiSpike -- verified
 dotnet run --project tools/WikiSpike -- verified "Dragon Bone Bracelet" "Staff of Forbidden Rites"
 
 # Diff every verified capture against its live wiki page (eligibility applied first — see the note above about
-# levelled items, or the numbers lie). The wiki-side equivalent of AccuracySpike:
+# levelled items, or the numbers lie). The wiki-side equivalent of AccuracySpike; it also censuses the edit
+# summaries it would write, since those are what a reader of the page history actually sees:
 dotnet run --project tools/WikiSpike -- analyze
 dotnet run --project tools/WikiSpike -- analyze --detail   # plus every non-matching field, per item
 

@@ -16,10 +16,11 @@ public class ItemPageEditorTests
         IReadOnlyList<string>? flags = null,
         IReadOnlyList<string>? classes = null,
         IReadOnlyList<string>? races = null,
+        IReadOnlyList<string>? slots = null,
         IReadOnlyList<KeyValuePair<string, string>>? stats = null,
         IReadOnlyList<EffectEntry>? effects = null,
         string? merchantValue = null) =>
-        new(name, 0, false, flags ?? [], classes ?? [], races ?? [], [], stats ?? [], [], effects ?? [],
+        new(name, 0, false, flags ?? [], classes ?? [], races ?? [], slots ?? [], stats ?? [], [], effects ?? [],
             merchantValue, null, []);
 
     private static ProposedEdit Edit(ParsedItem captured, string fixture)
@@ -146,7 +147,7 @@ public class ItemPageEditorTests
         Assert.StartsWith("{{Classic Era}}\n", edit.NewWikitext);
         Assert.DoesNotContain("Item Lore Missing", edit.NewWikitext);
         Assert.Contains("This charged source of Rune is <s>valuable for increasing hate", edit.NewWikitext);
-        Assert.Contains(edit.Changes, c => c.Contains("Classic Era"));
+        Assert.Contains(new EditChange(EditChangeKind.Added, "era"), edit.Changes);
     }
 
     /// <summary>A legacy era banner is replaced rather than added alongside — the item was just seen in game, so it
@@ -270,9 +271,10 @@ public class ItemPageEditorTests
         ProposedEdit edit = Edit(Captured(stats: [new("AC", "6")]), "Earring of Bashing");
 
         // The summary names the changes and nothing else: "updated from in-game data" is assumed, and a prefix only
-        // pushes the part that matters off the end of a history listing. (This capture carries no flags, so losing
+        // pushes the part that matters off the end of a history listing. It names *what* changed and not the value,
+        // because the wiki's own diff shows the value (user, 2026-09-29). (This capture carries no flags, so losing
         // the flags line is a real second change and belongs in the summary.)
-        Assert.Equal("removed the flags line, AC 6", edit.Summary);
+        Assert.Equal("removed flags; updated AC", edit.Summary);
     }
 
     /// <summary>Every fixture must survive an edit that changes nothing about it — the same byte-for-byte property
@@ -293,4 +295,78 @@ public class ItemPageEditorTests
     }
 
     public static TheoryData<string> Pages => WikiFixtures.AllTitles();
+
+    /// <summary>
+    /// The shape the user reported on `Shield of the Stalwart Seas` (2026-09-29): a page still in Project1999 state,
+    /// so nearly everything the tool touches changes at once. The old summary spelled every value out and then
+    /// truncated —
+    /// `removed the lore placeholder, set {{Classic Era}}, added merchant value 8p 5g 7s 1c, flags Lore Equipped,
+    /// Attunable, Placeable and 2 more` — which is both longer than a human would write and cut off before the end.
+    /// Grouped nouns fit the whole list in less space, and the wiki's diff is where the values belong.
+    /// </summary>
+    [Fact]
+    public void TheSummaryGroupsChangesByVerbAndNamesNoValues()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Velious Era}}\n<onlyinclude>{{Itempage\n|notes       = {{Item Lore Missing}}\n" +
+            "|itemname    = Shield of the Stalwart Seas\n|lucy_img_ID = 1234\n|statsblock  = \n" +
+            "MAGIC ITEM  LORE ITEM  NO DROP<br>\nAC: 10<br>\nClass: ALL<br>\nRace: ALL<br>\n}}</onlyinclude>")!;
+
+        ProposedEdit edit = ItemPageEditor.BuildEdit(
+            page,
+            ItemPageAnalyzer.Analyze(
+                Captured(
+                    name: "Shield of the Stalwart Seas",
+                    flags: ["Lore Equipped", "Attunable", "Placeable"],
+                    classes: ["ALL"],
+                    races: ["ALL"],
+                    stats: [new("AC", "12"), new("Type", "Shield")],
+                    merchantValue: "8 platinum 5 gold 7 silver 1 copper"),
+                page,
+                "Shield of the Stalwart Seas"));
+
+        Assert.Equal(
+            "removed lore placeholder; added merchant value, Type; updated era, flags, AC",
+            edit.Summary);
+        Assert.True(edit.Summary.Length < 80);
+    }
+
+    /// <summary>
+    /// Every added category is its own change, and a summary that listed them individually would be back where it
+    /// started — a `Class: ALL` item earns sixteen. Naming the *kind* of thing that changed is what lets the summary
+    /// list everything without a truncation cap.
+    /// </summary>
+    [Fact]
+    public void RepeatedChangesOfOneKindCollapseInTheSummary()
+    {
+        ProposedEdit edit = Edit(
+            Captured(
+                flags: ["Lore Equipped", "No Trade"],
+                classes: ["WAR", "CLR", "PAL"],
+                slots: ["Ear"]),
+            "Earring of Bashing");
+
+        Assert.Contains(new EditChange(EditChangeKind.Added, "categories"), edit.Changes);
+        Assert.True(edit.Changes.Count(c => c.What == "categories") > 1, "several categories should be added");
+        Assert.Equal("added categories; updated Class", edit.Summary);
+    }
+
+    /// <summary>
+    /// Nothing else bounds a summary's length now the four-item cap is gone, and MediaWiki truncates a comment at
+    /// 500 characters — so an implausibly large edit has to trim itself rather than be trimmed by the server.
+    /// </summary>
+    [Fact]
+    public void AnImplausiblyLargeSummaryTrimsItself()
+    {
+        var edit = new ProposedEdit(
+            "a",
+            "b",
+            [.. Enumerable.Range(0, 200).Select(i => new EditChange(EditChangeKind.Updated, $"Field{i}"))],
+            [],
+            NeedsReformatting: false);
+
+        Assert.True(edit.Summary.Length <= 450, $"summary was {edit.Summary.Length} characters");
+        Assert.EndsWith(" more", edit.Summary);
+        Assert.StartsWith("updated Field0, Field1, ", edit.Summary);
+    }
 }

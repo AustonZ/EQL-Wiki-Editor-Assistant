@@ -3,30 +3,96 @@ using EQLWikiAssistant.Wiki.Wikitext;
 
 namespace EQLWikiAssistant.Wiki.Analysis;
 
+/// <summary>What kind of change the edit made to one thing. The order is the order a summary lists them in.</summary>
+public enum EditChangeKind
+{
+    Removed,
+    Added,
+    Updated,
+}
+
+/// <summary>
+/// One change an edit made, as a kind and the *name* of what changed — deliberately never its value.
+///
+/// **The value belongs in the wiki's own diff, not in the summary** (user, 2026-09-29). Naming values made a
+/// routine legacy-page modernization read
+/// `removed the lore placeholder, set {{Classic Era}}, added merchant value 8p 5g 7s 1c, flags Lore Equipped,
+/// Attunable, Placeable and 2 more` where a human would have written `removed lore placeholder; added era, flags,
+/// merchant value, Type; updated effect` — or, honestly, "Updated for EQL". Enumerating is cheap for the tool and
+/// worth keeping, so the fix is to drop the values and the four-item truncation rather than to say less.
+/// </summary>
+public sealed record EditChange(EditChangeKind Kind, string What)
+{
+    public override string ToString() => $"{Verb(Kind)} {What}";
+
+    internal static string Verb(EditChangeKind kind) => kind switch
+    {
+        EditChangeKind.Removed => "removed",
+        EditChangeKind.Added => "added",
+        _ => "updated",
+    };
+}
+
 /// <summary>
 /// The edit the tool proposes: the new page text, what it changed, and whether the result needs the prettifier.
 /// </summary>
 public sealed record ProposedEdit(
     string OriginalWikitext,
     string NewWikitext,
-    IReadOnlyList<string> Changes,
+    IReadOnlyList<EditChange> Changes,
     IReadOnlyList<string> Deferred,
     bool NeedsReformatting)
 {
+    /// <summary>MediaWiki truncates an edit summary at 500 characters, so one is never allowed to reach that.</summary>
+    private const int SummaryLimit = 450;
+
     public bool HasChanges => !string.Equals(OriginalWikitext, NewWikitext, StringComparison.Ordinal);
 
     /// <summary>
-    /// A one-line edit summary for the wiki's history.
+    /// A one-line edit summary for the wiki's history: the changes grouped by verb, as names only.
     ///
     /// **It names the changes and nothing else** (user, 2026-09-28). An earlier version prefixed every summary with
     /// "Updated from in-game data:", which is assumed — nobody should be writing item data they did not see in game
-    /// — so it only made the summary longer and pushed the part that matters off the end of a history listing.
+    /// — so it only made the summary longer and pushed the part that matters off the end of a history listing. The
+    /// same reasoning later took the values out; see <see cref="EditChange"/>.
+    ///
+    /// **Grouping by verb is what makes listing everything affordable.** `added era, flags, merchant value, Type` is
+    /// shorter than three of the old entries were, so the four-item cap it needed is gone. The character guard
+    /// replacing it exists only because nothing else now bounds the length.
     /// </summary>
-    public string Summary =>
-        Changes.Count == 0
-            ? "No changes"
-            : string.Join(", ", Changes.Take(4)) +
-              (Changes.Count > 4 ? $" and {Changes.Count - 4} more" : "");
+    public string Summary
+    {
+        get
+        {
+            if (Changes.Count == 0) return "No changes";
+
+            // Duplicates are real and collapse deliberately: every added category is its own change, and a summary
+            // saying "categories" once is the point of naming things rather than listing values.
+            (EditChangeKind Kind, string What)[] items =
+            [
+                .. new[] { EditChangeKind.Removed, EditChangeKind.Added, EditChangeKind.Updated }
+                    .SelectMany(kind => Changes
+                        .Where(c => c.Kind == kind)
+                        .Select(c => c.What)
+                        .Distinct(StringComparer.Ordinal)
+                        .Select(what => (kind, what)))
+            ];
+
+            for (int keep = items.Length; keep > 1; keep--)
+            {
+                string candidate = Render(items.Take(keep)) +
+                                   (keep < items.Length ? $" and {items.Length - keep} more" : "");
+                if (candidate.Length <= SummaryLimit) return candidate;
+            }
+
+            return Render(items.Take(1)) + (items.Length > 1 ? $" and {items.Length - 1} more" : "");
+        }
+    }
+
+    private static string Render(IEnumerable<(EditChangeKind Kind, string What)> items) =>
+        string.Join("; ", items
+            .GroupBy(i => i.Kind)
+            .Select(g => $"{EditChange.Verb(g.Key)} {string.Join(", ", g.Select(i => i.What))}"));
 }
 
 /// <summary>
@@ -58,7 +124,7 @@ public static class ItemPageEditor
         mapping ??= WikiMapping.Default;
 
         string original = page.Wikitext;
-        var changes = new List<string>();
+        var changes = new List<EditChange>();
         var deferred = new List<string>();
         bool addedUnformattedLine = false;
 
@@ -77,15 +143,16 @@ public static class ItemPageEditor
             {
                 case ComplianceChecker.DuplicateParameterRule:
                     edited = edited.WithoutDuplicateParameters();
-                    changes.Add("removed duplicate parameters");
+                    changes.Add(new EditChange(EditChangeKind.Removed, "duplicate parameters"));
                     break;
                 case ComplianceChecker.LorePlaceholderRule:
                     edited = edited.WithoutLoreMissingPlaceholder();
-                    changes.Add("removed the lore placeholder");
+                    changes.Add(new EditChange(EditChangeKind.Removed, "lore placeholder"));
                     break;
                 case ComplianceChecker.EraTemplateRule:
                     edited = edited.WithEraTemplate(mapping.CurrentEra);
-                    changes.Add($"set {{{{{mapping.CurrentEra} Era}}}}");
+                    changes.Add(new EditChange(
+                        page.CurrentEra is null ? EditChangeKind.Added : EditChangeKind.Updated, "era"));
                     break;
             }
         }
@@ -101,7 +168,7 @@ public static class ItemPageEditor
                 // legacy EverQuest gave a player no easy way to learn a value. EQL states it in the window outright.
                 bool creating = edited.Template.Find(mapping.MerchantValueParameter) is null;
                 edited = edited.WithParameter(mapping.MerchantValueParameter, merchantValue, mapping.ParameterOrder);
-                changes.Add(creating ? $"added merchant value {merchantValue}" : $"merchant value {merchantValue}");
+                changes.Add(new EditChange(Kind(creating), "merchant value"));
                 addedUnformattedLine |= creating;
             }
             else if (finding.Field == ItemPageAnalyzer.CategoryField && finding.Captured is { } category)
@@ -110,7 +177,7 @@ public static class ItemPageEditor
                 // touches beyond it, after the era banner, and for the same reason: it is page furniture rather than
                 // item data. Only ever added; see ItemPageDocument.WithCategory.
                 edited = edited.WithCategory(category);
-                changes.Add($"added [[Category:{category}]]");
+                changes.Add(new EditChange(EditChangeKind.Added, "categories"));
             }
             else if (finding.Field == ItemPageAnalyzer.LoreField && finding.Captured is { } lore)
             {
@@ -118,7 +185,7 @@ public static class ItemPageEditor
                 // existing prose is never replaced. See AddLoreFinding for why that rule is narrower than the rest.
                 bool creating = edited.Template.Find(mapping.NotesParameter) is null;
                 edited = edited.WithLore(lore, mapping.ParameterOrder);
-                changes.Add("added the item's lore");
+                changes.Add(new EditChange(EditChangeKind.Added, "lore"));
                 addedUnformattedLine |= creating;
             }
             else if (finding.Field.EndsWith(" Effect", StringComparison.Ordinal) &&
@@ -127,7 +194,7 @@ public static class ItemPageEditor
             {
                 bool creating = edited.Template.Find(mapping.FocusEffectParameter) is null;
                 edited = edited.WithParameter(mapping.FocusEffectParameter, focus, mapping.ParameterOrder);
-                changes.Add(creating ? $"added focus effect {focus}" : $"focus effect {focus}");
+                changes.Add(new EditChange(Kind(creating), "focus effect"));
                 addedUnformattedLine |= creating;
             }
         }
@@ -145,7 +212,7 @@ public static class ItemPageEditor
 
                 if (finding.Field == ItemPageAnalyzer.FlagsField)
                 {
-                    block = ReplaceFlagsLine(block, wanted, ref changes);
+                    block = ReplaceFlagsLine(block, wanted, changes);
                     continue;
                 }
 
@@ -153,7 +220,7 @@ public static class ItemPageEditor
 
                 if (finding.Field.EndsWith(" Effect", StringComparison.Ordinal))
                 {
-                    block = WriteEffectLine(block, wanted, ref changes, ref addedUnformattedLine);
+                    block = WriteEffectLine(block, wanted, changes, ref addedUnformattedLine);
                     continue;
                 }
 
@@ -162,12 +229,12 @@ public static class ItemPageEditor
                 if (index >= 0 && block.Lines[index].ReplaceFieldValue(finding.Field, wanted) is { } rewritten)
                 {
                     block = block.ReplaceLine(index, rewritten);
-                    changes.Add($"{finding.Field} {wanted}");
+                    changes.Add(new EditChange(EditChangeKind.Updated, finding.Field));
                 }
                 else
                 {
                     block = block.InsertLine($"{finding.Field}: {wanted}");
-                    changes.Add($"added {finding.Field} {wanted}");
+                    changes.Add(new EditChange(EditChangeKind.Added, finding.Field));
                     addedUnformattedLine = true;
                 }
             }
@@ -185,10 +252,13 @@ public static class ItemPageEditor
             NeedsReformatting: addedUnformattedLine);
     }
 
+    private static EditChangeKind Kind(bool creating) =>
+        creating ? EditChangeKind.Added : EditChangeKind.Updated;
+
     /// <summary>The flags line is regenerated whole rather than edited field by field: it has no labels to edit in
     /// place, and legacy flags are discarded rather than translated, so what replaces it shares nothing with what
     /// was there.</summary>
-    private static StatsBlock ReplaceFlagsLine(StatsBlock block, string wanted, ref List<string> changes)
+    private static StatsBlock ReplaceFlagsLine(StatsBlock block, string wanted, List<EditChange> changes)
     {
         int index = block.Lines.ToList().FindIndex(l => l.Kind == StatsLineKind.Flags);
 
@@ -197,24 +267,24 @@ public static class ItemPageEditor
         if (string.IsNullOrWhiteSpace(wanted))
         {
             if (index < 0) return block;
-            changes.Add("removed the flags line");
+            changes.Add(new EditChange(EditChangeKind.Removed, "flags"));
             return block.RemoveLine(index);
         }
 
         if (index < 0)
         {
-            changes.Add($"added flags {wanted}");
+            changes.Add(new EditChange(EditChangeKind.Added, "flags"));
             return block.InsertLine(wanted);
         }
 
-        changes.Add($"flags {wanted}");
+        changes.Add(new EditChange(EditChangeKind.Updated, "flags"));
         return block.ReplaceLine(index, block.Lines[index].ReplaceText(wanted));
     }
 
     /// <summary>An effect line is replaced whole — the rendered line already contains its own `Effect:` label — and
     /// matched to the existing line by the effect's name, so the right one is rewritten when a page has several.</summary>
     private static StatsBlock WriteEffectLine(
-        StatsBlock block, string wanted, ref List<string> changes, ref bool addedUnformattedLine)
+        StatsBlock block, string wanted, List<EditChange> changes, ref bool addedUnformattedLine)
     {
         string? name = EffectLine.TryReadName(wanted);
 
@@ -226,11 +296,11 @@ public static class ItemPageEditor
             if (name is not null && !string.Equals(EffectLine.TryReadName(effect.Value), name, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            changes.Add($"effect {name}");
+            changes.Add(new EditChange(EditChangeKind.Updated, "effect"));
             return block.ReplaceLine(i, block.Lines[i].ReplaceText(wanted));
         }
 
-        changes.Add($"added effect {name}");
+        changes.Add(new EditChange(EditChangeKind.Added, "effect"));
         addedUnformattedLine = true;
         return block.InsertLine(wanted);
     }

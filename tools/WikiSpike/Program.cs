@@ -304,6 +304,7 @@ async Task<int> AnalyzeCorpusAsync()
     var verdictCounts = new Dictionary<FieldVerdict, int>();
     var needsReview = new List<(string Item, FieldFinding Finding)>();
     var compliance = new List<(string Item, ComplianceFinding Finding)>();
+    var summaries = new List<(string Item, string Summary)>();
     int notItemPages = 0, missing = 0, misnamed = 0, unusable = 0, clean = 0, changed = 0;
 
     foreach (ExpectedWindow window in items)
@@ -337,6 +338,11 @@ async Task<int> AnalyzeCorpusAsync()
 
         if (analysis.IsClean) clean++; else changed++;
 
+        // The summary is what a reader of the page history actually sees, so it is censused rather than judged on
+        // one example. It used to spell every value out and truncate the list at four (user, 2026-09-29).
+        ProposedEdit proposed = ItemPageEditor.BuildEdit(page, analysis);
+        if (proposed.HasChanges) summaries.Add((window.Name!, proposed.Summary));
+
         if (detail)
         {
             Console.WriteLine();
@@ -364,6 +370,16 @@ async Task<int> AnalyzeCorpusAsync()
     foreach (var group in compliance.GroupBy(c => (c.Finding.Rule, c.Finding.ToolWillFix)).OrderByDescending(g => g.Count()))
         Console.WriteLine($"  {group.Count(),4}  {group.Key.Rule,-24} " +
                           $"{(group.Key.ToolWillFix ? "tool fixes" : "needs a human"),-14} e.g. {group.First().Item}");
+
+    Console.WriteLine();
+    Console.WriteLine($"=== edit summaries ({summaries.Count}) ===");
+    if (summaries.Count > 0)
+    {
+        int[] lengths = [.. summaries.Select(s => s.Summary.Length).Order()];
+        Console.WriteLine($"  length: median {lengths[lengths.Length / 2]}, longest {lengths[^1]}");
+        foreach (var s in summaries.OrderByDescending(s => s.Summary.Length).Take(6))
+            Console.WriteLine($"  {s.Summary.Length,4}  {s.Item}: {s.Summary}");
+    }
 
     Console.WriteLine();
     Console.WriteLine($"=== needs review ({needsReview.Count}) ===");
