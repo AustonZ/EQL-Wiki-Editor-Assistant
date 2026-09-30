@@ -367,17 +367,27 @@
                         <StackPanel Orientation="Horizontal">
                             <StackPanel Margin="0,0,20,0">
                                 <TextBlock Text="In game" FontSize="11" Foreground="#666" Margin="0,0,0,3" />
-                                <Border BorderBrush="#DDD" BorderThickness="1" Background="#101010">
+                                <!-- Collapsed when there is no image, rather than left as an empty Border: its
+                                     near-black background renders as a small dark rectangle that looks exactly like
+                                     a corrupt icon, which is how a null here got reported as a capture bug (user,
+                                     2026-09-29). An absent icon has to look absent. -->
+                                <Border BorderBrush="#DDD" BorderThickness="1" Background="#101010"
+                                        Visibility="{Binding HasCapturedIcon, Converter={StaticResource BoolToVis}}">
                                     <Image x:Name="CapturedIconImage" Stretch="None" Margin="4"
                                            RenderOptions.BitmapScalingMode="NearestNeighbor" />
                                 </Border>
+                                <TextBlock Text="not captured" FontSize="11" Foreground="#999" FontStyle="Italic"
+                                           Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
                             <StackPanel>
                                 <TextBlock Text="On the wiki" FontSize="11" Foreground="#666" Margin="0,0,0,3" />
-                                <Border BorderBrush="#DDD" BorderThickness="1" Background="#101010">
+                                <Border BorderBrush="#DDD" BorderThickness="1" Background="#101010"
+                                        Visibility="{Binding HasWikiIcon, Converter={StaticResource BoolToVis}}">
                                     <Image x:Name="WikiIconImage" Stretch="None" Margin="4"
                                            RenderOptions.BitmapScalingMode="NearestNeighbor" />
                                 </Border>
+                                <TextBlock Text="none on the page" FontSize="11" Foreground="#999" FontStyle="Italic"
+                                           Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>

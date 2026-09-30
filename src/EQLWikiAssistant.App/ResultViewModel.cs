@@ -144,6 +144,17 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// <summary>Whether there is anything to show in the icon section — at least one of the two images.</summary>
     public bool HasIcons => Result.CapturedIconImage is not null || Result.WikiIconImage is not null;
 
+    /// <summary>Whether each side actually has artwork to show. **An absent icon must look absent**: an empty
+    /// <c>Border</c> keeps its near-black background and reads as a corrupt icon, which is how one of these got
+    /// reported as a capture bug (user, 2026-09-29).</summary>
+    public bool HasCapturedIcon => Result.CapturedIconImage is not null;
+
+    public bool HasNoCapturedIcon => !HasCapturedIcon;
+
+    public bool HasWikiIcon => Result.WikiIconImage is not null;
+
+    public bool HasNoWikiIcon => !HasWikiIcon;
+
     /// <summary>What the comparison concluded, in words, including when it declined to conclude anything. The
     /// images are shown regardless, so this is a starting point for the user's own look rather than a verdict they
     /// have to take on trust.</summary>

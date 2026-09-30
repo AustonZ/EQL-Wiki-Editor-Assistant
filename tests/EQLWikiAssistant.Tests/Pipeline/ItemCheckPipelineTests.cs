@@ -96,6 +96,37 @@ public class ItemCheckPipelineTests
         return (new ItemCheckPipeline(wiki, new FakeLocator(window), ledger, verified: verified), ledger);
     }
 
+    /// <summary>
+    /// **The captured icon survives an item that had no page when it was first checked** (user, 2026-09-29, on
+    /// `Lake Pebble`). The chain that lost it: the first capture found no wiki page, and the `NotOnWiki` branch
+    /// dropped the icon; the user then created the page and re-captured with the game still on the Lore tab, so
+    /// `ReanalyzeAsync` rebuilt the result from the previous one — carrying that null forward even though the page
+    /// now existed. The review screen then showed the wiki's icon beside an empty box, which its near-black
+    /// background rendered as a small dark rectangle indistinguishable from corrupt artwork.
+    /// </summary>
+    [Fact]
+    public async Task TheCapturedIconSurvivesAPageBeingCreatedAfterTheFirstCheck()
+    {
+        var wiki = new FakeWiki();
+        var pipeline = new ItemCheckPipeline(wiki, new FakeLocator(Window(EarringLines)), new CheckedItemsLedger());
+
+        // No page yet.
+        IReadOnlyList<ItemCheckResult> first = await pipeline.CheckAsync(BlankFrame());
+        Assert.Equal(ItemCheckStatus.NotOnWiki, first[0].Status);
+
+        // Somebody creates it, and the item is re-analyzed from that earlier result rather than re-read.
+        wiki.Pages["Earring of Bashing"] =
+            new WikiPage("Earring of Bashing", EarringPage(), 100, DateTimeOffset.UnixEpoch);
+
+        ItemCheckResult again = await pipeline.ReanalyzeAsync(first[0]);
+
+        Assert.NotEqual(ItemCheckStatus.NotOnWiki, again.Status);
+
+        // Asserted non-null on both sides: comparing two nulls is exactly the bug passing itself off as a fix.
+        Assert.NotNull(first[0].CapturedIconImage);
+        Assert.Same(first[0].CapturedIconImage, again.CapturedIconImage);
+    }
+
     // --- verification (reported, never enforced) --------------------------------------------------------
 
     /// <summary>
