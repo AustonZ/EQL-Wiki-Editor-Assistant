@@ -1215,6 +1215,27 @@ already found and fixed.
   content area's top outline look like the window's bottom. The step-in point also has to land on an actual
   interior row, not a fixed offset: a real Lore capture starts its first line of text 4px below the outline, so
   a fixed clearance lands inside a glyph and every interior test downstream fails.
+- **The top edge is probed across the anchor ±100 first, and across the window's own traced width only if that
+  finds nothing** (bug found by the user, 2026-09-30, on `Shield of the Stalwart Seas`). The player's HP bar is a
+  black HUD panel, and it sat flush on top of that window's title bar with no gap at all: the two black regions were
+  contiguous, so every column the panel covered measured a **41px band where a real one is ~16** and correctly
+  abstained. The panel covered x 780-1145 of a window spanning 807-1210, so the only columns that could answer were
+  the ~65px to its right — outside the ±100 span — leaving **zero** usable probes and a *fully visible* window
+  reported as occluded with no bounds at all. That is the abstain-and-let-the-others-decide rule working exactly as
+  designed and being given nowhere to work: refusing a merged column only helps if an unmerged one is sampled.
+  - **Widening the span unconditionally was tried first and the corpus rejected it**, which is the whole reason this
+    is a fallback rather than a replacement. The wider span also admits columns that merge by *less* than
+    `TitleBarMaxBandHeight`, so they answer instead of abstaining — and `TryGetConsensus` averages its agreeing
+    cluster, so one such column drags the result a pixel high. On `12e-3-neck-items.png` that moved a window's top
+    from 272 to 271 (measured: background to y=271, black from y=272), **one pixel**, which was enough to flip two
+    windows' reading order and score 32 fields against the wrong item. `AccuracySpike` went 0 → 32 silent-wrong on a
+    change that looked strictly like an improvement.
+  - So the proven span decides every window it can, and the wide one runs only where the alternative is refusing the
+    window outright — where a possibly-1px-high top beats reading nothing at all. Corpus after: **0 silent-wrong and
+    2197 correct, identical to before**, with occluded down from 2 to 1.
+  - **The lesson is the one this file keeps relearning**: a locate change that fixes the sample in front of you can
+    move a different sample by a pixel, and a pixel is enough. Re-run `AccuracySpike` over the whole set, and read
+    the *window rectangles* rather than the counts — the count was unchanged on the sample that broke.
 - **Probe agreement cannot decide occlusion; rectangle closure does.** Measured across the set, a clean window's
   edge agreement (64-100%) overlaps a genuinely part-covered edge's (55-67%), so no threshold separates them —
   strict enough to reject the covered edge also rejects a clean window touching a neighbour or sitting at the
@@ -1224,7 +1245,7 @@ already found and fixed.
   a partly-covered window came back confidently 587px wide, silently merged with its neighbour.
 - The absolute size ceilings (600x700) are retained and still catch an occluder adjacent along an *entire* side,
   where every probe agrees on the same wrong answer.
-- Validated against the full real-sample corpus (43 screenshots, 101 located windows, 1 correctly occluded;
+- Validated against the full real-sample corpus (46 screenshots, 109 located windows, 1 correctly occluded;
   `tools/LocateSpike --save` draws a debug overlay, green/red by `PossiblyOccluded`; golden tests in
   `Tests/Locate/`). Traced widths are consistently 388-404px — the window's true content width — where the
   previous design returned 414-587px because it ran past the real edge into neighbouring UI. Cases that now
@@ -1477,11 +1498,15 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline against the **verified** corpus (all 43 samples checked against the screenshots by the user,
-  2026-09-24): **101 windows (1 correctly occluded), 2094 correct fields, and 0 for every error count —
-  structural, silent-wrong, wrong, missing, extra and parser warnings alike.** All three ratchets in
-  `CorpusAccuracyTests` are therefore 0 and must stay there; a regression is now a real defect rather than a
-  known gap being re-measured. Under the previous configuration (RapidOCR reading window crops) the same corpus
+- Baseline against the **verified** corpus, re-measured 2026-09-30: **46 samples, 109 windows located (1 correctly
+  occluded), 2197 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing, extra and
+  parser warnings alike.** All three ratchets in `CorpusAccuracyTests` are therefore 0 and must stay there; a
+  regression is now a real defect rather than a known gap being re-measured. (It read 43 samples / 101 windows /
+  2094 fields when the user first verified the whole set on 2026-09-24; the growth is captures added since, and the
+  occluded count fell from 2 to 1 when the HUD-panel bug above was fixed.)
+  - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure.** A newly captured
+    sample is located and parsed but scored against nothing until a human checks it against the screenshot, which
+    is the one step this harness cannot do for itself. Under the previous configuration (RapidOCR reading window crops) the same corpus
   and the same ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them a
   glyph-level failure that exact template matching removed outright. `AccuracySpike --rapid` still scores the old
   configuration, so the comparison stays reproducible.

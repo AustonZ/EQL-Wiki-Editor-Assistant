@@ -263,4 +263,34 @@ public class ItemWindowLocatorTests
             Assert.Single(texts, t => t.Contains("Pegasus-Hide Belt"));
         }
     }
+
+    /// <summary>
+    /// **A black HUD panel directly above the title bar, with no gap** (bug found by the user, 2026-09-30). The
+    /// player's HP bar is a black panel, and here it sits flush on top of the window's title bar: the two black
+    /// regions are contiguous, so `ScanToWindowTop` measures a 41px band where a real one is ~16 and correctly
+    /// abstains — on every column the panel covers. It covered x 780-1145 of a window spanning 807-1210, so the
+    /// only columns that could answer sat outside the ±100 probe span around the tab, and a **fully visible**
+    /// window was reported as occluded with no bounds at all.
+    ///
+    /// The window is completely unobstructed, so `PossiblyOccluded` is the assertion that matters; the width is
+    /// here because the fallback span could in principle latch onto the wrong edge, and a plausible width is what
+    /// says it did not.
+    /// </summary>
+    [Fact]
+    public async Task LocateAsync_BlackHudPanelFlushAboveTheTitleBar_StillFindsTheWindow()
+    {
+        if (await Load("20-stalwart-seas-false-occlusion.png") is not { } l) return;
+        using (l.Engine as IDisposable)
+        {
+            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
+            Dump(windows);
+
+            LocatedWindow window = Assert.Single(windows);
+            Assert.False(window.PossiblyOccluded, "the window is entirely unobstructed");
+            AssertPlausibleSingleWindowSize(window);
+
+            // Read from the crop, so it also proves the bounds are the *right* 404px and not merely 404px wide.
+            Assert.Contains(window.Lines, line => line.Text.Contains("Stalwart Seas", StringComparison.Ordinal));
+        }
+    }
 }

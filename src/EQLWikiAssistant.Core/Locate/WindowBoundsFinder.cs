@@ -104,7 +104,13 @@ public static class WindowBoundsFinder
     //    early), scoring 64-82% on clean windows.
     private const double MinOutlineAgreementFraction = 0.45;
     private const double MinTopAgreementFraction = 0.4;
+    // Used for the two scans that run *before* the window's width is known (the bottom outline). Once left and
+    // right are traced, the top scan spans those instead — see TryFindBounds.
     private const int SafeHorizontalProbeHalfWidth = 100;
+
+    // Inset from the traced content outline when probing the title bar, so no column lands on the window's own
+    // frame. The outline sits a few px inside the outer frame, so this only has to clear the tracing tolerance.
+    private const int TitleBarProbeInset = 12;
 
     // Sanity ceilings, generous over the largest real window measured (~550x655). These catch the case where an
     // occluder is adjacent along an *entire* side, so every probe agrees on the same wrong, oversized answer and
@@ -128,8 +134,28 @@ public static class WindowBoundsFinder
         if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4, cx, dx: -1, out int left)) return null;
         if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4, cx, dx: 1, out int right)) return null;
 
+        // **The narrow span first, the window's full traced width only as a fallback** (bug found by the user,
+        // 2026-09-30, on `Shield of the Stalwart Seas`). The player's HP bar is a black HUD panel, and it sat
+        // directly above that window's title bar with no gap at all: the two black regions were contiguous, so every
+        // column under the panel correctly refused (a 41px band against a real ~16px one). The panel covered x
+        // 780-1145 of a window spanning 807-1210, so the only columns that could answer were the ~65px to its right
+        // — outside the ±100 span, leaving zero usable probes and a fully visible window reported as occluded. That
+        // is ScanToWindowTop's abstain-and-let-the-others-decide rule working as designed and being given nowhere to
+        // work: refusing a merged column only helps if an unmerged one is sampled.
+        //
+        // **Widening unconditionally was tried first and the corpus rejected it**, which is why this is a fallback
+        // rather than a replacement. The wider span also admits columns that merge *slightly* — by less than
+        // TitleBarMaxBandHeight, so they answer instead of abstaining — and since TryGetConsensus averages its
+        // agreeing cluster, one such column drags the result a pixel high. On `12e-3-neck-items.png` that moved a
+        // window's top from 272 to 271 (measured: background to 271, black from 272), which was enough to flip two
+        // windows' reading order and score 32 fields against the wrong item. A pixel of top edge is not worth that.
+        //
+        // So the proven span stays the default and decides every window it can; the wide one only ever runs where
+        // the alternative is refusing the window outright, where a possibly-1px-high top beats reading nothing.
         if (!TryConsensusWindowTop(image, cx - SafeHorizontalProbeHalfWidth, cx + SafeHorizontalProbeHalfWidth,
-                interiorY, out int top))
+                interiorY, out int top) &&
+            !TryConsensusWindowTop(image, left + TitleBarProbeInset, right - TitleBarProbeInset,
+                interiorY, out top))
             return null;
 
         int width = right - left, height = bottom - top;
