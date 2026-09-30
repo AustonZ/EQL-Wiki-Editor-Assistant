@@ -617,6 +617,13 @@ frequency across 744 real item pages, so none is hypothetical:
   but still carries `{{Item Lore Missing}}` is not "done" — the tool's edit would still change it. Compliance it
   cannot fix is excluded, since no amount of editing would clear it and such an item could never be recorded as
   checked.
+- **Removing `{{Item Lore Missing}}` takes its line break only when something follows it** (bug found by the user,
+  2026-09-29, on `Shield of the Stalwart Seas`). Where a human's own note sits below the placeholder the break belongs
+  to it, and taking it stops the note starting on a blank line. Where the placeholder *is* the whole value — **29 of
+  the 35 cached pages that carry one** — that very same break is the parameter's own line terminator, the last
+  character before the next `|`, so removing it merged the next parameter onto the line and produced
+  `|notes     = |itemname    = Shield of the Stalwart Seas`. The test that covered this only ever exercised the
+  note-below shape, where the two rules agree.
 - Removing a duplicate takes the parameter's whole `|name = value` run (`TemplateParameter.SegmentStart`/`SegmentEnd`),
   not just its value — splicing out the value alone leaves a stray `|notes =` behind — and keeps the **last**
   occurrence, the one MediaWiki renders.

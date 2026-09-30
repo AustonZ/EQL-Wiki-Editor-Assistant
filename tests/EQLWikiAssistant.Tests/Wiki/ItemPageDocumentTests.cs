@@ -230,6 +230,43 @@ public class ItemPageDocumentTests
         Assert.Equal(document.ItemName, cleaned.ItemName);
     }
 
+    /// <summary>
+    /// **The placeholder alone leaves an empty parameter, not a merged line** (bug found by the user, 2026-09-29, on
+    /// `Shield of the Stalwart Seas`). When a human's note sits below the placeholder, the line break belongs to the
+    /// placeholder and goes with it. When the placeholder is the whole value, the very same break is the parameter's
+    /// own line terminator, and taking it produced
+    /// <c>|notes     = |itemname    = Shield of the Stalwart Seas</c>.
+    /// </summary>
+    [Fact]
+    public void WithoutLoreMissingPlaceholder_KeepsTheLineBreakWhenThePlaceholderIsTheWholeValue()
+    {
+        // The real page's shape, verbatim.
+        const string original =
+            "\n<onlyinclude>{{Itempage\n|notes       = {{Item Lore Missing}}\n" +
+            "|itemname    = Shield of the Stalwart Seas\n|lucy_img_ID = 974\n}}</onlyinclude>";
+
+        string cleaned = ItemPageDocument.Parse(original)!.WithoutLoreMissingPlaceholder().Wikitext;
+
+        Assert.DoesNotContain("Item Lore Missing", cleaned);
+        Assert.Contains("|notes       = \n|itemname    = Shield of the Stalwart Seas", cleaned);
+
+        // Still a page, and still the same item — a merged line reparses as something else entirely.
+        Assert.Equal("Shield of the Stalwart Seas", ItemPageDocument.Parse(cleaned)!.ItemName);
+    }
+
+    /// <summary>The other half of the same rule: with a note below it, the break does go, so the note does not start
+    /// on a blank line.</summary>
+    [Fact]
+    public void WithoutLoreMissingPlaceholder_TakesTheLineBreakWhenANoteFollows()
+    {
+        const string original =
+            "{{Itempage\n|notes       = {{Item Lore Missing}}\nDropped rarely.\n|itemname    = A Thing\n}}";
+
+        string cleaned = ItemPageDocument.Parse(original)!.WithoutLoreMissingPlaceholder().Wikitext;
+
+        Assert.Contains("|notes       = Dropped rarely.\n|itemname    = A Thing", cleaned);
+    }
+
     [Fact]
     public void WithoutLoreMissingPlaceholder_IsANoOpWhenThereIsNoPlaceholder()
     {

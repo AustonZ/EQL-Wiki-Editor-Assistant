@@ -392,8 +392,18 @@ public sealed class ItemPageDocument
             int end = call.End;
             if (string.CompareOrdinal(value, end, "<br>", 0, 4) == 0) end += 4;
             else if (string.CompareOrdinal(value, end, "<br/>", 0, 5) == 0) end += 5;
-            if (end < value.Length && value[end] == '\r') end++;
-            if (end < value.Length && value[end] == '\n') end++;
+
+            // **The line break goes only when something else follows it** (bug found by the user, 2026-09-29, on
+            // `Shield of the Stalwart Seas`). Where a human's own note sits below the placeholder, that break belongs
+            // to the placeholder and taking it avoids leaving a blank first line. Where the placeholder *was* the
+            // whole value, the very same break is the parameter's own line terminator — the last character before
+            // the next `|` — so taking it merged the following parameter onto this line and produced
+            // `|notes     = |itemname    = Shield of the Stalwart Seas`.
+            int afterBreak = end;
+            if (afterBreak < value.Length && value[afterBreak] == '\r') afterBreak++;
+            if (afterBreak < value.Length && value[afterBreak] == '\n') afterBreak++;
+            if (value[afterBreak..].Trim().Length > 0) end = afterBreak;
+
             value = value[..call.Start] + value[end..];
         }
 
