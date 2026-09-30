@@ -1,9 +1,15 @@
-﻿<Application x:Class="EQLWikiAssistant.App.App"
+<Application x:Class="EQLWikiAssistant.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:EQLWikiAssistant.App"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- The dark palette and the control styles that make WPF honour it. Application-level so both
+                     windows and every dialog share one set of brushes. -->
+                <ResourceDictionary Source="Theme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

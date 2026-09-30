@@ -5,35 +5,36 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Checked items" Height="700" Width="1050"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Style="{StaticResource DarkWindow}">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="0,0,0,1" Padding="10,8">
+        <Border DockPanel.Dock="Top" Background="{StaticResource ChromeBrush}" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,0,0,1" Padding="10,8">
             <StackPanel>
                 <!-- The count of things still wanting a human comes first and in its own colour: it is the number
                      the user opened this window to read. -->
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="AttentionText" FontWeight="SemiBold" Foreground="Firebrick"
+                    <TextBlock x:Name="AttentionText" FontWeight="SemiBold" Foreground="{StaticResource AttentionBrush}"
                                VerticalAlignment="Center" />
-                    <TextBlock x:Name="SummaryText" Foreground="#555" VerticalAlignment="Center" Margin="10,0,0,0" />
+                    <TextBlock x:Name="SummaryText" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="10,0,0,0" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <TextBlock Text="Show" VerticalAlignment="Center" Foreground="#555" />
+                    <TextBlock Text="Show" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" />
                     <ComboBox x:Name="FilterBox" Width="200" Margin="6,0,0,0" VerticalAlignment="Center"
                               SelectionChanged="OnQueryChanged" />
-                    <TextBlock Text="Search" VerticalAlignment="Center" Foreground="#555" Margin="18,0,0,0" />
+                    <TextBlock Text="Search" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Margin="18,0,0,0" />
                     <TextBox x:Name="SearchBox" Width="240" Margin="6,0,0,0" Padding="4,3" VerticalAlignment="Center"
                              TextChanged="OnQueryChanged"
                              ToolTip="Matches the in-game name or the wiki page title" />
-                    <TextBlock x:Name="ShownText" VerticalAlignment="Center" Margin="14,0,0,0" Foreground="#888" />
+                    <TextBlock x:Name="ShownText" VerticalAlignment="Center" Margin="14,0,0,0" Foreground="{StaticResource TextDimBrush}" />
                 </StackPanel>
             </StackPanel>
         </Border>
 
-        <Border DockPanel.Dock="Bottom" BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="10,8">
+        <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0" Padding="10,8">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="Close" IsCancel="True" Padding="16,4" MinWidth="80" />
-                <TextBlock VerticalAlignment="Center" Foreground="#888" TextTrimming="CharacterEllipsis">
+                <TextBlock VerticalAlignment="Center" Foreground="{StaticResource TextDimBrush}" TextTrimming="CharacterEllipsis">
                     <Hyperlink Click="OnOpenLedgerFolderClick">
                         <TextBlock x:Name="LedgerPathText" />
                     </Hyperlink>
@@ -46,7 +47,7 @@
                       GridLinesVisibility="Horizontal" BorderThickness="0" CanUserSortColumns="True"
                       SelectionMode="Single" HorizontalScrollBarVisibility="Disabled">
                 <DataGrid.RowStyle>
-                    <Style TargetType="DataGridRow">
+                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                         <Setter Property="ToolTip" Value="{Binding CheckedExactly}" />
                     </Style>
                 </DataGrid.RowStyle>
@@ -60,7 +61,7 @@
                                     <!-- Only when it differs from the in-game name, which is the case worth
                                          seeing: the page a human had to name by hand. -->
                                     <TextBlock Text="{Binding PageTitle}" FontFamily="Consolas" FontSize="11"
-                                               Foreground="#888" TextWrapping="Wrap" />
+                                               Foreground="{StaticResource TextDimBrush}" TextWrapping="Wrap" />
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
@@ -108,7 +109,7 @@
                 </DataGrid.Columns>
             </DataGrid>
 
-            <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#999"
+            <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource TextDimBrush}"
                        TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420" Visibility="Collapsed" />
         </Grid>
     </DockPanel>

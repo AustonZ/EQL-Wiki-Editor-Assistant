@@ -30,17 +30,17 @@ public sealed record DiffLineViewModel(DiffLine Line)
 
     public Brush Background => Line.Kind switch
     {
-        DiffLineKind.Removed => new SolidColorBrush(Color.FromRgb(0xFF, 0xE5, 0xE5)),
-        DiffLineKind.Added => new SolidColorBrush(Color.FromRgb(0xE2, 0xF6, 0xE2)),
+        DiffLineKind.Removed => Palette.DiffRemovedBack,
+        DiffLineKind.Added => Palette.DiffAddedBack,
         _ => Brushes.Transparent,
     };
 
     public Brush Foreground => Line.Kind switch
     {
-        DiffLineKind.Removed => new SolidColorBrush(Color.FromRgb(0x8B, 0x1A, 0x1A)),
-        DiffLineKind.Added => new SolidColorBrush(Color.FromRgb(0x14, 0x5A, 0x14)),
-        DiffLineKind.Gap => Brushes.Gray,
-        _ => Brushes.Black,
+        DiffLineKind.Removed => Palette.DiffRemovedText,
+        DiffLineKind.Added => Palette.DiffAddedText,
+        DiffLineKind.Gap => Palette.Dim,
+        _ => Palette.Text,
     };
 }
 
@@ -63,7 +63,7 @@ public sealed record FindingViewModel(
 {
     /// <summary>Red for anything needing a human, because that is the one category the user must not skim past: the
     /// tool has declined to decide, so nobody has.</summary>
-    public Brush Foreground => Blocks ? Brushes.Firebrick : Brushes.Black;
+    public Brush Foreground => Blocks ? Palette.Attention : Palette.Text;
 
     public static FindingViewModel For(FieldFinding finding) => new(
         finding.Field,
@@ -211,9 +211,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public Brush IconVerdictBrush => Result.Icon switch
     {
-        { Matches: true } => Brushes.SeaGreen,
-        { Matches: false } => Brushes.Firebrick,
-        _ => Brushes.DimGray,
+        { Matches: true } => Palette.Done,
+        { Matches: false } => Palette.Attention,
+        _ => Palette.Neutral,
     };
 
     /// <summary>The lore read from the game, once a Lore-tab capture has been merged in.</summary>
@@ -291,11 +291,11 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public Brush StatusBrush => Result switch
     {
-        _ when IsDone => Brushes.SeaGreen,
-        { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Brushes.Firebrick,
-        { Status: ItemCheckStatus.EditProposed } => Brushes.DarkOrange,
-        { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded } => Brushes.Firebrick,
-        _ => Brushes.DimGray,
+        _ when IsDone => Palette.Done,
+        { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Palette.Attention,
+        { Status: ItemCheckStatus.EditProposed } => Palette.Warning,
+        { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded } => Palette.Attention,
+        _ => Palette.Neutral,
     };
 
     /// <summary>

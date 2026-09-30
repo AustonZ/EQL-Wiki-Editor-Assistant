@@ -39,10 +39,10 @@ public sealed record LedgerRowViewModel(LedgerEntry Entry, LedgerVerdict Verdict
     /// <summary>The same palette the review screen uses: green settled, red wanting a human, grey neither.</summary>
     public Brush OutcomeBrush => Entry.Outcome switch
     {
-        CheckOutcome.Matched or CheckOutcome.Edited => Brushes.SeaGreen,
-        CheckOutcome.Flagged => Brushes.Firebrick,
-        CheckOutcome.NotOnWiki => Brushes.DarkOrange,
-        _ => Brushes.DimGray,
+        CheckOutcome.Matched or CheckOutcome.Edited => Palette.Done,
+        CheckOutcome.Flagged => Palette.Attention,
+        CheckOutcome.NotOnWiki => Palette.Warning,
+        _ => Palette.Neutral,
     };
 
     public string Checked => Describe(Entry.CheckedAt);
@@ -63,7 +63,7 @@ public sealed record LedgerRowViewModel(LedgerEntry Entry, LedgerVerdict Verdict
     };
 
     public Brush NextCaptureBrush =>
-        Verdict == LedgerVerdict.AlreadyDone ? Brushes.DimGray : Brushes.SaddleBrown;
+        Verdict == LedgerVerdict.AlreadyDone ? Palette.Neutral : Palette.Recheck;
 
     public string? Note => Entry.Note;
 

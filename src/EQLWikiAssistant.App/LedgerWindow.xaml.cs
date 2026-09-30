@@ -46,6 +46,7 @@ public partial class LedgerWindow : Window
         ArgumentNullException.ThrowIfNull(save);
 
         InitializeComponent();
+        DarkTitleBar.Apply(this);
         _ledger = ledger;
         _mappingVersion = mappingVersion;
         _save = save;

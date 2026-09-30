@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        DarkTitleBar.Apply(this);
         ResultsList.ItemsSource = _results;
 
         // Built off the UI thread: RapidOcrEngine loads three ONNX models in its constructor, which is seconds of a

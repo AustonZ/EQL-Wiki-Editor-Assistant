@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EQLWikiAssistant.App"
         mc:Ignorable="d"
-        Title="EQLWiki Editor Assistant" Height="900" Width="1300">
+        Title="EQLWiki Editor Assistant" Height="900" Width="1300"
+        Style="{StaticResource DarkWindow}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
@@ -21,14 +22,14 @@
         <Style x:Key="SectionHeading" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,14,0,4" />
-            <Setter Property="Foreground" Value="#444" />
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
         </Style>
     </Window.Resources>
 
     <DockPanel>
         <!-- A plain header rather than a ToolBar: WPF's ToolBar restyles a CheckBox into a flat toggle with no box,
              which makes a setting look like a button, and adds an overflow chevron that never has anything in it. -->
-        <Border DockPanel.Dock="Top" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="0,0,0,1" Padding="10,7">
+        <Border DockPanel.Dock="Top" Background="{StaticResource ChromeBrush}" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,0,0,1" Padding="10,7">
             <StackPanel Orientation="Horizontal">
                 <Button x:Name="CaptureButton" Click="OnCaptureClick" Padding="12,4" FontWeight="SemiBold"
                         Content="Capture now" ToolTip="Capture the game window and check every item window in it" />
@@ -38,14 +39,14 @@
                 <Button x:Name="LedgerButton" Click="OnLedgerClick" Padding="12,4" Margin="16,0,0,0"
                         Content="Checked items…"
                         ToolTip="Everything checked so far, and what is still waiting for a human" />
-                <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="16,0,0,0" Foreground="#666" />
+                <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="16,0,0,0" Foreground="{StaticResource TextMutedBrush}" />
 
                 <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a
                      status line were too quiet to read as "working" (user, 2026-09-28). -->
                 <StackPanel x:Name="BusyPanel" Orientation="Horizontal" Margin="20,0,0,0" Visibility="Collapsed">
                     <ProgressBar IsIndeterminate="True" Width="150" Height="12" VerticalAlignment="Center" />
                     <TextBlock x:Name="BusyLabel" VerticalAlignment="Center" Margin="10,0,0,0"
-                               Foreground="#1B4A75" FontWeight="SemiBold" />
+                               Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -55,7 +56,7 @@
                 <TextBlock x:Name="StatusText" Text="Ready." />
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock x:Name="LedgerText" Foreground="#666" />
+                <TextBlock x:Name="LedgerText" Foreground="{StaticResource TextMutedBrush}" />
             </StatusBarItem>
         </StatusBar>
 
@@ -69,7 +70,7 @@
             <!-- Every window found in the frame, including the ones nothing could be done with: a window the tool
                  refused is exactly what the user needs to be told about. -->
             <ListBox x:Name="ResultsList" Grid.Column="0" SelectionChanged="OnResultSelected"
-                     HorizontalContentAlignment="Stretch" BorderThickness="0,0,1,0" BorderBrush="#DDD">
+                     HorizontalContentAlignment="Stretch" BorderThickness="0,0,1,0" BorderBrush="{StaticResource BorderBrushKey}">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid Margin="2,5" ToolTip="{Binding CaptureTip}">
@@ -85,27 +86,27 @@
                                          needs attention, so done is what has to be obvious (user, 2026-09-29). -->
                                     <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
                                                FontSize="11" FontWeight="SemiBold" />
-                                    <TextBlock Text="  •  lore" FontSize="11" Foreground="Gray"
+                                    <TextBlock Text="  •  lore" FontSize="11" Foreground="{StaticResource TextDimBrush}"
                                                Visibility="{Binding HasCapturedLore, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>
                             </StackPanel>
                             <!-- The list accumulates across captures, so finishing with an item has to be an
                                  explicit act rather than something the next capture does for you. -->
                             <Button Grid.Column="1" Content="✕" Click="OnCloseResultClick" Padding="6,0"
-                                    BorderThickness="0" Background="Transparent" Foreground="#999"
+                                    Style="{StaticResource QuietButton}"
                                     VerticalAlignment="Top" ToolTip="Close this item" />
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="#EEE" />
+            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" />
 
             <!-- Shown only when nothing is selected. It is a separate element rather than a placeholder inside the
                  detail panel because a binding against a null DataContext cannot resolve at all: WPF then falls back
                  to the property's default, and every `Visibility` below silently reverts to Visible — which rendered
                  the entire empty scaffold, lore panel and buttons included. -->
-            <TextBlock Grid.Column="2" x:Name="EmptyState" TextWrapping="Wrap" MaxWidth="420" Foreground="#888"
+            <TextBlock Grid.Column="2" x:Name="EmptyState" TextWrapping="Wrap" MaxWidth="420" Foreground="{StaticResource TextDimBrush}"
                        HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
                        Text="Open an item window in game and press Ctrl+Shift+E.&#10;&#10;Every item window in the capture is checked against the wiki and listed on the left." />
 
@@ -116,14 +117,14 @@
 
                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                         <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontWeight="SemiBold" />
-                        <TextBlock Text="  —  " Foreground="#AAA"
+                        <TextBlock Text="  —  " Foreground="{StaticResource TextDimBrush}"
                                    Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}" />
                         <TextBlock Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}">
                             <Hyperlink Click="OnOpenPageClick">
                                 <TextBlock Text="{Binding PageTitle}" />
                             </Hyperlink>
                         </TextBlock>
-                        <TextBlock Text="{Binding LedgerNote}" Foreground="#888" Margin="8,0,0,0"
+                        <TextBlock Text="{Binding LedgerNote}" Foreground="{StaticResource TextDimBrush}" Margin="8,0,0,0"
                                    Visibility="{Binding HasLedgerNote, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
 
@@ -133,9 +134,9 @@
                                   Visibility="{Binding HasWarnings, Converter={StaticResource BoolToVis}}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#FFF8E1" BorderBrush="#F0D48A" BorderThickness="1"
+                                <Border Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1"
                                         CornerRadius="3" Padding="8,5" Margin="0,0,0,4">
-                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#5D4200" />
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}" />
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -147,7 +148,7 @@
                          it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
                     <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
-                              BorderBrush="#DDD" HorizontalScrollBarVisibility="Disabled"
+                              BorderBrush="{StaticResource BorderBrushKey}" HorizontalScrollBarVisibility="Disabled"
                               ScrollViewer.VerticalScrollBarVisibility="Disabled"
                               PreviewMouseWheel="OnPassScrollToPage"
                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
@@ -182,7 +183,7 @@
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                         <DataGrid.RowStyle>
-                            <Style TargetType="DataGridRow">
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                 <Setter Property="Foreground" Value="{Binding Foreground}" />
                             </Style>
                         </DataGrid.RowStyle>
@@ -197,10 +198,10 @@
                         <!-- Waiting for the second capture. The button just captures again, so the user switches
                              tab in game and clicks here — or presses the same hotkey. -->
                         <Border Visibility="{Binding WantsLoreCapture, Converter={StaticResource BoolToVis}}"
-                                Background="#FFF8E1" BorderBrush="#F0D48A" BorderThickness="1" CornerRadius="3"
+                                Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1" CornerRadius="3"
                                 Padding="10,7">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#5D4200"
+                                <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
                                            Text="This item has a Lore tab that has not been captured yet. Switch to it in game, then:" />
                                 <Button Content="Capture the Lore tab" Click="OnCaptureClick" Padding="12,4"
                                         Margin="10,0,0,0" VerticalAlignment="Center" />
@@ -209,9 +210,9 @@
 
                         <!-- Captured, and the page has none to compare against — it will be added by the edit. -->
                         <Border Visibility="{Binding HasCapturedLoreOnly, Converter={StaticResource BoolToVis}}"
-                                BorderBrush="#DDD" BorderThickness="1" CornerRadius="3" Padding="8">
+                                BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3" Padding="8">
                             <StackPanel>
-                                <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="#555"
+                                <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"
                                            Margin="0,0,0,4" />
                                 <TextBlock Text="{Binding CapturedLore}" TextWrapping="Wrap" Style="{StaticResource ItemData}" />
                             </StackPanel>
@@ -221,25 +222,25 @@
                     <!-- The comparison, when the page already has lore of its own. The tool never overwrites it, so
                          this is purely "do you still like what the page says?". -->
                     <StackPanel Visibility="{Binding HasLoreToCompare, Converter={StaticResource BoolToVis}}">
-                        <TextBlock TextWrapping="Wrap" Foreground="#555" Margin="0,6,0,6"
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,6,0,6"
                                    Text="The page's lore and the captured lore differ. The tool does not overwrite lore, so the page keeps its own wording unless you change it by hand." />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" BorderBrush="#DDD" BorderThickness="1" CornerRadius="3"
+                            <Border Grid.Column="0" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
                                     Padding="8" Margin="0,0,5,0">
                                 <StackPanel>
-                                    <TextBlock Text="On the wiki (kept)" FontWeight="SemiBold" Foreground="SeaGreen"
+                                    <TextBlock Text="On the wiki (kept)" FontWeight="SemiBold" Foreground="{StaticResource DoneBrush}"
                                                Margin="0,0,0,4" />
                                     <TextBlock Text="{Binding LoreOnWiki}" TextWrapping="Wrap" Style="{StaticResource ItemData}" />
                                 </StackPanel>
                             </Border>
-                            <Border Grid.Column="1" BorderBrush="#DDD" BorderThickness="1" CornerRadius="3"
+                            <Border Grid.Column="1" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
                                     Padding="8" Margin="5,0,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="#555"
+                                    <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"
                                                Margin="0,0,0,4" />
                                     <TextBlock Text="{Binding LoreInGame}" TextWrapping="Wrap" Style="{StaticResource ItemData}" />
                                 </StackPanel>
@@ -249,7 +250,7 @@
 
                     <TextBlock Text="The edit" Style="{StaticResource SectionHeading}"
                                Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}" />
-                    <Border BorderBrush="#DDD" BorderThickness="1" CornerRadius="3"
+                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
                             Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
                         <ItemsControl ItemsSource="{Binding Diff}">
                             <ItemsControl.ItemTemplate>
@@ -260,7 +261,7 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{Binding LineNumbers}" FontFamily="Consolas"
-                                                   FontSize="11" Foreground="#AAA" Margin="4,0,8,0" />
+                                                   FontSize="11" Foreground="{StaticResource TextDimBrush}" Margin="4,0,8,0" />
                                         <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas"
                                                    FontSize="12" Foreground="{Binding Foreground}"
                                                    TextWrapping="Wrap" Margin="0,0,4,0" />
@@ -296,12 +297,12 @@
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
                                 Visibility="{Binding CanMarkChecked, Converter={StaticResource BoolToVis}}">
                         <Button Content="The wiki is right — mark as checked" Click="OnMarkCheckedClick" Padding="14,5" />
-                        <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Foreground="#666" TextWrapping="Wrap"
+                        <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                                    MaxWidth="520"
                                    Text="Records this item as matched without changing the page — for a value the page states better than the game does, or anything flagged above that you have judged yourself. It stops coming back unless the item itself changes." />
                     </StackPanel>
 
-                    <TextBlock Text="{Binding Outcome}" Foreground="SeaGreen" FontWeight="SemiBold"
+                    <TextBlock Text="{Binding Outcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
                                Margin="0,12,0,0" TextWrapping="Wrap"
                                Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
 
@@ -309,19 +310,19 @@
                          reformatting commit with no data changes is what makes page history reviewable. -->
                     <StackPanel Visibility="{Binding HasFormatting, Converter={StaticResource BoolToVis}}"
                                 Margin="0,18,0,0">
-                        <Border Background="#EEF4FB" BorderBrush="#BBD4EC" BorderThickness="1" CornerRadius="3"
+                        <Border Background="{StaticResource NoticeInfoBackBrush}" BorderBrush="{StaticResource NoticeInfoBorderBrush}" BorderThickness="1" CornerRadius="3"
                                 Padding="10,7">
                             <StackPanel>
-                                <TextBlock FontWeight="SemiBold" Foreground="#1B4A75"
+                                <TextBlock FontWeight="SemiBold" Foreground="{StaticResource NoticeInfoTextBrush}"
                                            Text="The page can also be tidied — as a separate edit" />
                                 <!-- Worded for both cases: after a data edit, and on a page whose data already
                                      agreed, where there is no edit above to keep readable (user, 2026-09-29). -->
-                                <TextBlock TextWrapping="Wrap" Foreground="#33618C" Margin="0,3,0,0"
+                                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeInfoBodyBrush}" Margin="0,3,0,0"
                                            Text="Laid out to the Item Page Blueprint. It changes nothing about what the page says, and stays its own commit so that a reflow never hides a data change in the page's history." />
                             </StackPanel>
                         </Border>
 
-                        <Border BorderBrush="#DDD" BorderThickness="1" CornerRadius="3" Margin="0,8,0,0">
+                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3" Margin="0,8,0,0">
                             <ItemsControl ItemsSource="{Binding FormattingDiff}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -331,7 +332,7 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="{Binding LineNumbers}" FontFamily="Consolas"
-                                                       FontSize="11" Foreground="#AAA" Margin="4,0,8,0" />
+                                                       FontSize="11" Foreground="{StaticResource TextDimBrush}" Margin="4,0,8,0" />
                                             <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas"
                                                        FontSize="12" Foreground="{Binding Foreground}"
                                                        TextWrapping="Wrap" Margin="0,0,4,0" />
@@ -355,7 +356,7 @@
                             <Button Content="Save the formatting" Click="OnCommitFormattingClick" Padding="14,5"
                                     IsEnabled="{Binding CanCommitFormatting}" />
                             <TextBlock Text="{Binding FormattingOutcome}" VerticalAlignment="Center"
-                                       Margin="12,0,0,0" Foreground="SeaGreen" FontWeight="SemiBold"
+                                       Margin="12,0,0,0" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </StackPanel>
@@ -370,27 +371,27 @@
                                    TextWrapping="Wrap" Margin="0,0,0,6" />
                         <StackPanel Orientation="Horizontal">
                             <StackPanel Margin="0,0,20,0">
-                                <TextBlock Text="In game" FontSize="11" Foreground="#666" Margin="0,0,0,3" />
+                                <TextBlock Text="In game" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                 <!-- Collapsed when there is no image, rather than left as an empty Border: its
                                      near-black background renders as a small dark rectangle that looks exactly like
                                      a corrupt icon, which is how a null here got reported as a capture bug (user,
                                      2026-09-29). An absent icon has to look absent. -->
-                                <Border BorderBrush="#DDD" BorderThickness="1" Background="#101010"
+                                <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
                                         Visibility="{Binding HasCapturedIcon, Converter={StaticResource BoolToVis}}">
                                     <Image x:Name="CapturedIconImage" Stretch="None" Margin="4"
                                            RenderOptions.BitmapScalingMode="NearestNeighbor" />
                                 </Border>
-                                <TextBlock Text="not captured" FontSize="11" Foreground="#999" FontStyle="Italic"
+                                <TextBlock Text="not captured" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
                                            Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
                             <StackPanel>
-                                <TextBlock Text="On the wiki" FontSize="11" Foreground="#666" Margin="0,0,0,3" />
-                                <Border BorderBrush="#DDD" BorderThickness="1" Background="#101010"
+                                <TextBlock Text="On the wiki" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
                                         Visibility="{Binding HasWikiIcon, Converter={StaticResource BoolToVis}}">
                                     <Image x:Name="WikiIconImage" Stretch="None" Margin="4"
                                            RenderOptions.BitmapScalingMode="NearestNeighbor" />
                                 </Border>
-                                <TextBlock Text="none on the page" FontSize="11" Foreground="#999" FontStyle="Italic"
+                                <TextBlock Text="none on the page" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
                                            Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
                         </StackPanel>

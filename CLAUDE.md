@@ -69,7 +69,9 @@ The full design rationale, wiki research findings, and milestone plan live in
   of those may depend on it.
 - `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: `AppServices` (the composition root),
   `MainWindow` (capture trigger + review/diff screen), `ResultViewModel`, `LedgerWindow`/`LedgerRowViewModel` (what
-  has been checked and what still wants a human). The settings/mapping editor is still to come (milestone 6).
+  has been checked and what still wants a human), and **`Theme.xaml`/`Palette.cs`/`DarkTitleBar.cs`** (the one
+  permanent dark palette — see "The dark palette" below; Theme.xaml is the only file in the app with a hex colour in
+  it). The settings/mapping editor is still to come (milestone 6).
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
 - `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
@@ -1053,6 +1055,42 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
     can pick one up by accident. A release build writes nothing, and the newest 50 are kept.
 - **Still to come here**: logging in needs `WikiSpike login` once — there is no in-app credential dialog yet
   (milestone 7), and no settings/mapping editor (milestone 6).
+
+**The dark palette (`App/Theme.xaml`, `App/Palette.cs`, 2026-09-30).** One permanent palette, no theme switch — the
+user asked for the colours changed, not for a setting. Pulled ahead of milestone 7 because it was bothering them.
+- **Most of the file is there because WPF's default control templates hard-code light chrome.** Setting `Background`
+  on a window buys dark panels with white buttons, a white combo popup and a light grey scrollbar. A control gets a
+  replaced template below only where its own template holds a colour no property exposes — a Button's hover
+  gradient, a CheckBox's box, a ComboBox's popup, a DataGrid's header and selection, a ScrollBar's track. Everything
+  reachable by a plain setter is set that way.
+- **`DarkWindow` is keyed and applied by hand on each window, because an implicit `Window` style never runs.** WPF
+  looks an implicit style up by the element's *actual* type, so for `MainWindow` it searches for a `MainWindow` key
+  and skips a `TargetType="Window"` style entirely. **Caught by screenshotting, not by reading**: every templated
+  control came out dark while the bare window behind them stayed white, which showed as one white panel wherever
+  nothing covered it — and nothing else in the app would have told us.
+- **There is deliberately no implicit `TextBlock` style setting `Foreground`, and that is load-bearing.**
+  `Foreground` is inherited, so the one on the window carries into every TextBlock that does not ask for its own. An
+  implicit style would *assign* it instead, which beats the value a `DataGridRow` sets — and both grids colour a
+  whole row by what it means. Every cell would have gone plain grey, silently.
+- **Semantic colours were re-chosen for this background, not darkened.** `SeaGreen` on #1E1E1E measures a contrast
+  ratio of 3.6, under the 4.5 body text needs, and `Firebrick` and `SaddleBrown` are no better — the three that
+  carried the most meaning. The replacements are computed, not eyeballed: done 6.9, attention 5.1, warning 6.9,
+  neutral 5.4.
+- **`Palette.cs` reads the brushes back out of Theme.xaml rather than restating them.** The view models decide colour
+  in C# (a value converter per case would be more code for the same decision), which leaves two places a colour
+  could live — and a second copy of a palette is the kind that drifts, with half the app still on `SeaGreen` after
+  the other half moved. A missing key throws rather than defaulting: a silently grey status column is exactly the
+  kind of wrong this tool avoids elsewhere.
+- **The title bar is the one part WPF does not own**, so `DarkTitleBar` sets `DWMWA_USE_IMMERSIVE_DARK_MODE` on
+  `SourceInitialized` — before that there is no HWND. Failure is ignored: a light caption is cosmetic, refusing to
+  open a window over it would not be. **A `MessageBox` stays light regardless**, since it is drawn by the OS.
+- **Verified by rendering, which is the only way any of this is visible.** The main window through the real
+  executable driven by UI Automation; the ledger window and a gallery of the replaced templates through
+  `RenderTargetBitmap` in a throwaway harness, because the review screen's detail panel cannot be reached without a
+  live capture. That gallery is what confirms an Expander still opens — a broken template there would have hidden
+  the wikitext editor entirely, which is a functional regression wearing a cosmetic change's clothes.
+  - **Still unverified: the detail panel in situ.** Its pieces — both notice bars, the diff tints, the Expander, the
+    icon tiles — were rendered from the same resources, but not in the screen that uses them.
 
 **The ledger view (`App.LedgerWindow`, 2026-09-29).** What has been checked, and — the reason it exists — what is
 still waiting for a human. Built ahead of milestone 6 by the user's agreement, because over a long session the
