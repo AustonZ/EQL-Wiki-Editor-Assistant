@@ -288,6 +288,10 @@ public partial class MainWindow : Window
                 _ => null,
             };
 
+            // Settled only when the write actually landed — a refused or failed commit leaves the item wanting
+            // attention, which is exactly what the status is read for.
+            view.Settled = commit.Status is CommitStatus.Committed or CommitStatus.NoChange;
+
             // The formatting pass has already run against the page as it now stands; offering it is a prompt, never
             // an automatic second write.
             view.Formatting = commit.Formatting;
@@ -365,6 +369,7 @@ public partial class MainWindow : Window
         await _services.SaveLedgerAsync();
         UpdateLedgerText();
 
+        view.Settled = true;
         view.Outcome = "Marked as checked — it will not come back unless the item itself changes.";
         StatusText.Text = $"'{view.ItemName}' marked as checked.";
 

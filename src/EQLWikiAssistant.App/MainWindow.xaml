@@ -80,9 +80,11 @@
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="{Binding ItemName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontSize="11" />
-                                    <TextBlock Text="  •  done" FontSize="11" Foreground="Gray"
-                                               Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
+                                    <!-- A settled item reads "Done" in green here rather than keeping its orange
+                                         status with a grey marker beside it: the list is scanned to find what still
+                                         needs attention, so done is what has to be obvious (user, 2026-09-29). -->
+                                    <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
+                                               FontSize="11" FontWeight="SemiBold" />
                                     <TextBlock Text="  •  lore" FontSize="11" Foreground="Gray"
                                                Visibility="{Binding HasCapturedLore, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>

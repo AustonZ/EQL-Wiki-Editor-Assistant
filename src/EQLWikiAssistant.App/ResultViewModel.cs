@@ -76,6 +76,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private CapturedImage? _loreImage;
     private string _formattedWikitext = "";
     private string? _captureFile;
+    private bool _settled;
 
     public ResultViewModel(ItemCheckResult result) => Load(result);
 
@@ -97,6 +98,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         // and there is nothing to inherit. CanAct requires one, so it has to be typed.
         _summary = result.Edit is { HasChanges: true } proposed ? proposed.Summary : "";
         _outcome = null;
+        _settled = false;
         _formatting = null;
         _formattingOutcome = null;
 
@@ -198,8 +200,40 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public string ItemName => string.IsNullOrEmpty(Result.ItemName) ? "(unreadable window)" : Result.ItemName;
 
+    /// <summary>
+    /// Whether this item is finished and wants nothing further.
+    ///
+    /// **The list is read to find what still needs attention** (user, 2026-09-29), so "done" is the state worth
+    /// showing plainly and everything else is the exception. It covers the item settled by the tool itself — a page
+    /// that already agreed, or one the ledger had settled before — and the one the user settled by committing or by
+    /// saying the wiki is right.
+    ///
+    /// **Skipping is deliberately not done.** `Skipped` means "not now": it never settles the ledger and the item
+    /// returns on the next capture, so showing it green would promise something the ledger does not honour.
+    /// </summary>
+    public bool IsDone =>
+        _settled ||
+        Result.Status == ItemCheckStatus.AlreadyChecked ||
+        (Result.Status == ItemCheckStatus.AlreadyCorrect && !Result.NeedsAttention);
+
+    /// <summary>Set by the review screen when the user's action settled the item — a successful commit, or "the wiki
+    /// is right". Not set by skipping.</summary>
+    public bool Settled
+    {
+        get => _settled;
+        set
+        {
+            Set(ref _settled, value);
+            OnPropertyChanged(nameof(IsDone));
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(StatusBrush));
+        }
+    }
+
     public string StatusText => Result switch
     {
+        _ when IsDone => "Done",
+
         // "Already correct" is a false statement about a page the tool declined to finish, and it sat directly above
         // a warning strip saying "Not done" (user, 2026-09-29). The ledger records Flagged in this case; the label
         // has to agree with it.
@@ -223,8 +257,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public Brush StatusBrush => Result switch
     {
+        _ when IsDone => Brushes.SeaGreen,
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Brushes.Firebrick,
-        { Status: ItemCheckStatus.AlreadyCorrect or ItemCheckStatus.AlreadyChecked } => Brushes.SeaGreen,
         { Status: ItemCheckStatus.EditProposed } => Brushes.DarkOrange,
         { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded } => Brushes.Firebrick,
         _ => Brushes.DimGray,
