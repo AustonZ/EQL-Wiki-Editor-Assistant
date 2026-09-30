@@ -20,9 +20,10 @@ public class ItemPageAnalyzerTests
         IReadOnlyList<string>? races = null,
         IReadOnlyList<string>? slots = null,
         IReadOnlyList<KeyValuePair<string, string>>? stats = null,
-        string? merchantValue = null) =>
+        string? merchantValue = null,
+        string? lore = null) =>
         new(name, 0, false, flags ?? [], classes ?? [], races ?? [], slots ?? [],
-            stats ?? [], [], [], merchantValue, null, []);
+            stats ?? [], [], [], merchantValue, lore, []);
 
     private static ItemPageAnalysis Analyze(ParsedItem captured, string fixture) =>
         ItemPageAnalyzer.Analyze(captured, ItemPageDocument.Parse(WikiFixtures.Load(fixture))!, fixture);
@@ -613,5 +614,55 @@ public class ItemPageAnalyzerTests
         // and it should not have been reported at all.
         Assert.All(analysis.Findings.Where(f => f.Verdict == FieldVerdict.Unverifiable),
             f => Assert.False(string.IsNullOrWhiteSpace(f.OnWiki)));
+    }
+
+    // ---- which compliance findings a field finding already speaks for ----
+
+    /// <summary>
+    /// `Bladestopper` carries `{{Item Lore Missing}}`, and a capture of it with lore makes the analyzer report that
+    /// lore against the page's nothing. The compliance finding then says the same thing again — and says it wrongly,
+    /// since its account of the game side is "no lore" and this item has some. The review screen shows one row, not
+    /// two (user, 2026-09-29).
+    /// </summary>
+    [Fact]
+    public void TheLorePlaceholderIsCoveredByACapturedLoreFinding()
+    {
+        ItemPageAnalysis analysis = Analyze(
+            Captured(name: "Bladestopper", lore: "A blade that stops blades."), "Bladestopper");
+
+        ComplianceFinding placeholder = Assert.Single(
+            analysis.Compliance.Where(c => c.Rule == ComplianceChecker.LorePlaceholderRule));
+
+        Assert.NotNull(analysis.Find(ItemPageAnalyzer.LoreField));
+        Assert.True(analysis.IsAlreadyCoveredByAFieldFinding(placeholder));
+    }
+
+    /// <summary>With no lore captured there is no lore finding at all, so the placeholder is the only thing that
+    /// says it is going — which is the row the user asked to see, reading "no lore" against the page's
+    /// placeholder.</summary>
+    [Fact]
+    public void TheLorePlaceholderStandsAloneWhenNoLoreWasCaptured()
+    {
+        ItemPageAnalysis analysis = Analyze(Captured(name: "Bladestopper"), "Bladestopper");
+
+        ComplianceFinding placeholder = Assert.Single(
+            analysis.Compliance.Where(c => c.Rule == ComplianceChecker.LorePlaceholderRule));
+
+        Assert.Null(analysis.Find(ItemPageAnalyzer.LoreField));
+        Assert.False(analysis.IsAlreadyCoveredByAFieldFinding(placeholder));
+    }
+
+    /// <summary>The era banner is never covered by a field finding — nothing else reports it — so it always reads as
+    /// a row of its own.</summary>
+    [Fact]
+    public void TheEraBannerIsNeverCoveredByAFieldFinding()
+    {
+        ItemPageAnalysis analysis = Analyze(
+            Captured(name: "Bladestopper", lore: "A blade that stops blades."), "Bladestopper");
+
+        ComplianceFinding era = Assert.Single(
+            analysis.Compliance.Where(c => c.Rule == ComplianceChecker.EraTemplateRule));
+
+        Assert.False(analysis.IsAlreadyCoveredByAFieldFinding(era));
     }
 }

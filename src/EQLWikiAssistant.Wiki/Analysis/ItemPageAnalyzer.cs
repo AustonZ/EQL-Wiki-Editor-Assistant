@@ -26,6 +26,27 @@ public sealed record ItemPageAnalysis(
 
     public FieldFinding? Find(string field) =>
         Findings.FirstOrDefault(f => string.Equals(f.Field, field, StringComparison.Ordinal));
+
+    /// <summary>
+    /// True when a field finding already reports what this compliance finding says, so showing both would state one
+    /// fact twice — and, in the one case this happens, state it wrongly the second time.
+    ///
+    /// That case is <c>{{Item Lore Missing}}</c> on a page whose item *does* have lore. The placeholder finding's
+    /// own account of the game side is "no lore", which is true of the page's placeholder and false of the item: the
+    /// analyzer has already reported the captured prose against the page's nothing. With no lore captured there is
+    /// no field finding at all, and the compliance finding is the only thing that says the placeholder is going.
+    ///
+    /// This lives here rather than in the review screen because it is a question about the analysis — which of its
+    /// own findings overlap — and because the screen is in the WPF app, where no test can reach it. Same reasoning
+    /// that put <c>LedgerQuery</c> in this assembly.
+    /// </summary>
+    public bool IsAlreadyCoveredByAFieldFinding(ComplianceFinding compliance)
+    {
+        ArgumentNullException.ThrowIfNull(compliance);
+
+        return compliance.Rule == ComplianceChecker.LorePlaceholderRule &&
+               Findings.Any(f => string.Equals(f.Field, ItemPageAnalyzer.LoreField, StringComparison.Ordinal));
+    }
 }
 
 /// <summary>

@@ -171,4 +171,45 @@ public class ComplianceCheckerTests
     }
 
     public static TheoryData<string> Pages => WikiFixtures.AllTitles();
+
+    /// <summary>
+    /// The era banner and the lore placeholder carry the two values being compared, so the review screen can show
+    /// each as an ordinary row in its differences table instead of a yellow bar (user, 2026-09-29). A missing banner
+    /// leaves <see cref="ComplianceFinding.OnPage"/> null — which is what tells the screen to read the row as
+    /// "missing on the wiki" rather than "differs".
+    /// </summary>
+    [Fact]
+    public void AMissingEraBannerCarriesTheValuesBeingCompared()
+    {
+        ComplianceFinding finding = Assert.Single(
+            Check("Bladestopper").Where(f => f.Rule == ComplianceChecker.EraTemplateRule));
+
+        Assert.Equal("{{Classic Era}}", finding.Wanted);
+        Assert.Null(finding.OnPage);
+    }
+
+    /// <summary>A legacy banner is the same comparison with both sides present — the page says one era, the capture
+    /// proves another.</summary>
+    [Fact]
+    public void ALegacyEraBannerCarriesBothSides()
+    {
+        ComplianceFinding finding = Assert.Single(
+            CheckText("{{Velious Era}}\n<onlyinclude>{{Itempage\n|itemname = Thing\n|lucy_img_ID = 1\n" +
+                      "|statsblock = \nClass: ALL<br>\n}}</onlyinclude>")
+                .Where(f => f.Rule == ComplianceChecker.EraTemplateRule));
+
+        Assert.Equal("{{Classic Era}}", finding.Wanted);
+        Assert.Equal("{{Velious Era}}", finding.OnPage);
+    }
+
+    /// <summary>The placeholder's wanted state is the absence of it, so only the page's side has a value.</summary>
+    [Fact]
+    public void TheLorePlaceholderCarriesOnlyThePagesSide()
+    {
+        ComplianceFinding finding = Assert.Single(
+            Check("Bladestopper").Where(f => f.Rule == ComplianceChecker.LorePlaceholderRule));
+
+        Assert.Null(finding.Wanted);
+        Assert.Equal("{{Item Lore Missing}}", finding.OnPage);
+    }
 }

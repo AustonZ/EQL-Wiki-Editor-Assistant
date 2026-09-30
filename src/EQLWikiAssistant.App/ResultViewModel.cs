@@ -44,18 +44,51 @@ public sealed record DiffLineViewModel(DiffLine Line)
     };
 }
 
-/// <summary>A field the analyzer had something to say about, flattened for the grid.</summary>
-public sealed record FindingViewModel(FieldFinding Finding)
+/// <summary>
+/// A row in the differences table, flattened for the grid.
+///
+/// **It takes a compliance finding as well as a field finding** (user, 2026-09-29). The era banner and the lore
+/// placeholder are ordinary "the wiki says this, the game says that" comparisons, and a yellow warning bar each —
+/// on top of the bars for everything else — made the strip long enough that nobody would read any of it. Which
+/// findings the strip is *for* is the real rule: things nobody has judged yet. Both of these the tool fixes
+/// itself, so they are differences, not open questions.
+/// </summary>
+public sealed record FindingViewModel(
+    string Field,
+    string Captured,
+    string OnWiki,
+    string Verdict,
+    string Explanation,
+    bool Blocks)
 {
-    public string Field => Finding.Field;
-    public string Verdict => Finding.Verdict.ToString();
-    public string Captured => Finding.Captured ?? "—";
-    public string OnWiki => Finding.OnWiki ?? "—";
-    public string Explanation => Finding.Explanation ?? "";
-
     /// <summary>Red for anything needing a human, because that is the one category the user must not skim past: the
     /// tool has declined to decide, so nobody has.</summary>
-    public Brush Foreground => Finding.Blocks ? Brushes.Firebrick : Brushes.Black;
+    public Brush Foreground => Blocks ? Brushes.Firebrick : Brushes.Black;
+
+    public static FindingViewModel For(FieldFinding finding) => new(
+        finding.Field,
+        finding.Captured ?? "—",
+        finding.OnWiki ?? "—",
+        finding.Verdict.ToString(),
+        finding.Explanation ?? "",
+        finding.Blocks);
+
+    /// <summary>A compliance finding the tool fixes, shown as the two-sided comparison it is. The verdict names
+    /// which side is empty, matching the vocabulary the field rows already use, and the finding's own prose becomes
+    /// the note — which is where it reads better than in a bar, because the table is where the reader is already
+    /// looking at what this row compares.
+    ///
+    /// <paramref name="emptyCaptured"/> exists because for the lore placeholder the wanted state genuinely *is* the
+    /// absence of something, and "no lore" says that where the table's usual "—" only says "nothing here". The
+    /// domain keeps null meaning absent; the wording belongs to the view.</summary>
+    public static FindingViewModel ForCompliance(
+        string field, ComplianceFinding finding, string emptyCaptured = "—") => new(
+        field,
+        finding.Wanted ?? emptyCaptured,
+        finding.OnPage ?? "—",
+        finding.OnPage is null ? nameof(FieldVerdict.MissingOnWiki) : nameof(FieldVerdict.Differs),
+        finding.Detail,
+        Blocks: false);
 }
 
 /// <summary>
@@ -106,9 +139,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             ? []
             : WikitextDiff.Compute(result.Edit.OriginalWikitext, result.Edit.NewWikitext)
                 .Select(l => new DiffLineViewModel(l)));
-        Replace(Findings, result.Analysis?.Findings
-            .Where(f => f.IsChange || f.Blocks)
-            .Select(f => new FindingViewModel(f)) ?? []);
+        Replace(Findings, (result.Analysis?.Findings
+                .Where(f => f.IsChange || f.Blocks)
+                .Select(FindingViewModel.For) ?? [])
+            .Concat(ComplianceRows(result)));
         Replace(Warnings, BuildWarnings(result));
         FormattingDiff.Clear();
 
@@ -478,6 +512,37 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         !HasOutcome && !IsBusy &&
         Result.Status is ItemCheckStatus.EditProposed or ItemCheckStatus.NotOnWiki or ItemCheckStatus.NotAnItemPage;
 
+    /// <summary>
+    /// The two compliance findings that read as differences rather than as open questions (user, 2026-09-29): the
+    /// era banner and the lore placeholder. Both are two-sided comparisons the tool fixes itself, so a yellow bar
+    /// each was overstating them — and the strip's length is what decides whether any of it gets read.
+    ///
+    /// **Only these two, and only when the tool will fix them.** A duplicate parameter has no in-game side to
+    /// compare against, and a compliance problem the tool *cannot* fix is exactly what the strip is for: nobody has
+    /// acted on it.
+    /// </summary>
+    private static IEnumerable<FindingViewModel> ComplianceRows(ItemCheckResult result)
+    {
+        foreach (ComplianceFinding compliance in result.Analysis?.Compliance ?? [])
+        {
+            if (!BelongsInTheDifferencesTable(compliance, result)) continue;
+
+            yield return compliance.Rule == ComplianceChecker.LorePlaceholderRule
+                ? FindingViewModel.ForCompliance("Lore", compliance, emptyCaptured: "no lore")
+                : FindingViewModel.ForCompliance("Era", compliance);
+        }
+    }
+
+    /// <summary>
+    /// The era banner and the lore placeholder, and only when the tool will fix them — plus the overlap rule the
+    /// analysis owns (<see cref="ItemPageAnalysis.IsAlreadyCoveredByAFieldFinding"/>), which keeps the placeholder
+    /// from producing a second, wrong `Lore` row on an item that does have lore.
+    /// </summary>
+    private static bool BelongsInTheDifferencesTable(ComplianceFinding compliance, ItemCheckResult result) =>
+        compliance.ToolWillFix &&
+        compliance.Rule is ComplianceChecker.EraTemplateRule or ComplianceChecker.LorePlaceholderRule &&
+        result.Analysis?.IsAlreadyCoveredByAFieldFinding(compliance) is false;
+
     private static IEnumerable<string> BuildWarnings(ItemCheckResult result)
     {
         foreach (string warning in result.Warnings)
@@ -508,9 +573,14 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         if (result.IconNote is { } note) yield return note;
 
         foreach (ComplianceFinding compliance in result.Analysis?.Compliance ?? [])
+        {
+            // The era banner and the lore placeholder are rows in the differences table instead — see ComplianceRows.
+            if (BelongsInTheDifferencesTable(compliance, result)) continue;
+
             yield return compliance.ToolWillFix
                 ? $"Template compliance (fixed by this edit): {compliance.Detail}"
                 : $"Template compliance — needs a human: {compliance.Detail}";
+        }
 
         foreach (string deferred in result.Edit?.Deferred ?? []) yield return "Not done: " + deferred;
 

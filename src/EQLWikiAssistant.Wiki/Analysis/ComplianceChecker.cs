@@ -9,8 +9,19 @@ namespace EQLWikiAssistant.Wiki.Analysis;
 /// <see cref="ToolWillFix"/> is the load-bearing distinction. A compliance problem the tool can correct is part of
 /// the edit it proposes; one it cannot is reported and left alone. Nothing in between — the tool never half-fixes a
 /// page, and never claims to have fixed something it only noticed.
+///
+/// <see cref="Wanted"/> and <see cref="OnPage"/> are set only where the finding is genuinely a two-sided comparison
+/// — the era banner and the lore placeholder — so the review screen can show it as an ordinary row in its
+/// differences table instead of a warning bar (user, 2026-09-29). They carry the values rather than leaving the UI
+/// to read them back out of <see cref="Detail"/>'s prose, which would couple a display to a sentence's wording.
+/// A finding with no second side, like a duplicate parameter, leaves both null and stays a warning.
 /// </summary>
-public sealed record ComplianceFinding(string Rule, string Detail, bool ToolWillFix);
+public sealed record ComplianceFinding(
+    string Rule,
+    string Detail,
+    bool ToolWillFix,
+    string? Wanted = null,
+    string? OnPage = null);
 
 /// <summary>
 /// Checks a page against the current template, separately from comparing it to a capture.
@@ -96,7 +107,9 @@ public static class ComplianceChecker
                 LorePlaceholderRule,
                 "The page still carries {{Item Lore Missing}}. It will be removed — by the time this tool edits, " +
                 "either the lore has been captured or the item has none.",
-                ToolWillFix: true));
+                ToolWillFix: true,
+                Wanted: null,
+                OnPage: "{{Item Lore Missing}}"));
 
         // 4 of 744 pages. Without the wrapper the item box cannot be transcluded into lists elsewhere, so this is a
         // real defect — but repairing it means deciding exactly what the wrapper should enclose, which depends on
@@ -119,7 +132,9 @@ public static class ComplianceChecker
                       "the item in game is what confirms it is in the game."
                     : $"The page says {{{{{page.CurrentEra}}}}}. It will be set to {{{{{mapping.CurrentEra} Era}}}}, " +
                       "since this item was just seen in game.",
-                ToolWillFix: true));
+                ToolWillFix: true,
+                Wanted: $"{{{{{mapping.CurrentEra} Era}}}}",
+                OnPage: page.CurrentEra is null ? null : $"{{{{{page.CurrentEra}}}}}"));
 
         return findings;
     }

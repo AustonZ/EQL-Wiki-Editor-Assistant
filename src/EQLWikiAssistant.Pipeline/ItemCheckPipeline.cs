@@ -116,10 +116,11 @@ public sealed class ItemCheckPipeline
     {
         if (_verified?.IsVerified(pageTitle) is not false) return;
 
-        warnings.Add(
-            $"'{pageTitle}' is not marked \"Verified for EQLegends\" on the wiki. This tool cannot verify a page — " +
-            "that covers the whole page, including the parts it never reads — so once you are happy with all of it, " +
-            "open the page and type \"Verified\" into the notice at the bottom right.");
+        // **Short, because the strip's length is what decides whether any of it gets read** (user, 2026-09-29). The
+        // long form explained what verification covers and how to do it; the user knows both, and the sentence was
+        // competing with the warnings that actually need judging. The page title is dropped too — the panel is headed
+        // by the item and links to its page, so there is no ambiguity about which page this is about.
+        warnings.Add("Wiki page not verified for EQL");
     }
 
     private async Task<ItemCheckResult> CheckWindowAsync(

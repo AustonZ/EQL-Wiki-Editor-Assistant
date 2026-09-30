@@ -745,6 +745,10 @@ measured.
   - **A message on the other branch was proposed and rejected by the user**, for the reason that settles it: an alert
     on *every* page, either "not yet verified" or "already verified", is an alert everyone learns to ignore. Only the
     actionable branch speaks.
+  - **The message is five words: "Wiki page not verified for EQL"** (user, 2026-09-29). It started as a sentence
+    saying what verification covers and how to clear it, which is written down here and was not news to the one person
+    using the tool — it just competed for attention with the warnings that need judging. With ~93% of pages unverified
+    this bar is the one the user sees most often, so it is the one that most has to be glanceable.
 - **Not knowing is silence.** A list that could not be read answers null and the caller says nothing — a false "this
   is unverified" would send the user to re-verify a page already done. Same rule the icon check follows when it
   cannot see an icon. A missing list page (somebody renames it) is likewise "unknown", not "nothing is verified".
@@ -1013,6 +1017,22 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
 - **Warnings come first and are unmissable**, above the field table and the diff. A flagged gap is the product, so
   **every field the tool declined to decide is repeated in the warning strip** rather than living only as a row in
   the findings grid — the grid truncates, and these are precisely the items nobody has judged yet.
+  - **The strip is for what nobody has judged yet, and that is what bounds it** (user, 2026-09-29, on the strip being
+    too long to read). The rule had drifted: every compliance finding got a bar, including the two the tool fixes
+    *without asking*. The era banner and `{{Item Lore Missing}}` are ordinary two-sided comparisons — the page says
+    one thing, the capture another — so they are rows in the differences table, and `ComplianceFinding` now carries
+    `Wanted`/`OnPage` so the screen reads the values rather than the `Detail` sentence's wording. Measured on the
+    corpus: **all 13 compliance findings the 33 eligible edits produce are one of those two**, so the strip loses a
+    bar on every page carrying either. A duplicate parameter stays a bar (it has no in-game side), and so does any
+    compliance the tool *cannot* fix — that branch is exactly what the strip is for.
+    - **The placeholder row yields to a real lore finding**, or it states one fact twice and states it wrongly the
+      second time: its account of the game side is "no lore", which is false of an item that has some and whose
+      captured prose the analyzer has already reported. `ItemPageAnalysis.IsAlreadyCoveredByAFieldFinding` owns that,
+      in `Wiki` rather than the app, because it is a question about the analysis and because nothing in the WPF
+      project can be tested — the same constraint that put `LedgerQuery` there.
+  - **"Wiki page not verified for EQL" is the whole message** (user, 2026-09-29), down from a sentence explaining what
+    verification covers and how to do it. Both are in this file and neither is news to the reader; the page title went
+    too, since the panel is headed by the item and links to its page.
 - Saving is confirmed explicitly: it writes to a public wiki under the user's own account, and an ordinary editor
   there cannot delete a revision.
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — `RapidOcrEngine` loads three

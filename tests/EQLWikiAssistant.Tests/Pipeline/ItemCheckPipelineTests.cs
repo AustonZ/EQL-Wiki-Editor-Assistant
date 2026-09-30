@@ -282,7 +282,7 @@ public class ItemCheckPipelineTests
 
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
-        Assert.Contains(results[0].Warnings, w => w.Contains("Verified for EQLegends", StringComparison.Ordinal));
+        Assert.Contains(results[0].Warnings, w => w.Contains("not verified for EQL", StringComparison.Ordinal));
         Assert.False(results[0].NeedsAttention);
         Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
     }
@@ -324,7 +324,7 @@ public class ItemCheckPipelineTests
         IReadOnlyList<ItemCheckResult> again = await pipeline.CheckAsync(BlankFrame());
 
         Assert.Equal(ItemCheckStatus.AlreadyChecked, again[0].Status);
-        Assert.Contains(again[0].Warnings, w => w.Contains("Verified for EQLegends", StringComparison.Ordinal));
+        Assert.Contains(again[0].Warnings, w => w.Contains("not verified for EQL", StringComparison.Ordinal));
     }
 
     /// <summary>A page whose data agrees but which carries a defect the tool will not fix — here the missing
