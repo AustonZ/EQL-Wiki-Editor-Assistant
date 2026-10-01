@@ -885,6 +885,83 @@ public class ItemCheckPipelineTests
             Task.FromResult<IReadOnlyList<LocatedWindow>>([Window]);
     }
 
+
+    // --- logging in before a write ----------------------------------------------------------------------
+
+    /// <summary>
+    /// **The bug the user hit on 2026-09-30, reproduced.** Logging in used to be each caller's job: the review
+    /// screen's data commit did it, and "Save the formatting" did not — so a formatting edit on a page with no data
+    /// change (exactly what the 2026-09-29 "offer formatting where nothing is written" work created) reached
+    /// `EditAsync` with no session and threw past the handler's `catch` to the dispatcher. The user saw an
+    /// unhandled-error dialog claiming they were logged out seconds after starting the tool, when the session had
+    /// never been created at all.
+    ///
+    /// Asserted on **request counts**, the way the rest of this file asserts: a refused write must cost nothing, not
+    /// merely fail late. The gate runs before the conflict re-fetch for that reason.
+    /// </summary>
+    [Fact]
+    public async Task TheFormattingCommitWillNotWriteWhenTheGateRefuses()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
+        (FormattingProposal? proposal, _) = await pipeline.PrepareFormattingAsync("Earring of Bashing");
+        Assert.NotNull(proposal);
+
+        int fetchesBefore = wiki.Fetches;
+        pipeline.BeforeWriting = _ => Task.FromResult<string?>("No bot password is stored.");
+
+        CommitResult commit = await pipeline.CommitFormattingAsync(proposal);
+
+        Assert.Equal(CommitStatus.Failed, commit.Status);
+        Assert.Equal("No bot password is stored.", commit.Error);
+        Assert.Equal(0, wiki.Edits);
+        Assert.Equal(fetchesBefore, wiki.Fetches);
+    }
+
+    /// <summary>The data commit honours the same gate, since the rule now lives in one place rather than in the
+    /// handler that happened to remember it.</summary>
+    [Fact]
+    public async Task TheDataCommitWillNotWriteWhenTheGateRefuses()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines), UntidyPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        int fetchesBefore = wiki.Fetches;
+        pipeline.BeforeWriting = _ => Task.FromResult<string?>("The wiki rejected the stored bot password.");
+
+        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+
+        Assert.Equal(CommitStatus.Failed, commit.Status);
+        Assert.Equal("The wiki rejected the stored bot password.", commit.Error);
+        Assert.Equal(0, wiki.Edits);
+        Assert.Equal(fetchesBefore, wiki.Fetches);
+
+        // A refused write is not a check: the item must come back rather than look handled. Either no row at all or
+        // a row that does not mean done satisfies that; what must not happen is a settled one.
+        LedgerEntry? row = ledger.Find(result.ItemName);
+        Assert.True(row is null || !CheckedItemsLedger.MeansDone(row.Outcome));
+    }
+
+    /// <summary>
+    /// The negative control. Both tests above would pass against a pipeline that simply never writes, so this
+    /// proves the gate is what stopped them — same setup, a gate that allows the write, and the edit lands.
+    /// </summary>
+    [Fact]
+    public async Task AGateThatAllowsTheWriteChangesNothing()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
+        (FormattingProposal? proposal, _) = await pipeline.PrepareFormattingAsync("Earring of Bashing");
+
+        var asked = 0;
+        pipeline.BeforeWriting = _ => { asked++; return Task.FromResult<string?>(null); };
+
+        CommitResult commit = await pipeline.CommitFormattingAsync(proposal!);
+
+        Assert.Equal(CommitStatus.Committed, commit.Status);
+        Assert.Equal(1, wiki.Edits);
+        Assert.Equal(1, asked);
+    }
+
     private sealed class FakeWiki : IMediaWikiClient
     {
         public Dictionary<string, WikiPage> Pages { get; } = new(StringComparer.Ordinal);

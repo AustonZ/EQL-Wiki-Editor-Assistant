@@ -90,6 +90,11 @@ public sealed class AppServices : IDisposable
             new WindowsImageDecoder(),
             Verified);
 
+        // **Set once, here, so no write path can forget it** (bug found by the user, 2026-09-30: the formatting
+        // commit never logged in, because logging in was each caller's job and that caller did not). The pipeline
+        // runs this before either commit writes, and turns a refusal into an ordinary failed-commit message.
+        Pipeline.BeforeWriting = EnsureLoggedInAsync;
+
         Capturer = new WindowCapturer();
     }
 

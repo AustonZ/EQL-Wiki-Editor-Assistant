@@ -75,6 +75,32 @@ public sealed class ItemCheckPipeline
     public bool ReCheckAnyway { get; set; }
 
     /// <summary>
+    /// Run before anything is written to the wiki. Returns null when the write may proceed, or a message for the
+    /// user explaining why it may not — which both commit methods turn into a <see cref="CommitStatus.Failed"/>
+    /// result rather than an exception.
+    ///
+    /// **This exists because the login was a per-caller responsibility and one caller forgot** (bug found by the
+    /// user, 2026-09-30). The review screen's data commit logged in; "Save the formatting" did not, so a formatting
+    /// edit on a page with no data change — which is precisely the case the 2026-09-29 "offer formatting where
+    /// nothing is written" work created — threw
+    /// <c>InvalidOperationException("Log in before editing")</c> straight past the handler's `catch` and out to the
+    /// dispatcher. The user saw an unhandled-error dialog saying they were logged out seconds after starting the
+    /// tool, when in fact the session had never been created.
+    ///
+    /// **Same shape as the ledger-fingerprint bug**, and the same fix: the rule belongs in one place the write path
+    /// must go through, not copied into each caller. A new write path must call this; it is checked before the
+    /// conflict re-fetch so a refused write costs no requests at all.
+    ///
+    /// Null means no gate, which is what the tools and tests use — <c>WikiSpike</c> logs in explicitly and the
+    /// fakes never need a session.
+    /// </summary>
+    public Func<CancellationToken, Task<string?>>? BeforeWriting { get; set; }
+
+    private async Task<string?> WhyWritingIsNotAllowedAsync(CancellationToken cancellationToken) =>
+        BeforeWriting is null ? null : await BeforeWriting(cancellationToken).ConfigureAwait(false);
+
+
+    /// <summary>
     /// Runs the whole read-only pipeline over one captured frame. Every window found is reported, including the ones
     /// nothing could be done with — a frame may hold several item windows, and a window the tool refused is exactly
     /// what the user needs to be told about.
@@ -445,6 +471,9 @@ public sealed class ItemCheckPipeline
 
         string title = result.Page.Title;
 
+        if (await WhyWritingIsNotAllowedAsync(cancellationToken).ConfigureAwait(false) is { } blocked)
+            return new CommitResult(CommitStatus.Failed, Error: blocked);
+
         try
         {
             WikiPage? current = await _wiki.FetchPageAsync(title, cancellationToken).ConfigureAwait(false);
@@ -616,6 +645,9 @@ public sealed class ItemCheckPipeline
         FormattingProposal proposal, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(proposal);
+
+        if (await WhyWritingIsNotAllowedAsync(cancellationToken).ConfigureAwait(false) is { } blocked)
+            return new CommitResult(CommitStatus.Failed, Error: blocked);
 
         try
         {

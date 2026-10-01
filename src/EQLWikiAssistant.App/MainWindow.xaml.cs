@@ -271,13 +271,8 @@ public partial class MainWindow : Window
         view.IsBusy = true;
         try
         {
-            if (await _services.EnsureLoggedInAsync() is { } problem)
-            {
-                StatusText.Text = problem;
-                MessageBox.Show(this, problem, "Not logged in", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
+            // Logging in is the pipeline's gate now, not this handler's — see AppServices.BeforeWriting. Doing it
+            // here as well is what let the formatting commit ship without it.
             CommitResult commit = await _services.Pipeline.CommitAsync(view.Result, view.Wikitext, view.Summary);
             await _services.SaveLedgerAsync();
             UpdateLedgerText();

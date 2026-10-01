@@ -1130,6 +1130,25 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
     players' names and chat — the reason `samples/` is gitignored and the reason the pipeline otherwise keeps every
     frame in memory. These go to `%APPDATA%\EQLWikiAssistant\debug-captures`, outside any working copy, so no commit
     can pick one up by accident. A release build writes nothing, and the newest 50 are kept.
+- **Logging in is the pipeline's gate, not each caller's job** (bug found by the user, 2026-09-30). Reads are
+  anonymous and only a write needs the credential, so the login was done by the review screen's commit handler —
+  and **the formatting commit never did it**. "Save the formatting" on a page with no data change threw
+  `InvalidOperationException("Log in before editing")` out of `EditAsync`, past a `catch` that only covered
+  `WikiUnavailableException`, to the dispatcher handler: an unhandled-error dialog telling the user they were
+  logged out seconds after starting the tool, when the session had never been created.
+  - **The 2026-09-29 "offer formatting where nothing is written" work is what exposed it.** While formatting was
+    only reachable after a data commit, the data commit's login covered it by accident and the shared
+    `MediaWikiClient` kept the session. Offering it on a page whose data already matches made the formatting commit
+    the *first* write of a session, which it had never been.
+  - **Same shape as the ledger-fingerprint bug, and the same fix**: the rule belongs in one place the write path
+    must go through, not copied into each caller. `ItemCheckPipeline.BeforeWriting` is checked by both commits
+    before the conflict re-fetch, so a refused write costs no requests, and a refusal becomes an ordinary
+    `CommitStatus.Failed` with a message both handlers already display — not an exception. `AppServices` sets it
+    once. The handler's own login call was *removed* rather than left as a second copy.
+  - **It is also why this was invisible to the tests.** They drive the pipeline with a fake client that needs no
+    session, so neither commit path could ever have failed this way. The gate is the testable form of the rule:
+    `ItemCheckPipelineTests` now asserts both commits write nothing and fetch nothing when it refuses, with a
+    negative control that a permissive gate still commits — and reinstating the bug fails exactly those tests.
 - **Still to come here**: logging in needs `WikiSpike login` once — there is no in-app credential dialog yet
   (milestone 7), and no settings/mapping editor (milestone 6).
 
