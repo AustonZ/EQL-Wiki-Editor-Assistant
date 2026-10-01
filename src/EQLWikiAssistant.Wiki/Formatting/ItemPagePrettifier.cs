@@ -46,7 +46,14 @@ public sealed record PrettifyResult(
 /// </summary>
 public static class ItemPagePrettifier
 {
-    /// <summary>Two spaces between fields sharing a line, which is what the blueprint's own examples use.</summary>
+    /// <summary>
+    /// Two spaces between fields sharing a line.
+    ///
+    /// This used to rest on the blueprint's examples being inconsistent about it — only its `Size`/`WT` and
+    /// `Weight Reduction` lines were double-spaced, and the stat lines were single-spaced. The blueprint's
+    /// 2026-09-30 revision (oldid 179818) double-spaced every one of them, so the convention is now stated
+    /// uniformly and this constant is what it says.
+    /// </summary>
     private const string FieldSeparator = "  ";
 
     public static PrettifyResult Format(string wikitext, WikiMapping? mapping = null)

@@ -383,13 +383,48 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   comparison finds a stat case-insensitively — it changes only what gets *written*, never whether an existing line
   counts as matching.
 - **`StatsBlockLineOrder` records the blueprint's line layout**, each entry naming the wiki labels that share a
-  line. Nothing reads it yet — the diff compares fields and does not care where they sit — but the renderer
-  milestone 5 needs does, and recording it while the blueprint was in hand beats reconstructing it later from
-  example pages that disagree with each other.
+  line. **The formatting pass reads it; the data pass does not** — the diff compares fields and does not care where
+  they sit. (An earlier note here said nothing read it yet, which stopped being true when `ItemPagePrettifier`
+  landed. The difference matters: it means removing an entry is not free by default, only when nothing on either
+  side carries that label.) A label no entry names is not dropped — it keeps its own line before `Class:` and is
+  reported.
 - **The blueprint and the game have gaps in both directions**, all on the user's TODO: it lists labels no capture
-  has produced (`Skill Mod`, `Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`,
-  `Recommended level`, `Required level`) and omits several the game does (`Range`, `Accuracy`, `Type`, `Items`),
-  plus `Worn` and `Can Equip` in the effect parenthetical.
+  has produced (`Skill Mod`, `Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`) and
+  omits several the game does (`Range`, `Accuracy`, `Type`, `Items`), plus `Worn` and `Can Equip` in the effect
+  parenthetical.
+
+**The blueprint's 2026-09-30 revision (oldid 179818), reconciled.** The user brought it over; its author's summary
+reads "Added proper formatting". Most of it ratified what the tool already did, which is the useful finding — three
+decisions made here on measurement are now documented upstream, so they no longer rest on frequency alone.
+- **It signed every attribute and every resist** (`STR: ?` -> `STR: +?`, likewise `SV Fire`), and left `Attack`,
+  `HP Regen`, `Mana Regen`, `Haste`, `Clairvoyance`, `Spell Dmg`, `Heal Amount` and `END Regen` plain. **That is
+  exactly `StatMapping.Signed` already**, down to the pair that is easiest to get backwards — `END` is signed,
+  `END Regen` one line below it is not. Re-measured against the new text: **1,053 signed occurrences against 54
+  unsigned, on 32 of 1,183 pages.** `WikiMappingBlueprintTests` now pins the split, with a negative control so a
+  mapping that signed everything or nothing could not pass.
+- **It settled the field separator at two spaces on every line.** Previously only its `Size`/`WT` and
+  `Weight Reduction` lines were double-spaced and the stat lines were single-spaced, so `FieldSeparator` rested on
+  the examples that happened to agree with it. Now the convention is uniform and the formatter already emitted it.
+- **It dropped its `Recommended level of ? Required level of ?` line**, so `StatsBlockLineOrder` drops it too.
+  Provably a no-op rather than assumed one: the game has never produced either label across 109 captured windows,
+  and of 1,183 cached pages exactly one mentions a required level at all — as the prose `Required level of 55.`,
+  which is not `Label: Value` and which the formatter already declines to touch. **Verified by re-running
+  `WikiSpike prettify --cached` before and after: the census is byte-identical.**
+- **`WT: 0` -> `WT: 0.0` changes nothing either**, because neither side ever writes an integer weight: 743 of 743
+  real values carry a decimal and so do all 109 captured windows. The old `0` was a sloppy placeholder.
+- **`WikiMapping.CurrentVersion` was deliberately not bumped**, although the mapping changed — the test is what the
+  tool would *write*, and the census identity above says nothing would. Bumping for form's sake is its own fault
+  here: it expires every settled ledger row and marches the user back through items whose pages the tool would
+  propose exactly the same thing for.
+- **One real gap this sharpens, left for the user**: nothing will sign an existing `STR: 5` on a page the tool is
+  not otherwise editing. The data pass signs a stat only when the edit already writes another signed one (the
+  2026-09-25 rule), and the formatter preserves every value byte for byte. Those are the 32 pages above. Closing it
+  means either reversing that rule or letting the formatter change a value — and the latter would break the content
+  check that is its whole licence to rearrange a page, so it is a decision rather than a fix.
+- **Out of scope, no action**: the in-world screenshot line lost its bold markup around the caption, and the
+  `dropsfrom`/`relatedquests`/`soldby`/`foraged` placeholders gained underscores (`[[Zone Name]]` ->
+  `[[Zone_Name]]`). v1 preserves all of these byte for byte and generates none of them. The underscores are
+  cosmetic regardless — in a wikilink `_` and a space are the same character to MediaWiki.
 
 **The item window's trailing region.** Below the effects the game mixes real fields with developer help text,
 because there was nowhere else to put either. **Handled by rules on what a line *says*, never on where it sits.**
@@ -498,6 +533,14 @@ recorded an incomplete convention as the convention.
     `ItemPageAnalyzer.NormalizeSignsIfTheEditWouldBeInconsistent` promotes the sign-only matches afterwards.
     **It has to be a post-pass, not a rule inside the comparison**, because the answer depends on what every other
     field concluded; a per-field rule cannot see that. `FieldFinding.SignedStat` carries the flag it needs.
+  - **"Belongs to the prettifier" is aspirational, not a description — nothing actually does it** (2026-09-30).
+    The formatter preserves every value byte for byte, because its licence to rearrange a page is that it *proves*
+    it changed nothing about what the page says, and a sign is part of a value. So an unsigned `STR: 5` on a page
+    the tool is not otherwise editing stays unsigned indefinitely, by both passes declining it. That was tenable
+    while the blueprint wrote `STR: ?`; its 2026-09-30 revision writes `STR: +?`, which makes it a real divergence
+    from the documented convention on **32 of 1,183 pages (54 occurrences)**. Raised with the user rather than
+    fixed, because every route to fixing it costs something load-bearing — see the blueprint-reconciliation section
+    above.
 - **Two mapping gaps were found only by running the analyzer over the corpus**, and both would have pushed a
   regression to the wiki:
   - **Units differ on `Weight Reduction`**: the game shows `100`, the wiki `100%`. The comparison called them

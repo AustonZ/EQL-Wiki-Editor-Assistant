@@ -28,7 +28,19 @@ public enum StatDisposition
 /// `SV FIRE` 68 against 0) while `WT`, `AC`, `DMG`, `Atk Delay`, `Range`, `Capacity` and `Weight Reduction` never
 /// are (`WT` 0 signed against 721). **It affects only the value the tool proposes, never whether two values match**
 /// — see <c>ItemPageAnalyzer</c> for why a sign-only difference is deliberately not an edit.
-/// </summary>
+///
+/// **The blueprint now documents this outright, and it agrees with the measurement exactly** (2026-09-30, oldid
+/// 179818): it was changed from `STR: ?` to `STR: +?` across every attribute and every `SV` resist, and left
+/// `Attack`, `HP Regen`, `Mana Regen`, `Haste`, `Clairvoyance`, `Spell Dmg`, `Heal Amount` and `END Regen`
+/// unsigned — which is the split below, including the easy-to-miss pair where `END` is signed but `END Regen` is
+/// not. So this set no longer rests on frequency alone, which matters because the repo's rule is that the
+/// blueprint outranks what existing pages do most. Re-measured against it: **1,053 signed occurrences against 54
+/// unsigned, the latter on 32 of 1,183 pages.**</summary>
+/// <remarks>Those 32 pages are not reached by anything today: the data pass signs a stat only when it is already
+/// writing another signed one, and the formatter preserves every value byte for byte. Raised with the user
+/// 2026-09-30 rather than changed, since closing it means either reversing their sign-only decision or letting
+/// the formatter edit a value — and the latter would break the content check that is its whole licence to
+/// rearrange a page.</remarks>
 public sealed record StatMapping(
     string GameLabel,
     string? WikiLabel,
@@ -71,6 +83,13 @@ public sealed class WikiMapping
     ///
     /// **3** (2026-09-28): `Mount Speed` became a mapped stat, so mounts checked under 2 would be settled while
     /// missing it.
+    ///
+    /// **Deliberately not bumped for the blueprint's 2026-09-30 revision** (oldid 179818), although the mapping
+    /// changed. The test is what the tool would *write*, and nothing moved: the sign convention the blueprint newly
+    /// states was already the mapping's, and the dropped `Recommended level` line was dead on both sides — the
+    /// formatter's census over all 1,183 cached pages is byte-identical before and after. Bumping anyway is not the
+    /// safe default here, it is its own fault: it would expire every settled ledger row and send the user back
+    /// through items whose pages the tool would propose exactly the same thing for.
     /// </summary>
     public const int CurrentVersion = 3;
 
@@ -145,13 +164,19 @@ public sealed class WikiMapping
     /// from the Item Page Blueprint on `Help:Contents` (user, 2026-09-25), which is the authority the user's own
     /// compliance routine follows.
     ///
-    /// **Nothing reads this yet** — the diff compares fields and does not care where they sit. It exists because the
-    /// renderer that milestone 5 needs does, and because the blueprint was in hand now; recording it while the
-    /// source is in front of us beats reconstructing it later from example pages that disagree with each other.
+    /// **The formatting pass reads this; the data pass does not** — the diff compares fields and does not care where
+    /// they sit. (An earlier note here said nothing read it yet, which stopped being true when
+    /// <c>ItemPagePrettifier</c> landed. It matters: removing an entry is not free by default, it is free only when
+    /// no page and no capture carries that label, which has to be measured.) A label named by no entry is not
+    /// dropped — it keeps its own line just before <c>Class:</c> and is reported.
     ///
     /// Note the blueprint lists several labels no capture has ever produced (`Skill Mod`, `Attack`, `Clairvoyance`,
-    /// `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`, `Recommended level`, `Required level`) and omits
-    /// several the game does produce (`Range`, `Accuracy`, `Type`, `Items`). Both gaps are on the user's list.
+    /// `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`) and omits several the game does produce (`Range`,
+    /// `Accuracy`, `Type`, `Items`). Both gaps are on the user's list.
+    ///
+    /// **Re-checked against the blueprint's 2026-09-30 revision** (oldid 179818). It dropped its
+    /// `Recommended level of ? Required level of ?` line, which is dropped here too, and it settled the field
+    /// separator at two spaces on every line — which is what the formatter already emitted. Nothing else here moved.
     /// </summary>
     public IReadOnlyList<IReadOnlyList<string>> StatsBlockLineOrder { get; init; } = [];
 
@@ -344,7 +369,10 @@ public sealed class WikiMapping
                 ["STR", "DEX", "STA", "CHA", "WIS", "INT", "AGI", "HP", "MANA", "END"],
                 ["SV Fire", "SV Disease", "SV Cold", "SV Magic", "SV Poison", "SV Void"],
                 ["Attack", "HP Regen", "Mana Regen", "Haste", "Clairvoyance", "Spell Dmg", "Heal Amount", "END Regen"],
-                ["Recommended level", "Required level"],
+                // The blueprint's `Recommended level of ? Required level of ?` line was removed from it on
+                // 2026-09-30, so it is gone from here too. Provably a no-op either way: the game has never produced
+                // either label, and of 1,183 real pages exactly one mentions a required level at all — as the prose
+                // `Required level of 55.`, which is not `Label: Value` and which the formatter declines to touch.
                 ["Effect"],
                 ["Charges"],
                 ["Size", "WT"],
