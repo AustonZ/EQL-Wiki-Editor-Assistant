@@ -13,6 +13,101 @@ public class ItemPagePrettifierTests
         "{{Classic Era}}\n<onlyinclude>{{Itempage\n|itemname = Thing\n|lucy_img_ID = 1\n|statsblock = \n" +
         statsblock + "\n" + extra + "}}</onlyinclude>\n\n[[Category:Waist]]";
 
+
+    // --- the block parameters at the end of the template -----------------------------------------------
+
+    /// <summary>
+    /// The seven parameters that read as sections get a blank line on each side of their content (user,
+    /// 2026-09-30, after the formatter condensed `Hematite`'s into an unbroken wall). See
+    /// <c>WikiMapping.BlockParameters</c>.
+    /// </summary>
+    [Theory]
+    [InlineData("bookcontents")]
+    [InlineData("dropsfrom")]
+    [InlineData("relatedquests")]
+    [InlineData("playercrafted")]
+    [InlineData("recipes")]
+    [InlineData("soldby")]
+    [InlineData("foraged")]
+    public void ABlockParameterIsFramedByBlankLines(string name)
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("AC: 1<br>", $"|{name} = * [[Thing]]\n"));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Contains($"|{name}", result.Formatted);
+        Assert.Matches($@"\|{name} *= *\n\n\* \[\[Thing\]\]\n\n", result.Formatted);
+    }
+
+    /// <summary>
+    /// **Always a block, even for one line of content** — the user's choice (2026-09-30) of the consistent rule
+    /// over a length-dependent one, so a short `|soldby =` reads like a long drop table and does not change shape
+    /// the moment a second line arrives.
+    /// </summary>
+    [Fact]
+    public void AOneLineBlockParameterIsStillABlock()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("AC: 1<br>", "|soldby = Some Vendor\n"));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Matches(@"\|soldby *= *\n\nSome Vendor\n\n", result.Formatted);
+    }
+
+    /// <summary>Blank lines frame content, so an empty one gets none — otherwise every page would carry a gap where
+    /// a parameter is merely declared, which 343 of 662 sampled pages do.</summary>
+    [Fact]
+    public void AnEmptyBlockParameterGetsNoBlankLines()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("AC: 1<br>", "|soldby = \n|foraged = \n"));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.DoesNotMatch(@"\|soldby *= *\n\n", result.Formatted);
+        Assert.DoesNotMatch(@"\|foraged *= *\n\n", result.Formatted);
+    }
+
+    /// <summary>
+    /// A parameter that is *not* one of the seven keeps the old rule — the negative control, since every assertion
+    /// above would also pass if the formatter simply framed everything.
+    /// </summary>
+    [Fact]
+    public void AParameterOutsideTheSetIsNotFramed()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("AC: 1<br>", "|notes = {{Item Lore|Some lore.}}\n"));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Matches(@"\|notes *= \{\{Item Lore\|Some lore\.\}\}", result.Formatted);
+    }
+
+    /// <summary>
+    /// Interior blank lines are content and must survive: `Hematite`'s `dropsfrom` separates each zone block with
+    /// one. Only the leading and trailing blanks are the formatter's business.
+    /// </summary>
+    [Fact]
+    public void InteriorBlankLinesInABlockAreLeftAlone()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(
+            Page("AC: 1<br>", "|dropsfrom = \n\n[[Zone A]]\n* [[a mob]]\n\n[[Zone B]]\n* [[another mob]]\n\n"));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Contains("[[Zone A]]\n* [[a mob]]\n\n[[Zone B]]\n* [[another mob]]", result.Formatted);
+    }
+
+    /// <summary>
+    /// Formatting twice must change nothing the second time. This is the property the framing could most easily
+    /// break — a rule that adds a blank line each pass would grow the gap on every commit, and the user would see a
+    /// formatting edit offered forever.
+    /// </summary>
+    [Fact]
+    public void FramingIsStableAcrossTwoPasses()
+    {
+        string once = ItemPagePrettifier.Format(
+            Page("AC: 1<br>", "|dropsfrom = * [[a mob]]\n|soldby = Some Vendor\n")).Formatted;
+
+        PrettifyResult twice = ItemPagePrettifier.Format(once);
+
+        Assert.True(twice.IsSafe, string.Join("; ", twice.Refusals));
+        Assert.Equal(once, twice.Formatted);
+    }
+
     // --- what it lays out -------------------------------------------------------------------------------
 
     // --- signing a positive stat value ------------------------------------------------------------------
@@ -256,6 +351,12 @@ public class ItemPagePrettifierTests
     /// **A `*` is a bullet only at the start of a line.** Folding a one-line `|relatedquests = * [[Quest]]` onto the
     /// parameter's own line leaves the value string identical while turning a list into a literal asterisk — a
     /// rendering change the content comparison cannot see, so the layout rule has to be right rather than checked.
+    ///
+    /// **Updated 2026-09-30**: this used to assert the formatter condensed the blank lines around the value to a
+    /// single newline, which is precisely the condensing the user asked to stop. The invariant it exists for is
+    /// untouched — the value still starts its own line, now with a blank line as well — and the `DoesNotContain`
+    /// below is the half that actually guards it. <see cref="ANonBlockParameterWithBulletMarkupAlsoKeepsItsOwnLine"/>
+    /// covers the same invariant where framing does not apply.
     /// </summary>
     [Fact]
     public void AValueStartingWithLineSensitiveMarkupKeepsItsOwnLine()
@@ -265,8 +366,22 @@ public class ItemPagePrettifierTests
             "|relatedquests = \n\n* [[Some Quest]]\n\n}}</onlyinclude>");
 
         Assert.True(result.IsSafe);
-        Assert.Contains("|relatedquests = \n* [[Some Quest]]\n", result.Formatted);
+        Assert.Matches(@"\|relatedquests *= *\n\n\* \[\[Some Quest\]\]\n\n", result.Formatted);
         Assert.DoesNotContain("= * [[Some Quest]]", result.Formatted);
+    }
+
+    /// <summary>
+    /// The same invariant on a parameter the framing rule does not cover, so it is still pinned by something that
+    /// cannot pass merely because every block gets a newline anyway.
+    /// </summary>
+    [Fact]
+    public void ANonBlockParameterWithBulletMarkupAlsoKeepsItsOwnLine()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("AC: 1<br>", "|notes = * a note\n"));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.DoesNotContain("= * a note", result.Formatted);
+        Assert.Matches(@"\|notes *= *\n\* a note\n", result.Formatted);
     }
 
     /// <summary>...while an ordinary value stays on the parameter's line. A template call is not line-sensitive.</summary>

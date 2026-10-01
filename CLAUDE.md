@@ -958,6 +958,38 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
   folding `|relatedquests = * [[Quest]]` onto the parameter's line turns a list into a literal asterisk while the
   value string stays byte-identical — **a rendering change no content check can see**. The layout rule has to be
   right rather than verified; there is an invariant guard as well.
+- **The seven end-of-template parameters are always laid out as blocks, framed by blank lines** (user, 2026-09-30,
+  on `Hematite`): `bookcontents`, `dropsfrom`, `relatedquests`, `playercrafted`, `recipes`, `soldby`, `foraged`.
+  One blank line between the `|name =` line and the content, one before whatever follows. They read as sections —
+  a drop table, a recipe list, a vendor table — and the blanks are what make a long template call skimmable; the
+  formatter had been condensing all of them into an unbroken wall.
+  - **Always, regardless of length.** The user chose the consistent rule over a length-dependent one, so a one-line
+    `|soldby =` reads like a long drop table and does not change shape the moment a second line arrives. An
+    *empty* parameter gets none, because blank lines frame content and there is none — otherwise the 343-of-662
+    pages that merely declare a parameter would each gain a gap.
+  - **`WikiMapping.BlockParameters` holds the set**, as data rather than hardcoded in the formatter. It is the tail
+    of `ParameterOrder` from `bookcontents` onward — every parameter after `notes`, and nothing else — but it is
+    listed explicitly rather than derived, because deriving it would let a future reordering silently change which
+    parameters are blocks.
+  - **No content check allowance was needed, unlike the sign.** `Verify` compares `TemplateParameter.Value`, which
+    is `RawValue.Trim()` on both sides, so it is blind to whitespace *around* a value in either direction — which
+    the old behaviour already proved, by removing these blank lines and passing. Corpus: **0 refusals on 744 pages**,
+    median size change +5 → +8 bytes.
+  - **No rendering effect either.** MediaWiki trims a named parameter's value, so the blanks never reach the page.
+    That is what makes this the formatter's business and not the data pass's — and it is on the user's list to say so
+    in the blueprint, which currently shows the convention only incidentally through whichever example has the
+    parameter filled in.
+  - **Interior blank lines are content and stay.** `Hematite`'s `dropsfrom` separates each zone block with one and
+    `recipes` each skill; only the leading and trailing blanks were ever at issue. A blank line *inside* a `*` list
+    would also split it into two lists.
+  - **The property worth testing hardest is that formatting twice changes nothing.** A rule that added a blank line
+    per pass would grow the gap on every commit and offer a formatting edit forever. Pinned by a unit test and
+    checked on 41 real pages, Hematite included: the second pass is byte-identical.
+  - **One pre-existing test had to be corrected rather than kept.**
+    `AValueStartingWithLineSensitiveMarkupKeepsItsOwnLine` asserted the formatter condensed `relatedquests`'s blank
+    lines to a single newline — it had pinned the very behaviour the user asked to remove. Its real invariant (a `*`
+    is a bullet only at line start) is untouched, and a second test now covers that on a *non*-block parameter, so
+    it cannot pass merely because every block gets a newline anyway.
 - **The statsblock always starts on its own line**, even when currently one line long, or it would jump onto its own
   the moment the data pass added a second — churn the formatting commit exists to prevent.
 - **A label the blueprint has no place for is kept, on its own line before `Class:`, and reported.** Led by `Deity`
@@ -995,8 +1027,9 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
   methodology as `grammar` and `analyze`, and how both of the above bugs were found. `prettyshow <in> <out>` writes
   one page's result so it can be diffed by eye, because a census says nothing about whether the layout is any good.
   Baseline (re-measured 2026-09-30): **744 item pages, 0 refusals, 478 statsblocks left alone**, median size change
-  +5 bytes. Unchanged by the signing change, which adds one byte to 19 values on 9 pages and moves no bucket — the
-  number that matters there is **0 refusals**, i.e. the content check accepted every page it signed.
+  **+8 bytes** (it was +5 before the block framing below added two blank lines per block parameter). The signing
+  change moved no bucket at all, adding one byte to 19 values on 9 pages. On both, the number that matters is
+  **0 refusals** — the content check accepted every page the formatter changed.
 
 **An unreachable wiki aborts; an error about one page does not** (user, 2026-09-29). Two failures that look alike in
 a stack trace and want opposite responses, so they are now different types.

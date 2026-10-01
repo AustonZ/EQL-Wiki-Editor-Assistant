@@ -143,10 +143,17 @@ public static class ItemPagePrettifier
 
             builder.Append('|').Append(parameter.Name!.PadRight(width)).Append(" = ");
 
+            // **A block parameter is surrounded by blank lines, always** (user, 2026-09-30) — see
+            // `WikiMapping.BlockParameters` for which and why. Deliberately regardless of length, so a one-line
+            // `|soldby =` reads the same as a long drop table and does not change shape when a second line
+            // arrives. An *empty* one gets nothing: blank lines frame content, and there is none.
+            if (value.Length > 0 && mapping.BlockParameters.Contains(parameter.Name!, StringComparer.Ordinal))
+                builder.Append("\n\n").Append(value).Append("\n\n");
+
             // The statsblock always starts on its own line, even when it is currently one line long. Every real page
             // writes it that way, and a block that sat on the `=` line would jump onto its own the moment the data
             // pass added a second line — which is churn the formatting commit exists to prevent.
-            if (isStatsBlock && value.Length > 0) builder.Append('\n').Append(value).Append('\n');
+            else if (isStatsBlock && value.Length > 0) builder.Append('\n').Append(value).Append('\n');
             else if (NeedsOwnLine(value)) builder.Append('\n').Append(value).Append('\n');
             else builder.Append(value).Append('\n');
         }

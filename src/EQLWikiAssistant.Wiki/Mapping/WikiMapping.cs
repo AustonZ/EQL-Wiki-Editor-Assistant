@@ -131,8 +131,11 @@ public sealed class WikiMapping
     /// next capture skips the wiki entirely, so without it an item whose page has an unsigned stat would never be
     /// offered the fix. Measured cost of not bumping: 9 of 1,183 cached pages. Measured cost of bumping: every
     /// settled row re-checks once, finds its data still matching, and settles again.
+    /// **5** (2026-09-30): the seven <see cref="BlockParameters"/> are always laid out as blocks, framed by blank
+    /// lines. Same reasoning as 4 — a settled row skips the wiki, so the page would never be offered the new
+    /// layout — and a wider reach: 721 of 744 cached pages carry at least one of those parameters.
     /// </summary>
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -236,6 +239,26 @@ public sealed class WikiMapping
     /// somebody's content and gets preserved, not sorted into a place nobody chose.
     /// </summary>
     public IReadOnlyList<string> ParameterOrder { get; init; } = [];
+
+    /// <summary>
+    /// Parameters whose value is always laid out as a block: on its own line, with one blank line between the
+    /// <c>|name =</c> line and the content and another before whatever follows.
+    ///
+    /// **These read as sections rather than as values** — a drop table, a recipe list, a vendor table — and the
+    /// blank lines are what make a long template call skimmable. The user asked for it on 2026-09-30 after the
+    /// formatter condensed `Hematite`'s `relatedquests`, `recipes` and `soldby` into an unbroken wall, and chose
+    /// the consistent rule over a length-dependent one: these are *always* blocks, even for a one-line value.
+    ///
+    /// **Purely source readability, with no rendering effect.** MediaWiki trims a named parameter's value, so the
+    /// surrounding blank lines never reach the page — which is exactly why this belongs to the formatting pass and
+    /// not the data pass. For the same reason the content check needs no special case: it compares
+    /// <see cref="Wikitext.TemplateParameter.Value"/>, which is trimmed on both sides.
+    ///
+    /// This is the tail of <see cref="ParameterOrder"/> from <c>bookcontents</c> onward — every parameter after
+    /// <c>notes</c>, and nothing else. Listed explicitly rather than derived from that order, because deriving it
+    /// would mean a future reordering silently changed which parameters are blocks.
+    /// </summary>
+    public IReadOnlyList<string> BlockParameters { get; init; } = [];
 
     /// <summary>The wiki's parenthetical token for a game effect kind, or null if it has none agreed.</summary>
     public string? FindEffectKind(string gameKind)
@@ -473,6 +496,10 @@ public sealed class WikiMapping
             [
                 "itemname", "lucy_img_ID", "statsblock", "focus_effect", "merchant_value", "notes", "bookcontents",
                 "dropsfrom", "soldby", "foraged", "playercrafted", "recipes", "relatedquests",
+            ],
+            BlockParameters =
+            [
+                "bookcontents", "dropsfrom", "soldby", "foraged", "playercrafted", "recipes", "relatedquests",
             ],
         };
     }
