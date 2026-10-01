@@ -597,9 +597,10 @@ public static class ItemPageAnalyzer
     ///
     /// **This is only the value the tool would write. It is deliberately not part of deciding whether two values
     /// match** — <see cref="ValuesAgree"/> ignores a leading `+`, so a page saying `STR: 5` counts as correct and
-    /// generates no edit. A sign is cosmetic: `STR: 5` reads unambiguously, and rewriting it would be exactly the
-    /// incidental reformatting this tool is not allowed to do (see the prettifier note in CLAUDE.md). The sign gets
-    /// applied when the value is being written anyway, for some other reason.
+    /// the *data* pass generates no edit for it. A sign is formatting, not data (user, 2026-09-30: "adding a `+` in
+    /// front of a stat value that is already positive is just data formatting in my book"), so the sign-only case
+    /// belongs to the formatting pass, which now applies it — see <c>ItemPagePrettifier</c>. Here the sign gets
+    /// applied only when the value is being written anyway, for some other reason.
     /// </summary>
     private static string ToWikiValue(string capturedValue, StatMapping mapping)
     {
@@ -608,12 +609,12 @@ public static class ItemPageAnalyzer
         if (mapping.WikiSuffix is { } suffix && !value.EndsWith(suffix, StringComparison.Ordinal))
             value += suffix;
 
-        // Only a bare non-negative number gains a sign; a value already signed keeps its own, and something like
-        // "SMALL" or "1H Slashing" is left alone.
-        if (mapping.Signed && value.Length > 0 && char.IsAsciiDigit(value[0]))
-            value = "+" + value;
-
-        return value;
+        // The sign rule lives on StatMapping because the formatting pass applies the same one, and two copies of it
+        // would drift into the two passes disagreeing about a sign — a diff that flaps back and forth. It is also
+        // slightly stricter than the test this used to do inline (first character is a digit): measured against the
+        // verified corpus, all 264 captured signed-stat values are a bare non-negative number or already signed, so
+        // nothing written from a capture changes.
+        return mapping.WithWikiSign(value);
     }
 
     /// <summary>Whether the wiki holds a slash-separated list of which the captured value is one member.</summary>

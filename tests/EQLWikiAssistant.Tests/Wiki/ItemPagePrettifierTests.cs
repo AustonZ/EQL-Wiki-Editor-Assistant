@@ -15,6 +15,119 @@ public class ItemPagePrettifierTests
 
     // --- what it lays out -------------------------------------------------------------------------------
 
+    // --- signing a positive stat value ------------------------------------------------------------------
+
+    /// <summary>
+    /// The one value this pass changes (user, 2026-09-30): *"Adding a `+` in front of a stat value that is already
+    /// positive is just data formatting in my book, not a data change."* Before this, nothing applied it — the data
+    /// pass signs a stat only when rewriting that line anyway, so an unsigned value on an otherwise correct page
+    /// stayed unsigned for good.
+    /// </summary>
+    [Theory]
+    [InlineData("STR: 5<br>", "STR: +5<br>")]
+    [InlineData("MANA: 10<br>", "MANA: +10<br>")]
+    [InlineData("SV FIRE: 7<br>", "SV FIRE: +7<br>")]
+    // Case is the page's business, not a reason to skip it: real pages write both `SV FIRE` and `SV Fire`.
+    [InlineData("SV Cold: 4<br>", "SV Cold: +4<br>")]
+    // A decimal is still a positive number.
+    [InlineData("HP: 2.5<br>", "HP: +2.5<br>")]
+    public void APositiveSignedStatGainsItsSign(string before, string after)
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page(before));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Contains(after, result.Formatted);
+    }
+
+    /// <summary>
+    /// What must survive untouched. The negative case is real rather than defensive on both sides: 29 values across
+    /// 1,183 pages are negative, and the game emits them too (`Earthshaker` shows `Dexterity: -1`,
+    /// `Adamantite Band` shows `SV. Magic: -10`).
+    /// </summary>
+    [Theory]
+    [InlineData("CHA: -5<br>")]
+    [InlineData("SV DISEASE: -20<br>")]
+    [InlineData("STR: +7<br>")]
+    // Not signed by the blueprint, so not signed here. `END Regen` is the one worth pinning: it sits one line below
+    // `END`, which *is* signed (user confirmed 2026-09-30 that it stays plain).
+    [InlineData("END Regen: 3<br>")]
+    [InlineData("AC: 10<br>")]
+    [InlineData("Haste: 10<br>")]
+    [InlineData("WT: 1.0<br>")]
+    // Not a number at all.
+    [InlineData("Size: SMALL<br>")]
+    public void EverythingElseKeepsItsValueExactly(string line)
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page(line));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Contains(line, result.Formatted);
+    }
+
+    /// <summary>
+    /// `END` signed and `END Regen` plain, on one page — the pair the blueprint makes easiest to get backwards,
+    /// since the two sit on adjacent lines and its 2026-09-30 revision touched both at once.
+    /// </summary>
+    [Fact]
+    public void EndIsSignedAndEndRegenIsNotOnTheSamePage()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("END: 12<br>\nEND Regen: 3<br>"));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Contains("END: +12<br>", result.Formatted);
+        Assert.Contains("END Regen: 3<br>", result.Formatted);
+    }
+
+    /// <summary>
+    /// A block the formatter refuses to reorder keeps its unsigned values, because that path returns the raw text
+    /// untouched. **That is the rule rather than a gap**: a pass which has just said it does not understand a block
+    /// has no business editing values inside it. It does mean the 469 legacy-flag pages get no signs until the data
+    /// pass modernizes them first, which is the settled data-before-formatting order working as intended.
+    /// </summary>
+    [Fact]
+    public void ABlockTheFormatterWillNotReorderKeepsItsUnsignedValues()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("MAGIC ITEM  LORE ITEM<br>\nSTR: 5<br>"));
+
+        Assert.True(result.IsSafe);
+        Assert.Contains("STR: 5<br>", result.Formatted);
+        Assert.DoesNotContain("STR: +5", result.Formatted);
+        Assert.Contains(result.Notes, n => n.Contains("left exactly as it was", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// **The negative control on the verification allowance.** `CanonicalField` deliberately treats `STR: 5` and
+    /// `STR: +5` as the same content, which is a hole cut in an otherwise byte-exact check — so this proves the hole
+    /// is only that wide, by feeding the comparison the differences it must still reject.
+    ///
+    /// Driven through <see cref="ItemPagePrettifier.WouldVerify"/> rather than through a deliberately broken
+    /// formatter, because the thing under test is the comparison, and a test that needed a sabotaged writer to
+    /// reach it would be testing the sabotage.
+    /// </summary>
+    [Theory]
+    // A changed number, which is the failure the whole check exists for.
+    [InlineData("STR: 5<br>", "STR: 7<br>", false)]
+    [InlineData("STR: +5<br>", "STR: +7<br>", false)]
+    // A sign flipped off a negative — the allowance strips a leading `+`, never a `-`, so these stay different.
+    [InlineData("CHA: -5<br>", "CHA: +5<br>", false)]
+    [InlineData("CHA: -5<br>", "CHA: 5<br>", false)]
+    // A dropped or invented field.
+    [InlineData("STR: 5<br>\nAC: 2<br>", "STR: +5<br>", false)]
+    [InlineData("STR: 5<br>", "STR: +5<br>\nAC: 2<br>", false)]
+    // A label the mapping does not mark signed gets no allowance at all.
+    [InlineData("AC: 5<br>", "AC: +5<br>", false)]
+    [InlineData("END Regen: 5<br>", "END Regen: +5<br>", false)]
+    // And the one difference that is allowed.
+    [InlineData("STR: 5<br>", "STR: +5<br>", true)]
+    [InlineData("SV FIRE: 5<br>", "SV FIRE: +5<br>", true)]
+    public void TheVerificationAllowanceIsOnlyAsWideAsTheSign(string was, string now, bool shouldPass)
+    {
+        bool verified = ItemPagePrettifier.WouldVerify(Page(was), Page(now));
+
+        Assert.Equal(shouldPass, verified);
+    }
+
+
     /// <summary>The blueprint's line order, which is the whole point: the data pass drops new content on its own
     /// line and trusts this to put it where it belongs.</summary>
     [Fact]

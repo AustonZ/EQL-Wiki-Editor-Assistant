@@ -399,9 +399,10 @@ decisions made here on measurement are now documented upstream, so they no longe
 - **It signed every attribute and every resist** (`STR: ?` -> `STR: +?`, likewise `SV Fire`), and left `Attack`,
   `HP Regen`, `Mana Regen`, `Haste`, `Clairvoyance`, `Spell Dmg`, `Heal Amount` and `END Regen` plain. **That is
   exactly `StatMapping.Signed` already**, down to the pair that is easiest to get backwards — `END` is signed,
-  `END Regen` one line below it is not. Re-measured against the new text: **1,053 signed occurrences against 54
-  unsigned, on 32 of 1,183 pages.** `WikiMappingBlueprintTests` now pins the split, with a negative control so a
-  mapping that signed everything or nothing could not pass.
+  `END Regen` one line below it is not (user confirmed 2026-09-30 that it stays plain). Re-measured properly:
+  **1,053 signed occurrences against 21 plain positive ones on 10 pages**, plus 29 that are legitimately negative.
+  `WikiMappingBlueprintTests` now pins the split, with a negative control so a mapping that signed everything or
+  nothing could not pass.
 - **It settled the field separator at two spaces on every line.** Previously only its `Size`/`WT` and
   `Weight Reduction` lines were double-spaced and the stat lines were single-spaced, so `FieldSeparator` rested on
   the examples that happened to agree with it. Now the convention is uniform and the formatter already emitted it.
@@ -412,15 +413,12 @@ decisions made here on measurement are now documented upstream, so they no longe
   `WikiSpike prettify --cached` before and after: the census is byte-identical.**
 - **`WT: 0` -> `WT: 0.0` changes nothing either**, because neither side ever writes an integer weight: 743 of 743
   real values carry a decimal and so do all 109 captured windows. The old `0` was a sloppy placeholder.
-- **`WikiMapping.CurrentVersion` was deliberately not bumped**, although the mapping changed — the test is what the
-  tool would *write*, and the census identity above says nothing would. Bumping for form's sake is its own fault
-  here: it expires every settled ledger row and marches the user back through items whose pages the tool would
-  propose exactly the same thing for.
-- **One real gap this sharpens, left for the user**: nothing will sign an existing `STR: 5` on a page the tool is
-  not otherwise editing. The data pass signs a stat only when the edit already writes another signed one (the
-  2026-09-25 rule), and the formatter preserves every value byte for byte. Those are the 32 pages above. Closing it
-  means either reversing that rule or letting the formatter change a value — and the latter would break the content
-  check that is its whole licence to rearrange a page, so it is a decision rather than a fix.
+- **The mapping edits above did not on their own warrant a `CurrentVersion` bump**, which is worth recording
+  because it looked like they should: the test is what the tool would *write*, and the census identity says nothing
+  would. What took the version to 4 was the behaviour change the user asked for next, not the reconciliation.
+- **The gap this sharpened is now closed, by the user's decision**: a sign is formatting, not data, so the
+  formatting pass applies it. See the sign bullet under the analyzer below for the shared rule, the one deliberate
+  hole it cuts in the content check, and the 9-of-10-pages corpus effect. `CurrentVersion` went to 4 for it.
 - **Out of scope, no action**: the in-world screenshot line lost its bold markup around the caption, and the
   `dropsfrom`/`relatedquests`/`soldby`/`foraged` placeholders gained underscores (`[[Zone Name]]` ->
   `[[Zone_Name]]`). v1 preserves all of these byte for byte and generates none of them. The underscores are
@@ -526,21 +524,51 @@ recorded an incomplete convention as the convention.
   `WT` is plain on all 721, and `AC`/`DMG`/`Atk Delay`/`Range`/`Capacity`/`Weight Reduction` are never signed.
   `StatMapping.Signed` carries it.
   - **A sign-only difference is an edit only when the edit would otherwise be inconsistent** (user, 2026-09-25).
-    On its own, `STR: 5` reads unambiguously and rewriting it to `+5` is the incidental reformatting that belongs
-    to the prettifier. But if the edit is already writing `WIS: +8` on that page, leaving `STR: 5` beside it
+    On its own, `STR: 5` reads unambiguously, and signing it is formatting — which the formatting pass now really
+    does apply (see the next bullet). But if the edit is already writing `WIS: +8` on that page, leaving `STR: 5` beside it
     produces a line *the tool itself* made inconsistent — so those get normalized too, and only then.
     `ValuesAgree` ignores a leading `+`, and
     `ItemPageAnalyzer.NormalizeSignsIfTheEditWouldBeInconsistent` promotes the sign-only matches afterwards.
     **It has to be a post-pass, not a rule inside the comparison**, because the answer depends on what every other
     field concluded; a per-field rule cannot see that. `FieldFinding.SignedStat` carries the flag it needs.
-  - **"Belongs to the prettifier" is aspirational, not a description — nothing actually does it** (2026-09-30).
-    The formatter preserves every value byte for byte, because its licence to rearrange a page is that it *proves*
-    it changed nothing about what the page says, and a sign is part of a value. So an unsigned `STR: 5` on a page
-    the tool is not otherwise editing stays unsigned indefinitely, by both passes declining it. That was tenable
-    while the blueprint wrote `STR: ?`; its 2026-09-30 revision writes `STR: +?`, which makes it a real divergence
-    from the documented convention on **32 of 1,183 pages (54 occurrences)**. Raised with the user rather than
-    fixed, because every route to fixing it costs something load-bearing — see the blueprint-reconciliation section
-    above.
+  - **A sign is formatting, so the formatting pass applies it** (user, 2026-09-30): *"Adding a `+` in front of a
+    stat value that is already positive is just data formatting in my book, not a data change."* This replaces an
+    earlier note here that called it the prettifier's job while nothing actually did it — the data pass signs only a
+    value it is rewriting anyway, and the formatter preserved every value byte for byte, so an unsigned `STR: 5` on
+    an otherwise correct page stayed unsigned for good.
+    - **It is the one value the formatter ever changes, so the content check is told about it by name.**
+      `CanonicalField` drops a leading `+` from a signed stat's value before comparing, making `STR: 5` and
+      `STR: +5` the same content and nothing else. It still refuses a changed number, a dropped or invented field, a
+      sign flipped off a negative (`-5` canonicalizes to `-5`, never `5`), and any change at all to a label the
+      mapping does not mark signed. `ItemPagePrettifier.WouldVerify` exists so that narrowness can be tested
+      directly — the formatter will never emit a bad pair, so the only other way to reach the comparison would be to
+      sabotage the writer, and a test needing a sabotaged writer is testing the sabotage.
+    - **One shared rule, `StatMapping.WithWikiSign`**, used by both passes, because two copies would drift into the
+      two disagreeing about a sign — a diff that flaps back and forth. It signs only a value that is *wholly* a
+      positive number, which is stricter than the first-character test the data pass used inline: a capture yields a
+      clean token, but the formatter is handed arbitrary human text where `50 / 75 / 100` (two real ammo pages) and
+      `0%` both start with a digit. Measured safe to tighten — all 264 signed-stat values in the verified corpus are
+      a bare non-negative number or already signed, so nothing written from a capture changed.
+    - **A negative keeps its sign, and that is real rather than defensive**: 29 values across 1,183 pages are
+      negative, and the game emits them too — `Earthshaker` shows `Dexterity: -1`, `Adamantite Band` shows
+      `SV. Magic: -10`. Zero is left alone as well; `+0` reads oddly and no signed stat anywhere is zero.
+    - **Corpus effect, and a correction to the figure recorded here yesterday.** This file said *54 unsigned values
+      on 32 pages*; that was mis-measured — the regex behind it counted negatives as unsigned and failed to split
+      single-spaced stat lines. Measured properly, **10 pages carry a plain positive signed stat (21 values), and
+      formatting fixes 9 of them (19 values)**. The one it does not is `Amygdalan Tendril`, whose legacy flags make
+      the formatter decline the whole block.
+    - **A block the formatter will not reorder keeps its unsigned values, by design.** That path returns the raw
+      text untouched, and a pass which has just said it does not understand a block has no business editing values
+      in it — so the 469 legacy-flag pages get signs only after the data pass modernizes them, which is the settled
+      data-before-formatting order working rather than a gap.
+    - **`ItemPageAnalyzer.NormalizeSignsIfTheEditWouldBeInconsistent` is still not redundant**, which is the
+      tempting deletion now. The formatting commit is a separate prompt the user can decline, and the formatter
+      refuses a block still carrying legacy flags — so without that post-pass the data pass could still leave behind
+      a line *it* made inconsistent, which is exactly what it exists to prevent.
+    - **`WikiMapping.CurrentVersion` is bumped to 4 for this**, unlike the blueprint reconciliation it followed. A
+      settled ledger row makes the next capture skip the wiki entirely, so an item whose page has an unsigned stat
+      would otherwise never be offered the fix. The cost is that every settled row re-checks once, finds its data
+      still matching, and settles again.
 - **Two mapping gaps were found only by running the analyzer over the corpus**, and both would have pushed a
   regression to the wiki:
   - **Units differ on `Weight Reduction`**: the game shows `100`, the wiki `100%`. The comparison called them
@@ -897,12 +925,16 @@ wrong or the capture caught something odd, and choosing one is a human's call.
 
 **The formatting pass (`Wiki.Formatting.ItemPagePrettifier`).** Lays the `{{Itempage}}` call out the way the Item
 Page Blueprint says — parameters in blueprint order with aligned `=`, statsblock lines in blueprint order with the
-blueprint's grouping, stray spacing removed — and changes nothing about what the page says. It is always **its own
-edit, after the data edit**; see "Formatting is a separate edit" above for why that order is settled.
+blueprint's grouping, stray spacing removed — and changes nothing about what the page says **except one thing: a
+signed stat's positive value gains its `+`** (user, 2026-09-30, who classes that as formatting rather than data).
+It is always **its own edit,
+after the data edit**; see "Formatting is a separate edit" above for why that order is settled.
 - **Its licence to rearrange a public wiki's pages is that it can *prove* it preserved the content.** Every format is
   verified by re-parsing the result and comparing parameter by parameter, with the statsblock compared as a multiset
   of its fields, flags and unreadable lines; any mismatch returns the original untouched with a refusal naming what
-  differed. **This is not decoration — it caught a real bug in the formatter on 14 real pages**: the blueprint's own
+  differed. The sign above is the one difference it is told to allow, by name (`CanonicalField`), and
+  `ItemPagePrettifier.WouldVerify` exists so that narrowness can be tested directly rather than via a sabotaged
+  writer. **This is not decoration — it caught a real bug in the formatter on 14 real pages**: the blueprint's own
   `EXPENDABLE  Charges: 10<br>` is a flag *and* a field on one line, and reading flags only from flag-only lines
   silently dropped it.
 - **It only touches the inside of the template call**, so the era banner, an in-world screenshot, categories and any
@@ -962,7 +994,9 @@ edit, after the data edit**; see "Formatting is a separate edit" above for why t
 - `tools/WikiSpike -- prettify --cached <dir>` runs it over the real corpus and censuses what it did — the same
   methodology as `grammar` and `analyze`, and how both of the above bugs were found. `prettyshow <in> <out>` writes
   one page's result so it can be diffed by eye, because a census says nothing about whether the layout is any good.
-  Baseline (2026-09-28): **744 item pages, 0 refusals, 478 statsblocks left alone**, median size change +5 bytes.
+  Baseline (re-measured 2026-09-30): **744 item pages, 0 refusals, 478 statsblocks left alone**, median size change
+  +5 bytes. Unchanged by the signing change, which adds one byte to 19 values on 9 pages and moves no bucket — the
+  number that matters there is **0 refusals**, i.e. the content check accepted every page it signed.
 
 **An unreachable wiki aborts; an error about one page does not** (user, 2026-09-29). Two failures that look alike in
 a stack trace and want opposite responses, so they are now different types.

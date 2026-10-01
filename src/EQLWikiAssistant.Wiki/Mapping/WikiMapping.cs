@@ -47,7 +47,44 @@ public sealed record StatMapping(
     StatDisposition Disposition,
     string? WikiSuffix = null,
     bool Signed = false,
-    string? Note = null);
+    string? Note = null)
+{
+    /// <summary>
+    /// The value as the wiki writes it, which for a signed stat means a leading <c>+</c>.
+    ///
+    /// **One rule, shared by both passes that write a value**, because two copies of it would drift and the two
+    /// passes disagreeing about a sign is a diff that flaps back and forth. <c>ItemPageAnalyzer</c> calls it for a
+    /// value it is writing from a capture; <c>ItemPagePrettifier</c> calls it for a value already on the page.
+    ///
+    /// **Only a value that is entirely a positive number is signed.** That is deliberately stricter than testing
+    /// the first character, which is what the data pass used to do: a capture only ever yields a clean token, but
+    /// the formatter is handed arbitrary human-written text, where <c>50 / 75 / 100</c> (two real ammo pages) and
+    /// <c>0%</c> would both start with a digit and neither should gain a sign. Measured safe to tighten: all 264
+    /// signed-stat values in the verified corpus are a bare non-negative number or already signed, so no captured
+    /// value changes.
+    ///
+    /// **A negative keeps its own sign, and that is real rather than defensive** — the game emits
+    /// <c>Dexterity: -1</c> on `Earthshaker` and <c>SV. Magic: -10</c> on `Adamantite Band`, and 29 values across
+    /// 1,183 real pages are negative. Zero is left alone too: <c>+0</c> reads oddly, and no signed stat on any real
+    /// page or in any capture is zero, so the case is unobservable either way.
+    /// </summary>
+    public string WithWikiSign(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        string trimmed = value.Trim();
+        return Signed && IsPositiveNumber(trimmed) ? "+" + trimmed : trimmed;
+    }
+
+    /// <summary>A bare positive number — all digits, at most one interior decimal point, and not zero.</summary>
+    private static bool IsPositiveNumber(string value)
+    {
+        if (value.Length == 0) return false;
+        if (!value.All(c => char.IsAsciiDigit(c) || c == '.')) return false;
+        if (value.Count(c => c == '.') > 1) return false;
+        if (value[0] == '.' || value[^1] == '.') return false;
+        return value.Any(c => c is >= '1' and <= '9');
+    }
+}
 
 /// <summary>
 /// The translation between what the game window says and what the wiki records.
@@ -84,14 +121,18 @@ public sealed class WikiMapping
     /// **3** (2026-09-28): `Mount Speed` became a mapped stat, so mounts checked under 2 would be settled while
     /// missing it.
     ///
-    /// **Deliberately not bumped for the blueprint's 2026-09-30 revision** (oldid 179818), although the mapping
-    /// changed. The test is what the tool would *write*, and nothing moved: the sign convention the blueprint newly
-    /// states was already the mapping's, and the dropped `Recommended level` line was dead on both sides — the
-    /// formatter's census over all 1,183 cached pages is byte-identical before and after. Bumping anyway is not the
-    /// safe default here, it is its own fault: it would expire every settled ledger row and send the user back
-    /// through items whose pages the tool would propose exactly the same thing for.
+    /// **The blueprint's 2026-09-30 revision (oldid 179818) did not on its own warrant a bump**, which is worth
+    /// recording because it looked like it should: the sign convention it newly states was already the mapping's and
+    /// the `Recommended level` line it dropped was dead on both sides, so the formatter's census over all 1,183
+    /// cached pages came out byte-identical. What earned the bump below was the *behaviour* change the user then
+    /// asked for, not the mapping edit that preceded it.
+    /// **4** (2026-09-30): the formatting pass now signs a positive attribute or resist (user: a sign is formatting,
+    /// not data). This is the bump the note above is about, and it is the awkward kind — a *settled* row means the
+    /// next capture skips the wiki entirely, so without it an item whose page has an unsigned stat would never be
+    /// offered the fix. Measured cost of not bumping: 9 of 1,183 cached pages. Measured cost of bumping: every
+    /// settled row re-checks once, finds its data still matching, and settles again.
     /// </summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -228,6 +269,45 @@ public sealed class WikiMapping
         ArgumentNullException.ThrowIfNull(gameLabel);
         return Stats.TryGetValue(gameLabel.Trim(), out StatMapping? mapping) ? mapping : null;
     }
+
+    /// <summary>
+    /// How a stat should be handled, looked up by the label the *wiki* writes rather than the one the game does.
+    ///
+    /// <see cref="Stats"/> is keyed by game label, which is what the data pass has in hand. The formatting pass only
+    /// ever sees a page, so it has the wiki's spelling — `STR` where the game says `Strength`, `SV Fire` where it
+    /// says `SV. Fire`. Case-insensitive for the same reason <see cref="Stats"/> is: real pages write both
+    /// `SV FIRE` and `SV Fire`, and a page's case must not decide whether its value gets a sign.
+    /// </summary>
+    public StatMapping? FindStatByWikiLabel(string wikiLabel)
+    {
+        ArgumentNullException.ThrowIfNull(wikiLabel);
+        return ByWikiLabel.TryGetValue(wikiLabel.Trim(), out StatMapping? mapping) ? mapping : null;
+    }
+
+    /// <summary>
+    /// Built on first use rather than in a field initializer, because <see cref="Stats"/> is set by an
+    /// <c>init</c> accessor and so is still empty while field initializers run. By the time anything can call
+    /// <see cref="FindStatByWikiLabel"/> the object is fully constructed.
+    ///
+    /// Two threads racing here would each build an index and one would win; both are the same content, so the
+    /// race is benign and not worth a lock on a lookup this hot.
+    /// </summary>
+    private IReadOnlyDictionary<string, StatMapping> ByWikiLabel
+    {
+        get
+        {
+            if (_byWikiLabel is not null) return _byWikiLabel;
+
+            var index = new Dictionary<string, StatMapping>(StringComparer.OrdinalIgnoreCase);
+            foreach (StatMapping stat in Stats.Values)
+                if (stat.WikiLabel is { Length: > 0 } label)
+                    index[label] = stat;
+
+            return _byWikiLabel = index;
+        }
+    }
+
+    private IReadOnlyDictionary<string, StatMapping>? _byWikiLabel;
 
     public static WikiMapping Load(string path)
     {

@@ -36,6 +36,14 @@ public sealed record PrettifyResult(
 /// anything that does not match means the original comes back untouched with a refusal saying what differed. A
 /// formatter that cannot prove it preserved the content does not get to write.
 ///
+/// **One exception, and it is the only value this pass ever changes: a signed stat's positive value gains its
+/// <c>+</c>** (user, 2026-09-30): *"Adding a `+` in front of a stat value that is already positive is just data
+/// formatting in my book, not a data change."* The blueprint writes every attribute and resist as <c>+?</c>, and
+/// before this nothing applied it — the data pass signs a stat only when it is rewriting that line anyway, so an
+/// unsigned value on an otherwise correct page stayed unsigned for good. The verification pass is told about this
+/// one transformation by name (<c>CanonicalField</c>) and still refuses any other change to a value, including a
+/// sign flipped off a negative.
+///
 /// **Two deliberate limits, both of which keep that proof cheap:**
 /// - **It only touches the inside of the template call.** Everything else on the page — the era banner, an in-world
 ///   screenshot, categories, stray prose — survives byte for byte, because the formatter never looks at it. The era
@@ -74,6 +82,27 @@ public static class ItemPagePrettifier
         return refusals.Count > 0
             ? new PrettifyResult(wikitext, wikitext, notes, refusals)
             : new PrettifyResult(wikitext, formatted, notes, []);
+    }
+
+    /// <summary>
+    /// Whether the verification pass would accept <paramref name="formatted"/> as saying what
+    /// <paramref name="original"/> says. Both must be parseable item pages.
+    ///
+    /// **This exists so the check can be tested directly, and that is worth a little public surface.** The check is
+    /// the whole reason this pass is allowed to rewrite a public wiki's pages, and <c>CanonicalField</c> cuts one
+    /// deliberate hole in it for the sign. Proving the hole is only that wide needs the comparison fed pairs it must
+    /// still reject — which the formatter will never produce, so the only other way to reach it would be to sabotage
+    /// the writer, and a test needing a sabotaged writer is testing the sabotage.
+    /// </summary>
+    public static bool WouldVerify(string original, string formatted, WikiMapping? mapping = null)
+    {
+        ArgumentNullException.ThrowIfNull(original);
+        ArgumentNullException.ThrowIfNull(formatted);
+
+        ItemPageDocument before = ItemPageDocument.Parse(original)
+            ?? throw new ArgumentException("Not an item page.", nameof(original));
+
+        return Verify(before, formatted, mapping ?? WikiMapping.Default).Count == 0;
     }
 
     private static string FormatTemplate(
@@ -218,7 +247,7 @@ public static class ItemPagePrettifier
 
             if (onThisLine.Count == 0) continue;
             foreach (StatsField field in onThisLine) remaining.Remove(field);
-            Emit(string.Join(FieldSeparator, onThisLine.Select(f => $"{f.Label}: {f.Value}")) + "<br>");
+            Emit(string.Join(FieldSeparator, onThisLine.Select(f => Render(f, mapping))) + "<br>");
         }
 
         void Emit(string line)
@@ -238,10 +267,35 @@ public static class ItemPagePrettifier
 
             int before = output.FindIndex(l => l.StartsWith("Class:", StringComparison.OrdinalIgnoreCase));
             if (before < 0) before = output.Count;
-            output.InsertRange(before, remaining.Select(f => $"{f.Label}: {f.Value}<br>"));
+            output.InsertRange(before, remaining.Select(f => Render(f, mapping) + "<br>"));
         }
 
         return string.Join('\n', output);
+    }
+
+    /// <summary>
+    /// One field as the blueprint writes it, which for an attribute or a resist includes a leading <c>+</c>.
+    ///
+    /// **Signing a positive value is formatting, not data** (user, 2026-09-30): *"Adding a `+` in front of a stat
+    /// value that is already positive is just data formatting in my book, not a data change."* The blueprint's
+    /// 2026-09-30 revision spells every one of them `+?`, and before this nothing applied it — the data pass signs a
+    /// stat only when it is already rewriting that line for another reason, so an unsigned value on an otherwise
+    /// correct page stayed unsigned indefinitely.
+    ///
+    /// **The sign rule is <see cref="StatMapping.WithWikiSign"/>, shared with the data pass** so the two cannot
+    /// disagree, and it signs only a value that is wholly a positive number. A negative keeps its own sign, which is
+    /// real rather than defensive: 29 values across 1,183 pages are negative, and the game emits them too.
+    ///
+    /// **This is the one place the formatter changes a value**, so <see cref="Verify"/> has to be told about it
+    /// explicitly — see <c>CanonicalField</c>. It is also why a block the formatter refuses to reorder keeps its
+    /// unsigned values: that path returns the raw text untouched, and a pass that has just said it does not
+    /// understand a block has no business editing values in it.
+    /// </summary>
+    private static string Render(StatsField field, WikiMapping mapping)
+    {
+        StatMapping? stat = mapping.FindStatByWikiLabel(field.Label);
+        string value = stat is null ? field.Value : stat.WithWikiSign(field.Value);
+        return $"{field.Label}: {value}";
     }
 
     /// <summary>The labels the blueprint places below the blank-line separator, at the bottom of the block.</summary>
@@ -350,7 +404,11 @@ public static class ItemPagePrettifier
     }
 
     /// <summary>
-    /// Proves the formatted page says exactly what the original said, and lists every way it does not.
+    /// Proves the formatted page says what the original said, and lists every way it does not.
+    ///
+    /// "What it said" allows exactly one difference, applied by <see cref="Render"/> and recognized by
+    /// <c>CanonicalField</c>: a signed stat's positive value may gain a leading <c>+</c>. Everything else about a
+    /// value is still compared byte for byte.
     ///
     /// This is the load-bearing part. Everything above rearranges text, and a rearrangement that drops a value looks
     /// like a tidy-up in review — so the formatter is not trusted, it is checked. Compared: the set of parameters,
@@ -380,7 +438,7 @@ public static class ItemPagePrettifier
 
             if (string.Equals(name, mapping.StatsBlockParameter, StringComparison.Ordinal))
             {
-                refusals.AddRange(CompareStatsBlocks(was, now));
+                refusals.AddRange(CompareStatsBlocks(was, now, mapping));
                 continue;
             }
 
@@ -408,14 +466,35 @@ public static class ItemPagePrettifier
         return refusals;
     }
 
-    private static IEnumerable<string> CompareStatsBlocks(string? was, string? now)
+    /// <summary>
+    /// A statsblock field reduced to what the verification pass treats as its content.
+    ///
+    /// **This is the one hole deliberately cut in an otherwise byte-exact check, so it is cut as narrowly as it can
+    /// be.** <see cref="Render"/> adds a <c>+</c> to a signed stat's positive value, which is a value change, and
+    /// the check would otherwise refuse every page it touched. So for exactly those labels a leading <c>+</c> is
+    /// dropped before comparing, making <c>STR: 5</c> and <c>STR: +5</c> the same content and nothing else.
+    ///
+    /// What it still catches, which is the point: a changed number (<c>5</c> against <c>7</c>), a dropped or
+    /// invented field, a sign flipped from <c>-</c> to <c>+</c> (<c>-5</c> canonicalizes to <c>-5</c>, not
+    /// <c>5</c>), and any change at all to a label the mapping does not mark signed.
+    /// </summary>
+    private static string CanonicalField(StatsField field, WikiMapping mapping)
+    {
+        string value = field.Value.Trim();
+        if (mapping.FindStatByWikiLabel(field.Label) is { Signed: true } && value.StartsWith('+'))
+            value = value[1..];
+
+        return $"{field.Label}: {value}";
+    }
+
+    private static IEnumerable<string> CompareStatsBlocks(string? was, string? now, WikiMapping mapping)
     {
         StatsBlock before = StatsBlock.Parse(was ?? "");
         StatsBlock after = StatsBlock.Parse(now ?? "");
 
         foreach (string difference in CompareMultisets(
-                     [.. before.AllFields().Select(f => $"{f.Label}: {f.Value}")],
-                     [.. after.AllFields().Select(f => $"{f.Label}: {f.Value}")],
+                     [.. before.AllFields().Select(f => CanonicalField(f, mapping))],
+                     [.. after.AllFields().Select(f => CanonicalField(f, mapping))],
                      "statsblock field"))
             yield return difference;
 
