@@ -7129,6 +7129,73 @@
       ]
     },
     {
+      "file": "20-stalwart-seas-false-occlusion.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Shield of the Stalwart Seas",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable",
+            "Placeable"
+          ],
+          "classes": [
+            "PAL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Secondary"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "35"
+            },
+            {
+              "label": "Weight",
+              "value": "7.3"
+            },
+            {
+              "label": "Type",
+              "value": "Shield"
+            },
+            {
+              "label": "Strength",
+              "value": "20"
+            },
+            {
+              "label": "Stamina",
+              "value": "20"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Worn",
+              "name": "Ultravision",
+              "conditions": [],
+              "modifiers": []
+            }
+          ],
+          "merchantValue": "8 platinum 5 gold 7 silver 1 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "notepad-with-all-glyphs.png",
       "verified": true,
       "windows": []

@@ -1498,18 +1498,24 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline against the **verified** corpus, re-measured 2026-09-30: **46 samples, 109 windows located (1 correctly
-  occluded), 2197 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing, extra and
-  parser warnings alike.** All three ratchets in `CorpusAccuracyTests` are therefore 0 and must stay there; a
-  regression is now a real defect rather than a known gap being re-measured. (It read 43 samples / 101 windows /
-  2094 fields when the user first verified the whole set on 2026-09-24; the growth is captures added since, and the
-  occluded count fell from 2 to 1 when the HUD-panel bug above was fixed.)
-  - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure.** A newly captured
-    sample is located and parsed but scored against nothing until a human checks it against the screenshot, which
-    is the one step this harness cannot do for itself. Under the previous configuration (RapidOCR reading window crops) the same corpus
-  and the same ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them a
-  glyph-level failure that exact template matching removed outright. `AccuracySpike --rapid` still scores the old
+- Baseline, re-measured 2026-09-30: **47 samples, 109 windows located (1 correctly occluded), 2216 correct fields,
+  and 0 for every error count — structural, silent-wrong, wrong, missing, extra and parser warnings alike.** All
+  three ratchets in `CorpusAccuracyTests` are therefore 0 and must stay there; a regression is now a real defect
+  rather than a known gap being re-measured. (It read 43 samples / 101 windows / 2094 fields when the user first
+  verified the whole set on 2026-09-24; the growth is captures added since, and the occluded count fell from 2 to 1
+  when the HUD-panel bug above was fixed.) Under the previous configuration (RapidOCR reading window crops) the same
+  corpus and the same ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them
+  a glyph-level failure that exact template matching removed outright. `AccuracySpike --rapid` still scores the old
   configuration, so the comparison stays reproducible.
+  - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
+    newly bootstrapped sample guards against regressions immediately; the flag only records whether a human has
+    checked it against the screenshot, and the summary counts it (`47 samples scored (46 verified)`). **46 of 47 are
+    verified**: `20-stalwart-seas-false-occlusion.png` was bootstrapped on 2026-09-30 and cross-checked against the
+    pixels at 4-6x (`AC: 35`, `Weight: 7.3`, `8 platinum 5 gold 7 silver 1 copper`) but not yet signed off by the
+    user.
+  - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure** — a sample that is
+    located and parsed but compared against nothing. `AccuracySpike --bootstrap --only <substring>` adds one entry
+    for it, merging into the tracked corpus rather than regenerating the whole file.
 - **Ground-truth ordering was a latent defect, fixed once and mechanically.** The bootstrap recorded RapidOCR's
   *detection* order, which is not the window's reading order; the user verified values, never order, and the plan
   makes order part of the contract because it is how the wikitext gets laid back out. 9 windows were reordered by
