@@ -7130,7 +7130,7 @@
     },
     {
       "file": "20-stalwart-seas-false-occlusion.png",
-      "verified": false,
+      "verified": true,
       "windows": [
         {
           "occluded": false,
