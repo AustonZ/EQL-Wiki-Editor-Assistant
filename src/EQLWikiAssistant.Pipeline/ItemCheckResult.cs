@@ -109,6 +109,16 @@ public sealed record ItemCheckResult
     public ProposedEdit? Edit { get; init; }
 
     /// <summary>
+    /// The whole page the tool would create, for an item the wiki has never heard of. Null for everything else, and
+    /// null even for a new item whose name makes creating unsafe — see <c>ItemPageLookupResult.MayCreate</c>.
+    ///
+    /// Separate from <see cref="Edit"/> because there is no original to diff against: the review is of the text
+    /// itself rather than of a change to somebody else's text, which is why the screen hides its diff and findings
+    /// for this case.
+    /// </summary>
+    public ProposedPage? Creation { get; init; }
+
+    /// <summary>
     /// The formatting the page would want, when the page already matches the capture (user, 2026-09-29).
     ///
     /// **Offered without anything being written**, because a page whose data is right can still be laid out wrongly,
@@ -146,6 +156,11 @@ public sealed record ItemCheckResult
         Status == ItemCheckStatus.EditProposed &&
         Edit is { HasChanges: true } &&
         Page is not null;
+
+    /// <summary>Whether this item can be created: it is not on the wiki, and a page was generated for it. A new
+    /// item whose name cannot safely become a title gets no proposal, so this is false and the user sees only the
+    /// warning explaining why.</summary>
+    public bool CanCreate => Status == ItemCheckStatus.NotOnWiki && Creation is not null;
 
     /// <summary>
     /// Whether something here wants the user's judgement before the page is written — a field the analyzer could not

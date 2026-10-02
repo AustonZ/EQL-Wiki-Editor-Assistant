@@ -1061,9 +1061,10 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
     well enough to lay out. Formatting first would have met a page it declines. A test pins exactly that sequence.
   - A page with nothing to do offers nothing — a prompt that appears when there is no work becomes noise the user
     learns to dismiss.
-  - **Still not applicable: the plan's "a brand-new page goes through the formatter before its first commit".** v1
-    never creates pages (`nocreate` is set, and creating one is a different feature with different review
-    requirements), so there is no first commit to get ahead of. It arrives with page creation, not before.
+  - **The plan's "a brand-new page goes through the formatter before its first commit" now applies, and is done**
+    (2026-10-01). This entry used to say it was not applicable because v1 never created pages. It does now, and the
+    formatter runs over the generated text *before* the proposal is ever shown, so a creation lands a finished page
+    in one revision. See "Creating a page for a new item" below.
 - `tools/WikiSpike -- prettify --cached <dir>` runs it over the real corpus and censuses what it did — the same
   methodology as `grammar` and `analyze`, and how both of the above bugs were found. `prettyshow <in> <out>` writes
   one page's result so it can be diffed by eye, because a census says nothing about whether the layout is any good.
@@ -1071,6 +1072,77 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
   **+8 bytes** (it was +5 before the block framing below added two blank lines per block parameter). The signing
   change moved no bucket at all, adding one byte to 19 values on 9 pages. On both, the number that matters is
   **0 refusals** — the content check accepted every page the formatter changed.
+
+**Creating a page for a new item (`Wiki.Analysis.ItemPageCreator`, `ItemCheckPipeline.CreateAsync`, 2026-10-01).**
+The item the wiki has never heard of — which is not an edge case but the whole category of "new in EQL". Measured on
+the user's own live ledger: **7 of 113 checked items have no page**, and the names say what they are —
+`Armor Ornamentation Token`, `Primary Class Unlock Token`, `Bottle of Alternate Adventure`, `Potion of Amnesia`,
+`Token of Reclamation`, `Lightweight Bag`, `Shiverback-Hide Boots`. A P1999-derived wiki was never going to have
+them, and before this the tool's only offer on one was **Skip**.
+
+- **It generates an empty blueprint skeleton and runs the ordinary data pass over it.** This is the load-bearing
+  decision and it is the lesson this codebase keeps relearning: a page renderer would be a *second home* for every
+  rule the analyzer and the editor already own — how a flags line is spelled, where a new stat line goes, which
+  categories an item earns, what a merchant value looks like — and two copies of a rule drift until the two passes
+  disagree about the same page. The skeleton is a page on which every field is missing, so the existing comparison
+  concludes "add all of it" and the existing editor writes it. Nothing about item data is decided twice.
+  - **Every blueprint parameter is declared and blank.** A declared-but-blank parameter is idiomatic here (343 of
+    662 sampled pages have one); it scaffolds the fields only a human can fill, which on a new page is most of the
+    work; and it means the data pass *updates* in place rather than inserting, so nothing is marked as an
+    unpositioned line.
+  - **No era banner and no categories in the skeleton**, deliberately — the compliance checker reports the missing
+    banner and the analyzer reports every derivable category, so the ordinary pass adds both.
+  - **`itemname` is the one field the skeleton fills**, because creating the page at that title is what makes it
+    true. Left blank it would be reported and never written: a name/title mismatch is *reported rather than fixed*
+    on an existing page, and that rule is right there and wrong here.
+- **The formatting pass runs before the proposal is shown, so one commit lands a finished page** (user, 2026-10-01).
+  A page generated in blueprint order from an empty skeleton is always something the formatter can lay out. A
+  formatting prompt still follows the save — the box is editable and a hand-edit can mangle the layout — but on the
+  ordinary path it finds nothing. Pinned by a test asserting the formatter would not change the generated text, and
+  by a census over every capture in the accuracy corpus.
+- **Creation is offered only for `LookupOutcome.NotFound`** (`ItemPageLookupResult.MayCreate`), which is narrower
+  than "this item is new" and the gap is the whole point. **An ordinary editor on this wiki cannot delete a page**,
+  so the other two "new" outcomes are exactly where creating does permanent damage: a `FoundMisnamedCandidate` is
+  almost certainly this item's page under a quote-character variant, so creating a second produces the duplicate
+  nobody can remove — the exact failure the variant search exists to prevent — and a `NameUnusable` has no title to
+  create at. Both still reach the user as a warning; what they do not reach is a Create button.
+- **`createonly=1`, not `basetimestamp`.** The guard inverts: an edit has to re-read the page to know its splice
+  still applies, while a creation only has to know the page is still absent, and the wiki enforces that itself —
+  stronger than a check in this tool, since nothing can happen between the wiki's own check and its own write. So
+  `CreateAsync` does not re-fetch, unlike `CommitAsync`. `MediaWikiClient.SaveAsync` is the single write path both
+  go through, with the guard as the only difference between them, which is the difference worth seeing at a glance.
+- **A blank `lucy_img_ID` warns but does not block** (user, 2026-10-01), and the ledger is what makes that safe.
+  No capture can read an icon ID off the game, so a generated page always starts without one. The page is written
+  if the user wants it written — but **the outcome is read back off the text that was actually saved**, and a page
+  still carrying a gap is recorded `Flagged`, not `Created`, so the item keeps coming back until somebody fills it
+  in. Without that, warn-don't-block would lose the icon permanently, because a settled row never reaches the wiki
+  again. `ItemPageCreator.GapsIn` is shared by the proposal and the commit so both ask the question the same way.
+- **`CheckOutcome.Created` is its own outcome, and `MeansDone` includes it.** Distinct from `Edited` for the reader
+  rather than for the logic: "this page exists because I made it" is the row most worth finding again, since its
+  `dropsfrom`, `soldby` and `relatedquests` are the ones nobody has filled in.
+  - **Outcomes are persisted by name, which is what made inserting an enum member safe** — and it was checked rather
+    than assumed, because the failure would have been silent and would have hit the user's live 113-row ledger: with
+    ordinals, every `Flagged` row would have become `Created`, turning seven items that still want a human into
+    settled ones that never reach the wiki again. A test now pins the by-name encoding.
+- **The review screen reads differently for a creation** (user, 2026-10-01): there is no original to diff against,
+  so the findings table and the diff have nothing to say and are gone, and the generated wikitext is shown outright
+  rather than behind an Expander — on a creation it is not a detail to drill into, it is the whole thing being
+  reviewed, so it must not be collapsible. The icon *comparison* goes too (there is no page to compare with), but
+  the captured icon stays, because it is how the user reads off the `lucy_img_ID` they are about to type.
+- **The confirmation names the title**, because that is the part that is permanent: a page created at the wrong name
+  stays, and the user is the only one who can judge it.
+- `tools/WikiSpike -- preview <screenshot>` now prints the whole page it would create for a new item, which is where
+  the generated text has to be judged — and it found two real bugs the moment it ran against a real capture:
+  - **The gap list described the skeleton rather than the result.** The data pass defers every required parameter
+    because the skeleton has none, so a page with a fully written statsblock was reported as missing its statsblock.
+    Gaps are recomputed against the finished text; the icon ID is then the only one that legitimately survives.
+  - **`preview` analyzed Lore-tab captures as if they were Description ones**, so three of the four windows in the
+    sample offered to create a page with an empty statsblock. A *preview* bug only — the real pipeline returns
+    `LoreRecorded` before the lookup and never reaches creation — but it is the kind of output that teaches a
+    reader to distrust the tool, so `preview` now skips them.
+- **No `WikiMapping.CurrentVersion` bump**, and the reason is the same test as always: the version exists to
+  invalidate settled ledger rows when what the tool *would write to an existing page* changes, and none of this
+  touches that. A new item has no settled row to invalidate.
 
 **An unreachable wiki aborts; an error about one page does not** (user, 2026-09-29). Two failures that look alike in
 a stack trace and want opposite responses, so they are now different types.
@@ -1259,8 +1331,14 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
   `RenderTargetBitmap` in a throwaway harness, because the review screen's detail panel cannot be reached without a
   live capture. That gallery is what confirms an Expander still opens — a broken template there would have hidden
   the wikitext editor entirely, which is a functional regression wearing a cosmetic change's clothes.
-  - **Still unverified: the detail panel in situ.** Its pieces — both notice bars, the diff tints, the Expander, the
-    icon tiles — were rendered from the same resources, but not in the screen that uses them.
+  - **The detail panel in situ is verified** (user, 2026-10-01): they have now used every part of it against real
+    captures under this palette. This entry previously said it was unverified, and that note outlived the fact —
+    worth recording, because it was then repeated back to the user as outstanding work when it was not.
+  - **Its rearrangement was re-verified by rendering** (2026-10-01), when the capture moved to the top of the panel
+    and the icons moved beside it: both layouts, a creation and an ordinary edit, at a wide and a narrow window, so
+    the WrapPanel is seen actually reflowing the icon column below the screenshot rather than clipping it. Rendering
+    the `DetailScroller` alone is misleading — it has no background of its own, so it comes out light-on-light and
+    clipped; render the whole window.
 
 **The ledger view (`App.LedgerWindow`, 2026-09-29).** What has been checked, and — the reason it exists — what is
 still waiting for a human. Built ahead of milestone 6 by the user's agreement, because over a long session the
@@ -1308,6 +1386,10 @@ name across frames, and the pipeline attaches the lore to the parsed item so the
 - **Comparison ignores line breaks and nothing else.** The game wraps lore to fit its window and the parser rejoins
   those rows with single spaces, so a page that breaks the same sentence differently is not a different sentence.
   Punctuation is content and compares exactly.
+- **The lore write path has been exercised against the live wiki** (user, 2026-10-01, on `Storage Trunk`): a page
+  they had created by hand without lore, carrying a note of their own in `notes`, so the capture exercised inserting
+  the lore wrapper *alongside* existing human-written text — the case the splice below exists for. It had previously
+  been recorded here as untested.
 - **`ItemPageDocument.WithLore` is the one edit that reaches inside another parameter.** An existing
   `{{Item Lore|...}}` has its value spliced in place, so a human's own commentary elsewhere in `notes` survives byte
   for byte; a page without the wrapper gets one at the front of `notes`, which is where the `{{Item Lore Missing}}`
@@ -1904,7 +1986,8 @@ dotnet run --project tools/WikiSpike -- prettify --cached .local-data/wiki-pages
 dotnet run --project tools/WikiSpike -- prettyshow ".local-data/wiki-pages/Girdle of Faith.txt" out.txt
 
 # The whole pipeline end to end against a screenshot — locate, parse, eligibility, lookup, analyze, edit — printing
-# the proposed line diff. Exists so the edit can be judged on real pages before there is a UI to judge it in:
+# the proposed line diff, and for an item with no page the whole page it would create. Exists so both can be judged
+# on real captures before there is a UI to judge them in; it is what found the two creation bugs of 2026-10-01:
 dotnet run --project tools/WikiSpike -- preview "samples/some screenshot.png"
 
 # Icon comparison against a real screenshot. Prints each captured icon against the one its page points at, AND a

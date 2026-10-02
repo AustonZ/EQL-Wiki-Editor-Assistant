@@ -24,4 +24,19 @@ public interface IMediaWikiClient
         string summary,
         DateTimeOffset baseTimestamp,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a page that does not exist yet.
+    ///
+    /// **Separate from <see cref="EditAsync"/> because the conflict guard inverts.** An edit sends
+    /// <c>basetimestamp</c>, which is meaningless here — there is no base revision to have moved on from. The
+    /// symmetric guard is <c>createonly</c>: if somebody created the page between the check and this write, the
+    /// wiki refuses rather than overwriting what they wrote. Keeping both in one method would have meant a call
+    /// that silently sends neither guard when handed the wrong arguments.
+    /// </summary>
+    Task<EditResult> CreatePageAsync(
+        string title,
+        string wikitext,
+        string summary,
+        CancellationToken cancellationToken = default);
 }

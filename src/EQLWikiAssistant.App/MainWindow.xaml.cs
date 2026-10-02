@@ -254,6 +254,68 @@ public partial class MainWindow : Window
         WikiIconImage.Source = view?.Result.WikiIconImage is { } wiki ? ToBitmap(wiki, 4) : null;
     }
 
+    /// <summary>
+    /// Creates the page for an item the wiki has never heard of.
+    ///
+    /// **Confirmed more pointedly than an edit is**, because creating is the one write this tool does that nobody
+    /// here can undo: an ordinary editor on this wiki cannot delete a page, so a page created at the wrong title
+    /// stays. The title is in the prompt for that reason — it is the part that is permanent, and the part the user
+    /// is the only one able to judge.
+    /// </summary>
+    private async void OnCreateClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel view || _services is null) return;
+        if (view.Result.Creation is not { } creation) return;
+
+        string warning = view.Result.Creation.HasIconId
+            ? ""
+            : "\n\nIt has no lucy_img_ID, so the item box will show no artwork until one is added.";
+
+        if (MessageBox.Show(
+                this,
+                $"Create the page '{creation.Title}'?\n\nNobody on this wiki can delete a page, so the title is " +
+                $"permanent once this is saved.{warning}",
+                "Create a wiki page",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning) != MessageBoxResult.OK)
+            return;
+
+        view.IsBusy = true;
+        try
+        {
+            CommitResult commit = await _services.Pipeline
+                .CreateAsync(view.Result, view.Wikitext, view.Summary);
+            await _services.SaveLedgerAsync();
+            UpdateLedgerText();
+
+            view.Outcome = commit.Status == CommitStatus.Committed
+                ? $"Created as revision {commit.RevisionId}."
+                : null;
+
+            view.Settled = commit.Status == CommitStatus.Committed;
+
+            // Normally finds nothing — the generated text is laid out before it is ever shown. It is offered anyway
+            // because the box is editable, and a hand-edit is exactly what a formatting pass is for.
+            view.Formatting = commit.Formatting;
+            foreach (string note in commit.FormattingNotes)
+                if (!view.Warnings.Contains(note))
+                    view.Warnings.Add(note);
+
+            StatusText.Text = view.Outcome ?? commit.Error ?? "The page was not created.";
+
+            if (commit.Status == CommitStatus.Failed)
+                MessageBox.Show(this, commit.Error, "Nothing was written", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (WikiUnavailableException ex)
+        {
+            ReportWikiUnavailable(ex, "The page was not created");
+        }
+        finally
+        {
+            view.IsBusy = false;
+        }
+    }
+
     private async void OnCommitClick(object sender, RoutedEventArgs e)
     {
         if (ResultsList.SelectedItem is not ResultViewModel view || _services is null) return;

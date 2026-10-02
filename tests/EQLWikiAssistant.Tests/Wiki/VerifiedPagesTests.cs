@@ -42,6 +42,11 @@ public class VerifiedPagesTests : IDisposable
             string title, string newWikitext, string summary, DateTimeOffset baseTimestamp,
             CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("The verified list is never written by this tool.");
+
+        public Task<EditResult> CreatePageAsync(
+            string title, string wikitext, string summary,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The verified list is never created by this tool.");
     }
 
     private async Task<(VerifiedPages Pages, FakeWiki Wiki)> LoadedAsync(string content = RealList)

@@ -37,6 +37,25 @@ public sealed record ItemPageLookupResult(
     /// misnamed-candidate case: the item has no page at its correct name, so from the tool's point of view it is
     /// new — the candidate is information for the user, not a page to edit.</summary>
     public bool TreatAsNew => Outcome is not LookupOutcome.Found;
+
+    /// <summary>
+    /// Whether the tool may offer to <em>create</em> this item's page — which is narrower than
+    /// <see cref="TreatAsNew"/>, and the gap between them is the whole point.
+    ///
+    /// **Only <see cref="LookupOutcome.NotFound"/> qualifies.** The other two "new" outcomes are precisely the cases
+    /// where creating a page does permanent damage, and an ordinary editor on this wiki cannot delete a page to
+    /// undo it:
+    /// - <see cref="LookupOutcome.FoundMisnamedCandidate"/> — a page for this item almost certainly already exists
+    ///   under a quote-character variant. Creating a second one produces the duplicate nobody can remove, which is
+    ///   the exact failure the variant search was built to prevent.
+    /// - <see cref="LookupOutcome.NameUnusable"/> — the in-game name cannot be a MediaWiki title, so there is no
+    ///   title to create at. The page very likely exists under a name a human chose (<c>Cell Key #5</c> living at
+    ///   <c>Cell Key No. 5</c>), and picking a replacement is a permanent, URL-defining judgement the tool never
+    ///   makes.
+    ///
+    /// Both still reach the user as a warning; what they do not reach is a Create button.
+    /// </summary>
+    public bool MayCreate => Outcome is LookupOutcome.NotFound;
 }
 
 /// <summary>

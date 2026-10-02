@@ -962,11 +962,155 @@ public class ItemCheckPipelineTests
         Assert.Equal(1, asked);
     }
 
+    // --- creating a page for an item the wiki has never heard of -----------------------------------------------
+
+    /// <summary>A new item arrives with a whole page proposed, built by the ordinary data pass over an empty
+    /// blueprint skeleton — so it carries the capture's flags, stats and categories without this path deciding
+    /// anything about how they are written.</summary>
+    [Fact]
+    public async Task ANewItemArrivesWithAWholePageProposed()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines));
+
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        Assert.Equal(ItemCheckStatus.NotOnWiki, result.Status);
+        Assert.True(result.CanCreate);
+        Assert.Equal("Earring of Bashing", result.Creation!.Title);
+        Assert.Contains("{{Classic Era}}", result.Creation.Wikitext);
+        Assert.Contains("Lore Equipped, No Trade", result.Creation.Wikitext);
+        Assert.Contains("AC: 5", result.Creation.Wikitext);
+        Assert.Contains("[[Category:Ear]]", result.Creation.Wikitext);
+    }
+
+    /// <summary>Creating writes exactly one page, through the create path rather than the edit path, and settles the
+    /// item — so the next capture of it costs no wiki traffic at all.</summary>
+    [Fact]
+    public async Task CreatingWritesThePageAndSettlesTheItem()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines));
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        // The icon ID is the one thing no capture can supply, so the user types it into the box before saving.
+        string typed = result.Creation!.Wikitext.Replace("|lucy_img_ID    =", "|lucy_img_ID    = 1234");
+
+        CommitResult commit = await pipeline.CreateAsync(result, typed, result.Creation.Summary);
+
+        Assert.Equal(CommitStatus.Committed, commit.Status);
+        Assert.Equal(1, wiki.Creations);
+        Assert.Equal(0, wiki.Edits);
+        Assert.Contains("1234", wiki.Pages["Earring of Bashing"].Wikitext);
+
+        LedgerEntry row = ledger.Find("Earring of Bashing")!;
+        Assert.Equal(CheckOutcome.Created, row.Outcome);
+        Assert.Equal("Earring of Bashing", row.WikiPageTitle);
+        Assert.Equal(LedgerVerdict.AlreadyDone, ledger.Consult(row.ItemName, row.Fingerprint, row.MappingVersion));
+    }
+
+    /// <summary>
+    /// **The consequence of allowing a creation with no icon ID** (user, 2026-10-01: warn, do not block). The page
+    /// is written, but the row is `Flagged` rather than `Created`, so the item comes back on the next capture until
+    /// somebody supplies the artwork. Without this, the warn-don't-block choice would lose the icon permanently —
+    /// a settled row never reaches the wiki again.
+    /// </summary>
+    [Fact]
+    public async Task CreatingWithNoIconIdLeavesTheItemComingBack()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines));
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        CommitResult commit = await pipeline.CreateAsync(
+            result, result.Creation!.Wikitext, result.Creation.Summary);
+
+        Assert.Equal(CommitStatus.Committed, commit.Status);
+        Assert.Equal(1, wiki.Creations);
+
+        LedgerEntry row = ledger.Find("Earring of Bashing")!;
+        Assert.Equal(CheckOutcome.Flagged, row.Outcome);
+        Assert.False(CheckedItemsLedger.MeansDone(row.Outcome));
+    }
+
+    /// <summary>
+    /// Somebody else creating the page between the check and the write is refused rather than overwritten — the case
+    /// `createonly=1` exists for. The row stays `NotOnWiki`, because the item was never checked against that page.
+    /// </summary>
+    [Fact]
+    public async Task APageCreatedBySomebodyElseFirstIsNotOverwritten()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines));
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        const string theirs = "a page somebody else just wrote";
+        wiki.Pages["Earring of Bashing"] =
+            new WikiPage("Earring of Bashing", theirs, 400, DateTimeOffset.UnixEpoch);
+
+        CommitResult commit = await pipeline.CreateAsync(
+            result, result.Creation!.Wikitext, result.Creation.Summary);
+
+        Assert.Equal(CommitStatus.Failed, commit.Status);
+        Assert.Contains("now exists", commit.Error!);
+        Assert.Equal(theirs, wiki.Pages["Earring of Bashing"].Wikitext);
+        Assert.Equal(CheckOutcome.NotOnWiki, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    /// <summary>The login gate covers creating too, and a refused write costs no requests — the same rule both
+    /// commits follow, checked here because a third write path is exactly where a copied rule would have been
+    /// forgotten again.</summary>
+    [Fact]
+    public async Task TheCreationWillNotWriteWhenTheGateRefuses()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines));
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+        pipeline.BeforeWriting = _ => Task.FromResult<string?>("No bot password is stored.");
+
+        CommitResult commit = await pipeline.CreateAsync(
+            result, result.Creation!.Wikitext, result.Creation.Summary);
+
+        Assert.Equal(CommitStatus.Failed, commit.Status);
+        Assert.Equal("No bot password is stored.", commit.Error);
+        Assert.Equal(0, wiki.Creations);
+        Assert.Empty(wiki.Pages);
+        Assert.Equal(CheckOutcome.NotOnWiki, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    /// <summary>
+    /// **The negative control on `MayCreate`**: an item whose page exists under a quote-character variant is new as
+    /// far as the tool is concerned, but creating a second page would produce the duplicate nobody on this wiki can
+    /// delete — the exact failure the variant search was built to prevent. It gets the warning and no proposal.
+    /// </summary>
+    [Fact]
+    public async Task AnItemWhosePageExistsUnderAQuoteVariantIsNotOfferedCreation()
+    {
+        OcrLine[] lines =
+        [
+            L("Kavruul's Mystic Pouch", 96, 0),
+            L("Description", 170, 18),
+            L("Kavruul's Mystic Pouch", 62, 49),
+            L("Class: ALL", 61, 78),
+            L("Race: ALL", 60, 95),
+        ];
+
+        var wiki = new FakeWiki();
+
+        // The page exists spelled with a grave accent; the capture reads the true apostrophe.
+        wiki.Pages["Kavruul`s Mystic Pouch"] = new WikiPage(
+            "Kavruul`s Mystic Pouch", EarringPage(), 100, DateTimeOffset.UnixEpoch);
+        var pipeline = new ItemCheckPipeline(wiki, new FakeLocator(Window(lines)), new CheckedItemsLedger());
+
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        Assert.Equal(ItemCheckStatus.NotOnWiki, result.Status);
+        Assert.Null(result.Creation);
+        Assert.False(result.CanCreate);
+        Assert.NotEmpty(result.Warnings);
+    }
+
     private sealed class FakeWiki : IMediaWikiClient
     {
         public Dictionary<string, WikiPage> Pages { get; } = new(StringComparer.Ordinal);
         public int Fetches { get; private set; }
         public int Edits { get; private set; }
+        public int Creations { get; private set; }
         public string? LastSummary { get; private set; }
         public bool FailFetches { get; init; }
 
@@ -995,6 +1139,22 @@ public class ItemCheckPipelineTests
             bool unchanged = string.Equals(Pages[title].Wikitext, newWikitext, StringComparison.Ordinal);
             Pages[title] = Pages[title] with { Wikitext = newWikitext, RevisionId = Pages[title].RevisionId + 1 };
             return Task.FromResult(new EditResult(title, Pages[title].RevisionId, unchanged));
+        }
+
+        /// <summary>Mirrors what `createonly=1` does server side: a page that already exists is refused with the
+        /// wiki's own code rather than overwritten. A fake that happily created over an existing page would let a
+        /// test pass against the one failure this path exists to prevent.</summary>
+        public Task<EditResult> CreatePageAsync(
+            string title, string wikitext, string summary,
+            CancellationToken cancellationToken = default)
+        {
+            Creations++;
+            LastSummary = summary;
+            if (Pages.ContainsKey(title))
+                throw new MediaWikiException("articleexists", $"The page '{title}' already exists.");
+
+            Pages[title] = new WikiPage(title, wikitext, 1, DateTimeOffset.UnixEpoch);
+            return Task.FromResult(new EditResult(title, 1, false));
         }
     }
 }

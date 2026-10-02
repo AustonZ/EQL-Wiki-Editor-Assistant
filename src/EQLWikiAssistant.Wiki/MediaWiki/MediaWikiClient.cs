@@ -174,15 +174,50 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         _csrfToken = null; // the anonymous CSRF token is not valid for the logged-in session
     }
 
-    public async Task<EditResult> EditAsync(
+    public Task<EditResult> EditAsync(
         string title,
         string newWikitext,
         string summary,
         DateTimeOffset baseTimestamp,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        SaveAsync(title, newWikitext, summary, new Dictionary<string, string>
+        {
+            // basetimestamp is the edit-conflict guard: if somebody else saved between our fetch and this write,
+            // the API refuses with "editconflict" instead of silently reverting them.
+            ["basetimestamp"] = baseTimestamp.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            // Creating a page is a separate request with separate review requirements, so doing it by accident
+            // here is worse than failing.
+            ["nocreate"] = "1",
+        }, cancellationToken);
+
+    public Task<EditResult> CreatePageAsync(
+        string title,
+        string wikitext,
+        string summary,
+        CancellationToken cancellationToken = default) =>
+        SaveAsync(title, wikitext, summary, new Dictionary<string, string>
+        {
+            // The mirror image of the pair above, and the reason creating is its own method: there is no base
+            // revision for basetimestamp to guard, so the guard that matters is "fail if this page now exists".
+            // Without it, two captures of the same new item — or somebody else creating the page in between —
+            // would overwrite a page this tool never read.
+            ["createonly"] = "1",
+        }, cancellationToken);
+
+    /// <summary>
+    /// The one write path. Everything both callers share lives here — the session check, the CSRF token,
+    /// <c>assert=user</c> and reading the wiki's answer — so the <em>only</em> difference between editing and
+    /// creating is the guard each one passes in, which is the difference worth being able to see at a glance.
+    /// </summary>
+    private async Task<EditResult> SaveAsync(
+        string title,
+        string wikitext,
+        string summary,
+        Dictionary<string, string> guard,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
-        ArgumentNullException.ThrowIfNull(newWikitext);
+        ArgumentNullException.ThrowIfNull(wikitext);
 
         if (!IsLoggedIn)
             throw new InvalidOperationException("Log in before editing — an anonymous edit would be attributed to an IP address.");
@@ -193,16 +228,13 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         {
             ["action"] = "edit",
             ["title"] = title,
-            ["text"] = newWikitext,
+            ["text"] = wikitext,
             ["summary"] = summary,
             ["token"] = _csrfToken,
-            // basetimestamp is the edit-conflict guard: if somebody else saved between our fetch and this write,
-            // the API refuses with "editconflict" instead of silently reverting them.
-            ["basetimestamp"] = baseTimestamp.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             // assert=user turns a silently-expired session into a loud failure rather than an anonymous edit.
             ["assert"] = "user",
-            ["nocreate"] = "1",
         };
+        foreach ((string key, string value) in guard) parameters[key] = value;
 
         using JsonDocument response = await PostAsync(parameters, cancellationToken).ConfigureAwait(false);
         JsonElement edit = response.RootElement.GetProperty("edit");
@@ -215,7 +247,6 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         long? newRevision = edit.TryGetProperty("newrevid", out JsonElement rev) ? rev.GetInt64() : null;
         return new EditResult(title, newRevision, noChange);
     }
-
     private async Task<string> FetchTokenAsync(string type, CancellationToken cancellationToken)
     {
         using JsonDocument response = await GetAsync(new Dictionary<string, string>

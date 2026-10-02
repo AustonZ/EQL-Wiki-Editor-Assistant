@@ -30,6 +30,7 @@ public sealed record LedgerRowViewModel(LedgerEntry Entry, LedgerVerdict Verdict
     {
         CheckOutcome.Matched => "Matched",
         CheckOutcome.Edited => "Edited",
+        CheckOutcome.Created => "Created",
         CheckOutcome.Flagged => "Flagged",
         CheckOutcome.Skipped => "Skipped",
         CheckOutcome.NotOnWiki => "Not on the wiki",
@@ -39,7 +40,7 @@ public sealed record LedgerRowViewModel(LedgerEntry Entry, LedgerVerdict Verdict
     /// <summary>The same palette the review screen uses: green settled, red wanting a human, grey neither.</summary>
     public Brush OutcomeBrush => Entry.Outcome switch
     {
-        CheckOutcome.Matched or CheckOutcome.Edited => Palette.Done,
+        CheckOutcome.Matched or CheckOutcome.Edited or CheckOutcome.Created => Palette.Done,
         CheckOutcome.Flagged => Palette.Attention,
         CheckOutcome.NotOnWiki => Palette.Warning,
         _ => Palette.Neutral,

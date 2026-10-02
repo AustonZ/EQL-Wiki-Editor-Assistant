@@ -128,6 +128,62 @@
                                    Visibility="{Binding HasLedgerNote, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
 
+                    <!-- **The capture comes first, above everything else** (user, 2026-10-01): the game is the
+                         source, so the panel reads from the source downward towards the finished wikitext. The
+                         icons share this row rather than taking a section of their own further down — there is
+                         spare width beside a ~400px window crop, and vertical space is what this panel runs out
+                         of. A WrapPanel is what makes that safe: on a narrow window the icons drop below the
+                         screenshot instead of being clipped. -->
+                    <TextBlock Text="What was captured" Style="{StaticResource SectionHeading}" />
+                    <WrapPanel Orientation="Horizontal">
+                        <Image x:Name="WindowImage" Stretch="None" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <!-- The Lore capture sits beside the Description one rather than replacing it, so both
+                             halves of a two-capture item stay visible together. -->
+                        <Image x:Name="LoreImage" Stretch="None" VerticalAlignment="Top" Margin="12,2,0,0" />
+
+                        <!-- Both icons, whatever the verdict. The comparison is perceptual and has limits — it
+                             declines near-black sprites and occasionally flags a good one — and every one of those
+                             outcomes is cheap to settle if the user can just look, and expensive if they cannot. It
+                             also makes a wrong "match" visible, which no threshold can. On a creation only the
+                             captured side shows: see ShowIconComparison. -->
+                        <StackPanel Margin="20,2,0,0" MaxWidth="320"
+                                    Visibility="{Binding HasIcons, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Icon" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding IconVerdict}" Foreground="{Binding IconVerdictBrush}"
+                                       TextWrapping="Wrap" Margin="0,0,0,6"
+                                       Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text="Read the item&#39;s lucy_img_ID off this artwork." TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
+                                       Visibility="{Binding IsCreation, Converter={StaticResource BoolToVis}}" />
+                            <StackPanel Orientation="Horizontal">
+                                <StackPanel Margin="0,0,20,0">
+                                    <TextBlock Text="In game" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <!-- Collapsed when there is no image, rather than left as an empty Border: its
+                                         near-black background renders as a small dark rectangle that looks exactly
+                                         like a corrupt icon, which is how a null here got reported as a capture bug
+                                         (user, 2026-09-29). An absent icon has to look absent. -->
+                                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                            Visibility="{Binding HasCapturedIcon, Converter={StaticResource BoolToVis}}">
+                                        <Image x:Name="CapturedIconImage" Stretch="None" Margin="4"
+                                               RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                    </Border>
+                                    <TextBlock Text="not captured" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
+                                               Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="On the wiki" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                            Visibility="{Binding HasWikiIcon, Converter={StaticResource BoolToVis}}">
+                                        <Image x:Name="WikiIconImage" Stretch="None" Margin="4"
+                                               RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                    </Border>
+                                    <TextBlock Text="none on the page" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
+                                               Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </WrapPanel>
+
                     <!-- Warnings first and unmissable. A flagged gap is the product here; silently-wrong data on a
                          public wiki is the failure this whole tool exists to avoid. -->
                     <ItemsControl ItemsSource="{Binding Warnings}" Margin="0,12,0,0"
@@ -292,6 +348,30 @@
                         </StackPanel>
                     </StackPanel>
 
+                    <!-- **A creation shows its wikitext outright, not behind an Expander** (user, 2026-10-01).
+                         There is no original to diff against, so the generated page is not a detail to drill into —
+                         it is the whole thing being reviewed, and it must not be collapsible. -->
+                    <StackPanel Margin="0,14,0,0"
+                                Visibility="{Binding IsCreation, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="The page to create" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
+                                   Text="Generated from the blueprint and laid out already, so this should need no second formatting edit. Everything the capture cannot know — where the item drops, who sells it, which quests use it — is left blank for you." />
+                        <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
+                                 FontFamily="Consolas" FontSize="12" Height="320" VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto" />
+
+                        <TextBlock Text="Edit summary" Style="{StaticResource SectionHeading}" Margin="0,12,0,4" />
+                        <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Padding="4,3"
+                                 FontFamily="Consolas" FontSize="12" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Content="Create the page" Click="OnCreateClick" Padding="14,5"
+                                    FontWeight="SemiBold" IsEnabled="{Binding CanCreatePage}" />
+                            <Button Content="Skip for now" Click="OnSkipClick" Padding="14,5" Margin="8,0,0,0"
+                                    IsEnabled="{Binding CanSkip}" />
+                        </StackPanel>
+                    </StackPanel>
+
                     <!-- The only way a flagged item becomes done. Without it, an item whose page the user has
                          decided is correct stays flagged and re-fetches on every capture forever. -->
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
@@ -361,49 +441,6 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Both icons, whatever the verdict. The comparison is perceptual and has limits — it declines
-                         near-black sprites and occasionally flags a good one — and every one of those outcomes is
-                         cheap to settle if the user can just look, and expensive if they cannot. It also makes a
-                         wrong "match" visible, which no threshold can. -->
-                    <StackPanel Visibility="{Binding HasIcons, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="Icon" Style="{StaticResource SectionHeading}" />
-                        <TextBlock Text="{Binding IconVerdict}" Foreground="{Binding IconVerdictBrush}"
-                                   TextWrapping="Wrap" Margin="0,0,0,6" />
-                        <StackPanel Orientation="Horizontal">
-                            <StackPanel Margin="0,0,20,0">
-                                <TextBlock Text="In game" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                <!-- Collapsed when there is no image, rather than left as an empty Border: its
-                                     near-black background renders as a small dark rectangle that looks exactly like
-                                     a corrupt icon, which is how a null here got reported as a capture bug (user,
-                                     2026-09-29). An absent icon has to look absent. -->
-                                <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
-                                        Visibility="{Binding HasCapturedIcon, Converter={StaticResource BoolToVis}}">
-                                    <Image x:Name="CapturedIconImage" Stretch="None" Margin="4"
-                                           RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                                </Border>
-                                <TextBlock Text="not captured" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
-                                           Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}" />
-                            </StackPanel>
-                            <StackPanel>
-                                <TextBlock Text="On the wiki" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
-                                        Visibility="{Binding HasWikiIcon, Converter={StaticResource BoolToVis}}">
-                                    <Image x:Name="WikiIconImage" Stretch="None" Margin="4"
-                                           RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                                </Border>
-                                <TextBlock Text="none on the page" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
-                                           Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}" />
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <TextBlock Text="What was captured" Style="{StaticResource SectionHeading}" />
-                    <StackPanel Orientation="Horizontal">
-                        <Image x:Name="WindowImage" Stretch="None" VerticalAlignment="Top" Margin="0,2,0,0" />
-                        <!-- The Lore capture sits beside the Description one rather than replacing it, so both
-                             halves of a two-capture item stay visible together. -->
-                        <Image x:Name="LoreImage" Stretch="None" VerticalAlignment="Top" Margin="12,2,0,0" />
-                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

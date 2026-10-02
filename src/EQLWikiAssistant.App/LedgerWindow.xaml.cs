@@ -37,6 +37,7 @@ public partial class LedgerWindow : Window
         (LedgerFilter.Skipped, "Skipped"),
         (LedgerFilter.NotOnWiki, "Not on the wiki"),
         (LedgerFilter.Edited, "Edited"),
+        (LedgerFilter.Created, "Created"),
         (LedgerFilter.Matched, "Matched"),
     ];
 
@@ -86,6 +87,7 @@ public partial class LedgerWindow : Window
         [
             .. Describe(summary.Matched, "matched"),
             .. Describe(summary.Edited, "edited"),
+            .. Describe(summary.Created, "created"),
             .. Describe(summary.Flagged, "flagged"),
             .. Describe(summary.Skipped, "skipped"),
             .. Describe(summary.NotOnWiki, "not on the wiki"),

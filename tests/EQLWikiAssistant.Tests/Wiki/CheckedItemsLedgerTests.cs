@@ -167,6 +167,30 @@ public class CheckedItemsLedgerTests
         finally { File.Delete(path); }
     }
 
+    /// <summary>
+    /// **Outcomes are stored by name, so adding one can never reinterpret the rows already on disk.**
+    ///
+    /// Worth pinning rather than trusting, because the failure would be silent and would hit the user's own live
+    /// ledger: `Created` was inserted into the middle of <see cref="CheckOutcome"/> (2026-10-01), and had the
+    /// converter been writing ordinals, every `Flagged` row in a 113-row ledger would have quietly become
+    /// `Created` — turning seven items that still want a human into settled ones that never reach the wiki again.
+    /// </summary>
+    [Fact]
+    public async Task OutcomesArePersistedByNameSoAddingOneCannotReinterpretOldRows()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"eqlwiki-ledger-{Guid.NewGuid():N}.json");
+        try
+        {
+            var ledger = new CheckedItemsLedger();
+            ledger.Record(Entry(name: "Bamboo Shoot", outcome: CheckOutcome.Flagged));
+            await ledger.SaveAsync(path);
+
+            Assert.Contains("\"Flagged\"", await File.ReadAllTextAsync(path));
+            Assert.Equal(CheckOutcome.Flagged, CheckedItemsLedger.Load(path).Find("Bamboo Shoot")!.Outcome);
+        }
+        finally { File.Delete(path); }
+    }
+
     /// <summary>A corrupt ledger costs re-checks, not correctness — every row is reconstructible by capturing the
     /// item again — so losing it beats refusing to start.</summary>
     [Fact]
@@ -255,6 +279,11 @@ public class CheckedItemsLedgerTests
 
         public Task<EditResult> EditAsync(
             string title, string newWikitext, string summary, DateTimeOffset baseTimestamp,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<EditResult> CreatePageAsync(
+            string title, string wikitext, string summary,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }

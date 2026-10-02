@@ -597,6 +597,16 @@ async Task<int> PreviewEditsAsync()
         Console.WriteLine();
         Console.WriteLine($"=== {item.Name}");
 
+        // A Lore-tab capture is prose and nothing else — no stats, no flags. The real pipeline returns LoreRecorded
+        // for it and never reaches the wiki; this tool has no second capture to merge it with, so analyzing it would
+        // report an item with no data and, worse, offer to create a page with an empty statsblock. Measured: three
+        // of the four windows in the sample that drove this were Lore-tab captures.
+        if (window.ActiveTab == ItemWindowTab.Lore)
+        {
+            Console.WriteLine($"    (Lore tab) {item.Lore ?? "(no lore read)"}");
+            continue;
+        }
+
         ItemEligibility eligibility = ItemEligibility.Check(item);
         if (!eligibility.IsEligible)
         {
@@ -610,6 +620,22 @@ async Task<int> PreviewEditsAsync()
         if (lookup.Outcome != LookupOutcome.Found)
         {
             Console.WriteLine($"    {lookup.Outcome}{(lookup.Warning is null ? "" : ": " + lookup.Warning)}");
+
+            // A new item is the one case where the tool proposes a whole page rather than a patch, so this is where
+            // it has to be judged — the same reason the rest of this command exists.
+            if (lookup.MayCreate)
+            {
+                ProposedPage? proposal = ItemPageCreator.Build(item, item.Name);
+                if (proposal is null) { Console.WriteLine("    could not generate a page"); continue; }
+
+                Console.WriteLine($"    summary: {proposal.Summary}");
+                foreach (string refusal in proposal.FormattingRefusals)
+                    Console.WriteLine($"    ! the formatter declined: {refusal}");
+                foreach (string gap in proposal.Gaps) Console.WriteLine($"    ! {gap}");
+                Console.WriteLine("    --- would create ---");
+                foreach (string line in proposal.Wikitext.Replace("\r\n", "\n").TrimEnd('\n').Split('\n'))
+                    Console.WriteLine($"      | {line}");
+            }
             continue;
         }
 

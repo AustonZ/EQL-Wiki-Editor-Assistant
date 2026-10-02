@@ -16,6 +16,7 @@ public enum LedgerFilter
 
     Matched,
     Edited,
+    Created,
     Flagged,
     Skipped,
     NotOnWiki,
@@ -27,6 +28,7 @@ public sealed record LedgerSummary(
     int Total,
     int Matched,
     int Edited,
+    int Created,
     int Flagged,
     int Skipped,
     int NotOnWiki)
@@ -38,7 +40,7 @@ public sealed record LedgerSummary(
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        int total = 0, matched = 0, edited = 0, flagged = 0, skipped = 0, notOnWiki = 0;
+        int total = 0, matched = 0, edited = 0, created = 0, flagged = 0, skipped = 0, notOnWiki = 0;
         foreach (LedgerEntry entry in entries)
         {
             total++;
@@ -46,13 +48,14 @@ public sealed record LedgerSummary(
             {
                 case CheckOutcome.Matched: matched++; break;
                 case CheckOutcome.Edited: edited++; break;
+                case CheckOutcome.Created: created++; break;
                 case CheckOutcome.Flagged: flagged++; break;
                 case CheckOutcome.Skipped: skipped++; break;
                 case CheckOutcome.NotOnWiki: notOnWiki++; break;
             }
         }
 
-        return new LedgerSummary(total, matched, edited, flagged, skipped, notOnWiki);
+        return new LedgerSummary(total, matched, edited, created, flagged, skipped, notOnWiki);
     }
 }
 
@@ -95,6 +98,7 @@ public static class LedgerQuery
         LedgerFilter.NeedsAttention => !CheckedItemsLedger.MeansDone(entry.Outcome),
         LedgerFilter.Matched => entry.Outcome == CheckOutcome.Matched,
         LedgerFilter.Edited => entry.Outcome == CheckOutcome.Edited,
+        LedgerFilter.Created => entry.Outcome == CheckOutcome.Created,
         LedgerFilter.Flagged => entry.Outcome == CheckOutcome.Flagged,
         LedgerFilter.Skipped => entry.Outcome == CheckOutcome.Skipped,
         LedgerFilter.NotOnWiki => entry.Outcome == CheckOutcome.NotOnWiki,

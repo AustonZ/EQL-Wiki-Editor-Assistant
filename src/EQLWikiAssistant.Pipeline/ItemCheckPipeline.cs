@@ -300,6 +300,11 @@ public sealed class ItemCheckPipeline
             return new ItemCheckResult
             {
                 Status = ItemCheckStatus.NotOnWiki,
+                // The page the tool would create, built only where creating is safe. `MayCreate` is narrower than
+                // "this item is new": a quote-variant candidate almost certainly *is* this item's page under a
+                // misspelt name, and a title-illegal name has no title to create at. Both would produce a page
+                // nobody on this wiki can delete, so both get the warning and no proposal.
+                Creation = lookup.MayCreate ? ItemPageCreator.Build(item, item.Name, _mapping) : null,
                 ItemName = item.Name,
                 Item = item,
                 WindowImage = crop,
@@ -518,6 +523,82 @@ public sealed class ItemCheckPipeline
         catch (MediaWikiException ex)
         {
             return new CommitResult(CommitStatus.Failed, Error: $"The wiki refused the edit ({ex.Code}): {ex.Message}");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return new CommitResult(CommitStatus.Failed, Error: ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Creates the page for an item the wiki has never heard of, then records the outcome.
+    ///
+    /// **It does not re-fetch first, unlike <see cref="CommitAsync"/>, because the wiki enforces this one itself.**
+    /// An edit has to re-read the page to be sure our splice still applies to it; a creation only has to be sure
+    /// the page is still absent, and `createonly=1` makes the wiki refuse otherwise. That is a stronger guarantee
+    /// than a check here could give, since nothing can happen between the wiki's own check and its own write.
+    ///
+    /// **The outcome is read back off the text that was actually written.** The review screen is editable, so the
+    /// icon ID may have been typed in — or left blank, which is allowed (user, 2026-10-01: warn, do not block).
+    /// A page created with a gap still in it is recorded `Flagged`, not `Created`, so it keeps coming back until
+    /// somebody fills it. Reading the proposal instead would settle a page on the strength of what the tool
+    /// suggested rather than what went to the wiki.
+    /// </summary>
+    /// <param name="wikitext">The text to save — normally <c>result.Creation.Wikitext</c>, but what the user sees
+    /// is what must be written.</param>
+    public async Task<CommitResult> CreateAsync(
+        ItemCheckResult result,
+        string wikitext,
+        string summary,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentException.ThrowIfNullOrWhiteSpace(wikitext);
+        ArgumentException.ThrowIfNullOrWhiteSpace(summary);
+        if (result.Creation is null)
+            throw new InvalidOperationException("This result has no proposed page, so there is nothing to create.");
+
+        string title = result.Creation.Title;
+
+        if (await WhyWritingIsNotAllowedAsync(cancellationToken).ConfigureAwait(false) is { } blocked)
+            return new CommitResult(CommitStatus.Failed, Error: blocked);
+
+        try
+        {
+            EditResult created = await _wiki
+                .CreatePageAsync(title, wikitext, summary, cancellationToken).ConfigureAwait(false);
+
+            IReadOnlyList<string> gaps = ItemPageCreator.GapsIn(wikitext, _mapping);
+
+            RecordLedgerEntry(
+                result.ItemName,
+                title,
+                gaps.Count > 0 || result.NeedsAttention ? CheckOutcome.Flagged : CheckOutcome.Created,
+                created.NewRevisionId,
+                FingerprintOf(result));
+
+            // The formatting follow-up runs here too, for the reason the user gave when asking for creation
+            // (2026-10-01): the generated text is already laid out, so this normally finds nothing — but the box is
+            // editable and a hand-edit can mangle it, which is exactly when a formatting pass is worth offering.
+            (FormattingProposal? formatting, IReadOnlyList<string> notes) =
+                await PrepareFormattingAsync(title, cancellationToken).ConfigureAwait(false);
+
+            return new CommitResult(
+                CommitStatus.Committed,
+                created.NewRevisionId,
+                Formatting: formatting,
+                FormattingNotes: notes);
+        }
+        catch (MediaWikiException ex)
+        {
+            // articleexists is the one worth wording plainly: it means somebody created the page between the check
+            // and this write, which is the case createonly exists to catch.
+            return new CommitResult(
+                CommitStatus.Failed,
+                Error: string.Equals(ex.Code, "articleexists", StringComparison.Ordinal)
+                    ? $"'{title}' now exists — somebody created it since this item was checked. Nothing was " +
+                      "written. Capture the item again to check it against the new page."
+                    : $"The wiki refused to create the page ({ex.Code}): {ex.Message}");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {

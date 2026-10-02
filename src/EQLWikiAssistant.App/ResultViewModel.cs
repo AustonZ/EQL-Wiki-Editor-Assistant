@@ -125,11 +125,14 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(result);
         Result = result;
-        _wikitext = result.Edit?.NewWikitext ?? result.Page?.Wikitext ?? "";
+        // A new item has no page to start from, so the box is seeded with the whole page the tool would create.
+        _wikitext = result.Creation?.Wikitext ?? result.Edit?.NewWikitext ?? result.Page?.Wikitext ?? "";
         // Left blank when the tool proposes nothing, rather than inheriting its "No changes" — if the user is
         // hand-editing a page the tool judged correct, that summary would be a false description of the revision,
-        // and there is nothing to inherit. CanAct requires one, so it has to be typed.
-        _summary = result.Edit is { HasChanges: true } proposed ? proposed.Summary : "";
+        // and there is nothing to inherit. CanAct requires one, so it has to be typed. A creation does have one to
+        // inherit, because "created from the in-game item window" is the whole truth about that revision.
+        _summary = result.Creation?.Summary
+            ?? (result.Edit is { HasChanges: true } proposed ? proposed.Summary : "");
         _outcome = null;
         _settled = false;
         _formatting = null;
@@ -209,6 +212,16 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         _ => Result.IconNote ?? "The icons were not compared.",
     };
 
+    /// <summary>
+    /// Whether to show the icon *comparison* — the verdict line and the wiki-side tile.
+    ///
+    /// **False for a creation** (user, 2026-10-01: do not bother showing in-game against wiki). There is no page,
+    /// so there is nothing to compare: the verdict would read "the icons were not compared" and the wiki tile would
+    /// read "none on the page", which is true of a page that does not exist and says nothing useful. The captured
+    /// icon itself stays, because it is how the user reads off the `lucy_img_ID` they are about to type.
+    /// </summary>
+    public bool ShowIconComparison => !IsCreation;
+
     public Brush IconVerdictBrush => Result.Icon switch
     {
         { Matches: true } => Palette.Done,
@@ -261,6 +274,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IsDone));
             OnPropertyChanged(nameof(StatusText));
             OnPropertyChanged(nameof(StatusBrush));
+            // A page just created becomes clickable at this moment and not before — see KnownPageTitle.
+            OnPropertyChanged(nameof(PageTitle));
+            OnPropertyChanged(nameof(HasPage));
         }
     }
 
@@ -306,8 +322,15 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// and used to be the one result with nothing to click. It is also the one most likely to need it, since "is this
     /// row stale, or has the page really been fixed?" is answered by going and looking.
     /// </summary>
+    /// <remarks>
+    /// A page this tool has just created counts too (2026-10-01). It has no <see cref="ItemCheckResult.Page"/> —
+    /// the check found nothing to fetch — but it exists now, and the moment after creating one is exactly when the
+    /// user wants to open it and start filling in where the item drops. Gated on <see cref="Settled"/> so the link
+    /// appears only once the write has actually landed; before that it would be a red link to nothing.
+    /// </remarks>
     private string? KnownPageTitle =>
         Result.Page?.Title ??
+        (Settled && Result.Creation is { } created ? created.Title : null) ??
         (Result.LedgerRow is { Outcome: not CheckOutcome.NotOnWiki } row ? row.WikiPageTitle ?? row.ItemName : null);
 
     /// <summary>Includes a title that was merely looked up and not found, so the user can see what was searched for
@@ -430,6 +453,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             Set(ref _wikitext, value);
             // Typing a correction into a page the tool judged correct is what makes saving possible at all.
             OnPropertyChanged(nameof(CanAct));
+            OnPropertyChanged(nameof(CanCreatePage));
         }
     }
 
@@ -440,6 +464,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         {
             Set(ref _summary, value);
             OnPropertyChanged(nameof(CanAct));
+            OnPropertyChanged(nameof(CanCreatePage));
         }
     }
 
@@ -452,6 +477,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         {
             Set(ref _outcome, value);
             OnPropertyChanged(nameof(CanAct));
+            OnPropertyChanged(nameof(CanCreatePage));
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
             OnPropertyChanged(nameof(CanCommitFormatting));
@@ -482,6 +508,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         {
             Set(ref _isBusy, value);
             OnPropertyChanged(nameof(CanAct));
+            OnPropertyChanged(nameof(CanCreatePage));
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
             OnPropertyChanged(nameof(CanCommitFormatting));
@@ -505,6 +532,27 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         Result.Page is not null && Result.Edit is not null &&
         !string.IsNullOrWhiteSpace(_summary) &&
         !string.Equals(_wikitext, Result.Edit.OriginalWikitext, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether this entry is a page the tool would *create* rather than an edit to one that exists.
+    ///
+    /// The review screen reads differently for it (user, 2026-10-01): there is no original to diff against, so the
+    /// findings table and the diff have nothing to say, and the generated wikitext is shown outright rather than
+    /// behind an Expander — on a creation it is not a detail to drill into, it is the whole thing being reviewed.
+    /// </summary>
+    public bool IsCreation => Result.CanCreate;
+
+    /// <summary>
+    /// Whether "Create the page" does anything. Same rule as <see cref="CanAct"/> minus its comparison against the
+    /// original, since there is no original: text and a summary are all that is required.
+    ///
+    /// **A blank icon ID deliberately does not block it** (user, 2026-10-01). It is warned about instead, and the
+    /// ledger records such a page as still wanting a human, so it comes back rather than being lost.
+    /// </summary>
+    public bool CanCreatePage =>
+        !HasOutcome && !IsBusy && Result.Creation is not null &&
+        !string.IsNullOrWhiteSpace(_wikitext) &&
+        !string.IsNullOrWhiteSpace(_summary);
 
     /// <summary>Skipping is available for anything that reached the wiki but was not settled — including a page the
     /// tool would not touch — so the user can record "I looked, not now".</summary>
@@ -583,6 +631,27 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         }
 
         foreach (string deferred in result.Edit?.Deferred ?? []) yield return "Not done: " + deferred;
+
+        if (result.Creation is { } creation)
+        {
+            // Worded for what it costs rather than quoted from the compliance rule, because this is the one gap
+            // every creation starts with and the user has to decide about it every time: no capture can read an
+            // icon ID off the game, so it is typed or it is missing.
+            if (!creation.HasIconId)
+                yield return
+                    "No lucy_img_ID — the item box will render without artwork. The icon from the window is shown " +
+                    "above; fill the ID in below, or create the page now and add it later (the item will keep " +
+                    "coming back until you do).";
+
+            foreach (string gap in creation.Gaps)
+            {
+                if (gap.Contains("lucy_img_ID", StringComparison.Ordinal)) continue; // said better, just above
+                yield return gap;
+            }
+
+            foreach (string refusal in creation.FormattingRefusals)
+                yield return "The formatting pass declined to lay this page out: " + refusal;
+        }
 
         if (result.Edit is { NeedsReformatting: true })
             yield return

@@ -4,8 +4,8 @@ using System.Text.Json.Serialization;
 namespace EQLWikiAssistant.Wiki.Ledger;
 
 /// <summary>
-/// What a check concluded. **Only <see cref="Matched"/> and <see cref="Edited"/> mean "done"** — see
-/// <see cref="CheckedItemsLedger"/> for why the others must never let a capture skip the wiki.
+/// What a check concluded. **Only <see cref="Matched"/>, <see cref="Edited"/> and <see cref="Created"/> mean
+/// "done"** — see <see cref="CheckedItemsLedger"/> for why the others must never let a capture skip the wiki.
 /// </summary>
 public enum CheckOutcome
 {
@@ -14,6 +14,14 @@ public enum CheckOutcome
 
     /// <summary>The page was brought into line with the capture.</summary>
     Edited,
+
+    /// <summary>The item had no page and the tool created one. Settled, like <see cref="Edited"/>.
+    ///
+    /// **Recorded distinctly rather than folded into `Edited`** for the reader rather than for the logic: the two
+    /// mean the same thing to <see cref="CheckedItemsLedger.Consult"/>, but "this page exists because I made it"
+    /// is the row most worth being able to find again — it is the one whose `dropsfrom`, `soldby` and
+    /// `relatedquests` nobody has filled in yet, because no capture can supply them.</summary>
+    Created,
 
     /// <summary>Something needs a human — a suspected wrong icon, an unreadable field, a page defect the tool will
     /// not fix. **Never treated as done**, however old the row is.</summary>
@@ -104,15 +112,15 @@ public sealed class CheckedItemsLedger
     public const string ItemKind = "item";
 
     /// <summary>
-    /// Whether an outcome means the item is settled. **Only <see cref="CheckOutcome.Matched"/> and
-    /// <see cref="CheckOutcome.Edited"/> do** — the others left something undone, so they must never let a capture
-    /// skip the wiki however recent and unchanged the row is.
+    /// Whether an outcome means the item is settled. **Only <see cref="CheckOutcome.Matched"/>,
+    /// <see cref="CheckOutcome.Edited"/> and <see cref="CheckOutcome.Created"/> do** — the others left something
+    /// undone, so they must never let a capture skip the wiki however recent and unchanged the row is.
     ///
     /// Public because the ledger view asks the same question (see <see cref="LedgerFilter.NeedsAttention"/>), and a
     /// second copy of this rule is exactly the kind that drifts and quietly starts calling a flagged item done.
     /// </summary>
     public static bool MeansDone(CheckOutcome outcome) =>
-        outcome is CheckOutcome.Matched or CheckOutcome.Edited;
+        outcome is CheckOutcome.Matched or CheckOutcome.Edited or CheckOutcome.Created;
 
     private readonly Dictionary<string, LedgerEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly TimeProvider _time;
@@ -146,7 +154,7 @@ public sealed class CheckedItemsLedger
         if (entry is null) return LedgerVerdict.NotChecked;
         if (reCheckAnyway) return LedgerVerdict.DataChanged;
 
-        // Flagged, Skipped and NotOnWiki are outcomes that left something undone, so they never skip the wiki
+        // Flagged, Skipped and NotOnWiki left something undone, so they never skip the wiki
         // however recent they are. Checking this before the fingerprint matters: a flagged item whose data has not
         // changed is still flagged.
         if (!MeansDone(entry.Outcome)) return LedgerVerdict.Unresolved;

@@ -156,5 +156,10 @@ public class ItemPageLookupTests
             string title, string newWikitext, string summary, DateTimeOffset baseTimestamp,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("A lookup must never write.");
+
+        public Task<EditResult> CreatePageAsync(
+            string title, string wikitext, string summary,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("A lookup must never write.");
     }
 }
