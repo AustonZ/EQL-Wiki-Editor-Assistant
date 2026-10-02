@@ -238,6 +238,41 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
     is the opposite: replace-wholesale is simpler, and it makes the nine sampled pages whose legacy flags are
     single-spaced (`MAGIC ITEM LORE ITEM NO TRADE`, which no separator rule can split without a vocabulary) a
     non-issue — the grammar reports them as one unrecognized token, and the tool discards the line regardless.
+  - **A flags line is compared as the page wrote it, legacy tokens included** (bug found by the user, 2026-10-01,
+    on `Treasure Hunter`s Satchel`). The comparison used to run against the legacy-*filtered* list, which made "the
+    page has no *current* flags" indistinguishable from "the page has no flags line" — so a page whose line was
+    nothing but `MAGIC ITEM`, against an item EQL gives no flags at all, counted as a **match**, and the legacy flag
+    stayed there forever. The tool reported the legacy flag in the same breath, which is what made the bug visible.
+    - **The general form was live too and is worse**: legacy *beside* a correct current flag matched as well, so
+      `MAGIC ITEM  Lore Equipped` was never cleaned up on a page whose real flags were already right.
+    - **Comparing the raw line is the right rule because the editor replaces it wholesale.** What the tool would
+      write is exactly the captured set, so anything else on the line is a difference by definition.
+      `ReplaceFlagsLine` already removed the line for an empty flag set — the entire defect was that nothing ever
+      asked it to, which is why the test asserts the analyzer's verdict *and* the resulting wikitext.
+    - **Corpus effect, isolated against the previous commit** because this split is the one that looks like a
+      regression when the user has been editing the live wiki: identical 16-correct / 26-would-change at both, so
+      the drift from the recorded 8/33 is entirely their own editing. The change itself moves **Matches 317 → 314,
+      Differs 26 → 34, MissingOnWiki 29 → 23** — three findings become changes, and six become a more accurate
+      `Differs` than `MissingOnWiki` now that a line which exists is not reported as absent. `Prayers of Life`
+      gains `removed flags`.
+    - **Prose on the flags line now blocks the rewrite, which this fix had to settle rather than inherit.** The
+      line is regenerated *whole*, so rewriting one carrying `This is a meal!` deletes it — and the tool is
+      forbidden to move or discard that text, only to raise it. Verified rather than reasoned: at the previous
+      commit the flags finding on `Arctic Mussels` **was** a change, so the line would have been rewritten and the
+      prose gone with it. Widening when a line gets rewritten would have made that worse, so the guard came with
+      the fix. The flags question then waits for the human — once they move the text into `notes`, the next capture
+      sees an ordinary line and fixes it — and the prose finding says exactly that instead of leaving the user to
+      wonder why the flags were untouched.
+    - **`Wiki.Wikitext.FlagDialect` now owns the shape rule, shared with the formatter.** The two passes reach the
+      same question from opposite ends — what may be written over a flags line, versus whether one can be laid out —
+      and two copies would drift into one pass rewriting a line the other declared it could not read. It also
+      widens the analyzer's prose test from a six-entry marker list (`This is a meal`, `The Book is`, ...) to the
+      formatter's measured shape rule, which additionally catches the real `Required level of 55.` page. The
+      formatter's census over 1,183 pages is byte-identical after the move, so the refactor changed nothing there.
+    - **`Attunable` beside a legacy flag is left as it is, and that is measured rather than overlooked**: the
+      Attunable-beats-No-Trade branch returns before this comparison, so such a line keeps its legacy token. **0 of
+      1,183 cached pages carry a legacy flag and `Attunable` together**, which is why it is not worth the second
+      finding that fixing it would produce on every ordinary Attunable page.
   - **Attunable beats No Trade: trust the wiki, and alert** (user, 2026-09-24). An item natively `Attunable` shows
     `No Trade` in the window once equipped, so the capture genuinely cannot distinguish it from a natively
     `No Trade` item. When the page says `Attunable` and the capture says `No Trade`, **keep `Attunable`** and tell
@@ -642,8 +677,14 @@ recorded an incomplete convention as the convention.
   reported 300 differing fields and "76 of 85 pages are stale", when a levelled item's stats are *legitimately*
   higher than the wiki's level-0 figures (Bladestopper +7 shows AC 43 against a correct 25). Filtering to eligible
   items dropped that to 19.
-- **Baseline on the verified corpus, re-measured 2026-09-29**, eligible items only: 44 of 94 distinct captures are
-  eligible (the rest are levelled), 41 have pages, **8 pages already correct and 33 would change** — 285 fields
+- **Baseline on the verified corpus, re-measured 2026-10-01**, eligible items only: 45 of 94 distinct captures are
+  eligible (the rest are levelled), 42 have pages, **16 pages already correct and 26 would change** — 314 fields
+  match, 34 differ, 23 are missing on the wiki, 3 unverifiable, 2 need review, plus 7 compliance findings the tool
+  fixes. The move from 2026-09-29's 8/33 is **the user's own editing of the live wiki**, confirmed by running
+  `analyze` at the preceding commit and getting the same 16/26; the flags fix of that day moved only the field
+  verdicts (see the flags bullet above). The older figures below are kept because the *method* they illustrate is
+  the point.
+- **Superseded, 2026-09-29**: 44 of 94 eligible, 41 with pages, **8 already correct and 33 would change** — 285 fields
   match, 27 differ, 49 are missing on the wiki, 3 unverifiable, 3 need review (the two food-prose lines, which are
   human-by-design, plus one category), plus 13 compliance findings the tool fixes (11 era banners, 2 lore
   placeholders). The differences are dominated by legacy flag lines being dropped, plus real staleness and several

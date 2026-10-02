@@ -28,6 +28,131 @@ public class ItemPageAnalyzerTests
     private static ItemPageAnalysis Analyze(ParsedItem captured, string fixture) =>
         ItemPageAnalyzer.Analyze(captured, ItemPageDocument.Parse(WikiFixtures.Load(fixture))!, fixture);
 
+    // ---- a legacy flags line is removed even when the capture has no flags ----
+
+    /// <summary>
+    /// **The reported bug** (user, 2026-10-01, on `Treasure Hunter`s Satchel`): a page whose flags line is nothing
+    /// but legacy, against an item EQL gives no flags at all. The tool reported the legacy flag and then left it on
+    /// the page.
+    ///
+    /// The cause was that the comparison ran against the legacy-*filtered* flag list, so "the page has no current
+    /// flags" and "the capture has no flags" matched — and a match tells the editor to leave the line exactly as the
+    /// page wrote it. `Golden Efreeti Boots` carries the same `MAGIC ITEM<br>` shape, so the real page needed no new
+    /// fixture.
+    /// </summary>
+    [Fact]
+    public void ALegacyOnlyFlagsLineIsRemovedWhenTheCaptureHasNoFlags()
+    {
+        ItemPageAnalysis analysis = Analyze(
+            Captured(name: "Golden Efreeti Boots", flags: []), "Golden Efreeti Boots");
+
+        FieldFinding finding = analysis.Find(ItemPageAnalyzer.FlagsField)!;
+        Assert.True(finding.IsChange, "the legacy line has to come off, so this is a change rather than a match");
+        Assert.Equal("", finding.Captured);
+        Assert.Equal("MAGIC ITEM", finding.OnWiki);
+    }
+
+    /// <summary>
+    /// The general form of the same bug, which the reported case is one instance of: legacy tokens *beside* current
+    /// ones. The filtered comparison called this a match too, so `MAGIC ITEM` survived on a page whose real flags
+    /// were already right.
+    /// </summary>
+    [Fact]
+    public void ALegacyFlagBesideAMatchingCurrentOneIsStillRemoved()
+    {
+        const string page =
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = \n" +
+            "MAGIC ITEM  Lore Equipped<br>\nClass: ALL<br>\nRace: ALL<br>\n}}</onlyinclude>";
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Thing", flags: ["Lore Equipped"]), ItemPageDocument.Parse(page)!, "Thing");
+
+        FieldFinding finding = analysis.Find(ItemPageAnalyzer.FlagsField)!;
+        Assert.True(finding.IsChange);
+        Assert.Equal("Lore Equipped", finding.Captured);
+    }
+
+    /// <summary>
+    /// The negative control, and the reason this is not simply "always rewrite the line": a page whose flags line is
+    /// already exactly right must still be left alone, or every flag finding becomes noise and the diff rewrites a
+    /// correct line. Order is not part of what a flags line means, so the reversed order still matches.
+    /// </summary>
+    [Theory]
+    [InlineData("Lore Equipped, No Trade")]
+    [InlineData("No Trade, Lore Equipped")]
+    public void ACorrectFlagsLineIsStillLeftExactlyAsItIs(string wikiFlags)
+    {
+        string page =
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = \n" +
+            wikiFlags.Replace(", ", "  ") + "<br>\nClass: ALL<br>\nRace: ALL<br>\n}}</onlyinclude>";
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Thing", flags: ["Lore Equipped", "No Trade"]), ItemPageDocument.Parse(page)!, "Thing");
+
+        FieldFinding finding = analysis.Find(ItemPageAnalyzer.FlagsField)!;
+        Assert.Equal(FieldVerdict.Matches, finding.Verdict);
+        Assert.False(finding.IsChange);
+    }
+
+    /// <summary>A page with no flags line and a capture with no flags has nothing to do — this must not become a
+    /// phantom change now that the comparison reads the raw line.</summary>
+    [Fact]
+    public void NoFlagsOnEitherSideIsNotAChange()
+    {
+        const string page =
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = \nClass: ALL<br>\nRace: ALL<br>\n}}" +
+            "</onlyinclude>";
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Thing", flags: []), ItemPageDocument.Parse(page)!, "Thing");
+
+        Assert.False(analysis.Find(ItemPageAnalyzer.FlagsField)?.IsChange ?? false);
+    }
+
+    /// <summary>
+    /// **Prose on the flags line blocks the rewrite**, which this fix had to settle rather than inherit: the tool is
+    /// forbidden to move or discard `This is a meal!` (user, 2026-09-24), and the flags line is regenerated *whole*,
+    /// so rewriting it at all would silently delete the prose. Widening when the line gets rewritten — which is what
+    /// fixing the legacy bug did — would have made that worse, so it is guarded instead, and the prose finding is
+    /// what reaches the user.
+    ///
+    /// `Arctic Mussels` is the real fixture for this: its whole flags line is `This is a meal!`.
+    /// </summary>
+    [Fact]
+    public void ProseOnTheFlagsLineIsNeverRewrittenAway()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(WikiFixtures.Load("Arctic Mussels"))!;
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Arctic Mussels", flags: ["Lore Equipped"]), page, "Arctic Mussels");
+
+        Assert.False(analysis.Find(ItemPageAnalyzer.FlagsField)?.IsChange ?? false);
+        Assert.NotNull(analysis.Find(ItemPageAnalyzer.FlagProseField));
+
+        // And the edit really does leave it there, which is the half that matters on a public wiki.
+        Assert.Contains("This is a meal!", ItemPageEditor.BuildEdit(page, analysis).NewWikitext);
+    }
+
+    /// <summary>
+    /// End to end on the reported bug: the analyzer calls it a change *and* the editor takes the line off. Worth
+    /// asserting together, because `ReplaceFlagsLine` already handled an empty flag set correctly — the whole defect
+    /// was that nothing ever asked it to.
+    /// </summary>
+    [Fact]
+    public void TheEditRemovesALegacyOnlyFlagsLineForAnItemWithNoFlags()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(WikiFixtures.Load("Golden Efreeti Boots"))!;
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Golden Efreeti Boots", flags: []), page, "Golden Efreeti Boots");
+
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis);
+
+        Assert.DoesNotContain("MAGIC ITEM", edit.NewWikitext);
+        // Surgical: the line goes and nothing around it moves.
+        Assert.Contains("Slot: FEET<br>", edit.NewWikitext);
+        Assert.Contains("WIS: +9  INT: +9 SV POISON: +1<br>", edit.NewWikitext);
+        Assert.Contains("removed", edit.Summary);
+    }
+
     // ---- the merchant-value rules, which are where a wrong answer does real damage ----
 
     /// <summary>The rule the corpus proves: all 63 No Trade windows show no merchant-value row, while all 12

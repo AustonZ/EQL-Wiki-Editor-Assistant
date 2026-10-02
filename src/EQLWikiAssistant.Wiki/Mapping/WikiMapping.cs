@@ -134,8 +134,12 @@ public sealed class WikiMapping
     /// **5** (2026-09-30): the seven <see cref="BlockParameters"/> are always laid out as blocks, framed by blank
     /// lines. Same reasoning as 4 — a settled row skips the wiki, so the page would never be offered the new
     /// layout — and a wider reach: 721 of 744 cached pages carry at least one of those parameters.
+    /// **6** (2026-10-01): a flags line is compared as the page wrote it, so a legacy flag the tool previously
+    /// called a match is now removed. This is the bump that matters most of the three: the pages affected are
+    /// exactly the ones a capture would have settled as `Matched`, so without it they would keep their legacy
+    /// flags forever.
     /// </summary>
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     public int Version { get; init; } = CurrentVersion;
 

@@ -381,34 +381,14 @@ public static class ItemPagePrettifier
     }
 
     /// <summary>
-    /// Whether a flag token is one of EQL's current ones, judged by *shape* rather than against a list.
+    /// Whether a flag token is one of EQL's current ones.
     ///
-    /// **A list would be the wrong tool**, for the same reason the capture side refuses to keep one: the devs keep
-    /// adding flags, and a list would reject exactly the rare items most worth recording. The shape separates them
-    /// cleanly, which was measured across 1,183 real pages rather than assumed — every legacy flag there is
-    /// ALL-CAPS (<c>MAGIC ITEM</c>, <c>EXPENDABLE</c>, <c>NODROP</c>, <c>NO RENT</c>) and every current one is Title
-    /// Case (<c>Lore Equipped</c>, <c>No Trade</c>, <c>Attunable</c>, <c>Placeable</c>, <c>Quest</c>).
-    ///
-    /// It also catches the third category the census turned up, which is neither: prose the grammar read as a flag
-    /// because it sat on the flags line — <c>This is a meal!</c>, <c>The Book is closed.</c>,
-    /// <c>Required level of 55.</c>, and one page's mis-parsed <c>Class:CLR DRU SHM</c>. Those fail on a lowercase
-    /// word, a terminal full stop or a colon, and a formatter should not be moving any of them.
+    /// **The rule itself now lives in <see cref="FlagDialect"/>, shared with the data pass** — the two reach the
+    /// same question from opposite ends (what may be written over a flags line, versus whether one can be laid
+    /// out), and two copies would drift into one pass rewriting a line the other declared it could not read. Its
+    /// summary carries the measurement and the three dialects.
     /// </summary>
-    private static bool IsCurrentFlag(string flag)
-    {
-        string trimmed = flag.Trim();
-        if (trimmed.Length == 0 || trimmed.Contains(':')) return false;
-        if (trimmed[^1] is '.' or '!' or '?') return false;
-
-        foreach (string word in trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (!char.IsUpper(word[0])) return false;
-            // An ALL-CAPS word is the legacy dialect. A single letter cannot tell us either way, so it passes.
-            if (word.Length > 1 && !word[1..].Any(char.IsLower)) return false;
-        }
-
-        return true;
-    }
+    private static bool IsCurrentFlag(string flag) => FlagDialect.IsCurrent(flag);
 
     /// <summary>
     /// Proves the formatted page says what the original said, and lists every way it does not.

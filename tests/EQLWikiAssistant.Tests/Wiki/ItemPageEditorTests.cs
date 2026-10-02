@@ -213,13 +213,24 @@ public class ItemPageEditorTests
         Assert.True(edit.NeedsReformatting);
     }
 
-    /// <summary>The whole point of the minimal-edit rule: inserting a parameter must not disturb one byte of the
-    /// rest of the page, including the aligned padding it deliberately does not match.</summary>
+    /// <summary>
+    /// The whole point of the minimal-edit rule: inserting a parameter must not disturb one byte of the rest of the
+    /// page, including the aligned padding it deliberately does not match.
+    ///
+    /// **Moved off `Cloak of Scales` on 2026-10-01**, whose flags line is entirely legacy — the tool now removes
+    /// such a line (it used to leave it, which was the bug), so that page no longer isolates a single insertion.
+    /// `Earring of Bashing` writes its flags in the current dialect, so a capture agreeing with them leaves the
+    /// flags line alone and the parameter is the only change.
+    /// </summary>
     [Fact]
     public void InsertingAParameterLeavesEveryOtherLineByteForByte()
     {
         ProposedEdit edit = Edit(
-            Captured(name: "Cloak of Scales", merchantValue: "2 gold 4 silver"), "Cloak of Scales");
+            Captured(
+                name: "Earring of Bashing",
+                flags: ["Lore Equipped", "No Trade"],
+                merchantValue: "2 gold 4 silver"),
+            "Earring of Bashing");
 
         string[] before = edit.OriginalWikitext.Split('\n');
         string[] after = edit.NewWikitext.Split('\n');

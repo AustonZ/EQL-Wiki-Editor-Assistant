@@ -84,11 +84,6 @@ public static class ItemPageAnalyzer
     public const string RacesField = "Race";
     public const string SlotsField = "Slot";
 
-    /// <summary>Flag strings the game no longer shows, which are food/book descriptions rather than flags. Raised for
-    /// the user to move into `notes`; never moved automatically and never silently dropped.</summary>
-    private static readonly string[] DescriptiveFlagMarkers =
-        ["This is a meal", "This is a drink", "This is a snack", "This is a banquet", "The Book is", "The Note is"];
-
     /// <param name="wholePageWikitext">The complete page source, for the compliance checks that look outside the
     /// template call (the <c>&lt;onlyinclude&gt;</c> wrapper and the era banner both sit around it). Defaults to the
     /// document's own text, which is the same thing unless a caller has a reason to differ.</param>
@@ -317,15 +312,8 @@ public static class ItemPageAnalyzer
     private static void AddFlagFindings(List<FieldFinding> findings, ParsedItem captured, StatsBlock? block)
     {
         IReadOnlyList<string> onWiki = block is null ? [] : ReadFlagLine(block);
-        string[] legacy = [.. onWiki.Where(IsLegacyFlag)];
-        string[] prose = [.. onWiki.Where(f => DescriptiveFlagMarkers.Any(m => f.StartsWith(m, StringComparison.OrdinalIgnoreCase)))];
-
-        if (prose.Length > 0)
-            findings.Add(new FieldFinding(
-                FlagProseField, FieldVerdict.NeedsReview, null, string.Join(", ", prose),
-                "EQL no longer shows this text, but it may still mean something the UI stopped exposing — in " +
-                "original EverQuest 'This is a hearty meal!' meant the food lasted longer. Move it into notes by " +
-                "hand if you want to keep it; this tool will not move or discard it for you."));
+        string[] legacy = [.. onWiki.Where(FlagDialect.IsLegacy)];
+        string[] prose = [.. onWiki.Where(FlagDialect.IsProse)];
 
         if (legacy.Length > 0)
             findings.Add(new FieldFinding(
@@ -333,6 +321,24 @@ public static class ItemPageAnalyzer
                 "These are pre-EQL flags with no current equivalent, so they are dropped rather than translated. " +
                 "'LORE ITEM' (carry one) is not the same property as 'Lore Equipped' (equip one), and 'MAGIC ITEM' " +
                 "has no counterpart at all."));
+
+        // **Prose on the flags line stops the rewrite, and that is the whole reason this is checked before
+        // comparing.** The line is regenerated *whole*, so rewriting one that carries `This is a meal!` would
+        // delete it — and the tool is forbidden to move or discard that text (user, 2026-09-24), only to raise it.
+        // So the flags question waits for the human: once they have moved the text into notes, the next capture
+        // sees an ordinary flags line and fixes it. Reported here rather than silently skipped, because "the tool
+        // left the flags alone and did not say why" is the failure this project most avoids.
+        if (prose.Length > 0)
+        {
+            findings.Add(new FieldFinding(
+                FlagProseField, FieldVerdict.NeedsReview, null, string.Join(", ", prose),
+                "The flags line carries text that is not a flag. EQL no longer shows it, but it may still mean " +
+                "something the UI stopped exposing — in original EverQuest 'This is a hearty meal!' meant the food " +
+                "lasted longer. Move it into notes by hand if you want to keep it; this tool will not move or " +
+                "discard it for you. Until it is gone the flags line is left exactly as it is, because the line is " +
+                "rewritten whole and that would delete this text."));
+            return;
+        }
 
         // The captured set is authoritative and open-ended: the devs keep adding flags (No Pet, Heirloom, Free
         // Storage), so an unfamiliar one is ordinary data, never a warning.
@@ -352,20 +358,22 @@ public static class ItemPageAnalyzer
             return;
         }
 
-        string[] current = [.. onWiki.Where(f => !IsLegacyFlag(f) && !prose.Contains(f))];
-        if (SameFlags(current, wanted))
-            findings.Add(new FieldFinding(FlagsField, FieldVerdict.Matches, string.Join(", ", wanted), string.Join(", ", current)));
-        else if (current.Length == 0 && wanted.Count > 0)
+        // **Compared against the line as the page actually wrote it, legacy tokens included** (bug found by the
+        // user, 2026-10-01, on `Treasure Hunter`s Satchel`). This used to compare against the legacy-*filtered*
+        // list, which made "the page has no *current* flags" indistinguishable from "the page has no flags line" —
+        // so a page whose line was nothing but `MAGIC ITEM`, against an item EQL gives no flags, counted as a match
+        // and the legacy flag stayed on the page forever. The general form is worse and was also live: legacy
+        // *beside* a correct current flag matched too, so `MAGIC ITEM  Lore Equipped` was never cleaned up.
+        //
+        // Comparing the raw line is right because the editor replaces it wholesale — what the tool would write is
+        // exactly `wanted`, so anything else on the line is a difference by definition.
+        if (SameFlags(onWiki, wanted))
+            findings.Add(new FieldFinding(FlagsField, FieldVerdict.Matches, string.Join(", ", wanted), string.Join(", ", onWiki)));
+        else if (onWiki.Count == 0)
             findings.Add(new FieldFinding(FlagsField, FieldVerdict.MissingOnWiki, string.Join(", ", wanted), null));
-        else if (wanted.Count > 0 || current.Length > 0)
-            findings.Add(new FieldFinding(FlagsField, FieldVerdict.Differs, string.Join(", ", wanted), string.Join(", ", current)));
+        else
+            findings.Add(new FieldFinding(FlagsField, FieldVerdict.Differs, string.Join(", ", wanted), string.Join(", ", onWiki)));
     }
-
-    /// <summary>A pre-EQL flag: the imported dialect is ALL CAPS, the current one is Title Case. Crude on purpose —
-    /// the line is discarded either way, so this only has to decide what to *tell* the user, and it never has to
-    /// split a legacy line into individual flags (which single-spaced pages make impossible anyway).</summary>
-    private static bool IsLegacyFlag(string flag) =>
-        flag.Any(char.IsLetter) && flag.Where(char.IsLetter).All(char.IsUpper);
 
     /// <summary>The flags line is the first line of the block carrying unlabelled tokens and no fields.</summary>
     /// <summary>
