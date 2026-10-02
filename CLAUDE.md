@@ -1118,10 +1118,41 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
 - `tools/WikiSpike -- prettify --cached <dir>` runs it over the real corpus and censuses what it did — the same
   methodology as `grammar` and `analyze`, and how both of the above bugs were found. `prettyshow <in> <out>` writes
   one page's result so it can be diffed by eye, because a census says nothing about whether the layout is any good.
-  Baseline (re-measured 2026-09-30): **744 item pages, 0 refusals, 478 statsblocks left alone**, median size change
-  **+8 bytes** (it was +5 before the block framing below added two blank lines per block parameter). The signing
-  change moved no bucket at all, adding one byte to 19 values on 9 pages. On both, the number that matters is
-  **0 refusals** — the content check accepted every page the formatter changed.
+  Baseline (re-measured 2026-10-02): **744 item pages, 0 refusals, 0 not settled on a second pass, 478 statsblocks
+  left alone**, median size change **+17 bytes** (it was +8 before the fixed alignment column below, and +5 before
+  the block framing added two blank lines per block parameter). The signing change moved no bucket at all, adding one
+  byte to 19 values on 9 pages. Across all of them the number that matters is **0 refusals** — the content check
+  accepted every page the formatter changed.
+  - **The census now formats everything twice and reports what did not settle**, because "formatting twice changes
+    nothing" is the property this pass most has to have and a single-pass census is blind to it. It was covered by
+    fixture tests and by 41 pages checked by hand; it is now **0 of 1,183** every run. Worth having before the
+    alignment change below, which is exactly the shape of rule that could have grown padding on each pass.
+
+- **The `=` column is the blueprint's width, not the longest name on the page** (user, 2026-10-02, choosing this over
+  the alternative after seeing the measurement). `WikiMapping.ParameterAlignmentWidth` owns it — the longest name
+  `ParameterOrder` declares, which is `merchant_value` at 14 — and a page carrying an even longer *unrecognized*
+  parameter widens past it, since that is somebody's content and should still line up. So the column is a floor
+  derived from the template, not a function of one page's parameter list.
+  - **The old rule made the column unstable under the data pass, which is the real defect and is much bigger than
+    the symptom that exposed it.** Aligning to the longest name *present* means adding or removing any parameter
+    reflows every line in the call. Measured on the 744 cached item pages: only **64 (9%) carry `merchant_value`** —
+    and adding a merchant value is the single most common thing this tool does to a legacy page, because legacy
+    EverQuest gave a player no way to learn a value while EQL states it outright. So the old rule dragged a
+    whole-column diff behind **680 of 744 pages** the first time the tool touched them.
+  - **The user found it from the creation end**: a generated page declares every blueprint parameter, so deleting the
+    blank scaffolding — the natural thing to do with nine empty lines — left the column one width too wide and the
+    formatter offered a reflow after *every* creation. Both symptoms are the same instability; fixing the width fixes
+    both, and the alternative on the table (stop generating the scaffolding) would have fixed only the creation half.
+  - **The blueprint is no authority here, which is worth recording because it is normally the tiebreaker.** Its own
+    `{{Itempage}}` call is not aligned at all — `|itemname = `, `|lucy_img_ID = `, `|statsblock  = ` in consecutive
+    lines — so the aligned column is the tool's own convention and choosing its width was a real decision rather than
+    a reading of upstream.
+  - Corpus cost: the one-time reflow above, median **+17 bytes** against +8, largest growth 38 and largest shrink 8,
+    with **0 refusals** — so no page's content moved. `AddingTheLongestParameterDoesNotMoveTheOtherLines` is the
+    negative control and fails against the old rule.
+  - **`WikiMapping.CurrentVersion` goes to 7 for it**, on the same reasoning as 4 and 5 and with the widest reach of
+    any bump so far: a settled ledger row makes the next capture skip the wiki, so those 680 pages would never be
+    offered the reflow. The cost is that every settled row re-checks once and settles again.
 
 **Creating a page for a new item (`Wiki.Analysis.ItemPageCreator`, `ItemCheckPipeline.CreateAsync`, 2026-10-01).**
 The item the wiki has never heard of — which is not an edge case but the whole category of "new in EQL". Measured on
@@ -1145,6 +1176,22 @@ them, and before this the tool's only offer on one was **Skip**.
   - **`itemname` is the one field the skeleton fills**, because creating the page at that title is what makes it
     true. Left blank it would be reported and never written: a name/title mismatch is *reported rather than fixed*
     on an existing page, and that rule is right there and wrong here.
+- **A generated page carries the lore, and the join that gives it the lore has to happen before the wiki lookup
+  branches** (bug found by the user, 2026-10-02: new items were created with an empty `notes`). Lore arrives on a
+  *second* capture of the Lore tab, so `ItemCheckPipeline` has to attach it to the Description item — and it used to
+  do that inline, in the argument list of the analyzer call. The creation branch returns before that line is ever
+  reached, so it was handed the bare parsed item and generated a page with no lore in it.
+  - **Creation is the worst place for this to be wrong.** On an existing page, lore the tool does not write is the
+    deliberate rule — added when absent, never overwritten when present — so a missing lore line looks exactly like
+    the tool correctly leaving the wiki's own prose alone. On a brand-new page there is nothing to leave alone, so
+    the rule's output and the bug's output are indistinguishable by inspection.
+  - **One rule, one home — the fourth time this exact shape has cost something here**, after the ledger fingerprint,
+    the login gate and the flag dialect. `item` now gains its lore once, at the top of `AnalyzeAgainstWikiAsync`,
+    before anything branches on what the wiki said.
+  - **No existing test could have caught it**, because every lore test goes through the edit path — the one path where
+    the attachment was done. `AGeneratedPageCarriesTheLoreFromTheLoreTabCapture` drives a Lore capture and then a
+    Description capture against an empty wiki, and `AGeneratedPageInventsNoLoreWhenNoneWasCaptured` is its control so
+    that writing a wrapper unconditionally could not pass.
 - **The formatting pass runs before the proposal is shown, so one commit lands a finished page** (user, 2026-10-01).
   A page generated in blueprint order from an empty skeleton is always something the formatter can lay out. A
   formatting prompt still follows the save — the box is editable and a hand-edit can mangle the layout — but on the
@@ -1167,6 +1214,18 @@ them, and before this the tool's only offer on one was **Skip**.
   still carrying a gap is recorded `Flagged`, not `Created`, so the item keeps coming back until somebody fills it
   in. Without that, warn-don't-block would lose the icon permanently, because a settled row never reaches the wiki
   again. `ItemPageCreator.GapsIn` is shared by the proposal and the commit so both ask the question the same way.
+  - **Every reader of that gap must ask the *saved text*, and the save confirmation did not** (bug found by the user,
+    2026-10-02: it warned that no icon ID was set on a page where one had just been typed in). `ProposedPage.HasIconId`
+    is false on every page this tool generates — no capture can supply an ID — so a caller consulting the proposal is
+    asking a question whose answer is fixed, and warns unconditionally. `CreateAsync` had this right already, which is
+    why the ledger outcome was correct while the dialog above it contradicted the ledger.
+    - **Same shape as the `CanAct` bug of 2026-09-29, and the same rule**: what is on screen is what gets saved, so
+      what is on screen is what gets judged. `ItemPageCreator.HasIconId(wikitext)` existed for exactly this and was
+      simply not called.
+    - **Not pinned by a test, and that is a real gap rather than an oversight to gloss**: the defect was in
+      `MainWindow.xaml.cs`, and nothing in the tests project can reference the WPF app. `AnIconIdTypedIntoTheGeneratedTextIsSeen`
+      pins the function's contract — a typed ID is seen, and the gap list empties — which is the testable half; the
+      call site itself is covered only by the rule being written down here.
 - **`CheckOutcome.Created` is its own outcome, and `MeansDone` includes it.** Distinct from `Edited` for the reader
   rather than for the logic: "this page exists because I made it" is the row most worth finding again, since its
   `dropsfrom`, `soldby` and `relatedquests` are the ones nobody has filled in.
@@ -1364,6 +1423,25 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
   `Foreground` is inherited, so the one on the window carries into every TextBlock that does not ask for its own. An
   implicit style would *assign* it instead, which beats the value a `DataGridRow` sets — and both grids colour a
   whole row by what it means. Every cell would have gone plain grey, silently.
+- **Selected text and a selected row are different problems and need different brushes** (bug found by the user,
+  2026-10-02: selected text unreadable in the wikitext boxes). A row's highlight is painted *opaque behind* its text;
+  a text selection is painted *translucent over* it. The dark navy `SelectionBrush` that suits the first is wrong for
+  the second, so `TextSelectionBrush` is its own key.
+  - **`SelectionOpacity` must stay below 1, and the measurement is what makes that a rule rather than a taste.** At 1
+    the highlight covers the glyphs and nothing redraws them, so selected text does not become hard to read — it
+    **disappears**. Rendered and measured: unselected ink is #E4E4E4 at contrast 10.8 against the field; selecting it
+    left the band holding the highlight colour and nothing else.
+  - **`SelectionTextBrush` is not the fix, which was tested rather than assumed.** It reads as white here, and setting
+    it to pure red put no red pixel anywhere in the render — WPF is not redrawing selected text in this configuration
+    at all. So translucency is the only lever, and the colour and the opacity are one decision.
+  - **Swept as a pair, because they trade against each other**: a heavier highlight is more obvious but tints the
+    glyphs it covers, and both the text and the highlight are blends of the same brush. 30 combinations across six
+    hues; **#4FA3E3 at 0.35** is the most visible highlight (RGB distance 75 from the unselected field) that still
+    clears the 4.5 contrast floor the rest of this palette is held to, measuring ink #B0CDE3 on highlight #39566E at
+    **4.65**. The same hue at 0.45 reads 3.59, and the old dark navy clears the floor only by being nearly invisible
+    (4.78 at RGB distance 33).
+  - **The probe was a throwaway, as the earlier render harnesses were** — but the thing it proves is in the file: an
+    opaque text selection is a blank selection, and that is not visible by reading XAML.
 - **Semantic colours were re-chosen for this background, not darkened.** `SeaGreen` on #1E1E1E measures a contrast
   ratio of 3.6, under the 4.5 body text needs, and `Firebrick` and `SaddleBrown` are no better — the three that
   carried the most meaning. The replacements are computed, not eyeballed: done 6.9, attention 5.1, warning 6.9,

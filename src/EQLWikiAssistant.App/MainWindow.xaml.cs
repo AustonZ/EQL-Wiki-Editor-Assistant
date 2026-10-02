@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 using EQLWikiAssistant.Capture;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
+using EQLWikiAssistant.Wiki.Analysis;
 using EQLWikiAssistant.Wiki.Ledger;
 using EQLWikiAssistant.Wiki.MediaWiki;
 
@@ -267,7 +268,12 @@ public partial class MainWindow : Window
         if (ResultsList.SelectedItem is not ResultViewModel view || _services is null) return;
         if (view.Result.Creation is not { } creation) return;
 
-        string warning = view.Result.Creation.HasIconId
+        // **Asked of the text on screen, not of the proposal.** The box is editable and typing the icon ID is the
+        // first thing the user does on a creation, so the proposal's answer is "missing" on every page the tool
+        // generates and would warn about a gap the user had just filled in (bug found by the user, 2026-10-02).
+        // `ItemPageCreator.HasIconId` is the same question `CreateAsync` asks of the saved text to decide the
+        // ledger outcome, which is what keeps the dialog and the ledger row agreeing about the same page.
+        string warning = ItemPageCreator.HasIconId(view.Wikitext, _services.Mapping)
             ? ""
             : "\n\nIt has no lucy_img_ID, so the item box will show no artwork until one is added.";
 

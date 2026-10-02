@@ -126,6 +126,30 @@ public class ItemPageCreatorTests
     }
 
     /// <summary>
+    /// **`HasIconId` must be asked of the text about to be saved, not of the proposal** (bug found by the user,
+    /// 2026-10-02: the save confirmation warned that no icon ID was set on a page where one had just been typed in).
+    ///
+    /// `ProposedPage.HasIconId` is false on every page this class generates, because no capture can read an icon ID
+    /// off the game — so a caller that consults the proposal is asking a question whose answer is fixed, and warns
+    /// unconditionally. The same rule as the review screen's one non-negotiable: what is on screen is what gets
+    /// saved, so what is on screen is what gets judged. `CreateAsync` already reads the saved text to pick the
+    /// ledger outcome; this is the function that lets the dialog agree with it instead of contradicting it.
+    /// </summary>
+    [Fact]
+    public void AnIconIdTypedIntoTheGeneratedTextIsSeen()
+    {
+        ProposedPage page = ItemPageCreator.Build(ARealisticItem(), "Shiverback-Hide Boots")!;
+
+        Assert.False(ItemPageCreator.HasIconId(page.Wikitext));
+
+        string typed = page.Wikitext.Replace("|lucy_img_ID    =", "|lucy_img_ID    = 5797");
+
+        Assert.NotEqual(page.Wikitext, typed);   // the replace actually matched, so the assertion below means something
+        Assert.True(ItemPageCreator.HasIconId(typed));
+        Assert.Empty(ItemPageCreator.GapsIn(typed));
+    }
+
+    /// <summary>
     /// **The negative control for the gap list, and a bug this caught rather than a hypothetical** (found by
     /// running the creator over a real capture of `Armor Ornamentation Token`, 2026-10-01). The data pass's own
     /// deferred list describes the *skeleton*, where every required parameter is missing by construction — so

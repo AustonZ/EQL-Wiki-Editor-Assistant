@@ -138,8 +138,12 @@ public sealed class WikiMapping
     /// called a match is now removed. This is the bump that matters most of the three: the pages affected are
     /// exactly the ones a capture would have settled as `Matched`, so without it they would keep their legacy
     /// flags forever.
+    /// **7** (2026-10-02): the <c>=</c> column is the blueprint's width rather than the longest name on the page —
+    /// see <see cref="ParameterAlignmentWidth"/>. Same settled-row reasoning as 4 and 5, and the widest reach of
+    /// any bump so far: **680 of 744 cached pages** are laid out at a narrower column than the new rule wants, and
+    /// a settled row would never be offered the reflow.
     /// </summary>
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -243,6 +247,24 @@ public sealed class WikiMapping
     /// somebody's content and gets preserved, not sorted into a place nobody chose.
     /// </summary>
     public IReadOnlyList<string> ParameterOrder { get; init; } = [];
+
+    /// <summary>
+    /// The column the formatting pass aligns every <c>=</c> to: the longest name the blueprint declares, whether or
+    /// not a given page carries that parameter.
+    ///
+    /// **It is a property of the template, not of one page's parameter list** (user, 2026-10-02), and that is the
+    /// whole point. Aligning to the longest name actually *present* made the column a function of which parameters a
+    /// page happened to have, so adding or removing any one of them reflowed every line in the call. Measured on the
+    /// 744 cached item pages: only **64 (9%) carry `merchant_value`**, the longest blueprint name — and adding a
+    /// merchant value is the single most common thing the data pass does to a legacy page, because legacy EverQuest
+    /// gave players no way to learn a value while EQL states it outright. So the old rule dragged a whole-column
+    /// reflow behind **680 of 744 pages** the first time the tool touched them.
+    /// The user found it from the other end (creation always offering a reformat afterwards): a generated page
+    /// declares every blueprint parameter, so deleting the blank scaffolding left the column one width too wide.
+    /// Both symptoms are the same instability, and fixing the width fixes both.
+    /// </summary>
+    public int ParameterAlignmentWidth =>
+        ParameterOrder.Count == 0 ? 0 : ParameterOrder.Max(p => p.Length);
 
     /// <summary>
     /// Parameters whose value is always laid out as a block: on its own line, with one blank line between the

@@ -838,6 +838,7 @@ async Task<int> PrettifyCorpusAsync()
     IReadOnlyList<(string Title, string Wikitext)> pages = await LoadPagesAsync();
 
     int changed = 0, unchanged = 0, refused = 0, keptOrder = 0, notApplicable = 0;
+    var notSettled = new List<string>();
     var refusalReasons = new List<(string Page, string Reason)>();
     var orderReasons = new List<(string Page, string Reason)>();
     var unknownLabels = new List<(string Page, string Note)>();
@@ -857,6 +858,13 @@ async Task<int> PrettifyCorpusAsync()
         }
 
         if (result.Changed) changed++; else unchanged++;
+
+        // **Formatting twice must change nothing**, over the whole corpus rather than only the fixtures. A rule that
+        // kept adjusting a page would offer a formatting edit forever, so this is the property the pass most has to
+        // have — and it is the one a single-pass census is blind to. Cheap here, and it is the check that would
+        // catch a padding rule which measured an already-padded name.
+        PrettifyResult second = ItemPagePrettifier.Format(result.Formatted);
+        if (!second.IsSafe || second.Formatted != result.Formatted) notSettled.Add(title);
 
         foreach (string note in result.Notes)
         {
@@ -880,6 +888,8 @@ async Task<int> PrettifyCorpusAsync()
     Console.WriteLine($"  reformatted             : {changed}");
     Console.WriteLine($"  already correct         : {unchanged}");
     Console.WriteLine($"  REFUSED (content moved) : {refused}");
+    Console.WriteLine($"  NOT SETTLED (2nd pass)  : {notSettled.Count}");
+    foreach (string title in notSettled.Take(10)) Console.WriteLine($"      {title}");
     Console.WriteLine($"  statsblock left alone   : {keptOrder}");
 
     if (refusalReasons.Count > 0)

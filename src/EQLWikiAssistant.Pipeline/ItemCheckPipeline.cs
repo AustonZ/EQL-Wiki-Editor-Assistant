@@ -287,6 +287,17 @@ public sealed class ItemCheckPipeline
         List<string> warnings,
         CancellationToken cancellationToken)
     {
+        // **The lore joins the item here, once, before anything branches on what the wiki said.** It came from a
+        // separate capture of the Lore tab, so the parsed Description item does not carry it, and *every* path
+        // below that reasons about item data needs the complete item — the analyzer and the page generator alike.
+        //
+        // Attaching it at the analyzer's own call site instead is exactly what hid the bug the user found
+        // (2026-10-02): the creation branch a few lines down was handed the bare `item`, so a brand-new page was
+        // generated with nothing in `notes` even though the lore had been captured — and creation is the case where
+        // that costs most, because there is no existing page whose lore the tool was deliberately leaving alone.
+        // One rule, one home: the same lesson as the ledger fingerprint and the login gate.
+        if (lore is not null) item = item with { Lore = lore };
+
         ItemPageLookupResult lookup = await ItemPageLookup
             .FindAsync(_wiki, item.Name, cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -347,10 +358,8 @@ public sealed class ItemCheckPipeline
             };
         }
 
-        // The lore came from a separate capture of the Lore tab, so it is attached here rather than being on the
-        // Description capture the parser produced. The analyzer then sees one complete item.
-        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
-            lore is null ? item : item with { Lore = lore }, page, wikiPage.Title, _mapping);
+        // `item` already carries the lore — see the top of this method for why that happens once, up there.
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(item, page, wikiPage.Title, _mapping);
         ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis, _mapping);
 
         (IconComparison? icon, string? iconNote, CapturedImage? wikiIcon) =

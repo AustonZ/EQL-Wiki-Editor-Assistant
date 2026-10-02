@@ -254,15 +254,64 @@ public class ItemPagePrettifierTests
         Assert.Contains("Haste: +41%<br>", result.Formatted);
     }
 
+    /// <summary>
+    /// Parameters are written in the blueprint's order, and the <c>=</c> column is the blueprint's own width —
+    /// 14, for <c>merchant_value</c> — even though no parameter on this page is anywhere near that long.
+    /// </summary>
     [Fact]
-    public void ParametersAreOrderedAndAligned()
+    public void ParametersAreOrderedAndAlignedToTheBlueprintsColumn()
     {
         PrettifyResult result = ItemPagePrettifier.Format(
             "<onlyinclude>{{Itempage\n|notes = Something\n|itemname = Thing\n|lucy_img_ID = 1\n" +
             "|statsblock = \nAC: 10<br>\n}}</onlyinclude>");
 
-        Assert.Contains("|itemname    = Thing\n|lucy_img_ID = 1\n|statsblock  = \nAC: 10<br>\n", result.Formatted);
-        Assert.Contains("|notes       = Something\n", result.Formatted);
+        Assert.Contains(
+            "|itemname       = Thing\n|lucy_img_ID    = 1\n|statsblock     = \nAC: 10<br>\n", result.Formatted);
+        Assert.Contains("|notes          = Something\n", result.Formatted);
+    }
+
+    /// <summary>
+    /// **The property the old rule could not have**, and the one the user's bug was really about (2026-10-02):
+    /// adding or removing a parameter must not move everything else.
+    ///
+    /// The column used to be the longest name *present*, so a page's whole template call reflowed the moment a
+    /// parameter arrived or left — and `merchant_value` is both the longest blueprint name and the thing the data
+    /// pass most often adds, so 680 of 744 real pages were one edit away from a full-column diff. This is the
+    /// negative control for the fix: under the old rule the two formats here differ on every line, and the
+    /// assertion is that now they differ on exactly the line that changed.
+    /// </summary>
+    [Fact]
+    public void AddingTheLongestParameterDoesNotMoveTheOtherLines()
+    {
+        const string without = "<onlyinclude>{{Itempage\n|itemname = Thing\n|lucy_img_ID = 1\n}}</onlyinclude>";
+        const string with =
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|lucy_img_ID = 1\n|merchant_value = 8c\n}}</onlyinclude>";
+
+        string[] before = ItemPagePrettifier.Format(without).Formatted.Split('\n');
+        string[] after = ItemPagePrettifier.Format(with).Formatted.Split('\n');
+
+        Assert.Contains("|itemname       = Thing", before);
+        Assert.Contains("|itemname       = Thing", after);
+        Assert.Contains("|lucy_img_ID    = 1", before);
+        Assert.Contains("|lucy_img_ID    = 1", after);
+        Assert.Contains("|merchant_value = 8c", after);
+
+        // Every line of the smaller page survives verbatim in the larger one: the only difference is the addition.
+        Assert.Empty(before.Except(after));
+    }
+
+    /// <summary>
+    /// A parameter whose name is longer than anything the blueprint declares still lines up — it is somebody's own
+    /// content, and the fixed column is a floor rather than a cap.
+    /// </summary>
+    [Fact]
+    public void AnUnrecognizedParameterLongerThanTheBlueprintWidensTheColumn()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|an_extremely_long_parameter = x\n}}</onlyinclude>");
+
+        Assert.Contains("|itemname                    = Thing\n", result.Formatted);
+        Assert.Contains("|an_extremely_long_parameter = x\n", result.Formatted);
     }
 
     /// <summary>Everything outside the template call survives byte for byte — this pass never looks at it, and the
@@ -392,7 +441,7 @@ public class ItemPagePrettifierTests
             "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = \nAC: 10<br>\n" +
             "|notes = {{Item Lore|Words.}}\n}}</onlyinclude>");
 
-        Assert.Contains("|notes      = {{Item Lore|Words.}}\n", result.Formatted);
+        Assert.Contains("|notes          = {{Item Lore|Words.}}\n", result.Formatted);
     }
 
     // --- what it refuses to rearrange --------------------------------------------------------------------

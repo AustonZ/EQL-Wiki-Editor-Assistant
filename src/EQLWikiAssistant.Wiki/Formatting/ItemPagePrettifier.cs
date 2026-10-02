@@ -128,7 +128,12 @@ public static class ItemPagePrettifier
             notes.Add($"{positional.Count} positional parameter(s) were left where they were — only named " +
                       "parameters have a documented order.");
 
-        int width = ordered.Count == 0 ? 0 : ordered.Max(p => p.Name!.Length);
+        // The blueprint's column, widened only by a name even longer than any the blueprint declares — which is an
+        // unrecognized parameter, somebody's own content, and it should still line up. See
+        // `WikiMapping.ParameterAlignmentWidth` for why this is not the longest name on *this* page.
+        int width = Math.Max(
+            mapping.ParameterAlignmentWidth,
+            ordered.Count == 0 ? 0 : ordered.Max(p => p.Name!.Length));
 
         var builder = new StringBuilder();
         builder.Append("{{").Append(template.Name).Append('\n');

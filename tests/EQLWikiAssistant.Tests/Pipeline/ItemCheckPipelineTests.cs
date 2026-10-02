@@ -983,6 +983,51 @@ public class ItemCheckPipelineTests
         Assert.Contains("[[Category:Ear]]", result.Creation.Wikitext);
     }
 
+    /// <summary>
+    /// **A generated page carries the lore from the Lore-tab capture** (bug found by the user, 2026-10-02).
+    ///
+    /// The lore arrives on a *separate* capture, so it has to be joined onto the Description item before anything
+    /// reasons about it — and that join used to happen inline at the analyzer's own call site, which the creation
+    /// branch never reaches. So a brand-new page was generated with an empty `notes` even when the lore had been
+    /// captured seconds earlier, and creation is the worst place for it: on an existing page a missing lore line is
+    /// the tool deliberately leaving the wiki's own prose alone, while here there is nothing to leave alone.
+    ///
+    /// This is the test that could not exist before, because every other lore test goes through the edit path — the
+    /// one path where the attachment was done.
+    /// </summary>
+    [Fact]
+    public async Task AGeneratedPageCarriesTheLoreFromTheLoreTabCapture()
+    {
+        var wiki = new FakeWiki();   // deliberately empty: the item has no page, so creation is what is offered
+        var locator = new FakeLocator(Window(LoreTabLines, hasLoreTab: true, tab: ItemWindowTab.Lore));
+        var pipeline = new ItemCheckPipeline(wiki, locator, new CheckedItemsLedger());
+
+        ItemCheckResult lore = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+        Assert.Equal(ItemCheckStatus.LoreRecorded, lore.Status);
+
+        locator.Window = Window(EarringLines, hasLoreTab: true);
+        ItemCheckResult description = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        Assert.Equal(ItemCheckStatus.NotOnWiki, description.Status);
+        Assert.Equal("A trophy of the first bashing.", description.Lore);
+        Assert.Contains(
+            "{{Item Lore|A trophy of the first bashing.}}", description.Creation!.Wikitext);
+    }
+
+    /// <summary>
+    /// The control for the test above: with no Lore capture, a generated page has no lore wrapper invented for it.
+    /// Without this, a bug that wrote a lore template unconditionally would pass.
+    /// </summary>
+    [Fact]
+    public async Task AGeneratedPageInventsNoLoreWhenNoneWasCaptured()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines));
+
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        Assert.DoesNotContain("{{Item Lore", result.Creation!.Wikitext);
+    }
+
     /// <summary>Creating writes exactly one page, through the create path rather than the edit path, and settles the
     /// item — so the next capture of it costs no wiki traffic at all.</summary>
     [Fact]
