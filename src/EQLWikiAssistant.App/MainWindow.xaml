@@ -146,14 +146,21 @@
                              outcomes is cheap to settle if the user can just look, and expensive if they cannot. It
                              also makes a wrong "match" visible, which no threshold can. On a creation only the
                              captured side shows: see ShowIconComparison. -->
-                        <StackPanel Margin="20,2,0,0" MaxWidth="320"
+                        <!-- **No MaxWidth on this panel**: the two tiles are 380px wide together at 4x (a 45x52
+                             captured strip and a 40x40 wiki file, plus borders and the gap), so any bound below
+                             that silently clips the wiki icon rather than wrapping it — which a 320 here did, at
+                             about two thirds of the second tile (user, 2026-10-01). The icons set the column's
+                             width; only the prose below is bounded, and at the same 380 so the column reads
+                             straight. -->
+                        <StackPanel Margin="20,2,0,0"
                                     Visibility="{Binding HasIcons, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="Icon" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
                             <TextBlock Text="{Binding IconVerdict}" Foreground="{Binding IconVerdictBrush}"
-                                       TextWrapping="Wrap" Margin="0,0,0,6"
+                                       TextWrapping="Wrap" Margin="0,0,0,6" MaxWidth="380" HorizontalAlignment="Left"
                                        Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}" />
                             <TextBlock Text="Read the item&#39;s lucy_img_ID off this artwork." TextWrapping="Wrap"
                                        Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
+                                       MaxWidth="380" HorizontalAlignment="Left"
                                        Visibility="{Binding IsCreation, Converter={StaticResource BoolToVis}}" />
                             <StackPanel Orientation="Horizontal">
                                 <StackPanel Margin="0,0,20,0">

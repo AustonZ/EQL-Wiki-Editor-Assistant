@@ -1339,6 +1339,15 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
     the WrapPanel is seen actually reflowing the icon column below the screenshot rather than clipping it. Rendering
     the `DetailScroller` alone is misleading — it has no background of its own, so it comes out light-on-light and
     clipped; render the whole window.
+  - **The icon column carries no `MaxWidth`, because the tiles set its width and anything narrower clips them
+    silently** (bug found by the user, 2026-10-01). At 4x the two tiles need **380px** together — a 45x52 captured
+    strip is 180 wide with its border and margin, the 40x40 wiki file is 170, and the gap is 20 — so a `MaxWidth`
+    of 320 cut the wiki icon off about two thirds across. Only the prose below is bounded, at the same 380.
+  - **Looking at a render is not the same as measuring one, and this is what that costs.** The clip was present in
+    the screenshots taken when the layout was rearranged and was read straight past; the user found it in use. The
+    harness now walks each icon's ancestors and reports any whose right edge falls outside one, which reproduces
+    the bug on demand — a rendered panel that is *too narrow* looks like a panel, whereas a missing one looks like
+    a hole. Measure what a render is supposed to prove.
 
 **The ledger view (`App.LedgerWindow`, 2026-09-29).** What has been checked, and — the reason it exists — what is
 still waiting for a human. Built ahead of milestone 6 by the user's agreement, because over a long session the
