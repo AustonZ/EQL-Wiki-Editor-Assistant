@@ -374,6 +374,56 @@ expect a few hundred broken pages wiki-wide.
   legal in MediaWiki titles) to make safe filenames. The real figures come from comparing against titles as the
   API returns them. `_` in a URL is just MediaWiki's rendering of a space and means nothing here.
 
+**Two different items can share one in-game name, and v1 cannot tell them apart** (user, 2026-10-01, for v2 design;
+measured against the live wiki the same day). The tool keys everything on the item's name — the lookup, the ledger,
+the proposed edit — and that assumption is wrong for a small, real set of items.
+
+- **Measured, against all 23,577 non-redirect main-namespace pages.** The wiki's marker for the second item is a
+  trailing `*`: **78 titles carry one, and for 6 the unmarked twin also exists as a real page.** All six pairs are
+  item pages: `Club`, `Dagger`, `Short Sword`, `Dark Stained Training Robe`, `Mud Covered Tunic`, `Shimmering
+  Pearl`. Five are demonstrably *different items* — `Dagger` has `Atk Delay: 20` against `Dagger*`'s `24`,
+  `Shimmering Pearl` is `Class: RNG, MEDIUM, WT 1.0` against the Cleric-epic pearl's `Class: ALL, TINY, WT 0.1` —
+  and `Mud Covered Tunic` has identical stats on both, so that one may be an ordinary duplicate rather than a
+  collision.
+- **Every one of the six pairs shares its `lucy_img_ID`** (737, 592, 580, 678, 713, 953). This is the finding that
+  matters most: the icon check is the tool's one *independent* signal, the thing that catches a page describing a
+  different object, and against this entire class it is blind by construction.
+- **What v1 does today, and it is a silently-wrong risk rather than a flagged gap.** A capture of either item looks
+  up its own name, finds the *unmarked* page, and compares against it — so capturing the Cleric-epic
+  `Shimmering Pearl` proposes rewriting the Ranger pearl's class, size and weight. The diff reads exactly like an
+  ordinary stale-page correction, the icon check says the artwork matches, and nothing anywhere says "there are two
+  of these". The ledger keys on the name too, so both items share one row; their fingerprints differ, so it
+  re-fetches rather than silently skipping, but alternate captures then propose contradictory edits forever.
+  - **Page creation is *not* the exposed surface**, which is worth stating because it looks like it should be:
+    `MayCreate` requires `LookupOutcome.NotFound`, and a shared name resolves. The edit path is where the damage is.
+- **The wiki has at least three incompatible conventions for this, and one of them is invisible to the tool.** Any
+  v2 design has to pick one and probably has to propose it to the other editors first:
+  - `Shimmering Pearl*` keeps `itemname = Shimmering Pearl` — the true in-game name. The title then disagrees with
+    the itemname, which `PageTitle.Compare` returns as `Divergent` and reports as a defect. Correctly flagged, for
+    the wrong reason: it is deliberate, not a mistake.
+  - `Dark Stained Training Robe*` writes `itemname = Dark Stained Training Robe*` on **both** pages, so the asterisk
+    has leaked into a name the game never displays, and the unmarked page's own itemname is now wrong.
+  - `Tanned Split Paw Skin (lore)` writes the qualifier into the itemname as well, so title and itemname agree and
+    **the tool sees nothing at all** — the one shape that produces no signal. Its own notes record that *four*
+    in-game items share that name, told apart only by reading the scroll's first line in-game.
+  - Hatnotes vary too: a hand-written `notes` sentence ("Not to be confused with...") on one, `{{Disambig3|...}}` on
+    another. Both are machine-readable and are the only on-page warning that a twin exists.
+- **A capitalisation difference is a *different* problem and was nearly mis-recorded as this one.** 64 groups of
+  real pages differ only in case, 39 of them entirely item pages — but spot-checking six (`Kiola Nut`/`Kiola nut`,
+  `Cyclops Skull`/`Cyclops skull`, `Loaf of Bread`/`Loaf of bread`, `Shark Fillet`/`Shark fillet`,
+  `Tiny Collar`/`Tiny collar`, `Rune Casing`/`Rune casing`) found **identical icon and identical stats on five, and
+  only legacy-flag transcription variance on the sixth**. These are duplicate *pages* for one item, a cleanup job
+  for a human, not two items sharing a name. Counting them as collisions would have inflated the problem roughly
+  sevenfold. (The raw figure before excluding redirects was 1,778 groups, almost all mob-page redirects — a third
+  way to get this number badly wrong.)
+- **Directions for v2, none of them decided.** The capture cannot resolve this on its own, since the window shows
+  the same name and the same artwork for both — so the discriminator has to be the *stats*, which is backwards from
+  how the tool works now (find the page by name, then compare the stats to it). Plausible shapes: look up every
+  candidate title (the name, plus its `*` and `(qualifier)` variants) and pick the page whose stats the capture
+  actually matches, reporting rather than guessing when more than one fits or none does; or refuse outright and
+  hand the user both candidates, which is cheap and safe and fits this project's existing bias toward a flagged gap.
+  Either way the ledger key stops being the item name alone.
+
 **Finding an item's page (`Wiki.MediaWiki.ItemPageLookup`).** More than one API call, because of two measured
 hazards.
 - **A quote-character mismatch must be offered as a candidate, not reported as a new item** (user, 2026-09-25). The
