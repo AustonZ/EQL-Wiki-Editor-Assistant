@@ -1498,28 +1498,52 @@ already found and fixed.
   individual channels of that thin frame unevenly — against a red element below one real window it reads
   `(11,0,0)` then `(34,0,0)`, which a max-channel test rejects — but never lifts all three, so the minimum stays
   at 0 while the interior's neutral grey keeps a minimum of ~16.
-- **The top edge traces a different piece of chrome**: there is no grey outline at the window's outer top, and
-  the title bar must stay in the crop for Parse's title-vs-content name check, so the top is traced from the
-  **title bar's own pure-black band** — its topmost row is the window's outer top. This also began as a
-  brightness scan and failed identically to the side edges: with other dark UI directly above a window, there is
-  no bright run to stop at and the scan ran to its limit, failing the window outright.
-  - That band's black is tested on the **maximum** channel, unlike the frame. The active tab's label is yellow,
-    `(191,191,4)`, whose *minimum* channel is 4 — a minimum-channel test reads bright yellow text as black and
-    latches the top edge onto the tab label.
-  - Inside the band, tolerate a short run of *any* non-black rather than only bright rows: the title's glyphs are
-    anti-aliased (one real stroke reads 192, 115, 77, 38 down a column), so a "black or bright, else stop" test
-    stops on the glyph's own soft edge and cuts the title bar out of the crop.
-  - A real band measures ~16px, so a **much taller band means it has merged with adjacent black chrome** (another
-    window's title bar, another dark panel) and that probe returns nothing rather than a wrong answer, leaving
-    consensus to the columns that didn't merge. Measure that cap from the band's *start*, not from the last black
-    row found — measuring from the latter lets a continuous band drag the limit along and never trip. Without
-    this, a window sitting under another dark panel had 8 of 11 probes walk ~200px up into it and agree with each
-    other, failing only later via the overall height ceiling: 13 of 26 real captures lost a readable window.
-  - **Stop at interior grey, but tolerate glyphs.** A title bar contains only its own black plus its text, so an
-    interior-grey pixel means the band has ended. Tolerating *any* short non-black run instead is not safe: with
-    one window overlapping another the two title bars can sit ~7px apart, which such a rule bridges into the
-    neighbour's chrome — that made a **fully visible** window report as occluded, because every probe then
-    overran the band-height cap. Glyph rows are bright and still tolerated; interior grey ends the band.
+- **The top edge is found by confirming the title bar's *shape*, not by walking until the black runs out**
+  (rewritten 2026-10-01, at the user's prompting, after the third bug of the same kind). There is no grey outline
+  at the window's outer top and the title bar must stay in the crop for Parse's title-vs-content name check, so
+  the top is the one edge that cannot be traced from the content outline. It is read from the **title bar's own
+  pure-black band** instead — and the lesson of three bugs is that *where the band is* has to be established by
+  what the band looks like, because on a dark UI "black" identifies nothing on its own.
+  - **The rule: a band of pure black whose bottom row sits directly on the content interior, 13-18 rows tall, with
+    something other than black above it.** A column either matches that or abstains, and abstaining is useful
+    because consensus then comes from the columns that can see it. Measured across the whole sample corpus — 47
+    screenshots, 109 located windows — **103 read exactly 16 rows**; of the rest, one is the known-occluded window,
+    one is a window flush with the top of the screen whose bar is genuinely clipped to 14, and **four read 17,
+    which was the old scan already sitting a pixel high on them**. Fixing the rule moved exactly those four down by
+    one pixel and left the other 105 rectangles byte-identical.
+  - **What it replaced, and why tuning could not save it.** The old scan walked up through black and stopped when
+    it ran out. Every fix it received added a tolerance — skip glyph rows, tolerate a short non-black run, cap the
+    band height, widen the probe span when a HUD panel merges — and each tolerance widened what could be mistaken
+    for a title bar. The bug that ended it (`Armor Ornamentation Token`, user, 2026-10-01) used the glyph tolerance
+    to bridge **12 rows of open game world** into unrelated black chrome 15px above the window: measured on the
+    real capture, black at y 225-239, world at 240-251, the real bar at 252. The crop started at 237 and took the
+    window-relative icon strip with it, which is how the user saw it.
+  - **The walk limit is barely above the band height, and that is the point.** It is not searching for the top, it
+    is confirming a band of known size, so it never travels far — which makes the world-gap bug structurally
+    impossible rather than merely tuned against: the chrome that caused it is now never looked at.
+  - **"The band must end" is a separate check from its height, and both are needed.** A merged band — a HUD panel
+    flush on the title bar, another window's chrome butting against it — is simply truncated at the walk limit, so
+    it can land *inside* the permitted height range. Testing that the row above the band is not black is what
+    rejects it. A band running to the top of the frame is a window clipped by the screen edge, which is real and
+    allowed.
+  - **Black is tested on the maximum channel, unlike the frame.** The active tab's label is yellow, `(191,191,4)`,
+    whose *minimum* channel is 4 — a minimum-channel test reads bright yellow text as black and latches the top
+    edge onto the tab label.
+  - **Interior grey ends the band, and must be tested after black, not before.** A title bar contains only its own
+    black plus its text, so interior means the band is over — which is what makes one window overlapping another
+    (their title bars can sit ~7px apart) come out too short and abstain rather than bridging into the neighbour.
+    The ordering is load-bearing and cost a debugging round: `IsInterior` is a max-channel test, so **pure black
+    satisfies it too**, and checking interior first ends the walk on the band's own second row — every column
+    abstains and every window in the frame collapses to its anchor box.
+  - Glyph rows are still skipped rather than ended on: anti-aliasing means a stroke is not simply "bright" (a real
+    capture reads 192, 115, 77, 38 down one). Skipping them is safe here in a way it was not before, because the
+    height bounds and the must-end check now do the work that tolerance alone used to be asked to do.
+  - **It is pinned by tests that can actually fail**, which none of the previous three fixes were. The locate
+    goldens all run against `samples/`, which is gitignored, so they skip on a fresh clone — which is how three
+    bugs in a row shipped with no test able to catch them. `WindowTopEdgeTests` synthesizes the arrangement instead
+    (the values are the measured ones; only the layout is made up) and covers the chrome-above case, the flush
+    panel, a panel covering the whole width — which must be *refused*, since nothing can know where the window
+    starts — and the screen-edge window. Verified as a control: the chrome-above test fails against the old rule.
 - **Both tab states must work.** When `Description` is the *active* tab it merges into the content area, so there
   is no chrome line below the label. When it's *inactive* (the Lore tab is selected) it's drawn as its own raised
   box, so a stack of chrome lines sits below it and all must be stepped past — stopping between them makes the
@@ -1541,6 +1565,11 @@ already found and fixed.
     from 272 to 271 (measured: background to y=271, black from y=272), **one pixel**, which was enough to flip two
     windows' reading order and score 32 fields against the wrong item. `AccuracySpike` went 0 → 32 silent-wrong on a
     change that looked strictly like an improvement.
+  - **The 2026-10-01 rewrite removed the hazard that made this a fallback rather than a replacement**, since a
+    column merged by even one row now fails the must-end check and abstains instead of answering a pixel high. The
+    two-step was nonetheless left exactly as it is: the corpus says the narrow span already decides every window it
+    can, so collapsing the two would be a behaviour change bought for nothing. Noted because the reasoning above
+    cites `TitleBarMaxBandHeight`, which no longer exists.
   - So the proven span decides every window it can, and the wide one runs only where the alternative is refusing the
     window outright — where a possibly-1px-high top beats reading nothing at all. Corpus after: **0 silent-wrong and
     2197 correct, identical to before**, with occluded down from 2 to 1.
@@ -1809,9 +1838,13 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline, re-measured 2026-09-30: **47 samples, 109 windows located (1 correctly occluded), 2216 correct fields,
-  and 0 for every error count — structural, silent-wrong, wrong, missing, extra and parser warnings alike.** All
-  three ratchets in `CorpusAccuracyTests` are therefore 0 and must stay there; a regression is now a real defect
+- Baseline, re-measured 2026-10-01 after the top-edge rewrite: **47 samples, 109 windows located (1 correctly
+  occluded), 2216 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and extra.
+  Parser warnings are 2, not 0**: both are `Convert to Guise of the Deceiver`, which is the trailing-region rule
+  working exactly as designed (see "The item window's trailing region" — an unknown line reaching the user is the
+  right outcome). This line previously claimed 0 warnings, which contradicted that section of this same file; the
+  corpus test gates structural, silent-wrong, wrong and missing, and has never gated warnings. Those
+  ratchets in `CorpusAccuracyTests` are all 0 and must stay there; a regression is now a real defect
   rather than a known gap being re-measured. (It read 43 samples / 101 windows / 2094 fields when the user first
   verified the whole set on 2026-09-24; the growth is captures added since, and the occluded count fell from 2 to 1
   when the HUD-panel bug above was fixed.) Under the previous configuration (RapidOCR reading window crops) the same
