@@ -106,6 +106,66 @@ public class ItemCheckPipelineTests
 
     private static string EarringPage() => WikiFixtures.Load("Earring of Bashing");
 
+    /// <summary>
+    /// A pipeline whose icon library will recognize whatever <see cref="FrameWithIcon"/> paints, plus a decoy far
+    /// enough away to leave a clear margin — so "the icon was identified" is a property of the wiring rather than of
+    /// the artwork. How well the real library discriminates 11,562 icons is measured by `WikiSpike iconsearch`.
+    /// </summary>
+    private static (ItemCheckPipeline Pipeline, FakeWiki Wiki, CheckedItemsLedger Ledger) BuildWithIconLibrary(
+        LocatedWindow window, CapturedImage frame, string iconId = "5797", bool wikiAlreadyHasIcon = false)
+    {
+        var wiki = new FakeWiki();
+        var ledger = new CheckedItemsLedger();
+
+        // The library's entry is the fingerprint of the very strip the frame paints, which is what a correct match
+        // looks like; the decoy is an unrelated pattern.
+        var region = new Rect(
+            window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
+            ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height);
+        Assert.True(IconHasher.TryFingerprint(frame, region, out IconFingerprint painted));
+
+        var decoy = new byte[painted.Signature.Length];
+        for (int i = 0; i < decoy.Length; i++) decoy[i] = (byte)((i * 31) % 256);
+
+        var library = new IconLibrary([
+            new LibraryIcon(iconId, painted),
+            new LibraryIcon("9999", new IconFingerprint(decoy, 40, 40)),
+        ]);
+
+        var files = new IconLibraryFolder(IconFolderWith(iconId));
+        var icons = new IconCache(
+            Path.Combine(Path.GetTempPath(), "eqlwiki-icontest-" + Guid.NewGuid().ToString("N")),
+            new StubIconSource(wikiAlreadyHasIcon));
+
+        return (new ItemCheckPipeline(
+            wiki, new FakeLocator(window), ledger, null, icons, new StubDecoder(), null, library, files), wiki, ledger);
+    }
+
+    /// <summary>A throwaway folder holding one icon file, so the upload path has something real to read.</summary>
+    private static string IconFolderWith(string iconId)
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "eqlwiki-iconlib-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllBytes(Path.Combine(dir, $"{iconId}.png"), [1, 2, 3, 4]);
+        return dir;
+    }
+
+    /// <summary>Answers "does the wiki have this icon?" without a network, which is the only part the pipeline asks
+    /// about.</summary>
+    private sealed class StubIconSource(bool present) : IIconSource
+    {
+        public Task<byte[]?> DownloadAsync(string iconId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(present ? new byte[] { 9, 9, 9 } : null);
+    }
+
+    private sealed class StubDecoder : IImageDecoder
+    {
+        public Task<CapturedImage> DecodeAsync(
+            byte[] bytes, byte background = AlphaComposite.GameBackground,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new CapturedImage(1, 1, new byte[4]));
+    }
+
     /// <summary>A pipeline that also knows the wiki's verified-pages list, holding exactly the titles given.</summary>
     private static (ItemCheckPipeline Pipeline, CheckedItemsLedger Ledger) BuildWithVerifiedList(
         LocatedWindow window, string pageWikitext, params string[] verifiedTitles)
@@ -1028,6 +1088,128 @@ public class ItemCheckPipelineTests
         Assert.DoesNotContain("{{Item Lore", result.Creation!.Wikitext);
     }
 
+    // --- identifying the icon of a new item -------------------------------------------------------------------
+
+    /// <summary>
+    /// **The icon id reaches the generated wikitext**, which is the whole feature: it is the one field no capture can
+    /// read off the game, and before the icon library it was the gap every creation started with.
+    /// </summary>
+    [Fact]
+    public async Task AConfidentlyIdentifiedIconFillsInTheIconId()
+    {
+        CapturedImage frame = FrameWithIcon();
+        (ItemCheckPipeline pipeline, _, _) = BuildWithIconLibrary(Window(EarringLines), frame);
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.NotNull(result.IconSuggestion);
+        Assert.True(result.IconSuggestion!.IsConfident);
+        Assert.Equal("5797", result.IconSuggestion.IconId);
+        Assert.Contains("|lucy_img_ID    = 5797", result.Creation!.Wikitext);
+
+        // The gap the icon used to be is gone — which is also what lets the ledger record this as Created rather
+        // than Flagged once it is saved.
+        Assert.True(result.Creation.HasIconId);
+        Assert.Empty(result.Creation.Gaps);
+    }
+
+    /// <summary>
+    /// **The control, and the rule that keeps this safe**: with no library the behaviour is exactly what it was
+    /// before — a blank id, reported as a gap. The feature degrades rather than guessing.
+    /// </summary>
+    [Fact]
+    public async Task WithNoIconLibraryTheIconIdIsStillLeftBlankAndReported()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines));
+
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        Assert.Null(result.IconSuggestion);
+        Assert.False(result.Creation!.HasIconId);
+        Assert.Contains("lucy_img_ID", Assert.Single(result.Creation.Gaps));
+    }
+
+    /// <summary>The wiki holds 796 of the game's 11,592 icons, so a new item's icon is usually missing — and that is
+    /// exactly when the upload is offered.</summary>
+    [Fact]
+    public async Task AnIconTheWikiLacksIsOfferedForUpload()
+    {
+        CapturedImage frame = FrameWithIcon();
+        (ItemCheckPipeline pipeline, _, _) = BuildWithIconLibrary(Window(EarringLines), frame);
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.False(result.IconSuggestion!.AlreadyOnWiki);
+        Assert.True(result.IconSuggestion.CanUpload);
+        Assert.Equal("Item_5797.png", result.IconSuggestion.WikiFileName);
+    }
+
+    /// <summary>An icon the wiki already has is not offered — there is nothing to add, and uploading over it is the
+    /// one act nobody here could undo.</summary>
+    [Fact]
+    public async Task AnIconTheWikiAlreadyHasIsNotOfferedForUpload()
+    {
+        CapturedImage frame = FrameWithIcon();
+        (ItemCheckPipeline pipeline, _, _) =
+            BuildWithIconLibrary(Window(EarringLines), frame, wikiAlreadyHasIcon: true);
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.True(result.IconSuggestion!.AlreadyOnWiki);
+        Assert.False(result.IconSuggestion.CanUpload);
+    }
+
+    [Fact]
+    public async Task UploadingSendsTheLibraryFileUnderTheWikisOwnName()
+    {
+        CapturedImage frame = FrameWithIcon();
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = BuildWithIconLibrary(Window(EarringLines), frame);
+        await pipeline.CheckAsync(frame);
+
+        IconUploadResult uploaded = await pipeline.UploadIconAsync("5797");
+
+        Assert.True(uploaded.Uploaded);
+        Assert.Equal(1, wiki.Uploads);
+        Assert.Equal("Item_5797.png", wiki.LastUploadedFile);
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, wiki.LastUploadedBytes);
+    }
+
+    /// <summary>
+    /// **Refuses rather than overwrites**, enforced by the wiki rather than by a check here. An ordinary editor on
+    /// this wiki cannot delete a file, so an overwrite is permanent *and* destroys the original.
+    /// </summary>
+    [Fact]
+    public async Task UploadingOverAnExistingFileFailsRatherThanReplacingIt()
+    {
+        CapturedImage frame = FrameWithIcon();
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = BuildWithIconLibrary(Window(EarringLines), frame);
+        wiki.Files.Add("Item_5797.png");
+        await pipeline.CheckAsync(frame);
+
+        IconUploadResult uploaded = await pipeline.UploadIconAsync("5797");
+
+        Assert.False(uploaded.Uploaded);
+        Assert.Equal(0, wiki.Uploads);
+        Assert.NotNull(uploaded.Error);
+    }
+
+    /// <summary>The login gate covers uploading too — it is a write, and the rule lives in one place the write paths
+    /// go through rather than being copied into each caller (the 2026-09-30 bug).</summary>
+    [Fact]
+    public async Task UploadingRespectsTheWriteGate()
+    {
+        CapturedImage frame = FrameWithIcon();
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = BuildWithIconLibrary(Window(EarringLines), frame);
+        pipeline.BeforeWriting = _ => Task.FromResult<string?>("Not logged in.");
+        await pipeline.CheckAsync(frame);
+
+        IconUploadResult uploaded = await pipeline.UploadIconAsync("5797");
+
+        Assert.False(uploaded.Uploaded);
+        Assert.Equal(0, wiki.Uploads);
+        Assert.Equal("Not logged in.", uploaded.Error);
+    }
+
     /// <summary>Creating writes exactly one page, through the create path rather than the edit path, and settles the
     /// item — so the next capture of it costs no wiki traffic at all.</summary>
     [Fact]
@@ -1156,6 +1338,12 @@ public class ItemCheckPipelineTests
         public int Fetches { get; private set; }
         public int Edits { get; private set; }
         public int Creations { get; private set; }
+        public int Uploads { get; private set; }
+
+        /// <summary>Files the wiki already has, so "refuse rather than overwrite" can be exercised.</summary>
+        public HashSet<string> Files { get; } = new(StringComparer.Ordinal);
+        public string? LastUploadedFile { get; private set; }
+        public byte[]? LastUploadedBytes { get; private set; }
         public string? LastSummary { get; private set; }
         public bool FailFetches { get; init; }
 
@@ -1200,6 +1388,20 @@ public class ItemCheckPipelineTests
 
             Pages[title] = new WikiPage(title, wikitext, 1, DateTimeOffset.UnixEpoch);
             return Task.FromResult(new EditResult(title, 1, false));
+        }
+
+        public Task<UploadResult> UploadFileAsync(
+            string fileName, byte[] content, string description, string comment,
+            CancellationToken cancellationToken = default)
+        {
+            // Mirrors the real client: no ignorewarnings, so an existing file is a refusal, not an overwrite.
+            if (!Files.Add(fileName))
+                throw new MediaWikiException("fileexists-no-change", $"'{fileName}' already exists.");
+
+            Uploads++;
+            LastUploadedFile = fileName;
+            LastUploadedBytes = content;
+            return Task.FromResult(new UploadResult(fileName, $"https://example.invalid/{fileName}"));
         }
     }
 }

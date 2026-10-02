@@ -130,6 +130,17 @@ public sealed record ItemCheckResult
 
     public IconComparison? Icon { get; init; }
 
+    /// <summary>
+    /// Which icon the library recognized in the captured artwork, for an item being created. Null when there is no
+    /// library, no readable icon, or nothing close enough to say.
+    ///
+    /// **Only ever set on the creation path.** On a page that already exists the icon is *compared and flagged*,
+    /// never proposed, because the tool cannot know whether the page's id or the capture is the odd one — see
+    /// <see cref="Icon"/>. A page that does not exist yet has no such doubt and nothing to overwrite, which is the
+    /// whole reason this can fill a field that is elsewhere forbidden to touch.
+    /// </summary>
+    public IconSuggestion? IconSuggestion { get; init; }
+
     /// <summary>Why the icon could not be compared, when it could not — a Lore capture, an unuploaded file, a page
     /// with no <c>lucy_img_ID</c>, or a sprite too dark to judge. Informational: an icon check that cannot see the
     /// icon must stay silent rather than report a mismatch.</summary>

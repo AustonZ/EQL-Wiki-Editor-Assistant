@@ -158,7 +158,7 @@
                             <TextBlock Text="{Binding IconVerdict}" Foreground="{Binding IconVerdictBrush}"
                                        TextWrapping="Wrap" Margin="0,0,0,6" MaxWidth="380" HorizontalAlignment="Left"
                                        Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}" />
-                            <TextBlock Text="Read the item&#39;s lucy_img_ID off this artwork." TextWrapping="Wrap"
+                            <TextBlock Text="{Binding IconColumnHint}" TextWrapping="Wrap"
                                        Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
                                        MaxWidth="380" HorizontalAlignment="Left"
                                        Visibility="{Binding IsCreation, Converter={StaticResource BoolToVis}}" />
@@ -187,7 +187,43 @@
                                     <TextBlock Text="none on the page" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
                                                Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>
+
+                                <!-- The icon the library matched, beside the captured one. **This tile is the whole
+                                     safety argument for writing lucy_img_ID automatically**: the match is perceptual
+                                     and no threshold separates a lucky win from a real one, so the user confirming by
+                                     eye is what makes a 96.7% identifier safe to act on. -->
+                                <StackPanel Visibility="{Binding ShowMatchedIcon, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding MatchedIconCaption}" FontSize="11"
+                                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                    <Border BorderBrush="{Binding MatchedIconBorderBrush}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                            Visibility="{Binding HasMatchedIcon, Converter={StaticResource BoolToVis}}">
+                                        <Image x:Name="MatchedIconImage" Stretch="None" Margin="4"
+                                               RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                    </Border>
+                                </StackPanel>
                             </StackPanel>
+
+                            <!-- Offered only when the tool knows which icon it is *and* knows the wiki lacks it. The
+                                 wiki holds 796 of the game's 11,592 icons, so this is the common case on a new item
+                                 rather than an exotic one. -->
+                            <StackPanel Margin="0,8,0,0" MaxWidth="380" HorizontalAlignment="Left"
+                                        Visibility="{Binding CanUploadIcon, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding IconUploadPrompt}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4" />
+                                <!-- The label is a TextBlock rather than string Content because **a Button eats an
+                                     underscore**: WPF reads it as an access-key prefix, so binding the file name
+                                     directly rendered "Upload Item3327.png" for a file actually called
+                                     Item_3327.png — a wrong file name on the one button whose whole job is to say
+                                     which file it publishes. Caught by rendering it; invisible in the XAML. -->
+                                <Button Click="OnUploadIconClick" HorizontalAlignment="Left" Padding="10,4"
+                                        IsEnabled="{Binding IsNotBusy}">
+                                    <TextBlock Text="{Binding IconUploadButtonText}" />
+                                </Button>
+                            </StackPanel>
+                            <TextBlock Text="{Binding IconUploadOutcome}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                       MaxWidth="380" HorizontalAlignment="Left"
+                                       Foreground="{Binding IconUploadOutcomeBrush}"
+                                       Visibility="{Binding HasIconUploadOutcome, Converter={StaticResource BoolToVis}}" />
                         </StackPanel>
                     </WrapPanel>
 

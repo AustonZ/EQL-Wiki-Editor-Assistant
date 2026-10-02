@@ -3,6 +3,7 @@ using System.Net.Http;
 using EQLWikiAssistant.Capture;
 using EQLWikiAssistant.Core.Glyphs;
 using EQLWikiAssistant.Core.Locate;
+using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.Pipeline;
@@ -57,6 +58,13 @@ public sealed class AppServices : IDisposable
     public VerifiedPages Verified { get; }
     public ItemCheckPipeline Pipeline { get; }
     public WindowCapturer Capturer { get; }
+    /// <summary>Fingerprints of every icon the game ships, or null when the asset folder could not be found.
+    /// Null degrades the feature (a generated page gets a blank lucy_img_ID) rather than breaking anything.</summary>
+    public IconLibrary? IconLibrary { get; }
+
+    /// <summary>The icon PNGs themselves, for showing a match and uploading it.</summary>
+    public IconLibraryFolder? IconFiles { get; }
+
     public ICredentialStore Credentials { get; } = new WindowsCredentialStore();
 
     /// <summary>Whether this session has logged in. Reads are anonymous, so this stays false until the first commit
@@ -81,14 +89,31 @@ public sealed class AppServices : IDisposable
         Icons = new IconCache(AppPaths.IconCacheDirectory, new WikiIconSource(_http, Endpoint));
         Verified = new VerifiedPages(Wiki, AppPaths.VerifiedPagesFile);
 
+        var decoder = new WindowsImageDecoder();
+
+        // The icon library, for identifying a new item's lucy_img_ID. Loaded from a cached fingerprint index that
+        // rebuilds itself when the icon folder changes; the first run after an asset re-export costs about eight
+        // seconds. Absent entirely when the folder cannot be found, which simply leaves lucy_img_ID blank — the
+        // behaviour that existed before the library did. This runs off the UI thread with the rest of the
+        // composition root, so the cost lands where the OCR models already do.
+        string? iconFolder = AppPaths.IconLibraryDirectory;
+        if (iconFolder is not null)
+        {
+            IconFiles = new IconLibraryFolder(iconFolder);
+            IconLibrary = IconLibraryStore
+                .LoadOrBuildAsync(iconFolder, AppPaths.IconIndexFile, decoder).GetAwaiter().GetResult();
+        }
+
         Pipeline = new ItemCheckPipeline(
             Wiki,
             new BorderTracingWindowLocator(ocr),
             Ledger,
             Mapping,
             Icons,
-            new WindowsImageDecoder(),
-            Verified);
+            decoder,
+            Verified,
+            IconLibrary,
+            IconFiles);
 
         // **Set once, here, so no write path can forget it** (bug found by the user, 2026-09-30: the formatting
         // commit never logged in, because logging in was each caller's job and that caller did not). The pipeline

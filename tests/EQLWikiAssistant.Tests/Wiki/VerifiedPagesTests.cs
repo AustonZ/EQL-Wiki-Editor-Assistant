@@ -47,6 +47,12 @@ public class VerifiedPagesTests : IDisposable
             string title, string wikitext, string summary,
             CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("The verified list is never created by this tool.");
+
+        // This fake exists to answer reads; nothing here uploads.
+        public Task<UploadResult> UploadFileAsync(
+            string fileName, byte[] content, string description, string comment,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private async Task<(VerifiedPages Pages, FakeWiki Wiki)> LoadedAsync(string content = RealList)

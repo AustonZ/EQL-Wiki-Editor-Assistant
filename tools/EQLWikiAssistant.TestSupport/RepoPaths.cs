@@ -22,6 +22,12 @@ public static class RepoPaths
     /// summaries) — anything derived from real screenshots and therefore not committable.</summary>
     public static string LocalDataDirectory => Path.Combine(Root, ".local-data");
 
+    /// <summary>Every item icon extracted from the game's own asset files, one PNG per icon, named by its id —
+    /// **tracked in git** (the user added it), unlike samples/. These are the game's artwork rather than a capture of
+    /// anyone's screen, so they carry none of the private-information risk that keeps screenshots out of the repo.
+    /// </summary>
+    public static string IconLibraryDirectory => Path.Combine(Root, "game_assets", "item_icons");
+
     private static string FindRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

@@ -41,6 +41,8 @@ public sealed class ItemCheckPipeline
     private readonly IconCache? _icons;
     private readonly IImageDecoder? _decoder;
     private readonly VerifiedPages? _verified;
+    private readonly IconLibrary? _iconLibrary;
+    private readonly IconLibraryFolder? _iconFiles;
 
     /// <summary>Lore captured from a Lore-tab window, by item name, waiting for the Description capture that needs
     /// it. Held here rather than by the caller because the two captures are separate frames, and the pipeline is
@@ -52,6 +54,12 @@ public sealed class ItemCheckPipeline
     /// <param name="decoder">Decodes a downloaded icon. Needed alongside <paramref name="icons"/>.</param>
     /// <param name="verified">The wiki's verified-pages list, or null to say nothing about verification. Optional
     /// for the same reason the icon cache is: the tool only ever reports this and never acts on it.</param>
+    /// <param name="iconLibrary">Fingerprints of every icon the game ships, used to identify a new item's icon id.
+    /// Null simply leaves <c>lucy_img_ID</c> blank on a generated page, which is the behaviour that existed before
+    /// the library did — degraded, not wrong.</param>
+    /// <param name="iconFiles">The icon PNGs themselves, for showing a match and for uploading it. Needed alongside
+    /// <paramref name="iconLibrary"/>; without it an id can still be identified and written, just not illustrated or
+    /// published.</param>
     public ItemCheckPipeline(
         IMediaWikiClient wiki,
         IItemWindowLocator locator,
@@ -59,7 +67,9 @@ public sealed class ItemCheckPipeline
         WikiMapping? mapping = null,
         IconCache? icons = null,
         IImageDecoder? decoder = null,
-        VerifiedPages? verified = null)
+        VerifiedPages? verified = null,
+        IconLibrary? iconLibrary = null,
+        IconLibraryFolder? iconFiles = null)
     {
         _wiki = wiki ?? throw new ArgumentNullException(nameof(wiki));
         _locator = locator ?? throw new ArgumentNullException(nameof(locator));
@@ -68,6 +78,8 @@ public sealed class ItemCheckPipeline
         _icons = icons;
         _decoder = decoder;
         _verified = verified;
+        _iconLibrary = iconLibrary;
+        _iconFiles = iconFiles;
     }
 
     /// <summary>Set for the user's "re-check anyway" action: the ledger is still consulted, but never allowed to
@@ -305,6 +317,14 @@ public sealed class ItemCheckPipeline
 
         if (lookup.TreatAsNew)
         {
+            // Identified here rather than up with the icon *comparison*, because this question only exists on this
+            // branch: there is no page, so there is nothing to compare against and an id to propose instead.
+            // **No warning is raised here**, deliberately. An unidentified icon and a blank `lucy_img_ID` are the same
+            // fact, and the review screen already has a bar for the second — adding one here produced two bars saying
+            // overlapping things, which is exactly how the warning strip got too long to read before (user,
+            // 2026-09-29). The screen's own message names the closest candidate when there is one.
+            IconSuggestion? suggestion = await SuggestIconAsync(capturedIcon, cancellationToken).ConfigureAwait(false);
+
             // Recorded, because "not on the wiki" is a real finding — but as NotOnWiki, which never lets a later
             // capture skip the fetch: somebody may have created the page since.
             RecordLedgerEntry(item.Name, null, CheckOutcome.NotOnWiki, null, fingerprint);
@@ -315,7 +335,14 @@ public sealed class ItemCheckPipeline
                 // "this item is new": a quote-variant candidate almost certainly *is* this item's page under a
                 // misspelt name, and a title-illegal name has no title to create at. Both would produce a page
                 // nobody on this wiki can delete, so both get the warning and no proposal.
-                Creation = lookup.MayCreate ? ItemPageCreator.Build(item, item.Name, _mapping) : null,
+                // Only a *confident* match reaches the wikitext. An unsure one still travels on the result, so the
+                // review screen can offer its shortlist — the id is left blank and reported as a gap, which keeps
+                // the item coming back until a human settles it.
+                Creation = lookup.MayCreate
+                    ? ItemPageCreator.Build(
+                        item, item.Name, _mapping, suggestion is { IsConfident: true } ? suggestion.IconId : null)
+                    : null,
+                IconSuggestion = suggestion,
                 ItemName = item.Name,
                 Item = item,
                 WindowImage = crop,
@@ -417,6 +444,102 @@ public sealed class ItemCheckPipeline
     /// Every "cannot judge" path returns a note rather than a verdict. An icon check that cannot see the icon has to
     /// stay silent: a false "wrong icon" sends the user hunting for a problem that is not there.
     /// </summary>
+    /// <summary>
+    /// Identifies a captured icon against the whole library, for an item that has no page yet.
+    ///
+    /// **A search rather than a comparison, which is a harder question than it looks.** The icon check elsewhere only
+    /// has to separate one right answer from one wrong one; this has to beat 11,561 wrong ones. It gates on the gap
+    /// to the runner-up rather than on the absolute score — see <see cref="IconLibrary.ConfidentMargin"/>, where the
+    /// measurement says an absolute cutoff loses correct answers without catching anything extra.
+    /// </summary>
+    private async Task<IconSuggestion?> SuggestIconAsync(
+        IconFingerprint? captured, CancellationToken cancellationToken)
+    {
+        if (_iconLibrary is null || captured is null) return null;
+        if (_iconLibrary.Identify(captured) is not { } found) return null;
+
+        // Loaded only for the winner, not for the shortlist: this is a file read per capture, and the thing the user
+        // confirms by eye is the match itself.
+        CapturedImage? image = null;
+        if (_iconFiles is not null && _decoder is not null &&
+            await _iconFiles.ReadAsync(found.IconId, cancellationToken).ConfigureAwait(false) is { } bytes)
+        {
+            image = await _decoder
+                .DecodeAsync(bytes, AlphaComposite.GameBackground, cancellationToken).ConfigureAwait(false);
+        }
+
+        // "Does the wiki have this icon?" is already the icon cache's question — a null answer from it means the file
+        // is absent, and it negative-caches that for six hours so a creation session does not re-ask on every
+        // capture. Asking a second way here would be a second home for the same question.
+        bool? onWiki = null;
+        if (_icons is not null)
+        {
+            try
+            {
+                onWiki = await _icons.GetAsync(found.IconId, cancellationToken).ConfigureAwait(false) is not null;
+            }
+            catch (MediaWikiException)
+            {
+                // The wiki answered about this one file and would not say. Unknown is the honest value, and
+                // CanUpload treats it as "do not offer" — publishing over a file that may exist is the one act
+                // nobody here could undo.
+            }
+        }
+
+        return new IconSuggestion(
+            found.IconId, found.Distance, found.Margin, found.IsConfident, found.Candidates, image, onWiki);
+    }
+
+    /// <summary>
+    /// Uploads a new item icon to the wiki, from the library's own file.
+    ///
+    /// **It uploads the file whose name matches the id the page carries**, which is the invariant the whole feature
+    /// rests on: the artwork and the <c>lucy_img_ID</c> are written as a pair, so the page renders what the capture
+    /// showed even where the wiki's historical numbering differs from the game's.
+    ///
+    /// Refuses rather than overwrites — the client omits <c>ignorewarnings</c>, so an existing file comes back as a
+    /// failure. That is the right way round here: an ordinary editor on this wiki cannot delete a file, so a wrong
+    /// overwrite is permanent and takes the original with it.
+    /// </summary>
+    public async Task<IconUploadResult> UploadIconAsync(string iconId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(iconId);
+
+        if (_iconFiles is null)
+            return new IconUploadResult(false, null, "There is no icon library configured, so there is no file to upload.");
+
+        if (await WhyWritingIsNotAllowedAsync(cancellationToken).ConfigureAwait(false) is { } blocked)
+            return new IconUploadResult(false, null, blocked);
+
+        byte[]? bytes = await _iconFiles.ReadAsync(iconId, cancellationToken).ConfigureAwait(false);
+        if (bytes is null)
+            return new IconUploadResult(false, null, $"The icon library has no file for icon {iconId}.");
+
+        string fileName = IconLibraryFolder.WikiFileNameFor(iconId);
+
+        try
+        {
+            UploadResult uploaded = await _wiki.UploadFileAsync(
+                fileName,
+                bytes,
+                // Matches the convention the wiki's own 796 imported icon files use, which all read
+                // "== Summary ==\nImporting file", while saying the one thing that is actually true of this one.
+                $"== Summary ==\nItem icon {iconId}, from the game's own asset files.",
+                $"Item icon {iconId}",
+                cancellationToken).ConfigureAwait(false);
+
+            // The cache said this file was missing; it is not missing any more, and a stale negative entry would
+            // keep offering the upload for six hours.
+            _icons?.Forget(iconId);
+
+            return new IconUploadResult(true, uploaded.Url, null);
+        }
+        catch (MediaWikiException ex)
+        {
+            return new IconUploadResult(false, null, ex.Message);
+        }
+    }
+
     private async Task<(IconComparison?, string?, CapturedImage?)> CompareIconAsync(
         IconFingerprint? captured, string? unreadableNote, string? iconId, CancellationToken cancellationToken)
     {

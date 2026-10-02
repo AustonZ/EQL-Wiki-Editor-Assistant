@@ -77,7 +77,7 @@ public static class ItemPageCreator
     /// **No in-world screenshot line.** v1 preserves one where it exists and generates none — the tool has no
     /// screenshot of the item in the world, only of its window.
     /// </summary>
-    public static string Skeleton(string title, WikiMapping? mapping = null)
+    public static string Skeleton(string title, WikiMapping? mapping = null, string? iconId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         mapping ??= WikiMapping.Default;
@@ -87,12 +87,22 @@ public static class ItemPageCreator
         foreach (string parameter in mapping.ParameterOrder)
         {
             builder.Append('|').Append(parameter).Append(" = ");
-            // itemname is the one field the skeleton can fill, because creating the page at this title is what
+            // itemname is one of only two fields the skeleton fills, because creating the page at this title is what
             // makes it true. Leaving it blank would have the analyzer report it as missing and the editor decline
             // to write it: a name/title mismatch is reported rather than fixed on an existing page, and that rule
             // is right there and wrong here.
             if (string.Equals(parameter, mapping.ItemNameParameter, StringComparison.Ordinal))
                 builder.Append(title);
+
+            // The icon id is the other, when the icon library recognized the captured artwork. **The same exception
+            // applies for the same reason**: on an existing page a suspect icon is reported and never rewritten,
+            // because the tool cannot know whether the page or the capture is the odd one — on a page that does not
+            // exist yet there is no such doubt and nothing to overwrite. The caller decides whether the match was
+            // clear enough to pass in at all; this just writes what it is given.
+            else if (iconId is { Length: > 0 }
+                     && string.Equals(parameter, mapping.IconIdParameter, StringComparison.Ordinal))
+                builder.Append(iconId);
+
             builder.Append('\n');
         }
         builder.Append("}}</onlyinclude>\n");
@@ -103,13 +113,17 @@ public static class ItemPageCreator
     /// Builds the page, or null if the skeleton could not be read back — which would mean the generated template
     /// call is malformed, so refusing beats offering to create a page out of text the tool cannot parse.
     /// </summary>
-    public static ProposedPage? Build(ParsedItem captured, string title, WikiMapping? mapping = null)
+    /// <param name="iconId">The icon id the library identified from the captured artwork, when it identified one
+    /// clearly enough to write. Null leaves <c>lucy_img_ID</c> blank, which is reported as the page's one remaining
+    /// gap exactly as before — see <see cref="ProposedPage.Gaps"/>.</param>
+    public static ProposedPage? Build(
+        ParsedItem captured, string title, WikiMapping? mapping = null, string? iconId = null)
     {
         ArgumentNullException.ThrowIfNull(captured);
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         mapping ??= WikiMapping.Default;
 
-        ItemPageDocument? skeleton = ItemPageDocument.Parse(Skeleton(title, mapping));
+        ItemPageDocument? skeleton = ItemPageDocument.Parse(Skeleton(title, mapping, iconId));
         if (skeleton is null) return null;
 
         ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, skeleton, title, mapping);

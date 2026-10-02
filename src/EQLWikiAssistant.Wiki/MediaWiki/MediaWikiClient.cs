@@ -247,6 +247,94 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         long? newRevision = edit.TryGetProperty("newrevid", out JsonElement rev) ? rev.GetInt64() : null;
         return new EditResult(title, newRevision, noChange);
     }
+    /// <summary>
+    /// Uploads a new file, and refuses rather than replaces when the wiki already has one by that name.
+    ///
+    /// **It does not go through <see cref="SaveAsync"/>, and the reason is not shared-code squeamishness**: this is a
+    /// different API module (<c>action=upload</c>) sending multipart form data rather than a URL-encoded body, with
+    /// its own result shape. What it does share is the discipline — the session check, the CSRF token,
+    /// <c>assert=user</c>, and a guard in the request rather than a check in this process.
+    ///
+    /// **That guard is `ignorewarnings` left off.** MediaWiki answers an upload over an existing file with a warning
+    /// rather than an error, and `ignorewarnings=1` is what turns it into an overwrite — so omitting it makes
+    /// "replace somebody's file" unreachable from this tool rather than merely unintended. This matters more here
+    /// than anywhere else in the codebase: an ordinary editor on this wiki cannot delete a file, so a wrong overwrite
+    /// is permanent and takes the original with it. The warning comes back as an exception naming what the wiki
+    /// objected to.
+    /// </summary>
+    /// <param name="fileName">The target name *without* the `File:` prefix — e.g. <c>Item_5797.png</c>.</param>
+    /// <param name="description">The initial wikitext of the file's own page.</param>
+    public async Task<UploadResult> UploadFileAsync(
+        string fileName,
+        byte[] content,
+        string description,
+        string comment,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentException.ThrowIfNullOrWhiteSpace(comment);
+        if (content.Length == 0)
+            throw new ArgumentException("Refusing to upload an empty file.", nameof(content));
+
+        if (!IsLoggedIn)
+            throw new InvalidOperationException(
+                "Log in before uploading — an anonymous upload would be attributed to an IP address.");
+
+        _csrfToken ??= await FetchTokenAsync("csrf", cancellationToken).ConfigureAwait(false);
+
+        using var form = new MultipartFormDataContent
+        {
+            { new StringContent("upload"), "action" },
+            { new StringContent("json"), "format" },
+            { new StringContent("2"), "formatversion" },   // see AddFormat for why
+            { new StringContent(fileName), "filename" },
+            { new StringContent(comment), "comment" },
+            { new StringContent(description), "text" },
+            { new StringContent(_csrfToken), "token" },
+            { new StringContent("user"), "assert" },
+        };
+
+        var file = new ByteArrayContent(content);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        form.Add(file, "file", fileName);
+
+        JsonDocument response;
+        try
+        {
+            using HttpResponseMessage message = await _http
+                .PostAsync(_endpoint, form, cancellationToken).ConfigureAwait(false);
+            response = await ReadAsync(message, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsUnreachable(ex, cancellationToken))
+        {
+            throw Unavailable(ex);
+        }
+
+        using (response)
+        {
+            JsonElement upload = response.RootElement.GetProperty("upload");
+            string result = upload.TryGetProperty("result", out JsonElement r) ? r.GetString() ?? "" : "";
+
+            if (!string.Equals(result, "Success", StringComparison.Ordinal))
+            {
+                // A refused upload is nearly always "the file already exists", which is a real answer rather than a
+                // fault: the caller checks first, and this is the race. Named so the user is told which it was.
+                string warnings = upload.TryGetProperty("warnings", out JsonElement w) ? w.ToString() : upload.ToString();
+                throw new MediaWikiException(
+                    result.Length == 0 ? "uploadfailed" : result,
+                    $"Upload of '{fileName}' was not accepted: {warnings}");
+            }
+
+            string? url = upload.TryGetProperty("imageinfo", out JsonElement info)
+                          && info.TryGetProperty("url", out JsonElement u)
+                ? u.GetString()
+                : null;
+
+            return new UploadResult(fileName, url);
+        }
+    }
+
     private async Task<string> FetchTokenAsync(string type, CancellationToken cancellationToken)
     {
         using JsonDocument response = await GetAsync(new Dictionary<string, string>

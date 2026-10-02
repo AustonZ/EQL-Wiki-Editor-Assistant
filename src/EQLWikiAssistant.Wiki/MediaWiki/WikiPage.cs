@@ -19,6 +19,12 @@ public sealed record WikiPage(
 /// "matched", not "edited".</summary>
 public sealed record EditResult(string Title, long? NewRevisionId, bool NoChange);
 
+/// <summary>The outcome of a file upload. <paramref name="Url"/> is where the wiki put it, when it said — useful for
+/// linking the user straight at what was just published, which for an upload is the only way to check it by eye.
+/// </summary>
+/// <param name="FileName">The name the file landed under, without the <c>File:</c> prefix.</param>
+public sealed record UploadResult(string FileName, string? Url);
+
 /// <summary>
 /// Who the wiki thinks we are and what it will let us do.
 ///
@@ -34,6 +40,19 @@ public sealed record UserInfo(string Name, bool IsAnonymous, IReadOnlyList<strin
 
     /// <summary>Whether it may also create pages. Not needed by v1, which only edits pages that already exist.</summary>
     public bool CanCreate => Rights.Contains("createpage", StringComparer.Ordinal);
+
+    /// <summary>
+    /// Whether this session may upload a new file — the grant an icon upload needs, and a *separate* bot-password
+    /// grant from editing, so a credential that edits perfectly well can still refuse to upload. Asked rather than
+    /// discovered by attempting one, for the same reason as the rest of this type: a failed attempt against a wiki
+    /// where an ordinary editor cannot delete anything is not a free experiment.
+    /// </summary>
+    public bool CanUpload => Rights.Contains("upload", StringComparer.Ordinal);
+
+    /// <summary>Whether this session may overwrite a file that already exists. Deliberately distinct from
+    /// <see cref="CanUpload"/>: this tool only ever uploads an icon the wiki does not have, so it never needs this —
+    /// it is reported so a missing grant is never mistaken for the cause of a refused first upload.</summary>
+    public bool CanReupload => Rights.Contains("reupload", StringComparer.Ordinal);
 }
 
 /// <summary>Raised when the wiki rejects a request. Carries MediaWiki's own error code (<c>badtoken</c>,

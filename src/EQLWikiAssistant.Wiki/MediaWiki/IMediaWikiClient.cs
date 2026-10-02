@@ -39,4 +39,23 @@ public interface IMediaWikiClient
         string wikitext,
         string summary,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads a file the wiki does not have, and refuses if it turns out to have one by that name.
+    ///
+    /// **Refusing is the guard, and it is enforced by the wiki rather than by this process**: the implementation omits
+    /// <c>ignorewarnings</c>, so an existing file comes back as a failure instead of an overwrite — the same shape as
+    /// <c>createonly</c> on <see cref="CreatePageAsync"/>, and for a stronger reason. Nobody with an ordinary account
+    /// on this wiki can delete a file, so an overwrite is permanent *and* destroys the original. It is also the one
+    /// grant a bot password may lack while editing perfectly well, so check <c>UserInfo.CanUpload</c> rather than
+    /// discovering it from a failure.
+    /// </summary>
+    /// <param name="fileName">The target name without the <c>File:</c> prefix, e.g. <c>Item_5797.png</c>.</param>
+    /// <param name="description">The initial wikitext of the file's own page.</param>
+    Task<UploadResult> UploadFileAsync(
+        string fileName,
+        byte[] content,
+        string description,
+        string comment,
+        CancellationToken cancellationToken = default);
 }

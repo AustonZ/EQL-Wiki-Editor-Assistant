@@ -932,8 +932,11 @@ measured.
   censuses the cached corpus. That is where the 48/744 figure comes from.
 
 **Icon comparison (`Core.Icons`, `Wiki.MediaWiki.IconCache`) — flag only, per the plan.** Catches a page whose
-`lucy_img_ID` points at the wrong artwork. It never proposes a new id: the tool cannot know whether the page is
-wrong or the capture caught something odd, and choosing one is a human's call.
+`lucy_img_ID` points at the wrong artwork. It never proposes a new id **for a page that already exists**: the tool
+cannot know whether the page is wrong or the capture caught something odd, and choosing one is a human's call.
+**A page that does not exist yet is the exception, and it is not an exception to the reasoning** — there is no id to
+be wrong and nothing to overwrite, so identifying one is an addition rather than a correction. See "Identifying an
+item's icon" below.
 - **The in-game icon has no frame.** The game draws the sprite with transparency straight onto the window's 16-grey,
   left of the item's name — nothing to trace, unlike the window outline. `ItemIconReader.IconStrip` is the region it
   occupies, measured across all 43 screenshots (`LocateSpike --icon`): window-relative x 12..52, y 52..100, with the
@@ -1154,6 +1157,80 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
     any bump so far: a settled ledger row makes the next capture skip the wiki, so those 680 pages would never be
     offered the reflow. The cost is that every settled row re-checks once and settles again.
 
+**Identifying an item's icon (`Core.Icons.IconLibrary`, 2026-10-02).** The user extracted **every icon from the game's
+own asset files** into `game_assets/item_icons`, one 40x40 PNG per icon, named by its id — 11,592 of them, tracked in
+git (they are the game's artwork, not a capture of anyone's screen, so none of the private-information risk that keeps
+`samples/` out of the repo). That turns `lucy_img_ID` from the one field no capture could supply into one the tool can
+usually read: match the captured sprite against the library, and the matching file's *name* is the id.
+
+- **It inverts what the icon code was for, and that is a harder question than it looks.** `IconFingerprint` was built
+  to answer "does this page point at the right artwork?" — one capture against one known file, where the comparison
+  only has to separate one right answer from one wrong one. A search has to beat **every** wrong one. The same 12x12x3
+  signature is reused (a second fingerprint would be a second home for a measured rule), but the thresholds are its
+  own.
+- **Measured before it was designed, with `WikiSpike iconsearch`**: 90 distinct captured items, each against all
+  11,562 indexed icons, ground truth being the `lucy_img_ID` on the item's own live wiki page. **Top-1 is 87/90
+  (96.7%), nothing refused.** A separate proxy run first — the 76 cached *wiki* icon files against the library, which
+  removes the game's resample from the question — scored 74/74 where ground truth is self-consistent, which is what
+  established that the library is discriminable at all before any app code existed.
+- **Gating is on the margin to the runner-up, not on the absolute distance, and that reversed the obvious choice.**
+  Adding `SameIconThreshold` (0.13) as a second gate *loses 5 correct answers and catches nothing the margin does not*:
+  a correct match reaches **0.2977** (`Cloak of Scales`), because the game draws each icon ~1.10x its stored size and
+  interpolates, which moves the absolute score far more than it moves the ranking. `IconLibrary.ConfidentMargin` is
+  **0.01**, in the middle of the flat part of the sweep — 8x above the one genuine error and 2x below the closest
+  correct answer it gives up.
+- **No threshold separates the two classes perfectly, which is the same shape of answer as the icon check's own
+  threshold and is worth not hiding.** `Cloak of Scales` is a *correct* answer at a margin of 0.0002 — below the one
+  genuine error (`Puppet Strings`, 0.0013) — so it is a coin flip the tool happened to win, and it is excluded. That
+  is the right outcome: it becomes a shortlist rather than a silent guess.
+- **The three apparent failures are two different things, and only one is a matcher failure.**
+  - `Puppet Strings` is the real one: its best match is 0.3754, far past the same-icon threshold, so *nothing in the
+    library resembles what was captured*. The margin gate rejects it.
+  - `Mote of Grand Potential` and `Void-Touched Potential` are **wiki data inconsistencies, not matcher errors**.
+    `File:Item_2896.png` holds the artwork the library files as **10275**, and `File:Item_10275.png` does not exist on
+    the wiki at all; same shape for 2899/2002. Both were confirmed independently by the proxy run at distance 0.0000.
+    Whether this is a historical Lucy-vs-asset numbering difference or an old mis-upload is unresolved and does not
+    need resolving — see the consistency rule below.
+- **The id and the artwork are written as a pair, which is what makes the previous point harmless.** The tool writes
+  `lucy_img_ID = N` and, when the wiki lacks the file, uploads `game_assets/item_icons/N.png` as `File:Item_N.png` —
+  the same N on both sides. So a created page renders the artwork the capture actually showed, whichever numbering the
+  wiki used historically. **This only ever runs on creation**: an existing page's icon id is still compared and
+  flagged, never rewritten, because there the tool cannot tell a wrong page from an odd capture.
+- **Uploading is the common case, not the exception**: the wiki holds **796** `Item_<id>.png` files against the
+  library's 11,592, so **93% of icons are missing**. Measured, and it is why the upload button is part of the feature
+  rather than a nicety.
+  - **The bot password's `upload` grant is separate from editing** and was checked rather than assumed — `WikiSpike
+    whoami` now reports it. This credential has `upload` but *not* `reupload`, which happens to match the design
+    exactly: the tool only ever uploads a file the wiki lacks.
+  - **`ignorewarnings` is deliberately omitted**, so an upload over an existing file is refused by the wiki rather
+    than becoming an overwrite. Stronger than a check in this process, and it matters more here than anywhere else:
+    nobody with an ordinary account can delete a file, so a wrong overwrite is permanent *and* destroys the original.
+- **The index is cached and rebuilds itself when the folder changes, which is a correctness rule rather than a
+  speed one.** Fingerprinting 11,592 PNGs takes ~8 seconds, so the result is cached in app-data with a stamp of what
+  it was built from (file count plus newest write time). A stale index would be the worst bug this feature could
+  have: the user adds newly extracted icons — which has **already happened once in this repo's history** — the index
+  does not know them, and every capture of one of those items is matched against the closest *older* icon and offered
+  confidently. Pinned by tests that fail when the stamp check is removed.
+  - **Not committed beside the icons**, deliberately: a committed index is a second record of which icons exist, and
+    the moment the two disagree the tool starts matching against an out-of-date library. The folder is the only
+    answer to "what icons are there".
+- **The library is optional everywhere.** No folder, no index, no match — a generated page simply gets a blank
+  `lucy_img_ID`, exactly as it did before any of this existed. Degraded, never wrong.
+- **The user confirms by eye, and that is the actual safety argument.** The review screen shows the matched artwork
+  beside the captured one — green when the id was written, amber when the tool could not decide. This is the same
+  reasoning that made the icon check's thresholds acceptable: a wrong match becomes a glance rather than a silent
+  edit. Verified by rendering all three states (confident, unsure, already-on-wiki) and *measuring* that no tile
+  falls outside an ancestor, which is the check the 2026-10-01 clipping bug earned.
+  - **Rendering found two bugs that are invisible in the XAML.** A `Button`'s string `Content` eats an underscore as
+    an access-key prefix, so the upload button read `Upload Item3327.png` for a file actually called `Item_3327.png`
+    — a wrong file name on the one control whose whole job is to say which file it publishes. And the pipeline's
+    "could not identify" warning duplicated the review screen's existing "no lucy_img_ID" bar, which is exactly how
+    the warning strip got too long to read before; the pipeline now raises nothing and the screen's one bar names the
+    close candidate when there is one.
+- `tools/WikiSpike -- iconindex [--force]` builds the index through the same store the app uses; `iconsearch`
+  measures identification against the live wiki and writes `.local-data/icon-search.tsv` so the threshold can be
+  re-swept with no wiki traffic. `preview` now prints the matched id, its distance and margin, and its runners-up.
+
 **Creating a page for a new item (`Wiki.Analysis.ItemPageCreator`, `ItemCheckPipeline.CreateAsync`, 2026-10-01).**
 The item the wiki has never heard of — which is not an edge case but the whole category of "new in EQL". Measured on
 the user's own live ledger: **7 of 113 checked items have no page**, and the names say what they are —
@@ -1209,7 +1286,9 @@ them, and before this the tool's only offer on one was **Skip**.
   `CreateAsync` does not re-fetch, unlike `CommitAsync`. `MediaWikiClient.SaveAsync` is the single write path both
   go through, with the guard as the only difference between them, which is the difference worth seeing at a glance.
 - **A blank `lucy_img_ID` warns but does not block** (user, 2026-10-01), and the ledger is what makes that safe.
-  No capture can read an icon ID off the game, so a generated page always starts without one. The page is written
+  **Since 2026-10-02 a generated page usually has one** — the icon library identifies it from the captured artwork
+  (see "Identifying an item's icon" above), correctly on 87 of 90 corpus items. This rule still governs the rest: a
+  match the library cannot make confidently leaves the field blank rather than guessing. The page is written
   if the user wants it written — but **the outcome is read back off the text that was actually saved**, and a page
   still carrying a gap is recorded `Flagged`, not `Created`, so the item keeps coming back until somebody fills it
   in. Without that, warn-don't-block would lose the icon permanently, because a settled row never reaches the wiki
@@ -2167,6 +2246,16 @@ dotnet run --project tools/WikiSpike -- icons "samples/12a-3-ear-items.png"
 
 # Find the icon strip in a window (the icon has no frame, so it has to be measured, not traced):
 dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --icon
+
+# The icon library: fingerprint every icon the game ships (game_assets/item_icons, 11,592 files) into the index the
+# app loads at startup. Cached in app-data and rebuilt automatically when the folder changes, so this is only needed
+# to warm it or to force a rebuild:
+dotnet run --project tools/WikiSpike -- iconindex [--force]
+
+# Can a captured icon be identified among all 11,562? The measurement that sets IconLibrary.ConfidentMargin — every
+# corpus capture against the whole library, scored against the item's own live wiki page. Writes a TSV so the
+# threshold can be re-swept without touching the wiki again:
+dotnet run --project tools/WikiSpike -- iconsearch
 # The analyze summary also cross-tabs template-compliance findings by rule and by whether the tool can fix them.
 
 # Store the bot password (prompts; never pass it as an argument — that lands in shell history and the process

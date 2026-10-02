@@ -185,8 +185,90 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public bool HasLoreImage => _loreImage is not null;
 
-    /// <summary>Whether there is anything to show in the icon section — at least one of the two images.</summary>
-    public bool HasIcons => Result.CapturedIconImage is not null || Result.WikiIconImage is not null;
+    /// <summary>Whether there is anything to show in the icon section — at least one of the images.</summary>
+    public bool HasIcons =>
+        Result.CapturedIconImage is not null || Result.WikiIconImage is not null || MatchedIconImage is not null;
+
+    /// <summary>The artwork the icon library matched, for a new item. This is what the user confirms against the
+    /// captured icon — see <c>IconLibrary.ConfidentMargin</c> for why the eye is the backstop and not the number.
+    /// </summary>
+    public CapturedImage? MatchedIconImage => Result.IconSuggestion?.Image;
+
+    public bool HasMatchedIcon => MatchedIconImage is not null;
+
+    /// <summary>Shown only on a creation: on an existing page the icon is compared, never proposed.</summary>
+    public bool ShowMatchedIcon => IsCreation && Result.IconSuggestion is not null;
+
+    /// <summary>
+    /// What the user is being asked to do with this column, which changed when the icon became identifiable.
+    ///
+    /// It used to read "read the lucy_img_ID off this artwork", which was the only thing available: no capture can
+    /// read an icon id off the game, so the user looked the icon up by hand. With a confident match that instruction
+    /// is stale — the id is already in the box, and the job is now to confirm it rather than to find it.
+    /// </summary>
+    public string IconColumnHint => Result.IconSuggestion switch
+    {
+        { IsConfident: true } s =>
+            $"The icon library matched this artwork to {s.IconId}, which is already filled in below. Check the two " +
+            "images agree before saving.",
+        { IsConfident: false } =>
+            "The icon library could not decide between two similar icons, so lucy_img_ID was left blank. Its closest " +
+            "guess is shown on the right.",
+        _ => "Read the item's lucy_img_ID off this artwork.",
+    };
+
+    /// <summary>
+    /// Names the id, because the id is the thing being written into the page — and says plainly when the tool is not
+    /// sure, since an unsure match leaves <c>lucy_img_ID</c> blank and becomes the user's job.
+    /// </summary>
+    public string MatchedIconCaption => Result.IconSuggestion switch
+    {
+        { IsConfident: true } s => $"Matched: {s.IconId}",
+        { } s => $"Closest: {s.IconId} (unsure)",
+        _ => "",
+    };
+
+    /// <summary>Green for a match written into the page, amber for one the user has to settle — the same two-state
+    /// reading the rest of the panel uses.</summary>
+    public Brush MatchedIconBorderBrush =>
+        Result.IconSuggestion is { IsConfident: true } ? Palette.Done : Palette.Warning;
+
+    /// <summary>Whether to offer the upload: the tool is sure which icon it is, and the wiki is known not to have
+    /// it. An unknown answer deliberately does not offer — see <c>IconSuggestion.CanUpload</c>.</summary>
+    public bool CanUploadIcon => Result.IconSuggestion?.CanUpload == true && !_iconUploaded;
+
+    public string IconUploadPrompt => Result.IconSuggestion is { } s
+        ? $"The wiki has no {s.WikiFileName}, so this item's box would render without artwork until it is uploaded."
+        : "";
+
+    public string IconUploadButtonText =>
+        Result.IconSuggestion is { } s ? $"Upload {s.WikiFileName} to the wiki" : "Upload the icon";
+
+    private bool _iconUploaded;
+    private string? _iconUploadOutcome;
+    private bool _iconUploadFailed;
+
+    public string? IconUploadOutcome => _iconUploadOutcome;
+
+    public bool HasIconUploadOutcome => !string.IsNullOrWhiteSpace(_iconUploadOutcome);
+
+    public Brush IconUploadOutcomeBrush => _iconUploadFailed ? Palette.Attention : Palette.Done;
+
+    /// <summary>Records what the upload did. Kept on the view model rather than re-running the check, because the
+    /// capture is gone and re-asking the wiki would only confirm what it just told us.</summary>
+    public void RecordIconUpload(bool uploaded, string? url, string? error)
+    {
+        _iconUploaded = uploaded;
+        _iconUploadFailed = !uploaded;
+        _iconUploadOutcome = uploaded
+            ? $"Uploaded{(url is null ? "." : $" — {url}")}"
+            : $"The icon was not uploaded: {error}";
+
+        OnPropertyChanged(nameof(CanUploadIcon));
+        OnPropertyChanged(nameof(IconUploadOutcome));
+        OnPropertyChanged(nameof(HasIconUploadOutcome));
+        OnPropertyChanged(nameof(IconUploadOutcomeBrush));
+    }
 
     /// <summary>Whether each side actually has artwork to show. **An absent icon must look absent**: an empty
     /// <c>Border</c> keeps its near-black background and reads as a corrupt icon, which is how one of these got
@@ -391,6 +473,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(Formatting));
             OnPropertyChanged(nameof(HasFormatting));
             OnPropertyChanged(nameof(CanCommitFormatting));
+            OnPropertyChanged(nameof(CanUploadIcon));
+            OnPropertyChanged(nameof(IsNotBusy));
         }
     }
 
@@ -422,6 +506,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             Set(ref _formattingOutcome, value);
             OnPropertyChanged(nameof(HasFormattingOutcome));
             OnPropertyChanged(nameof(CanCommitFormatting));
+            OnPropertyChanged(nameof(CanUploadIcon));
+            OnPropertyChanged(nameof(IsNotBusy));
         }
     }
 
@@ -481,6 +567,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
             OnPropertyChanged(nameof(CanCommitFormatting));
+            OnPropertyChanged(nameof(CanUploadIcon));
+            OnPropertyChanged(nameof(IsNotBusy));
             OnPropertyChanged(nameof(HasOutcome));
         }
     }
@@ -501,6 +589,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public string? CaptureTip => _captureFile is null ? null : $"Captured frame: {_captureFile}";
 
+    /// <summary>The inverse of <see cref="IsBusy"/>, for controls that are enabled while idle. A converter for one
+    /// binding would be more machinery than a property.</summary>
+    public bool IsNotBusy => !IsBusy;
+
     public bool IsBusy
     {
         get => _isBusy;
@@ -512,6 +604,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
             OnPropertyChanged(nameof(CanCommitFormatting));
+            OnPropertyChanged(nameof(CanUploadIcon));
+            OnPropertyChanged(nameof(IsNotBusy));
         }
     }
 
@@ -637,11 +731,17 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             // Worded for what it costs rather than quoted from the compliance rule, because this is the one gap
             // every creation starts with and the user has to decide about it every time: no capture can read an
             // icon ID off the game, so it is typed or it is missing.
+            // One bar for the icon gap, whatever the reason. When the library had a near-miss it names the candidate,
+            // because "it is probably this one, check it" is a different job from "type one in" — but it is still the
+            // same gap, and two bars about one gap is how this strip got too long to read before.
             if (!creation.HasIconId)
-                yield return
-                    "No lucy_img_ID — the item box will render without artwork. The icon from the window is shown " +
-                    "above; fill the ID in below, or create the page now and add it later (the item will keep " +
-                    "coming back until you do).";
+                yield return result.IconSuggestion is { IsConfident: false } unsure
+                    ? $"No lucy_img_ID — the closest icon is {unsure.IconId}, but another is nearly as close, so the " +
+                      "tool did not fill it in. Compare the artwork shown above and type the ID below, or create the " +
+                      "page now and add it later (the item will keep coming back until you do)."
+                    : "No lucy_img_ID — the item box will render without artwork. The icon from the window is shown " +
+                      "above; fill the ID in below, or create the page now and add it later (the item will keep " +
+                      "coming back until you do).";
 
             foreach (string gap in creation.Gaps)
             {

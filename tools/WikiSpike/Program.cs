@@ -1,5 +1,6 @@
 using EQLWikiAssistant.Capture;
 using EQLWikiAssistant.TestSupport;
+using EQLWikiAssistant.Pipeline;
 using EQLWikiAssistant.Wiki.MediaWiki;
 using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Items;
@@ -52,6 +53,8 @@ switch (args[0])
     case "prettyshow": return ShowPrettified();
     case "icons": return args.Contains("--corpus") ? await MeasureIconsAcrossCorpusAsync() : await CompareIconsAsync();
     case "icondiff": return await DiffIconPixelsAsync();
+    case "iconindex": return await BuildIconIndexAsync();
+    case "iconsearch": return await MeasureIconSearchAsync();
     case "verified": return await VerifiedAsync();
     case "preview": return await PreviewEditsAsync();
     case "login": return Login();
@@ -589,6 +592,10 @@ async Task<int> PreviewEditsAsync()
     IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
 
+    // Optional, exactly as it is in the app: without it a generated page simply has a blank lucy_img_ID.
+    IconLibrary? iconLibrary = await IconLibraryStore.LoadOrBuildAsync(
+        RepoPaths.IconLibraryDirectory, AppPaths.IconIndexFile, new WindowsImageDecoder());
+
     foreach (LocatedWindow window in windows)
     {
         if (window.PossiblyOccluded) { Console.WriteLine("--- (occluded window, skipped)"); continue; }
@@ -625,7 +632,26 @@ async Task<int> PreviewEditsAsync()
             // it has to be judged — the same reason the rest of this command exists.
             if (lookup.MayCreate)
             {
-                ProposedPage? proposal = ItemPageCreator.Build(item, item.Name);
+                // The icon the library recognizes, which is what fills lucy_img_ID on a generated page. Identified
+                // here so the whole page can be judged as the user will see it — a blank icon id was the one gap
+                // every creation used to start with, and whether that is now filled *correctly* is a question about
+                // real captures rather than about unit tests.
+                string? iconId = null;
+                if (iconLibrary is not null && ItemIconReader.TryRead(image, window, out IconFingerprint capturedIcon))
+                {
+                    IconIdentification? found = iconLibrary.Identify(capturedIcon);
+                    if (found is null) Console.WriteLine("    icon: not comparable");
+                    else
+                    {
+                        Console.WriteLine(
+                            $"    icon: {(found.IsConfident ? "matched" : "UNSURE")} {found.IconId} " +
+                            $"(distance {found.Distance:F4}, margin {found.Margin:F4}) " +
+                            $"runners-up {string.Join(", ", found.Candidates.Skip(1).Take(3).Select(c => $"{c.IconId}@{c.Distance:F4}"))}");
+                        if (found.IsConfident) iconId = found.IconId;
+                    }
+                }
+
+                ProposedPage? proposal = ItemPageCreator.Build(item, item.Name, null, iconId);
                 if (proposal is null) { Console.WriteLine("    could not generate a page"); continue; }
 
                 Console.WriteLine($"    summary: {proposal.Summary}");
@@ -746,7 +772,9 @@ async Task<int> WhoAmIAsync()
     UserInfo info = await client.GetUserInfoAsync();
     Console.WriteLine($"The wiki sees: {info.Name}{(info.IsAnonymous ? " (ANONYMOUS — the login did not stick)" : "")}");
     Console.WriteLine($"  edit existing pages : {(info.CanEdit ? "yes" : "NO — re-create the bot password with that grant")}");
-    Console.WriteLine($"  create new pages    : {(info.CanCreate ? "yes" : "no")} (v1 never creates a page, so this is optional)");
+    Console.WriteLine($"  create new pages    : {(info.CanCreate ? "yes" : "no")}");
+    Console.WriteLine($"  upload new files    : {(info.CanUpload ? "yes" : "NO — add the \"Upload new files\" grant at Special:BotPasswords to upload item icons")}");
+    Console.WriteLine($"  overwrite files     : {(info.CanReupload ? "yes" : "no")} (never needed — the tool only uploads an icon the wiki lacks)");
 
     if (info.IsAnonymous || !info.CanEdit) return 1;
 
@@ -1046,5 +1074,177 @@ async Task<int> VerifiedAsync()
     }
 
     Console.WriteLine($"cached item pages: {items}, verified {done} ({(items == 0 ? 0 : 100.0 * done / items):F1}%)");
+    return 0;
+}
+
+// Builds the icon-library fingerprint index from the extracted game assets. The same arrangement as the glyph atlas:
+// a generated artifact with its generator kept in the repo, because fingerprinting 11,592 PNGs is far too slow to do
+// at startup while the result never changes unless the game patches.
+async Task<int> BuildIconIndexAsync()
+{
+    string folder = RepoPaths.IconLibraryDirectory;
+    string output = IconIndexPath();
+
+    Console.WriteLine($"fingerprinting {folder}");
+    Console.WriteLine($"  index -> {output}");
+    var clock = System.Diagnostics.Stopwatch.StartNew();
+    int lastReport = 0;
+
+    // Goes through the same store the app does, rather than building the index a second way: the staleness rule is
+    // the whole value of that type, and a tool that wrote an index without the stamp beside it would produce one the
+    // app then rebuilt on sight.
+    (IconLibrary? library, bool rebuilt) = await IconLibraryStore.LoadOrBuildAsync(
+        folder,
+        output,
+        new WindowsImageDecoder(),
+        (done, total) =>
+        {
+            if (done - lastReport < 2000 && done != total) return;
+            lastReport = done;
+            Console.WriteLine($"  {done}/{total}  ({clock.Elapsed.TotalSeconds:F0}s)");
+        },
+        force: args.Contains("--force"));
+
+    if (library is null) { Console.Error.WriteLine($"No icon library at {folder}."); return 1; }
+
+    Console.WriteLine();
+    Console.WriteLine(rebuilt
+        ? $"built {library.Count} fingerprint(s) in {clock.Elapsed.TotalSeconds:F0}s"
+        : $"loaded {library.Count} fingerprint(s) from the cached index (pass --force to rebuild)");
+    if (File.Exists(output)) Console.WriteLine($"  index size: {new FileInfo(output).Length / 1024.0:F0} KiB");
+
+    int files = Directory.GetFiles(folder, "*.png").Length;
+    // Named rather than counted: a library quietly missing entries would answer searches with the second-best icon
+    // and still look like it was working.
+    Console.WriteLine($"  icon files: {files}, fingerprinted: {library.Count}, " +
+                      $"skipped as too blank to fingerprint: {files - library.Count}");
+    return 0;
+}
+
+// Where the index is cached. The same path the app uses, so building it here warms the app's own cache rather than
+// producing a second copy that disagrees.
+string IconIndexPath() => AppPaths.IconIndexFile;
+
+/// <summary>
+/// Measures whether a captured in-game icon can be identified among the whole library — the number that decides
+/// whether the icon id may be filled in automatically or only ever suggested.
+///
+/// **This is a strictly harder question than the existing `icons` run**, and the difference is the point: that one
+/// compares one capture against one known file, so it only has to separate a right answer from a wrong one. This has
+/// to beat every one of 11,591 wrong answers. Ground truth is the `lucy_img_ID` on the item's own live wiki page.
+/// </summary>
+async Task<int> MeasureIconSearchAsync()
+{
+    IconLibrary? library = await IconLibraryStore.LoadOrBuildAsync(
+        RepoPaths.IconLibraryDirectory, IconIndexPath(), new WindowsImageDecoder());
+    if (library is null)
+    {
+        Console.Error.WriteLine($"No icon library at {RepoPaths.IconLibraryDirectory}.");
+        return 1;
+    }
+    Console.WriteLine($"library: {library.Count} icon(s)");
+
+    using var rapid = new RapidOcrEngine();
+    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+    using MediaWikiClient client = MediaWikiClient.Create(endpoint);
+
+    // One row per distinct item, with the id its own wiki page claims.
+    var rows = new List<(string Name, string TrueId, IconIdentification? Found, double Contrast)>();
+    var seen = new HashSet<string>(StringComparer.Ordinal);
+
+    foreach (string file in Directory.EnumerateFiles(RepoPaths.SamplesDirectory, "*.png").OrderBy(f => f))
+    {
+        CapturedImage image = await ImageFile.LoadAsync(file);
+        foreach (LocatedWindow window in await ItemWindowLocator.LocateAsync(image, ocr))
+        {
+            ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+            if (string.IsNullOrWhiteSpace(item.Name) || !seen.Add(item.Name)) continue;
+            if (!ItemIconReader.TryRead(image, window, out IconFingerprint captured)) continue;
+
+            ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
+            if (lookup.Outcome != LookupOutcome.Found) continue;
+            if (ItemPageDocument.Parse(lookup.Page!.Wikitext)?.IconId is not { Length: > 0 } trueId) continue;
+
+            rows.Add((item.Name, trueId, library.Identify(captured, candidates: 10), captured.Contrast));
+        }
+    }
+
+    int top1 = 0, top3 = 0, top10 = 0, refused = 0;
+    var misses = new List<string>();
+    var margins = new List<(double Margin, bool Correct)>();
+
+    foreach ((string name, string trueId, IconIdentification? found, double contrast) in rows)
+    {
+        if (found is null) { refused++; continue; }
+
+        var ranked = found.Candidates.Select(c => c.IconId).ToList();
+        bool correct = ranked.Count > 0 && ranked[0] == trueId;
+        if (correct) top1++;
+        if (ranked.Take(3).Contains(trueId)) top3++;
+        if (ranked.Contains(trueId)) top10++;
+        margins.Add((found.Margin, correct));
+
+        if (!correct)
+            misses.Add($"  {name,-34} wiki says {trueId,-6} tool says {found.IconId,-6} " +
+                       $"d={found.Distance:F4} margin={found.Margin:F4} rank of truth=" +
+                       $"{(ranked.IndexOf(trueId) < 0 ? ">10" : (ranked.IndexOf(trueId) + 1).ToString())}");
+    }
+
+    int judged = rows.Count - refused;
+    Console.WriteLine();
+    Console.WriteLine($"=== captured icon -> library, {rows.Count} distinct item(s) with a wiki icon id ===");
+    Console.WriteLine($"  refused (not comparable): {refused}");
+    if (judged > 0)
+    {
+        Console.WriteLine($"  top-1  : {top1}/{judged}  ({100.0 * top1 / judged:F1}%)");
+        Console.WriteLine($"  top-3  : {top3}/{judged}  ({100.0 * top3 / judged:F1}%)");
+        Console.WriteLine($"  top-10 : {top10}/{judged}  ({100.0 * top10 / judged:F1}%)");
+    }
+
+    if (misses.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- where the top answer was not the wiki's id ---");
+        foreach (string m in misses) Console.WriteLine(m);
+    }
+
+    // A TSV of every row, so the threshold can be re-swept offline. The sweep below is the whole reason this command
+    // exists, and re-running it costs a live wiki lookup per item — which is a bad reason not to re-measure.
+    string tsv = Path.Combine(RepoPaths.LocalDataDirectory, "icon-search.tsv");
+    Directory.CreateDirectory(RepoPaths.LocalDataDirectory);
+    await File.WriteAllLinesAsync(tsv,
+        new[] { "item	wikiId	bestId	distance	margin	contrast	rankOfTruth" }.Concat(
+            rows.Where(r => r.Found is not null).Select(r =>
+            {
+                var ranked = r.Found!.Candidates.Select(c => c.IconId).ToList();
+                int rank = ranked.IndexOf(r.TrueId);
+                return $"{r.Name}	{r.TrueId}	{r.Found.IconId}	{r.Found.Distance:F6}	" +
+                       $"{(double.IsInfinity(r.Found.Margin) ? 99 : r.Found.Margin):F6}	{r.Contrast:F6}	" +
+                       $"{(rank < 0 ? 99 : rank + 1)}";
+            })));
+    Console.WriteLine();
+    Console.WriteLine($"wrote {tsv}");
+
+    // **Two gates, because the three failures are two different kinds.** An absolute distance catches "nothing in
+    // the library looks like this" (Puppet Strings, best match 0.3754 — far past the measured 0.13 same-icon
+    // threshold). A margin catches "several things look like this and one barely won". Neither catches both.
+    Console.WriteLine();
+    Console.WriteLine($"--- gate sweep: distance <= {IconFingerprint.SameIconThreshold} AND margin >= threshold ---");
+    Console.WriteLine("  threshold   accepted   of which wrong   correct answers rejected");
+    var gated = rows.Where(r => r.Found is not null)
+        .Select(r => (r.Found!.Distance, r.Found.Margin, Correct: r.Found.Candidates[0].IconId == r.TrueId))
+        .ToList();
+    int byDistance = gated.Count(g => g.Distance > IconFingerprint.SameIconThreshold);
+    Console.WriteLine($"  (rejected by the distance gate alone: {byDistance})");
+    foreach (double t in new[] { 0.0, 0.005, 0.01, 0.02, 0.03, 0.04, 0.05, 0.075, 0.10 })
+    {
+        bool Pass((double Distance, double Margin, bool Correct) g) =>
+            g.Distance <= IconFingerprint.SameIconThreshold && g.Margin >= t;
+        int accepted = gated.Count(Pass);
+        int acceptedWrong = gated.Count(g => Pass(g) && !g.Correct);
+        int rejectedRight = gated.Count(g => !Pass(g) && g.Correct);
+        Console.WriteLine($"  {t,9:F3}   {accepted,8}   {acceptedWrong,14}   {rejectedRight,24}");
+    }
+
     return 0;
 }

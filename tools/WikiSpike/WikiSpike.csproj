@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\EQLWikiAssistant.Pipeline\EQLWikiAssistant.Pipeline.csproj" />
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Wiki\EQLWikiAssistant.Wiki.csproj" />
     <ProjectReference Include="..\EQLWikiAssistant.TestSupport\EQLWikiAssistant.TestSupport.csproj" />
     <ProjectReference Include="..\..\src\EQLWikiAssistant.Ocr\EQLWikiAssistant.Ocr.csproj" />

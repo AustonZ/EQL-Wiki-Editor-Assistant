@@ -253,6 +253,46 @@ public partial class MainWindow : Window
         // large enough to compare by eye, which is the whole reason they are here.
         CapturedIconImage.Source = view?.Result.CapturedIconImage is { } shot ? ToBitmap(shot, 4) : null;
         WikiIconImage.Source = view?.Result.WikiIconImage is { } wiki ? ToBitmap(wiki, 4) : null;
+        // The library's match, at the same 4x, so comparing it against the captured strip beside it is a glance.
+        MatchedIconImage.Source = view?.MatchedIconImage is { } matched ? ToBitmap(matched, 4) : null;
+    }
+
+    /// <summary>
+    /// Uploads the matched icon to the wiki.
+    ///
+    /// **Confirmed, and the confirmation says the file name**, because that is the permanent part: nobody with an
+    /// ordinary account on this wiki can delete a file. The client refuses rather than overwrites, so the worst
+    /// outcome of a mistake here is a refusal — but a file uploaded under the wrong name still cannot be taken back,
+    /// and the name is the one thing the user can check that the tool cannot.
+    /// </summary>
+    private async void OnUploadIconClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel view || _services is null) return;
+        if (view.Result.IconSuggestion is not { CanUpload: true } suggestion) return;
+
+        if (MessageBox.Show(
+                this,
+                $"Upload this icon to the wiki as '{suggestion.WikiFileName}'?\n\nCheck it against the in-game " +
+                "icon first — nobody on this wiki can delete a file once it is uploaded.",
+                "Upload an item icon",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning) != MessageBoxResult.OK)
+            return;
+
+        view.IsBusy = true;
+        try
+        {
+            IconUploadResult uploaded = await _services.Pipeline.UploadIconAsync(suggestion.IconId);
+            view.RecordIconUpload(uploaded.Uploaded, uploaded.Url, uploaded.Error);
+        }
+        catch (WikiUnavailableException ex)
+        {
+            ReportWikiUnavailable(ex, "The icon was not uploaded");
+        }
+        finally
+        {
+            view.IsBusy = false;
+        }
     }
 
     /// <summary>
