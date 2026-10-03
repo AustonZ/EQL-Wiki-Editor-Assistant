@@ -7129,6 +7129,54 @@
       ]
     },
     {
+      "file": "14-race-restricted-item.png",
+      "verified": false,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Feir`Dal Fletching Kit",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ELF",
+            "DEF",
+            "VAH"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "GIANT"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            },
+            {
+              "label": "Capacity",
+              "value": "10"
+            },
+            {
+              "label": "Size Cap",
+              "value": "LARGE"
+            },
+            {
+              "label": "Container",
+              "value": "CLOSED."
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 silver",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "20-stalwart-seas-false-occlusion.png",
       "verified": true,
       "windows": [

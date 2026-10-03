@@ -1891,6 +1891,16 @@ body by pattern-matching each row, since the body's actual field set varies a lo
   truncated class list, empty races, and the continuation consumed as the item's *slot*. Continuation rows are
   absorbed into the list above them; class/race codes are short and ALL-CAPS, which is what distinguishes them
   from the bare slot row that can also follow (slots read `Range Ammo`, `Primary Secondary`, `Ear` — mixed case).
+- **`Races` is a restriction list like `Class`, and there is finally a sample proving it** (user, 2026-10-03,
+  Feir`Dal Fletching Kit: `Race: ELF DEF VAH`). Every one of the 109 windows captured before it said `ALL`,
+  `NONE` or nothing, so the field's list behaviour was implemented from the game's rules and tested by nothing —
+  the plan called that gap evidential rather than behavioural, and it was right, but only a real capture could
+  show it. `14-race-restricted-item.png` closes it, and the entry reads exactly as it should: three codes, parsed
+  the same way `Class` is. **Don't "simplify" `Races` to a single string** on the grounds that it is almost always
+  `ALL` — now there is a corpus entry that fails if anyone does.
+  - It is a useful sample beyond races: a container with no flags line and no slot, a merchant value of `1 silver`,
+    a `Container: CLOSED.` whose trailing period is really on screen, and a name carrying the grave accent the
+    atlas keeps distinct from an apostrophe.
 - **`Slots` is a list, not a string.** An item can be equippable in several slots, and the game lists them
   space-separated on that one unlabeled row: `Primary Secondary` and `Range Ammo` are common, and odder pairings
   exist (a shield usable in Secondary *or* Back; an item usable in Chest *or* Waist). Empty for items with no slot
@@ -2114,17 +2124,17 @@ invisible that way by definition.
   corpus test gates structural, silent-wrong, wrong and missing, and has never gated warnings. Those
   ratchets in `CorpusAccuracyTests` are all 0 and must stay there; a regression is now a real defect
   rather than a known gap being re-measured. (It read 43 samples / 101 windows / 2094 fields when the user first
-  verified the whole set on 2026-09-24; the growth is captures added since, and the occluded count fell from 2 to 1
-  when the HUD-panel bug above was fixed.) Under the previous configuration (RapidOCR reading window crops) the same
+  verified the whole set on 2026-09-24, and 47 / 109 / 2216 on 2026-10-01; the growth is captures added since, and
+  the occluded count fell from 2 to 1 when the HUD-panel bug above was fixed.) Under the previous configuration (RapidOCR reading window crops) the same
   corpus and the same ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them
   a glyph-level failure that exact template matching removed outright. `AccuracySpike --rapid` still scores the old
   configuration, so the comparison stays reproducible.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
     newly bootstrapped sample guards against regressions immediately; the flag only records whether a human has
-    checked it against the screenshot, and the summary counts it (`47 samples scored (46 verified)`). **46 of 47 are
-    verified**: `20-stalwart-seas-false-occlusion.png` was bootstrapped on 2026-09-30 and cross-checked against the
-    pixels at 4-6x (`AC: 35`, `Weight: 7.3`, `8 platinum 5 gold 7 silver 1 copper`) but not yet signed off by the
-    user.
+    checked it against the screenshot, and the summary counts it (`48 samples scored (47 verified)`). **47 of 48 are
+    verified**; the outstanding one is `14-race-restricted-item.png`, bootstrapped 2026-10-03 and cross-checked
+    against the pixels at 3x but not yet signed off by the user. (This entry previously said the same of
+    `20-stalwart-seas-false-occlusion.png`, which the user signed off in `6f79395` — the note outlived the fact.)
   - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure** — a sample that is
     located and parsed but compared against nothing. `AccuracySpike --bootstrap --only <substring>` adds one entry
     for it, merging into the tracked corpus rather than regenerating the whole file.
@@ -2390,4 +2400,12 @@ dotnet run --project tools/CaptureSpike -- capture "<title>" "samples/NN-descrip
 Arrange the game, alt-tab to a terminal, then capture — Graphics Capture reads an unfocused window fine. Samples
 are named `NN-description.png` (with a sub-letter for variants of one scenario, e.g. `06a`/`06b`), and the golden
 tests reference those names directly, so renaming one means updating the tests. Current coverage is the geometry
-and negative cases; item-type, exaltation and eligibility captures are still to come.
+and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*`) and one race-restricted item
+(`14`); exaltation and eligibility captures are still to come.
+
+**A sample can come from the debug-capture archive rather than a fresh capture.** A Debug build already files every
+frame under `%APPDATA%\EQLWikiAssistant\debug-captures`, named after the items in it, so an interesting item the
+user has already looked at is usually sitting there — which is how `14-race-restricted-item.png` was added without
+asking them to go and find the item again. Copy it into `samples/` under the naming convention, then
+`AccuracySpike --bootstrap --only <substring>` merges one entry into the tracked ground truth without touching the
+others.
