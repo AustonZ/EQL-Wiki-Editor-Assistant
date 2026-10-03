@@ -47,8 +47,30 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         return new MediaWikiClient(http, endpoint, ownsHttpClient: true);
     }
 
-    /// <summary>True once <see cref="LoginAsync"/> has succeeded in this session.</summary>
+    /// <summary>
+    /// True once <see cref="LoginAsync"/> has succeeded in this session.
+    ///
+    /// **It records what this process did, not what the wiki still believes**, which is the distinction that cost
+    /// the user a failed save (2026-10-02). A MediaWiki session expires on its own schedule and a cookie can be
+    /// dropped, so a client that logged in an hour ago can be anonymous now with nothing locally having changed.
+    /// Hence <see cref="ReestablishSession"/>, and hence this flag being cleared the moment the wiki says the
+    /// session is gone rather than only when a login fails.
+    /// </summary>
     public bool IsLoggedIn { get; private set; }
+
+    /// <summary>
+    /// Logs in again when the wiki says this session is no longer authenticated. Returns true if a fresh session
+    /// was established. Left null, a lost session is simply reported, which is what it did before.
+    ///
+    /// **It lives here because the session does.** Every write already funnels through this class, so a repair
+    /// attached here covers both commits, the creation, the upload and <c>WikiSpike</c> alike — where putting it in
+    /// the pipeline would mean four copies of the same recovery, which is the duplication this codebase has paid
+    /// for four times (the ledger fingerprint, the login gate, the flag dialect, the lore join).
+    ///
+    /// The host supplies it rather than this class reading Credential Manager itself: which credential to use, and
+    /// whether to use one at all, is the composition root's decision.
+    /// </summary>
+    public Func<CancellationToken, Task<bool>>? ReestablishSession { get; set; }
 
     public async Task<WikiPage?> FetchPageAsync(string title, CancellationToken cancellationToken = default)
     {
@@ -236,7 +258,8 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         };
         foreach ((string key, string value) in guard) parameters[key] = value;
 
-        using JsonDocument response = await PostAsync(parameters, cancellationToken).ConfigureAwait(false);
+        using JsonDocument response = await PostRenewingALostSessionAsync(parameters, cancellationToken)
+            .ConfigureAwait(false);
         JsonElement edit = response.RootElement.GetProperty("edit");
 
         string result = edit.TryGetProperty("result", out JsonElement r2) ? r2.GetString() ?? "" : "";
@@ -283,32 +306,47 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
 
         _csrfToken ??= await FetchTokenAsync("csrf", cancellationToken).ConfigureAwait(false);
 
-        using var form = new MultipartFormDataContent
+        // Built per attempt rather than once: an HttpContent cannot be sent twice, so a retry after the session is
+        // renewed needs its own form — and that form has to carry the new session's token anyway.
+        async Task<JsonDocument> SendAsync()
         {
-            { new StringContent("upload"), "action" },
-            { new StringContent("json"), "format" },
-            { new StringContent("2"), "formatversion" },   // see AddFormat for why
-            { new StringContent(fileName), "filename" },
-            { new StringContent(comment), "comment" },
-            { new StringContent(description), "text" },
-            { new StringContent(_csrfToken), "token" },
-            { new StringContent("user"), "assert" },
-        };
+            using var form = new MultipartFormDataContent
+            {
+                { new StringContent("upload"), "action" },
+                { new StringContent("json"), "format" },
+                { new StringContent("2"), "formatversion" },   // see AddFormat for why
+                { new StringContent(fileName), "filename" },
+                { new StringContent(comment), "comment" },
+                { new StringContent(description), "text" },
+                { new StringContent(_csrfToken!), "token" },
+                { new StringContent("user"), "assert" },
+            };
 
-        var file = new ByteArrayContent(content);
-        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
-        form.Add(file, "file", fileName);
+            var file = new ByteArrayContent(content);
+            file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            form.Add(file, "file", fileName);
+
+            try
+            {
+                using HttpResponseMessage message = await _http
+                    .PostAsync(_endpoint, form, cancellationToken).ConfigureAwait(false);
+                return await ReadAsync(message, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (IsUnreachable(ex, cancellationToken))
+            {
+                throw Unavailable(ex);
+            }
+        }
 
         JsonDocument response;
         try
         {
-            using HttpResponseMessage message = await _http
-                .PostAsync(_endpoint, form, cancellationToken).ConfigureAwait(false);
-            response = await ReadAsync(message, cancellationToken).ConfigureAwait(false);
+            response = await SendAsync().ConfigureAwait(false);
         }
-        catch (Exception ex) when (IsUnreachable(ex, cancellationToken))
+        catch (MediaWikiException ex) when (IsSessionLost(ex.Code))
         {
-            throw Unavailable(ex);
+            if (!await TryReestablishSessionAsync(cancellationToken).ConfigureAwait(false)) throw;
+            response = await SendAsync().ConfigureAwait(false);
         }
 
         using (response)
@@ -334,6 +372,63 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
             return new UploadResult(fileName, url);
         }
     }
+
+    /// <summary>
+    /// Posts a write, and — if the wiki answers that this session is not authenticated — logs in again and sends it
+    /// exactly once more.
+    ///
+    /// **Retrying a write is only safe because of what these particular codes mean.** MediaWiki checks
+    /// <c>assert</c> and the CSRF token *before* performing the action, so a request refused for either reason
+    /// changed nothing: there is no half-done edit to resend. Any other failure — an edit conflict, a protected
+    /// page, a refused upload — is passed straight out, because a retry there could duplicate real work.
+    /// </summary>
+    private async Task<JsonDocument> PostRenewingALostSessionAsync(
+        Dictionary<string, string> parameters, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await PostAsync(parameters, cancellationToken).ConfigureAwait(false);
+        }
+        catch (MediaWikiException ex) when (IsSessionLost(ex.Code))
+        {
+            if (!await TryReestablishSessionAsync(cancellationToken).ConfigureAwait(false)) throw;
+            parameters["token"] = _csrfToken!;
+            return await PostAsync(parameters, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Drops the session this client believed in and asks the host for a new one.
+    ///
+    /// **Forgetting comes first, and happens even when there is no way to log in again.** The app's write gate
+    /// short-circuits on <see cref="IsLoggedIn"/>, so leaving it true after the wiki has disowned the session means
+    /// the *next* write starts from the same dead state and fails the same way — which is how a single expiry
+    /// turned into "not logged in" on every attempt until the tool was restarted.
+    /// </summary>
+    private async Task<bool> TryReestablishSessionAsync(CancellationToken cancellationToken)
+    {
+        IsLoggedIn = false;
+        _csrfToken = null;
+
+        if (ReestablishSession is null) return false;
+        if (!await ReestablishSession(cancellationToken).ConfigureAwait(false) || !IsLoggedIn) return false;
+
+        // A CSRF token belongs to the session that issued it, so the new session needs its own.
+        _csrfToken = await FetchTokenAsync("csrf", cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>
+    /// Whether this error code means "the wiki no longer considers this session logged in" rather than something
+    /// about the request.
+    ///
+    /// <c>assertuserfailed</c> is the one that actually happens: every write sends <c>assert=user</c> precisely so
+    /// an expired session fails loudly instead of editing as an IP address, and this is that failure arriving.
+    /// <c>badtoken</c> is the same event seen through the CSRF token, which is session-bound and so stops being
+    /// valid at the same moment. The remaining two are how other modules phrase it.
+    /// </summary>
+    private static bool IsSessionLost(string code) =>
+        code is "assertuserfailed" or "assertnameduserfailed" or "badtoken" or "notloggedin" or "mustbeloggedin";
 
     private async Task<string> FetchTokenAsync(string type, CancellationToken cancellationToken)
     {

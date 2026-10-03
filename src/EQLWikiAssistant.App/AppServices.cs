@@ -120,6 +120,12 @@ public sealed class AppServices : IDisposable
         // runs this before either commit writes, and turns a refusal into an ordinary failed-commit message.
         Pipeline.BeforeWriting = EnsureLoggedInAsync;
 
+        // **And the gate is not enough on its own**, because a session can die after it has been passed (user,
+        // 2026-10-02). The gate only asks whether this process has logged in; the wiki can expire the session
+        // minutes later, and the next write then fails with "not logged in" however correct the credential is. The
+        // client repairs that itself and retries the write once — see MediaWikiClient.ReestablishSession.
+        Wiki.ReestablishSession = ReestablishSessionAsync;
+
         Capturer = new WindowCapturer();
     }
 
@@ -161,7 +167,23 @@ public sealed class AppServices : IDisposable
     public async Task<string?> EnsureLoggedInAsync(CancellationToken cancellationToken = default)
     {
         if (Wiki.IsLoggedIn) return null;
+        return await LogInAsync(cancellationToken);
+    }
 
+    /// <summary>
+    /// Starts a fresh session after the wiki has disowned the current one — <see cref="MediaWikiClient
+    /// .ReestablishSession"/>. The credential is already saved, so this needs nothing from the user and the write
+    /// that tripped it goes through on its retry.
+    ///
+    /// **It is the same login as the gate's, deliberately.** Two ways to log in would be two places to get the
+    /// credential lookup or its failure wording wrong, and the second one only ever runs when something has already
+    /// gone slightly wrong.
+    /// </summary>
+    private async Task<bool> ReestablishSessionAsync(CancellationToken cancellationToken) =>
+        await LogInAsync(cancellationToken) is null;
+
+    private async Task<string?> LogInAsync(CancellationToken cancellationToken)
+    {
         BotCredentials? credentials = Credentials.Read();
         if (credentials is null)
             return "No bot password is stored. Create one at https://eqlwiki.com/Special:BotPasswords with the " +

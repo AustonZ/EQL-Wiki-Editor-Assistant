@@ -1484,6 +1484,28 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
     session, so neither commit path could ever have failed this way. The gate is the testable form of the rule:
     `ItemCheckPipelineTests` now asserts both commits write nothing and fetch nothing when it refuses, with a
     negative control that a permissive gate still commits — and reinstating the bug fails exactly those tests.
+- **The gate answers "has this process logged in"; the wiki answers "is this session still good", and those are
+  different questions** (bug found by the user, 2026-10-02: "not logged in" on a save, with the credential stored and
+  a login already done that session). A MediaWiki session expires on its own schedule, so a write can be refused with
+  `assertuserfailed` long after the gate waved it through — and `AppServices.EnsureLoggedInAsync` short-circuits on
+  `IsLoggedIn`, so **every later write failed the same way until the tool was restarted**. The gate was not wrong, it
+  was answering a question whose answer had gone stale.
+  - **The repair lives in `MediaWikiClient`, not in the pipeline**, because the session does. One `ReestablishSession`
+    hook covers both commits, the creation, the upload and `WikiSpike` alike; putting it beside each
+    `BeforeWriting` call would have been the fourth copy of a rule this codebase has already paid to deduplicate.
+    `AppServices` points it at the same login the gate uses, so there is one credential lookup and one failure
+    wording.
+  - **Resending a write is safe here and nowhere else, which is why the retry is keyed on the error code.** MediaWiki
+    checks `assert` and the CSRF token *before* performing the action, so a request refused for either changed
+    nothing — there is no half-done edit to duplicate. An edit conflict, a protected page or a refused upload is
+    passed straight out. `assertuserfailed` is the code that actually occurs; `badtoken` is the same expiry seen
+    through the CSRF token, which is session-bound and dies with it.
+  - **The session is forgotten even when it cannot be renewed**, and that half matters on its own: it is what turns
+    "broken until restart" into "fails once, then the gate logs in again". Pinned by its own test, since a renewal
+    hook that happened to work would hide it.
+  - The retry sends the *new* session's CSRF token — a token belongs to the session that issued it — and the upload
+    rebuilds its multipart form, which cannot be sent twice. Both are asserted, and four of the five new tests fail
+    against the previous behaviour.
 - **Still to come here**: logging in needs `WikiSpike login` once — there is no in-app credential dialog yet
   (milestone 7), and no settings/mapping editor (milestone 6).
 

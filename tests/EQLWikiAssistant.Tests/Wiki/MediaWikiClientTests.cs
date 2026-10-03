@@ -213,6 +213,157 @@ public class MediaWikiClientTests
         Assert.Equal("editconflict", ex.Code);
     }
 
+    // --- a session that expired underneath us ------------------------------------------------------------
+
+    /// <summary>
+    /// **The session can die after the login gate has passed** (user, 2026-10-02: "not logged in" on a save, with
+    /// the credential saved and a login already done). `assert=user` is what turns that into a loud failure instead
+    /// of an anonymous edit; this is the tool answering that failure by logging in again and sending the edit once
+    /// more, rather than handing the user an error they can only fix by restarting it.
+    ///
+    /// Safe to resend precisely because of what the refusal means: MediaWiki checks `assert` before it edits, so
+    /// nothing was written.
+    /// </summary>
+    [Fact]
+    public async Task AnEditRefusedBecauseTheSessionExpiredLogsInAgainAndSucceeds()
+    {
+        var handler = new StubHandler(
+            Json("""{"query":{"tokens":{"logintoken":"t"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"first"}}}"""),
+            Json("""{"error":{"code":"assertuserfailed","info":"You are not logged in."}}"""),
+            // the renewal: a login token, the login itself, then a token belonging to the new session
+            Json("""{"query":{"tokens":{"logintoken":"t2"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"second"}}}"""),
+            Json("""{"edit":{"result":"Success","newrevid":4301}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+        await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"));
+
+        int renewals = 0;
+        client.ReestablishSession = async ct =>
+        {
+            renewals++;
+            await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"), ct);
+            return true;
+        };
+
+        EditResult result = await client.EditAsync("Sandbox", "text", "why", DateTimeOffset.UtcNow);
+
+        Assert.Equal(4301, result.NewRevisionId);
+        Assert.Equal(1, renewals);
+        Assert.True(client.IsLoggedIn);
+        // The retry must carry the *new* session's token — a CSRF token belongs to the session that issued it.
+        Assert.Contains("token=second", handler.Requests[^1]);
+    }
+
+    /// <summary>
+    /// The negative control, and it is the half that matters even with no way to log in again: the client stops
+    /// believing it has a session. The app's write gate short-circuits on <see cref="MediaWikiClient.IsLoggedIn"/>,
+    /// so leaving it true is what made one expiry fail every subsequent write until the tool was restarted.
+    /// </summary>
+    [Fact]
+    public async Task AnExpiredSessionIsForgottenEvenWhenItCannotBeRenewed()
+    {
+        var handler = new StubHandler(
+            Json("""{"query":{"tokens":{"logintoken":"t"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"c"}}}"""),
+            Json("""{"error":{"code":"assertuserfailed","info":"You are not logged in."}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+        await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"));
+        Assert.True(client.IsLoggedIn);
+
+        MediaWikiException ex = await Assert.ThrowsAsync<MediaWikiException>(
+            () => client.EditAsync("Sandbox", "text", "s", DateTimeOffset.UtcNow));
+
+        Assert.Equal("assertuserfailed", ex.Code);
+        Assert.False(client.IsLoggedIn);
+    }
+
+    /// <summary>
+    /// **Only a lost session is retried.** Every other refusal — a conflict, a protected page — means the request
+    /// itself was wrong or beaten to it, and resending one of those could duplicate real work. The stub answers
+    /// four requests and fails the test if a fifth is made, so a retry here cannot pass unnoticed.
+    /// </summary>
+    [Fact]
+    public async Task AnEditConflictIsNotRetried()
+    {
+        var handler = new StubHandler(
+            Json("""{"query":{"tokens":{"logintoken":"t"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"c"}}}"""),
+            Json("""{"error":{"code":"editconflict","info":"Edit conflict."}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+        await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"));
+
+        int renewals = 0;
+        client.ReestablishSession = _ => { renewals++; return Task.FromResult(true); };
+
+        await Assert.ThrowsAsync<MediaWikiException>(
+            () => client.EditAsync("Sandbox", "text", "s", DateTimeOffset.UtcNow));
+
+        Assert.Equal(0, renewals);
+        Assert.Equal(4, handler.Requests.Count);
+        Assert.True(client.IsLoggedIn);
+    }
+
+    /// <summary>
+    /// The upload path builds its own request — multipart, a different API module — so it needs its own proof. Its
+    /// form cannot be sent twice, which is why the retry rebuilds it.
+    /// </summary>
+    [Fact]
+    public async Task AnUploadRefusedBecauseTheSessionExpiredLogsInAgainAndSucceeds()
+    {
+        var handler = new StubHandler(
+            Json("""{"query":{"tokens":{"logintoken":"t"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"first"}}}"""),
+            Json("""{"error":{"code":"assertuserfailed","info":"You are not logged in."}}"""),
+            Json("""{"query":{"tokens":{"logintoken":"t2"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"second"}}}"""),
+            Json("""{"upload":{"result":"Success","imageinfo":{"url":"https://eqlwiki.com/images/Item_5797.png"}}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+        await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"));
+        client.ReestablishSession = async ct =>
+        {
+            await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"), ct);
+            return true;
+        };
+
+        UploadResult result = await client.UploadFileAsync(
+            "Item_5797.png", [1, 2, 3, 4], "An item icon.", "Uploading an item icon");
+
+        Assert.Equal("Item_5797.png", result.FileName);
+        Assert.Equal("https://eqlwiki.com/images/Item_5797.png", result.Url);
+        Assert.Contains("second", handler.Requests[^1], StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A renewal that fails leaves the original refusal in place rather than reporting the login's problem over it:
+    /// what the caller attempted was the write. The next write asks the gate, which has the better message, because
+    /// the session has been forgotten by then.
+    /// </summary>
+    [Fact]
+    public async Task AFailedRenewalLeavesTheOriginalRefusal()
+    {
+        var handler = new StubHandler(
+            Json("""{"query":{"tokens":{"logintoken":"t"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"c"}}}"""),
+            Json("""{"error":{"code":"assertuserfailed","info":"You are not logged in."}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+        await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"));
+        client.ReestablishSession = _ => Task.FromResult(false);
+
+        MediaWikiException ex = await Assert.ThrowsAsync<MediaWikiException>(
+            () => client.EditAsync("Sandbox", "text", "s", DateTimeOffset.UtcNow));
+
+        Assert.Equal("assertuserfailed", ex.Code);
+        Assert.False(client.IsLoggedIn);
+    }
+
     private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
     {
         Content = new StringContent(body, Encoding.UTF8, "application/json"),
