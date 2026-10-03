@@ -380,4 +380,61 @@ public class ItemPageEditorTests
         Assert.EndsWith(" more", edit.Summary);
         Assert.StartsWith("updated Field0, Field1, ", edit.Summary);
     }
+
+    // --- pointing a page at a different icon ------------------------------------------------------------
+
+    /// <summary>
+    /// The id changes where it stands and the rest of the page is byte-identical — the minimal-edit rule, which
+    /// matters as much for this value as any other: the user presses a button about an icon and must not be handed
+    /// a reflowed page to review (user, 2026-10-02).
+    /// </summary>
+    [Fact]
+    public void WithIconIdChangesTheIdInPlaceAndNothingElse()
+    {
+        string original = WikiFixtures.Load("Earring of Bashing");
+
+        string edited = ItemPageEditor.WithIconId(original, "617");
+
+        Assert.Contains("|lucy_img_ID = 617", edited);
+        Assert.DoesNotContain("752", edited);
+        // Everything either side of the value is untouched, which is what "in place" has to mean here.
+        Assert.Equal(
+            original.Replace("|lucy_img_ID = 752", "|lucy_img_ID = 617"),
+            edited);
+    }
+
+    /// <summary>A page with no such parameter gets one in the blueprint's order, the minimal-edit rule's third
+    /// case — not appended wherever it happened to be convenient.</summary>
+    [Fact]
+    public void WithIconIdWritesAMissingParameterInBlueprintOrder()
+    {
+        const string original = """
+            {{Itempage
+            |itemname = Molten Coil
+            |statsblock = AC: 5<br>
+            }}
+            """;
+
+        string edited = ItemPageEditor.WithIconId(original, "617");
+
+        Assert.Contains("617", edited);
+        Assert.True(
+            edited.IndexOf("itemname", StringComparison.Ordinal) <
+            edited.IndexOf("lucy_img_ID", StringComparison.Ordinal),
+            edited);
+        Assert.True(
+            edited.IndexOf("lucy_img_ID", StringComparison.Ordinal) <
+            edited.IndexOf("statsblock", StringComparison.Ordinal),
+            edited);
+    }
+
+    /// <summary>Text that is not an item page comes back untouched. The caller is editing what is on screen, which
+    /// the user may have been typing into — guessing at it would be worse than doing nothing.</summary>
+    [Fact]
+    public void WithIconIdLeavesSomethingItCannotReadAlone()
+    {
+        const string notAPage = "This page was never an item page.";
+
+        Assert.Equal(notAPage, ItemPageEditor.WithIconId(notAPage, "617"));
+    }
 }

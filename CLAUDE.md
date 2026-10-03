@@ -931,12 +931,13 @@ measured.
 - `tools/WikiSpike -- verified [<title>...]` prints the list's size and revision, answers specific titles, and
   censuses the cached corpus. That is where the 48/744 figure comes from.
 
-**Icon comparison (`Core.Icons`, `Wiki.MediaWiki.IconCache`) — flag only, per the plan.** Catches a page whose
-`lucy_img_ID` points at the wrong artwork. It never proposes a new id **for a page that already exists**: the tool
-cannot know whether the page is wrong or the capture caught something odd, and choosing one is a human's call.
-**A page that does not exist yet is the exception, and it is not an exception to the reasoning** — there is no id to
-be wrong and nothing to overwrite, so identifying one is an addition rather than a correction. See "Identifying an
-item's icon" below.
+**Icon comparison (`Core.Icons`, `Wiki.MediaWiki.IconCache`) — it flags; it never writes on its own.** Catches a page
+whose `lucy_img_ID` points at the wrong artwork. The tool cannot know whether the page is wrong or the capture caught
+something odd, so choosing is a human's call — and that rule is about the *writing*, which is the distinction the
+2026-10-02 change turned on. **Since then the flag names the right id and offers a button**, because the library had
+already identified the artwork in order to notice the mismatch; a page that does not exist gets its id filled in
+outright, there being nothing to overwrite. Either way nothing reaches a page without the user looking at two images
+and pressing something. See "Identifying an item's icon" below.
 - **The in-game icon has no frame.** The game draws the sprite with transparency straight onto the window's 16-grey,
   left of the item's name — nothing to trace, unlike the window outline. `ItemIconReader.IconStrip` is the region it
   occupies, measured across all 43 screenshots (`LocateSpike --icon`): window-relative x 12..52, y 52..100, with the
@@ -1194,8 +1195,38 @@ usually read: match the captured sprite against the library, and the matching fi
 - **The id and the artwork are written as a pair, which is what makes the previous point harmless.** The tool writes
   `lucy_img_ID = N` and, when the wiki lacks the file, uploads `game_assets/item_icons/N.png` as `File:Item_N.png` —
   the same N on both sides. So a created page renders the artwork the capture actually showed, whichever numbering the
-  wiki used historically. **This only ever runs on creation**: an existing page's icon id is still compared and
-  flagged, never rewritten, because there the tool cannot tell a wrong page from an odd capture.
+  wiki used historically.
+- **An existing page whose icon is wrong is now told which icon is right, and the offer is a button rather than an
+  edit** (user, 2026-10-02, on `Molten Coil`: the page says 765 and the right answer is 617). This supersedes the
+  flag-only rule above *for the proposal*, not for the writing. The tool still never re-points a page's icon on its
+  own — it had already searched the whole library to notice the mismatch and then threw the answer away, leaving the
+  user to look the id up by hand after being told their page was wrong.
+  - **Two triggers only: the comparison said mismatch, or the page has no `lucy_img_ID` at all.** A comparison that
+    could not judge — no file on the wiki, too little ink, too low contrast — is not evidence the id is wrong, so
+    offering a different one there would be guessing. The blank case was the user's call (asked, 2026-10-02) and has
+    the same gap with none of the risk.
+  - **The library agreeing with the page produces no offer**, which is a different finding and must not be confused
+    with this one: the id is right and the *file* holds the wrong artwork — the 31-file numbering divergence the icon
+    audit found — and the fix for that is re-uploading over somebody's file, which this tool refuses to do.
+  - **One button that does whatever is needed**, which the user chose over an upload-only one after the measurement
+    made the gap concrete: `File:Item_617.png` is *already on the wiki*, so an upload-only button would have shown
+    nothing at all on the case they reported. It uploads first when the wiki lacks the file (93% of the library) and
+    then sets the id; only the upload is confirmed, because only the upload is permanent. **A failed upload stops
+    before the id is written** — pointing a page at a file that is not there trades a wrong picture for no picture.
+  - **Applying rebuilds the diff and amends the summary.** The diff is computed once from the tool's own proposal, so
+    leaving it would show a diff that no longer describes what Save would write — the one property this screen cannot
+    give up. The summary gains `updated lucy_img_ID` for the same reason: a revision whose summary omits a change it
+    made is the page history this tool is supposed to be improving.
+  - **`ItemPageEditor.WithIconId` is the one edit in that file the analyzer did not decide**, and it goes through
+    `ItemPageDocument.WithParameter` like every other value — in place, so the diff shows the id changing and nothing
+    else, and in blueprint order when the parameter is absent. Text it cannot read as an item page comes back
+    untouched, since the caller is editing what is on screen.
+  - **Rendering found both bugs again, neither visible in the XAML.** The warning strip still ended "the tool never
+    changes an icon id", directly contradicting the button that now sat above it. And the new third tile's Border
+    overpainted the last letter of the wiki column's "none on the page" label, which is wider than the tile above it
+    — invisible until something sat to the right of that label. The clipping measurement reported 0 both times,
+    because it walks `Image` elements and this was a `TextBlock`: measure what a render is supposed to prove, and
+    then look at it as well.
 - **Uploading is the common case, not the exception**: the wiki holds **796** `Item_<id>.png` files against the
   library's 11,592, so **93% of icons are missing**. Measured, and it is why the upload button is part of the feature
   rather than a nicety.

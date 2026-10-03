@@ -392,6 +392,26 @@ public sealed class ItemCheckPipeline
         (IconComparison? icon, string? iconNote, CapturedImage? wikiIcon) =
             await CompareIconAsync(capturedIcon, iconUnreadableNote, page.IconId, cancellationToken).ConfigureAwait(false);
 
+        // **And when the comparison says the page is pointing at the wrong artwork, say which one is right** (user,
+        // 2026-10-02). Flagging alone left the user to find the id by hand — the tool had just searched 11,562
+        // icons to check this one and threw the answer away. It still *proposes* rather than acts: nothing reaches
+        // the wikitext until the user has looked at the two images and pressed the button, which is the same human
+        // confirmation that made the creation path's matcher acceptable.
+        //
+        // Only these two cases, deliberately. A page with no id at all has the same gap and no risk. A comparison
+        // that could not judge — no file on the wiki, too little ink, too low contrast — is *not* evidence the id is
+        // wrong, so offering a different one there would be guessing.
+        IconSuggestion? iconFix =
+            icon is { Matches: false } || string.IsNullOrWhiteSpace(page.IconId)
+                ? await SuggestIconAsync(capturedIcon, cancellationToken).ConfigureAwait(false)
+                : null;
+
+        // The library agreeing with the page is a different finding: the id is right and the *file* holds the wrong
+        // artwork, which is the 31-file numbering divergence the icon audit found. Re-uploading over it is the one
+        // act this tool refuses, so there is nothing to offer and the mismatch stays flagged.
+        if (iconFix is not null && string.Equals(iconFix.IconId, page.IconId, StringComparison.Ordinal))
+            iconFix = null;
+
         if (needsLore)
             warnings.Add(
                 "This item has a Lore tab that has not been captured. Switch to it and capture again so the lore " +
@@ -414,6 +434,7 @@ public sealed class ItemCheckPipeline
             WikiIconImage = wikiIcon,
             Icon = icon,
             IconNote = iconNote,
+            IconSuggestion = iconFix,
             Page = wikiPage,
             Lore = lore,
             NeedsLoreCapture = needsLore,
@@ -445,7 +466,8 @@ public sealed class ItemCheckPipeline
     /// stay silent: a false "wrong icon" sends the user hunting for a problem that is not there.
     /// </summary>
     /// <summary>
-    /// Identifies a captured icon against the whole library, for an item that has no page yet.
+    /// Identifies a captured icon against the whole library — for an item with no page, and for one whose page
+    /// points at the wrong artwork.
     ///
     /// **A search rather than a comparison, which is a harder question than it looks.** The icon check elsewhere only
     /// has to separate one right answer from one wrong one; this has to beat 11,561 wrong ones. It gates on the gap

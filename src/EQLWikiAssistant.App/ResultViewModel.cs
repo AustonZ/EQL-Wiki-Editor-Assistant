@@ -146,7 +146,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
                 .Where(f => f.IsChange || f.Blocks)
                 .Select(FindingViewModel.For) ?? [])
             .Concat(ComplianceRows(result)));
-        Replace(Warnings, BuildWarnings(result));
+        Replace(Warnings, BuildWarnings());
         FormattingDiff.Clear();
 
         // Through the property, not the field, so its diff gets built. A page that already matches arrives with its
@@ -196,8 +196,15 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public bool HasMatchedIcon => MatchedIconImage is not null;
 
-    /// <summary>Shown only on a creation: on an existing page the icon is compared, never proposed.</summary>
-    public bool ShowMatchedIcon => IsCreation && Result.IconSuggestion is not null;
+    /// <summary>
+    /// Shown whenever the library has something to say — on a creation, and on an existing page whose icon the
+    /// comparison flagged (user, 2026-10-02).
+    ///
+    /// It used to be creation-only, on the rule that an existing page's icon is compared and never proposed. That
+    /// rule still holds for what the tool *writes*; what changed is that it no longer throws away the answer it
+    /// already computed, leaving the user to look the id up by hand after being told their page is wrong.
+    /// </summary>
+    public bool ShowMatchedIcon => Result.IconSuggestion is not null;
 
     /// <summary>
     /// What the user is being asked to do with this column, which changed when the icon became identifiable.
@@ -206,16 +213,29 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// read an icon id off the game, so the user looked the icon up by hand. With a confident match that instruction
     /// is stale — the id is already in the box, and the job is now to confirm it rather than to find it.
     /// </summary>
-    public string IconColumnHint => Result.IconSuggestion switch
+    public string IconColumnHint => (IsCreation, Result.IconSuggestion) switch
     {
-        { IsConfident: true } s =>
+        (true, { IsConfident: true } s) =>
             $"The icon library matched this artwork to {s.IconId}, which is already filled in below. Check the two " +
             "images agree before saving.",
-        { IsConfident: false } =>
+        (true, { IsConfident: false }) =>
             "The icon library could not decide between two similar icons, so lucy_img_ID was left blank. Its closest " +
             "guess is shown on the right.",
-        _ => "Read the item's lucy_img_ID off this artwork.",
+        (true, _) => "Read the item's lucy_img_ID off this artwork.",
+
+        // On an existing page the question is not "what is this icon" but "is the page pointing at the right one",
+        // so the hint names what the button would do rather than what was already written.
+        (false, { CanApplyToPage: true } s) =>
+            $"The icon library matched the in-game artwork to {s.IconId}. Check it against the capture — nothing " +
+            "changes until you use the button below.",
+        (false, { IsConfident: false } s) =>
+            $"The icon library could not decide which icon this is; its closest guess is {s.IconId}. Deciding is " +
+            "yours — the id is left as the page has it.",
+        _ => "",
     };
+
+    /// <summary>Whether the hint says anything. It is blank on an ordinary page whose icon agrees.</summary>
+    public bool HasIconColumnHint => !string.IsNullOrEmpty(IconColumnHint);
 
     /// <summary>
     /// Names the id, because the id is the thing being written into the page — and says plainly when the tool is not
@@ -233,18 +253,43 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public Brush MatchedIconBorderBrush =>
         Result.IconSuggestion is { IsConfident: true } ? Palette.Done : Palette.Warning;
 
-    /// <summary>Whether to offer the upload: the tool is sure which icon it is, and the wiki is known not to have
-    /// it. An unknown answer deliberately does not offer — see <c>IconSuggestion.CanUpload</c>.</summary>
-    public bool CanUploadIcon => Result.IconSuggestion?.CanUpload == true && !_iconUploaded;
+    /// <summary>
+    /// Whether to offer the icon action, which is a different question on each path.
+    ///
+    /// On a creation the id is already in the generated text, so the only thing left to do is publish the file —
+    /// offered when the tool is sure which icon it is and the wiki is known not to have it. On an existing page the
+    /// id itself is the fix, so the offer also needs the file question *answered*: see
+    /// <c>IconSuggestion.CanApplyToPage</c> for why an unknown answer is not good enough there either.
+    /// </summary>
+    public bool CanActOnIcon =>
+        !_iconActioned &&
+        Result.IconSuggestion is { } s &&
+        (IsCreation ? s.CanUpload : s.CanApplyToPage && Result.Edit is not null);
 
-    public string IconUploadPrompt => Result.IconSuggestion is { } s
-        ? $"The wiki has no {s.WikiFileName}, so this item's box would render without artwork until it is uploaded."
-        : "";
+    /// <summary>What pressing it will do, said before it is pressed — the upload is the part that cannot be taken
+    /// back, so it is named rather than implied.</summary>
+    public string IconActionPrompt => (IsCreation, Result.IconSuggestion) switch
+    {
+        (_, null) => "",
+        (true, { } s) =>
+            $"The wiki has no {s.WikiFileName}, so this item's box would render without artwork until it is uploaded.",
+        (false, { NeedsUpload: true } s) =>
+            $"The wiki has no {s.WikiFileName}. This uploads it and then points the page at {s.IconId}; the page " +
+            "itself is not saved until you press Save.",
+        (false, { } s) =>
+            $"{s.WikiFileName} is already on the wiki. This sets lucy_img_ID to {s.IconId} in the proposed edit; " +
+            "nothing is saved until you press Save.",
+    };
 
-    public string IconUploadButtonText =>
-        Result.IconSuggestion is { } s ? $"Upload {s.WikiFileName} to the wiki" : "Upload the icon";
+    public string IconActionButtonText => (IsCreation, Result.IconSuggestion) switch
+    {
+        (_, null) => "Upload the icon",
+        (true, { } s) => $"Upload {s.WikiFileName} to the wiki",
+        (false, { NeedsUpload: true } s) => $"Upload {s.WikiFileName} and use icon {s.IconId}",
+        (false, { } s) => $"Use icon {s.IconId}",
+    };
 
-    private bool _iconUploaded;
+    private bool _iconActioned;
     private string? _iconUploadOutcome;
     private bool _iconUploadFailed;
 
@@ -258,16 +303,56 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// capture is gone and re-asking the wiki would only confirm what it just told us.</summary>
     public void RecordIconUpload(bool uploaded, string? url, string? error)
     {
-        _iconUploaded = uploaded;
+        _iconActioned = uploaded;
         _iconUploadFailed = !uploaded;
         _iconUploadOutcome = uploaded
             ? $"Uploaded{(url is null ? "." : $" — {url}")}"
             : $"The icon was not uploaded: {error}";
 
-        OnPropertyChanged(nameof(CanUploadIcon));
+        OnPropertyChanged(nameof(CanActOnIcon));
         OnPropertyChanged(nameof(IconUploadOutcome));
         OnPropertyChanged(nameof(HasIconUploadOutcome));
         OnPropertyChanged(nameof(IconUploadOutcomeBrush));
+    }
+
+    /// <summary>
+    /// Points the proposed edit at the matched icon: the new wikitext goes into the box the user is reviewing, and
+    /// the diff is rebuilt so it shows the id changing (user, 2026-10-02 — "update the diff to use the new icon ID").
+    ///
+    /// **The diff has to be rebuilt here rather than left alone**, because it is computed once from the tool's own
+    /// proposal and this change does not come from there. Leaving it would show the user a diff that no longer
+    /// describes what Save would write, which is the one property this screen cannot give up.
+    ///
+    /// The summary gains a mention for the same reason: a revision whose summary omits a change it made is exactly
+    /// the page history this tool is supposed to be improving. It is left alone if the user already wrote one that
+    /// mentions the icon.
+    /// </summary>
+    public void ApplyIconId(string wikitext, string iconId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(wikitext);
+        ArgumentException.ThrowIfNullOrWhiteSpace(iconId);
+
+        _iconActioned = true;
+        _wikitext = wikitext;
+
+        if (Result.Edit is { } edit)
+            Replace(Diff, WikitextDiff.Compute(edit.OriginalWikitext, wikitext).Select(l => new DiffLineViewModel(l)));
+
+        if (_summary.Length == 0)
+            _summary = $"Set lucy_img_ID to {iconId} from the in-game icon";
+        else if (!_summary.Contains("lucy_img_ID", StringComparison.OrdinalIgnoreCase) &&
+                 !_summary.Contains("icon", StringComparison.OrdinalIgnoreCase))
+            _summary += "; updated lucy_img_ID";
+
+        Replace(Warnings, BuildWarnings());
+
+        _iconUploadFailed = false;
+        _iconUploadOutcome = _iconUploadOutcome is { } uploaded
+            ? $"{uploaded} lucy_img_ID set to {iconId} — review the diff, then Save."
+            : $"lucy_img_ID set to {iconId} — review the diff, then Save.";
+
+        // Everything the box, the diff, the summary and the button all read from has moved.
+        OnPropertyChanged(null);
     }
 
     /// <summary>Whether each side actually has artwork to show. **An absent icon must look absent**: an empty
@@ -288,9 +373,13 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     {
         { Matches: true } icon => $"These look like the same artwork (difference {icon.Distance:F3}, " +
                                   $"threshold {IconFingerprint.SameIconThreshold:F2}). Check by eye if you like.",
+        { Matches: false } icon when Result.IconSuggestion is { CanApplyToPage: true } =>
+            $"These do not look like the same artwork (difference {icon.Distance:F3}, threshold " +
+            $"{IconFingerprint.SameIconThreshold:F2}). The library says the in-game icon is " +
+            $"{Result.IconSuggestion.IconId} — compare the third tile, then decide.",
         { Matches: false } icon => $"These do not look like the same artwork (difference {icon.Distance:F3}, " +
                                    $"threshold {IconFingerprint.SameIconThreshold:F2}). The tool never changes an " +
-                                   "icon id — decide which side is wrong.",
+                                   "icon id on its own — decide which side is wrong.",
         _ => Result.IconNote ?? "The icons were not compared.",
     };
 
@@ -473,7 +562,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(Formatting));
             OnPropertyChanged(nameof(HasFormatting));
             OnPropertyChanged(nameof(CanCommitFormatting));
-            OnPropertyChanged(nameof(CanUploadIcon));
+            OnPropertyChanged(nameof(CanActOnIcon));
             OnPropertyChanged(nameof(IsNotBusy));
         }
     }
@@ -506,7 +595,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             Set(ref _formattingOutcome, value);
             OnPropertyChanged(nameof(HasFormattingOutcome));
             OnPropertyChanged(nameof(CanCommitFormatting));
-            OnPropertyChanged(nameof(CanUploadIcon));
+            OnPropertyChanged(nameof(CanActOnIcon));
             OnPropertyChanged(nameof(IsNotBusy));
         }
     }
@@ -567,7 +656,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
             OnPropertyChanged(nameof(CanCommitFormatting));
-            OnPropertyChanged(nameof(CanUploadIcon));
+            OnPropertyChanged(nameof(CanActOnIcon));
             OnPropertyChanged(nameof(IsNotBusy));
             OnPropertyChanged(nameof(HasOutcome));
         }
@@ -604,7 +693,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
             OnPropertyChanged(nameof(CanCommitFormatting));
-            OnPropertyChanged(nameof(CanUploadIcon));
+            OnPropertyChanged(nameof(CanActOnIcon));
             OnPropertyChanged(nameof(IsNotBusy));
         }
     }
@@ -685,8 +774,13 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         compliance.Rule is ComplianceChecker.EraTemplateRule or ComplianceChecker.LorePlaceholderRule &&
         result.Analysis?.IsAlreadyCoveredByAFieldFinding(compliance) is false;
 
-    private static IEnumerable<string> BuildWarnings(ItemCheckResult result)
+    /// <summary>An instance method rather than a static one over the result, because one of these bars depends on
+    /// what the user has done since: an icon bar telling them to press a button they have already pressed is the
+    /// kind of stale instruction that teaches people to stop reading the strip.</summary>
+    private IEnumerable<string> BuildWarnings()
     {
+        ItemCheckResult result = Result;
+
         foreach (string warning in result.Warnings)
         {
             // The lore section says this, with a button to act on it. Repeating it up here was noise once lore got
@@ -706,11 +800,18 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
         if (result.Error is { } error) yield return error;
 
-        if (result.Icon is { Matches: false } icon)
+        // The bar stays — a wrong icon is exactly the kind of thing nobody has judged yet — but it must not
+        // contradict the button sitting above it in the Icon panel, which it did until the panel grew one
+        // (rendered, 2026-10-02). Where the library has an answer the bar sends the user to it instead of telling
+        // them the tool will never do anything.
+        if (result.Icon is { Matches: false } icon && !_iconActioned)
             yield return
                 $"The icon on the page (lucy_img_ID {icon.IconId}) does not look like the one in the window " +
                 $"(difference {icon.Distance:F2} against a threshold of {IconFingerprint.SameIconThreshold:F2}). " +
-                "The tool never changes an icon id — check by eye which side is wrong.";
+                (result.IconSuggestion is { CanApplyToPage: true } fix
+                    ? $"The library matched the in-game artwork to {fix.IconId} — compare the two and use the "
+                      + "button in the Icon panel if you agree."
+                    : "The tool never changes an icon id on its own — check by eye which side is wrong.");
 
         if (result.IconNote is { } note) yield return note;
 

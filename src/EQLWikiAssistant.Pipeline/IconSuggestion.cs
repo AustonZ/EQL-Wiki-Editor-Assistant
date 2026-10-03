@@ -4,12 +4,14 @@ using EQLWikiAssistant.Core.Ocr;
 namespace EQLWikiAssistant.Pipeline;
 
 /// <summary>
-/// The icon the library recognized in a captured item window, for a page about to be created.
+/// The icon the library recognized in a captured item window.
 ///
-/// **This is the one place the tool proposes an icon id rather than merely checking one**, and the asymmetry is
-/// deliberate: an existing page's <c>lucy_img_ID</c> is compared and flagged, never rewritten, because the tool
-/// cannot tell a wrong page from an odd capture. A page that does not exist has no id to be wrong and nothing to
-/// overwrite, so identifying one is an addition rather than an overwrite.
+/// **The tool proposes an id; it never writes one on its own.** On a page being created the id is filled into the
+/// generated text, which the user reads before saving. On a page that already exists it reaches the wikitext only
+/// when the user presses the button (user, 2026-10-02) — because there the tool cannot tell a wrong page from an odd
+/// capture, and that judgement was always meant to be a human's rather than a threshold's. What changed is only that
+/// the human is now shown the answer instead of being left to look it up: the search has already run, since it is
+/// what noticed the mismatch.
 ///
 /// **The id and the artwork stay consistent by construction**, which is what makes this safe even where the wiki's
 /// own numbering disagrees. The tool writes <c>lucy_img_ID = N</c> and, if the wiki lacks the file, uploads
@@ -44,6 +46,19 @@ public sealed record IconSuggestion(
     /// known not to have it. An unknown answer is not an invitation to upload — publishing over a file that may
     /// exist is the one thing nobody here could undo.</summary>
     public bool CanUpload => IsConfident && AlreadyOnWiki == false;
+
+    /// <summary>
+    /// Whether the tool can offer to point an existing page at this icon.
+    ///
+    /// **It needs a known answer about the file, not merely a confident match**, and that is the whole difference
+    /// from <see cref="CanUpload"/>. Writing an id whose file may not exist would leave the item's box rendering
+    /// nothing — trading a wrong picture for no picture. Known-absent is fine, because the offer then includes the
+    /// upload: 93% of the library is missing from the wiki, so that is the ordinary case rather than the exception.
+    /// </summary>
+    public bool CanApplyToPage => IsConfident && AlreadyOnWiki is not null;
+
+    /// <summary>Whether applying this icon has to upload the file first.</summary>
+    public bool NeedsUpload => AlreadyOnWiki == false;
 
     /// <summary>The name the file would take on the wiki.</summary>
     public string WikiFileName => IconLibraryFolder.WikiFileNameFor(IconId);

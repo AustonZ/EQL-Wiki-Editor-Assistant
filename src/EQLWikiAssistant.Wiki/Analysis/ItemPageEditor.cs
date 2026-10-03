@@ -114,6 +114,31 @@ public sealed record ProposedEdit(
 /// </summary>
 public static class ItemPageEditor
 {
+    /// <summary>
+    /// Points a page's <c>lucy_img_ID</c> at a different icon, leaving everything else byte for byte.
+    ///
+    /// **The one edit in this file the analyzer did not decide**, and that is the point rather than an exception to
+    /// it: the icon check is flag-only because the tool cannot tell a wrong page from an odd capture, so the
+    /// judgement is the user's — they look at the two images and press the button (user, 2026-10-02, on
+    /// <c>Molten Coil</c>, whose page says 765 against the library's 617). This function exists so that pressing it
+    /// writes the id the same way every other value is written: in place through
+    /// <see cref="ItemPageDocument.WithParameter"/>, so the diff shows the id changing and nothing else, and in the
+    /// blueprint's order when the page has no such parameter at all.
+    ///
+    /// Returns the text unchanged if it cannot be read as an item page — the caller is editing what is on screen,
+    /// which the user may have been typing into.
+    /// </summary>
+    public static string WithIconId(string wikitext, string iconId, WikiMapping? mapping = null)
+    {
+        ArgumentNullException.ThrowIfNull(wikitext);
+        ArgumentException.ThrowIfNullOrWhiteSpace(iconId);
+        mapping ??= WikiMapping.Default;
+
+        return ItemPageDocument.Parse(wikitext) is { } page
+            ? page.WithParameter(mapping.IconIdParameter, iconId, mapping.ParameterOrder).Wikitext
+            : wikitext;
+    }
+
     public static ProposedEdit BuildEdit(
         ItemPageDocument page,
         ItemPageAnalysis analysis,

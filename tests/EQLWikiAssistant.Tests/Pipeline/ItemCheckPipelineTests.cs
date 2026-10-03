@@ -117,8 +117,20 @@ public class ItemCheckPipelineTests
         var wiki = new FakeWiki();
         var ledger = new CheckedItemsLedger();
 
-        // The library's entry is the fingerprint of the very strip the frame paints, which is what a correct match
-        // looks like; the decoy is an unrelated pattern.
+        IconLibrary library = LibraryMatching(window, frame, iconId);
+        var files = new IconLibraryFolder(IconFolderWith(iconId));
+        var icons = new IconCache(
+            Path.Combine(Path.GetTempPath(), "eqlwiki-icontest-" + Guid.NewGuid().ToString("N")),
+            new StubIconSource(wikiAlreadyHasIcon));
+
+        return (new ItemCheckPipeline(
+            wiki, new FakeLocator(window), ledger, null, icons, new StubDecoder(), null, library, files), wiki, ledger);
+    }
+
+    /// <summary>The library's entry is the fingerprint of the very strip the frame paints, which is what a correct
+    /// match looks like; the decoy is an unrelated pattern, far enough away to leave a clear margin.</summary>
+    private static IconLibrary LibraryMatching(LocatedWindow window, CapturedImage frame, string iconId)
+    {
         var region = new Rect(
             window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
             ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height);
@@ -127,18 +139,10 @@ public class ItemCheckPipelineTests
         var decoy = new byte[painted.Signature.Length];
         for (int i = 0; i < decoy.Length; i++) decoy[i] = (byte)((i * 31) % 256);
 
-        var library = new IconLibrary([
+        return new IconLibrary([
             new LibraryIcon(iconId, painted),
             new LibraryIcon("9999", new IconFingerprint(decoy, 40, 40)),
         ]);
-
-        var files = new IconLibraryFolder(IconFolderWith(iconId));
-        var icons = new IconCache(
-            Path.Combine(Path.GetTempPath(), "eqlwiki-icontest-" + Guid.NewGuid().ToString("N")),
-            new StubIconSource(wikiAlreadyHasIcon));
-
-        return (new ItemCheckPipeline(
-            wiki, new FakeLocator(window), ledger, null, icons, new StubDecoder(), null, library, files), wiki, ledger);
     }
 
     /// <summary>A throwaway folder holding one icon file, so the upload path has something real to read.</summary>
@@ -150,20 +154,81 @@ public class ItemCheckPipelineTests
         return dir;
     }
 
-    /// <summary>Answers "does the wiki have this icon?" without a network, which is the only part the pipeline asks
-    /// about.</summary>
-    private sealed class StubIconSource(bool present) : IIconSource
+    /// <summary>
+    /// Answers "does the wiki have this icon?" without a network, which is the only part the pipeline asks about.
+    ///
+    /// **Per id, not a single yes/no**, because fixing an existing page's icon asks it about two different files at
+    /// once: the one the page points at (which has to be there to be compared) and the one the library says is
+    /// right (which decides whether the offer includes an upload). One shared answer cannot tell those apart.
+    /// </summary>
+    private sealed class StubIconSource(bool present, params string[] ids) : IIconSource
     {
         public Task<byte[]?> DownloadAsync(string iconId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(present ? new byte[] { 9, 9, 9 } : null);
+            Task.FromResult(present || ids.Contains(iconId) ? new byte[] { 9, 9, 9 } : null);
     }
 
-    private sealed class StubDecoder : IImageDecoder
+    /// <summary>
+    /// A pipeline for the "this page's icon is wrong" case: a real page, a library that recognizes the captured
+    /// artwork as <paramref name="libraryIconId"/>, and a decoder that hands back <paramref name="wikiIcon"/> as
+    /// whatever the page's own icon file contains — which is what decides whether the comparison matches.
+    /// </summary>
+    private static ItemCheckPipeline BuildForIconFix(
+        LocatedWindow window,
+        CapturedImage frame,
+        string pageWikitext,
+        string libraryIconId,
+        string[] iconsOnWiki,
+        CapturedImage wikiIcon,
+        string pageTitle = "Earring of Bashing")
+    {
+        var wiki = new FakeWiki();
+        wiki.Pages[pageTitle] = new WikiPage(pageTitle, pageWikitext, 100, DateTimeOffset.UnixEpoch);
+
+        var icons = new IconCache(
+            Path.Combine(Path.GetTempPath(), "eqlwiki-icontest-" + Guid.NewGuid().ToString("N")),
+            new StubIconSource(false, iconsOnWiki));
+
+        return new ItemCheckPipeline(
+            wiki, new FakeLocator(window), new CheckedItemsLedger(), null, icons, new StubDecoder(wikiIcon), null,
+            LibraryMatching(window, frame, libraryIconId), new IconLibraryFolder(IconFolderWith(libraryIconId)));
+    }
+
+    /// <summary>The icon strip exactly as the frame painted it, for a wiki file that *does* hold this item's
+    /// artwork — the control case, where the page is right and nothing should be offered.</summary>
+    private static CapturedImage IconStripOf(CapturedImage frame, LocatedWindow window)
+    {
+        Rect strip = ItemIconReader.IconStrip;
+        int x0 = window.Bounds.X + strip.X, y0 = window.Bounds.Y + strip.Y;
+        var pixels = new byte[strip.Width * strip.Height * 4];
+        for (int y = 0; y < strip.Height; y++)
+            Array.Copy(frame.Pixels, ((y0 + y) * frame.Width + x0) * 4, pixels, y * strip.Width * 4, strip.Width * 4);
+        return new CapturedImage(strip.Width, strip.Height, pixels);
+    }
+
+    /// <summary>A 40x40 icon that is not this item's, for a page pointing at the wrong file. Enough ink and enough
+    /// variation to be judged — a flat or near-black one is declined rather than called a mismatch.</summary>
+    private static CapturedImage UnrelatedIcon()
+    {
+        var pixels = new byte[40 * 40 * 4];
+        for (int y = 0; y < 40; y++)
+            for (int x = 0; x < 40; x++)
+            {
+                int o = (y * 40 + x) * 4;
+                pixels[o] = (byte)(200 - y * 4);        // B
+                pixels[o + 1] = (byte)(30 + x * 5 % 90); // G
+                pixels[o + 2] = (byte)(240 - x * 3);     // R
+                pixels[o + 3] = 255;
+            }
+
+        return new CapturedImage(40, 40, pixels);
+    }
+
+    private sealed class StubDecoder(CapturedImage? image = null) : IImageDecoder
     {
         public Task<CapturedImage> DecodeAsync(
             byte[] bytes, byte background = AlphaComposite.GameBackground,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CapturedImage(1, 1, new byte[4]));
+            Task.FromResult(image ?? new CapturedImage(1, 1, new byte[4]));
     }
 
     /// <summary>A pipeline that also knows the wiki's verified-pages list, holding exactly the titles given.</summary>
@@ -1191,6 +1256,104 @@ public class ItemCheckPipelineTests
         Assert.False(uploaded.Uploaded);
         Assert.Equal(0, wiki.Uploads);
         Assert.NotNull(uploaded.Error);
+    }
+
+    // --- an existing page pointing at the wrong icon ----------------------------------------------------
+
+    /// <summary>
+    /// **Flagging the mismatch was only half the job** (user, 2026-10-02, on `Molten Coil`: the page says 765 and
+    /// the right answer is 617). The tool had already searched the whole library to notice the mismatch, then threw
+    /// the answer away and left the user to find the id by hand. It now names it — and still writes nothing, because
+    /// which side is wrong remains the user's call.
+    /// </summary>
+    [Fact]
+    public async Task APageWhoseIconIsWrongIsToldWhichIconIsRight()
+    {
+        CapturedImage frame = FrameWithIcon();
+        LocatedWindow window = Window(EarringLines);
+        ItemCheckPipeline pipeline = BuildForIconFix(
+            window, frame, EarringPage(), "617", ["752", "617"], UnrelatedIcon());
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.False(result.Icon!.Matches);
+        Assert.Equal("617", result.IconSuggestion!.IconId);
+        Assert.True(result.IconSuggestion.CanApplyToPage);
+        // Molten Coil's own case: the right file is already on the wiki, so there is nothing to upload and the whole
+        // fix is the id. An upload-only offer would have shown no button at all here.
+        Assert.False(result.IconSuggestion.NeedsUpload);
+    }
+
+    /// <summary>
+    /// The control, and the one that matters most: an icon the page gets right must offer nothing. Without this a
+    /// confident matcher would volunteer an id on every item in the corpus, which is the noise that teaches a user
+    /// to stop reading icon findings.
+    /// </summary>
+    [Fact]
+    public async Task APageWhoseIconAgreesIsOfferedNothing()
+    {
+        CapturedImage frame = FrameWithIcon();
+        LocatedWindow window = Window(EarringLines);
+        ItemCheckPipeline pipeline = BuildForIconFix(
+            window, frame, EarringPage(), "617", ["752", "617"], IconStripOf(frame, window));
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.True(result.Icon!.Matches);
+        Assert.Null(result.IconSuggestion);
+    }
+
+    /// <summary>A page with no icon at all has the same gap and none of the risk — there is no id to be wrong.
+    /// Nothing flagged it before, because with no id there is nothing to compare.</summary>
+    [Fact]
+    public async Task APageWithNoIconIdAtAllIsOfferedOne()
+    {
+        CapturedImage frame = FrameWithIcon();
+        LocatedWindow window = Window(EarringLines);
+        ItemCheckPipeline pipeline = BuildForIconFix(
+            window, frame, EarringPage().Replace("|lucy_img_ID = 752", "|lucy_img_ID = "), "617", ["617"],
+            UnrelatedIcon());
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.Null(result.Icon);
+        Assert.Equal("617", result.IconSuggestion!.IconId);
+        Assert.True(result.IconSuggestion.CanApplyToPage);
+    }
+
+    /// <summary>When the wiki lacks the right file the offer carries the upload with it, which is the ordinary case:
+    /// the wiki holds 796 of the library's 11,592 icons.</summary>
+    [Fact]
+    public async Task TheOfferIncludesTheUploadWhenTheWikiLacksTheRightFile()
+    {
+        CapturedImage frame = FrameWithIcon();
+        LocatedWindow window = Window(EarringLines);
+        ItemCheckPipeline pipeline = BuildForIconFix(
+            window, frame, EarringPage(), "617", ["752"], UnrelatedIcon());
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.True(result.IconSuggestion!.NeedsUpload);
+        Assert.True(result.IconSuggestion.CanApplyToPage);
+    }
+
+    /// <summary>
+    /// **The library agreeing with the page is a different finding, and must not produce an offer.** It means the id
+    /// is right and the *file* holds the wrong artwork — the 31-file numbering divergence the icon audit found — and
+    /// the fix for that is re-uploading over somebody's file, which this tool refuses to do.
+    /// </summary>
+    [Fact]
+    public async Task AnIdTheLibraryAgreesWithIsNotOfferedBack()
+    {
+        CapturedImage frame = FrameWithIcon();
+        LocatedWindow window = Window(EarringLines);
+        ItemCheckPipeline pipeline = BuildForIconFix(
+            window, frame, EarringPage(), "752", ["752"], UnrelatedIcon());
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.False(result.Icon!.Matches);
+        Assert.Null(result.IconSuggestion);
     }
 
     /// <summary>The login gate covers uploading too — it is a write, and the rule lives in one place the write paths

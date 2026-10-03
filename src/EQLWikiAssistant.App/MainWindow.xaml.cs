@@ -258,19 +258,25 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Uploads the matched icon to the wiki.
+    /// Does whatever this item's icon needs: uploads the matched file, points the page's <c>lucy_img_ID</c> at it,
+    /// or both.
     ///
-    /// **Confirmed, and the confirmation says the file name**, because that is the part the user cannot undo on
-    /// their own: only an admin on this wiki can delete a file. The client refuses rather than overwrites, so the
-    /// worst outcome of a mistake here is a refusal — but a file uploaded under the wrong name needs somebody else
-    /// to clean up, and the name is the one thing the user can check that the tool cannot.
+    /// **Only the upload is confirmed, because only the upload is permanent.** Setting the id edits the text in the
+    /// box, which the user then reads in the diff and saves or does not — ordinary reviewable work. Publishing a
+    /// file is not: the client refuses rather than overwrites, so the worst outcome of a mistake is a refusal, but a
+    /// file uploaded under the wrong name needs an admin to clean up, and the name is the one thing the user can
+    /// check that the tool cannot — so the confirmation says it.
+    ///
+    /// **A failed upload stops before the id is written.** Pointing a page at a file that is not there would trade a
+    /// wrong picture for no picture, which is the one way this could leave the page worse than it found it.
     /// </summary>
-    private async void OnUploadIconClick(object sender, RoutedEventArgs e)
+    private async void OnIconActionClick(object sender, RoutedEventArgs e)
     {
         if (ResultsList.SelectedItem is not ResultViewModel view || _services is null) return;
-        if (view.Result.IconSuggestion is not { CanUpload: true } suggestion) return;
+        if (view.Result.IconSuggestion is not { } suggestion) return;
 
-        if (MessageBox.Show(
+        bool upload = suggestion.NeedsUpload;
+        if (upload && MessageBox.Show(
                 this,
                 $"Upload this icon to the wiki as '{suggestion.WikiFileName}'?\n\nCheck it against the in-game " +
                 "icon first — only a wiki admin can delete a file once it is uploaded.",
@@ -282,8 +288,19 @@ public partial class MainWindow : Window
         view.IsBusy = true;
         try
         {
-            IconUploadResult uploaded = await _services.Pipeline.UploadIconAsync(suggestion.IconId);
-            view.RecordIconUpload(uploaded.Uploaded, uploaded.Url, uploaded.Error);
+            if (upload)
+            {
+                IconUploadResult uploaded = await _services.Pipeline.UploadIconAsync(suggestion.IconId);
+                view.RecordIconUpload(uploaded.Uploaded, uploaded.Url, uploaded.Error);
+                if (!uploaded.Uploaded) return;
+            }
+
+            // On a creation the id is already in the generated text — the file was the only thing missing. On an
+            // existing page the id *is* the fix, and this is the press that writes it: see ItemPageEditor.WithIconId
+            // for why it goes through the ordinary parameter edit rather than being spliced in here.
+            if (!view.IsCreation)
+                view.ApplyIconId(
+                    ItemPageEditor.WithIconId(view.Wikitext, suggestion.IconId, _services.Mapping), suggestion.IconId);
         }
         catch (WikiUnavailableException ex)
         {
