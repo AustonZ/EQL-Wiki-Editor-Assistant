@@ -383,11 +383,24 @@ public static class ItemPageAnalyzer
     /// Compared as a multiset rather than a set, so a page that genuinely repeats a flag is still a difference. A
     /// match here means the finding is <see cref="FieldVerdict.Matches"/>, so the editor leaves the line exactly as
     /// the page wrote it; whether alphabetical order is the house style is a formatting question, not a data one.
+    ///
+    /// **Case matters, and ignoring it silently blessed legacy flags** (bug found by the user, 2026-10-02, on
+    /// `Prickly Pear`, whose line is `QUEST` against a captured `Quest`). Case is the *only* thing that tells the
+    /// two dialects apart — `FlagDialect` reads ALL-CAPS as legacy and Title Case as current, measured across 1,183
+    /// pages — so a case-insensitive comparison threw away exactly the signal this question turns on. The page
+    /// matched, the item was recorded done, and the legacy token would have stayed there forever with nobody told.
+    /// That is the silently-wrong outcome this project exists to avoid, and the user only caught it by checking the
+    /// wiki by hand.
+    ///
+    /// **Comparing exactly is right for the same reason the raw line is compared at all**: the editor replaces the
+    /// line wholesale, so what the tool would write is exactly <c>wanted</c> and anything else is a difference by
+    /// definition — including a different spelling of the same word. Measured on the 1,183 cached pages, this
+    /// catches 5 of them (`NO TRADE` on 5, `LORE EQUIPPED` on 1) and no page where the only difference is harmless
+    /// casing: a flags line carrying a lowercase word is read as prose, and that branch returns before this.
     /// </summary>
     private static bool SameFlags(IReadOnlyList<string> a, IReadOnlyList<string> b) =>
         a.Count == b.Count &&
-        a.Order(StringComparer.OrdinalIgnoreCase)
-            .SequenceEqual(b.Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        a.Order(StringComparer.Ordinal).SequenceEqual(b.Order(StringComparer.Ordinal), StringComparer.Ordinal);
 
     private static IReadOnlyList<string> ReadFlagLine(StatsBlock block) =>
         block.Lines.FirstOrDefault(l => l.Kind == StatsLineKind.Flags)?.Flags ?? [];
@@ -608,20 +621,12 @@ public static class ItemPageAnalyzer
     /// belongs to the formatting pass, which now applies it — see <c>ItemPagePrettifier</c>. Here the sign gets
     /// applied only when the value is being written anyway, for some other reason.
     /// </summary>
-    private static string ToWikiValue(string capturedValue, StatMapping mapping)
-    {
-        string value = capturedValue.Trim();
-
-        if (mapping.WikiSuffix is { } suffix && !value.EndsWith(suffix, StringComparison.Ordinal))
-            value += suffix;
-
-        // The sign rule lives on StatMapping because the formatting pass applies the same one, and two copies of it
-        // would drift into the two passes disagreeing about a sign — a diff that flaps back and forth. It is also
-        // slightly stricter than the test this used to do inline (first character is a digit): measured against the
-        // verified corpus, all 264 captured signed-stat values are a bare non-negative number or already signed, so
-        // nothing written from a capture changes.
-        return mapping.WithWikiSign(value);
-    }
+    private static string ToWikiValue(string capturedValue, StatMapping mapping) =>
+        // Suffix, format and sign all live on StatMapping, in one method, because applying two of the three and
+        // missing the other is the kind of mistake that writes a *plausible* wrong value. The sign rule in
+        // particular is shared with the formatting pass, and two copies of it would drift into the two passes
+        // disagreeing about a sign — a diff that flaps back and forth.
+        mapping.ToWikiValue(capturedValue);
 
     /// <summary>Whether the wiki holds a slash-separated list of which the captured value is one member.</summary>
     private static bool IsOneAlternativeOf(string captured, string onWiki) =>

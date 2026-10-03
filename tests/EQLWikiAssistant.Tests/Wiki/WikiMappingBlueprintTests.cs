@@ -116,4 +116,69 @@ public class WikiMappingBlueprintTests
         Assert.Contains("Range: 50", result.Formatted);
         Assert.Contains(result.Notes, n => n.Contains("Range", StringComparison.Ordinal));
     }
+
+    // ---- Skill Mod ----
+
+    /// <summary>
+    /// **A field the blueprint documents must be mapped, however rarely a capture produces it** (user, 2026-10-02,
+    /// on `Collapsible Fishing Pole`): the tool reported "no mapping at all — possibly new" for a line the template
+    /// has always had. It was in <see cref="WikiMapping.StatsBlockLineOrder"/> and nowhere else, which is the gap
+    /// this pins — the order knows where the line goes, the mapping knows the value belongs on the page at all.
+    /// </summary>
+    [Fact]
+    public void SkillModIsMappedBecauseTheBlueprintHasIt()
+    {
+        Assert.Contains(
+            "Skill Mod",
+            WikiMapping.Default.StatsBlockLineOrder.SelectMany(line => line),
+            StringComparer.Ordinal);
+
+        StatMapping? mapping = WikiMapping.Default.FindStat("Skill Mod");
+
+        Assert.NotNull(mapping);
+        Assert.Equal("Skill Mod", mapping.WikiLabel);
+        Assert.Equal(StatDisposition.Stored, mapping.Disposition);
+    }
+
+    /// <summary>
+    /// The game writes `Fishing 5 % (10 Max)` and the wiki's one page with this field writes `Fishing +5%`, so the
+    /// value needs a sign and the space closed. The cap is kept, by the user's decision (2026-10-02): it is real
+    /// game data and nothing else on the page records it.
+    /// </summary>
+    [Theory]
+    [InlineData("Fishing 5 % (10 Max)", "Fishing +5% (10 Max)")]
+    [InlineData("Fishing 5 %", "Fishing +5%")]
+    [InlineData("Fishing 5%", "Fishing +5%")]
+    [InlineData("Blacksmithing 12.5 % (20 Max)", "Blacksmithing +12.5% (20 Max)")]
+    // Idempotent, which matters because this value is compared against a page that already carries it.
+    [InlineData("Fishing +5% (10 Max)", "Fishing +5% (10 Max)")]
+    // A negative keeps its own sign, the same rule every signed stat follows.
+    [InlineData("Fishing -5 %", "Fishing -5%")]
+    // Two-word skills exist, and the skill name is not part of what gets rewritten.
+    [InlineData("Sense Heading 5 % (10 Max)", "Sense Heading +5% (10 Max)")]
+    public void ASkillModifierIsSignedAndItsPercentClosedUp(string captured, string expected) =>
+        Assert.Equal(expected, WikiMapping.Default.FindStat("Skill Mod")!.ToWikiValue(captured));
+
+    /// <summary>
+    /// A value the format does not recognize comes back untouched. **This is the control that keeps the transform
+    /// from being a licence to reshape anything** — a value this does not understand is one to leave alone, not one
+    /// to tidy into something that reads well and says something else.
+    /// </summary>
+    [Theory]
+    [InlineData("Fishing")]
+    [InlineData("5")]
+    [InlineData("Fishing five percent")]
+    public void ASkillModifierItCannotReadIsLeftExactlyAsCaptured(string captured) =>
+        Assert.Equal(captured, WikiMapping.Default.FindStat("Skill Mod")!.ToWikiValue(captured));
+
+    /// <summary>And no other stat is reshaped by it: the format is opt-in per mapping, not a rule about values that
+    /// happen to contain a percent sign.</summary>
+    [Fact]
+    public void NoOtherStatIsTouchedByTheSkillModifierFormat()
+    {
+        Assert.Equal("13.6 % (10 Max)", WikiMapping.Default.FindStat("Accuracy")!.ToWikiValue("13.6 % (10 Max)"));
+        Assert.All(
+            WikiMapping.Default.Stats.Values.Where(s => s.GameLabel != "Skill Mod"),
+            s => Assert.Equal(StatValueFormat.AsCaptured, s.Format));
+    }
 }

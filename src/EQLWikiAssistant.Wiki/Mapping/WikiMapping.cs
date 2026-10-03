@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace EQLWikiAssistant.Wiki.Mapping;
 
@@ -13,6 +14,22 @@ public enum StatDisposition
     /// affected item. <see cref="StatMapping.Note"/> says why, because the reasons differ and a future reader
     /// should not have to guess.</summary>
     NotStored,
+}
+
+/// <summary>
+/// How a captured value is turned into the value the wiki writes, where a rename is not enough.
+///
+/// Deliberately a short list: every other stat's value is copied through verbatim, with at most the unit suffix and
+/// the sign the mapping already carries. A format is for a value with its own small grammar, and each one here has
+/// to be justified by both sides having been measured.
+/// </summary>
+public enum StatValueFormat
+{
+    /// <summary>Written as captured, give or take <see cref="StatMapping.WikiSuffix"/> and the sign rule.</summary>
+    AsCaptured,
+
+    /// <summary>A skill percentage: <c>Fishing 5 % (10 Max)</c> -> <c>Fishing +5% (10 Max)</c>.</summary>
+    SkillModifier,
 }
 
 /// <summary>
@@ -47,8 +64,57 @@ public sealed record StatMapping(
     StatDisposition Disposition,
     string? WikiSuffix = null,
     bool Signed = false,
-    string? Note = null)
+    string? Note = null,
+    StatValueFormat Format = StatValueFormat.AsCaptured)
 {
+    /// <summary>
+    /// The captured value as the wiki writes it: the format first, then the unit suffix, then the sign.
+    ///
+    /// **One home for the whole conversion**, so a caller cannot apply two of the three and miss the other. The
+    /// order matters and is the only one that works: a format that rewrites the number has to run before the sign
+    /// rule looks at whether the value is a bare number.
+    /// </summary>
+    public string ToWikiValue(string capturedValue)
+    {
+        ArgumentNullException.ThrowIfNull(capturedValue);
+        string value = capturedValue.Trim();
+
+        if (Format == StatValueFormat.SkillModifier) value = AsSkillModifier(value);
+
+        if (WikiSuffix is { } suffix && !value.EndsWith(suffix, StringComparison.Ordinal))
+            value += suffix;
+
+        return WithWikiSign(value);
+    }
+
+    /// <summary>
+    /// <c>Fishing 5 % (10 Max)</c> -> <c>Fishing +5% (10 Max)</c>: sign the percentage and close the space before
+    /// the <c>%</c>, keeping the skill's name and the cap exactly as the game gave them.
+    ///
+    /// **A format rather than the ordinary sign rule, because the value is not a number** — it is a skill name, a
+    /// percentage and a ceiling in one string, so <see cref="WithWikiSign"/> (which deliberately only signs a value
+    /// that is wholly a positive number) can never apply. Measured against the only two sources there are: the game
+    /// writes `Skill Mod: Fishing 5 % (10 Max)` on `Collapsible Fishing Pole`, the wiki's one page carrying this
+    /// field writes `Skill Mod: Fishing +5%`, and the blueprint writes `Skill Mod: ?` — so the sign and the spacing
+    /// come from the page and the cap is kept by the user's decision (2026-10-02), it being real game data that
+    /// nothing else on the page records.
+    ///
+    /// Anything that does not match that shape is returned untouched: a value this does not understand is one to
+    /// leave alone, not to reshape into something that looks tidy and says something else.
+    /// </summary>
+    private static string AsSkillModifier(string value)
+    {
+        Match match = SkillModifierPattern.Match(value);
+        if (!match.Success) return value;
+
+        string sign = match.Groups["sign"].Value is { Length: > 0 } given ? given : "+";
+        return $"{match.Groups["skill"].Value} {sign}{match.Groups["amount"].Value}%{match.Groups["rest"].Value}";
+    }
+
+    private static readonly Regex SkillModifierPattern = new(
+        @"^(?<skill>\S+(?: \S+)*?)\s+(?<sign>[+-]?)(?<amount>\d+(?:\.\d+)?)\s*%(?<rest>.*)$",
+        RegexOptions.Compiled);
+
     /// <summary>
     /// The value as the wiki writes it, which for a signed stat means a leading <c>+</c>.
     ///
@@ -142,8 +208,14 @@ public sealed class WikiMapping
     /// see <see cref="ParameterAlignmentWidth"/>. Same settled-row reasoning as 4 and 5, and the widest reach of
     /// any bump so far: **680 of 744 cached pages** are laid out at a narrower column than the new rule wants, and
     /// a settled row would never be offered the reflow.
+    /// **8** (2026-10-02): `Skill Mod` is mapped, and a flags line is compared case-sensitively so a legacy `QUEST`
+    /// stops matching a captured `Quest`. The second half is the one that needs the bump, and it needs it for
+    /// exactly the reason 6 did: the affected pages are the ones a capture *settled* as `Matched`, so without it
+    /// they keep their legacy flags forever and nobody is told. Measured at 5 of 1,183 cached pages (`NO TRADE` on
+    /// 5, `LORE EQUIPPED` on 1). The user said no bump was needed for the item they reported, having removed it
+    /// from their ledger by hand — this is for the ones they have not checked.
     /// </summary>
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -222,9 +294,11 @@ public sealed class WikiMapping
     /// no page and no capture carries that label, which has to be measured.) A label named by no entry is not
     /// dropped — it keeps its own line just before <c>Class:</c> and is reported.
     ///
-    /// Note the blueprint lists several labels no capture has ever produced (`Skill Mod`, `Attack`, `Clairvoyance`,
-    /// `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`) and omits several the game does produce (`Range`,
-    /// `Accuracy`, `Type`, `Items`). Both gaps are on the user's list.
+    /// Note the blueprint lists several labels no capture has produced (`Attack`, `Clairvoyance`, `Spell Dmg`,
+    /// `Heal Amount`, `Magic DMG`, `Poison DMG`) and omits several the game does produce (`Range`, `Accuracy`,
+    /// `Type`, `Items`). Both gaps are on the user's list. **`Skill Mod` was on the first list until 2026-10-02**,
+    /// when a capture produced one — being listed here and nowhere else is exactly how it came to have a line
+    /// position but no mapping, so the tool called a documented template field "possibly new".
     ///
     /// **Re-checked against the blueprint's 2026-09-30 revision** (oldid 179818). It dropped its
     /// `Recommended level of ? Required level of ?` line, which is dropped here too, and it settled the field
@@ -469,6 +543,16 @@ public sealed class WikiMapping
         // help text that is *not* data (user, 2026-09-28: "this seems like a legitimate stat for the statsblock").
         // Values seen: `Fast`, `AA Speed or Highest`. One wiki page already writes it by hand.
         map["Mount Speed"] = new StatMapping("Mount Speed", "Mount Speed", StatDisposition.Stored);
+
+        // **In the blueprint all along, and missing here because no capture had ever produced it** (user,
+        // 2026-10-02, on `Collapsible Fishing Pole`): this file's own note listed `Skill Mod` among the labels the
+        // blueprint has and the game had not been seen to write, so the tool reported "no mapping at all — possibly
+        // new" for a field the template documents. The game does write it: `Skill Mod: Fishing 5 % (10 Max)`.
+        //
+        // The value needs a format rather than a rename, because the game's spelling and the wiki's differ in three
+        // ways at once — see StatMapping.AsSkillModifier for the measurement and for what happens to the cap.
+        map["Skill Mod"] = new StatMapping(
+            "Skill Mod", "Skill Mod", StatDisposition.Stored, Format: StatValueFormat.SkillModifier);
 
         return new WikiMapping
         {

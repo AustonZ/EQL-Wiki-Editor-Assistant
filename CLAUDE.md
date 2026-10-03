@@ -219,6 +219,25 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
   `EXPENDABLE` have no modern counterpart at all, and classic `LORE ITEM` (carry only one) is a different property
   from `Lore Equipped` (equip only one), so "translating" one would invent an equivalence. The flags line is
   regenerated from the captured window, not reconciled with what the page had.
+  - **Case is part of what a flags line says, and ignoring it silently blessed legacy flags** (bug found by the
+    user, 2026-10-02, on `Prickly Pear`, whose line reads `QUEST` against a captured `Quest`). `SameFlags` compared
+    case-insensitively, so the two matched, the page was recorded **done**, and the legacy token would have stayed
+    there forever — *"I wouldn't have noticed if I hadn't manually checked the wiki"*, which is the definition of
+    the silently-wrong outcome this project exists to avoid.
+    - **Case is the only thing that tells the two dialects apart.** `FlagDialect` reads ALL-CAPS as legacy and Title
+      Case as current — measured across 1,183 pages — so comparing case-insensitively threw away the exact signal
+      the question turns on. The two rules were each right and could not both be.
+    - **Comparing exactly is right for the same reason the raw line is compared at all**: the editor replaces the
+      line wholesale, so what the tool would write is exactly the captured set and anything else is a difference by
+      definition — a different spelling of the same word included.
+    - **Measured: 5 of the 1,183 cached pages** carry a current flag in legacy casing (`NO TRADE` on 5,
+      `LORE EQUIPPED` on 1), every one of which a capture would have settled as `Matched`. No page is newly flagged
+      for harmless casing, because a flags line carrying a lowercase word is read as prose and that branch returns
+      before this comparison.
+    - **The verified corpus shows nothing either way**, which is worth recording rather than hiding: no capture in
+      it meets a page with this shape. The evidence is the census and the tests, and the corpus's own movement that
+      evening (20 correct/23 changed to 30/13) was **the user editing the live wiki**, confirmed by running
+      `analyze` at `HEAD` and at the change in the same minute and getting identical numbers.
   - **Order is not part of what a flags line means** (user, 2026-09-29). `Brell's Girdle` writes
     `Attunable, Lore Equipped` where the game lists them in its own order; comparing the line as an ordered sequence
     called that a difference and would have rewritten a correct line — and taught the user that flag findings are
@@ -493,9 +512,28 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   side carries that label.) A label no entry names is not dropped — it keeps its own line before `Class:` and is
   reported.
 - **The blueprint and the game have gaps in both directions**, all on the user's TODO: it lists labels no capture
-  has produced (`Skill Mod`, `Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`) and
+  has produced (`Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`) and
   omits several the game does (`Range`, `Accuracy`, `Type`, `Items`), plus `Worn` and `Can Equip` in the effect
   parenthetical.
+- **`Skill Mod` was on that first list until a capture produced one** (user, 2026-10-02, on `Collapsible Fishing
+  Pole`): the tool reported *"a stat this tool has no mapping for at all — possibly new"* about a field the template
+  documents. Being in `StatsBlockLineOrder` and in no other structure is exactly how that happens — the order knows
+  where the line goes, the mapping knows the value belongs on the page at all, and only the second one is consulted
+  before reporting. A blueprint label with no `StatMapping` is a latent version of this bug; the others above have
+  no mapping either, and will report the same way the day one of them is captured.
+  - **The value needed a format, not a rename**, because the two spellings differ in three ways at once: the game
+    writes `Skill Mod: Fishing 5 % (10 Max)`, the wiki's one page with this field writes `Skill Mod: Fishing +5%`,
+    and the blueprint writes `Skill Mod: ?` — no guidance at all. `StatValueFormat.SkillModifier` signs the
+    percentage and closes the space; **the cap is kept** (user, 2026-10-02, choosing that over matching the existing
+    page exactly), because it is real game data and nothing else on a page records it. So the tool writes
+    `Skill Mod: Fishing +5% (10 Max)`, which sets the convention rather than following one.
+  - **A value the format cannot read is returned untouched**, which is what keeps a transform from being a licence
+    to reshape anything, and it is opt-in per mapping rather than a rule about values containing a `%`. Both are
+    pinned, the second by asserting every *other* stat is `AsCaptured`.
+  - **The whole conversion now lives in `StatMapping.ToWikiValue`** — format, then unit suffix, then sign, in that
+    order because a format that rewrites the number has to run before the sign rule asks whether the value is a bare
+    number. It was spread across the analyzer and the mapping, which is how a caller ends up applying two of the
+    three and writing a *plausible* wrong value.
 
 **The blueprint's 2026-09-30 revision (oldid 179818), reconciled.** The user brought it over; its author's summary
 reads "Added proper formatting". Most of it ratified what the tool already did, which is the useful finding — three

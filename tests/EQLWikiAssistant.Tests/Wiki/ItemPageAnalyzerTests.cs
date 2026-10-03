@@ -73,6 +73,38 @@ public class ItemPageAnalyzerTests
     }
 
     /// <summary>
+    /// **A legacy flag spelled like a current one must not match it** (bug found by the user, 2026-10-02, on
+    /// `Prickly Pear`, whose line is `QUEST` against a captured `Quest`). Case is the only thing that tells the two
+    /// dialects apart, so comparing case-insensitively threw away the signal the whole question turns on: the page
+    /// matched, the item was recorded done, and the legacy token would have stayed forever — the user caught it
+    /// only by checking the wiki by hand.
+    /// </summary>
+    [Theory]
+    [InlineData("QUEST", "Quest")]
+    [InlineData("NO TRADE", "No Trade")]
+    [InlineData("LORE EQUIPPED", "Lore Equipped")]
+    public void ALegacyFlagSpelledLikeACurrentOneIsStillADifference(string onPage, string captured)
+    {
+        string page = """
+            <onlyinclude>{{Itempage
+            |itemname = Thing
+            |statsblock =
+            FLAGS<br>
+            Class: ALL<br>
+            Race: ALL<br>
+            }}</onlyinclude>
+            """.Replace("FLAGS", onPage, StringComparison.Ordinal);
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Thing", flags: [captured]), ItemPageDocument.Parse(page)!, "Thing");
+
+        FieldFinding finding = analysis.Find(ItemPageAnalyzer.FlagsField)!;
+        Assert.True(finding.IsChange, $"'{onPage}' is not what the tool would write, so the line has to be rewritten");
+        Assert.Equal(captured, finding.Captured);
+        Assert.Equal(onPage, finding.OnWiki);
+    }
+
+    /// <summary>
     /// The negative control, and the reason this is not simply "always rewrite the line": a page whose flags line is
     /// already exactly right must still be left alone, or every flag finding becomes noise and the diff rewrites a
     /// correct line. Order is not part of what a flags line means, so the reversed order still matches.
