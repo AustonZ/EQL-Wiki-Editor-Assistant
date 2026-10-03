@@ -2131,10 +2131,10 @@ invisible that way by definition.
   configuration, so the comparison stays reproducible.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
     newly bootstrapped sample guards against regressions immediately; the flag only records whether a human has
-    checked it against the screenshot, and the summary counts it (`48 samples scored (47 verified)`). **47 of 48 are
-    verified**; the outstanding one is `14-race-restricted-item.png`, bootstrapped 2026-10-03 and cross-checked
-    against the pixels at 3x but not yet signed off by the user. (This entry previously said the same of
-    `20-stalwart-seas-false-occlusion.png`, which the user signed off in `6f79395` — the note outlived the fact.)
+    checked it against the screenshot, and the summary counts it (`48 samples scored (48 verified)`). **All 48 are
+    verified** as of 2026-10-03, when the user signed off `14-race-restricted-item.png`. Keep this line honest: it
+    has twice outlived the fact, having claimed `20-stalwart-seas-false-occlusion.png` was outstanding after the
+    user signed it off in `6f79395`.
   - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure** — a sample that is
     located and parsed but compared against nothing. `AccuracySpike --bootstrap --only <substring>` adds one entry
     for it, merging into the tracked corpus rather than regenerating the whole file.
