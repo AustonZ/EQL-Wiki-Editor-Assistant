@@ -1175,8 +1175,8 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
-    /// **Refuses rather than overwrites**, enforced by the wiki rather than by a check here. An ordinary editor on
-    /// this wiki cannot delete a file, so an overwrite is permanent *and* destroys the original.
+    /// **Refuses rather than overwrites**, enforced by the wiki rather than by a check here. Only an admin on this
+    /// wiki can delete a file, so an overwrite destroys the original and needs somebody else to undo.
     /// </summary>
     [Fact]
     public async Task UploadingOverAnExistingFileFailsRatherThanReplacingIt()

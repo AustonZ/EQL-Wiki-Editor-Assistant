@@ -45,8 +45,8 @@ public interface IMediaWikiClient
     ///
     /// **Refusing is the guard, and it is enforced by the wiki rather than by this process**: the implementation omits
     /// <c>ignorewarnings</c>, so an existing file comes back as a failure instead of an overwrite — the same shape as
-    /// <c>createonly</c> on <see cref="CreatePageAsync"/>, and for a stronger reason. Nobody with an ordinary account
-    /// on this wiki can delete a file, so an overwrite is permanent *and* destroys the original. It is also the one
+    /// <c>createonly</c> on <see cref="CreatePageAsync"/>, and for a stronger reason. Only an admin on this wiki can
+    /// delete a file, so an overwrite destroys the original and needs somebody else to undo. It is also the one
     /// grant a bot password may lack while editing perfectly well, so check <c>UserInfo.CanUpload</c> rather than
     /// discovering it from a failure.
     /// </summary>

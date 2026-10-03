@@ -258,9 +258,9 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
     /// **That guard is `ignorewarnings` left off.** MediaWiki answers an upload over an existing file with a warning
     /// rather than an error, and `ignorewarnings=1` is what turns it into an overwrite — so omitting it makes
     /// "replace somebody's file" unreachable from this tool rather than merely unintended. This matters more here
-    /// than anywhere else in the codebase: an ordinary editor on this wiki cannot delete a file, so a wrong overwrite
-    /// is permanent and takes the original with it. The warning comes back as an exception naming what the wiki
-    /// objected to.
+    /// than anywhere else in the codebase: only an admin on this wiki can delete a file, so a wrong overwrite takes
+    /// the original with it and needs somebody else to put right. The warning comes back as an exception naming what
+    /// the wiki objected to.
     /// </summary>
     /// <param name="fileName">The target name *without* the `File:` prefix — e.g. <c>Item_5797.png</c>.</param>
     /// <param name="description">The initial wikitext of the file's own page.</param>

@@ -498,8 +498,8 @@ public sealed class ItemCheckPipeline
     /// showed even where the wiki's historical numbering differs from the game's.
     ///
     /// Refuses rather than overwrites — the client omits <c>ignorewarnings</c>, so an existing file comes back as a
-    /// failure. That is the right way round here: an ordinary editor on this wiki cannot delete a file, so a wrong
-    /// overwrite is permanent and takes the original with it.
+    /// failure. That is the right way round here: only an admin on this wiki can delete a file, so a wrong
+    /// overwrite replaces the original with nothing this tool's user can put back themselves.
     /// </summary>
     public async Task<IconUploadResult> UploadIconAsync(string iconId, CancellationToken cancellationToken = default)
     {

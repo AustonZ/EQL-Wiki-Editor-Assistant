@@ -1204,7 +1204,8 @@ usually read: match the captured sprite against the library, and the matching fi
     exactly: the tool only ever uploads a file the wiki lacks.
   - **`ignorewarnings` is deliberately omitted**, so an upload over an existing file is refused by the wiki rather
     than becoming an overwrite. Stronger than a check in this process, and it matters more here than anywhere else:
-    nobody with an ordinary account can delete a file, so a wrong overwrite is permanent *and* destroys the original.
+    **only an admin can delete a file** (user, 2026-10-02, correcting a "nobody can" claim that had been written both
+    here and into the upload dialog), so a wrong overwrite destroys the original and needs somebody else to undo.
 - **The index is cached and rebuilds itself when the folder changes, which is a correctness rule rather than a
   speed one.** Fingerprinting 11,592 PNGs takes ~8 seconds, so the result is cached in app-data with a stamp of what
   it was built from (file count plus newest write time). A stale index would be the worst bug this feature could

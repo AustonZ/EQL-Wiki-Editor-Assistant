@@ -260,10 +260,10 @@ public partial class MainWindow : Window
     /// <summary>
     /// Uploads the matched icon to the wiki.
     ///
-    /// **Confirmed, and the confirmation says the file name**, because that is the permanent part: nobody with an
-    /// ordinary account on this wiki can delete a file. The client refuses rather than overwrites, so the worst
-    /// outcome of a mistake here is a refusal — but a file uploaded under the wrong name still cannot be taken back,
-    /// and the name is the one thing the user can check that the tool cannot.
+    /// **Confirmed, and the confirmation says the file name**, because that is the part the user cannot undo on
+    /// their own: only an admin on this wiki can delete a file. The client refuses rather than overwrites, so the
+    /// worst outcome of a mistake here is a refusal — but a file uploaded under the wrong name needs somebody else
+    /// to clean up, and the name is the one thing the user can check that the tool cannot.
     /// </summary>
     private async void OnUploadIconClick(object sender, RoutedEventArgs e)
     {
@@ -273,7 +273,7 @@ public partial class MainWindow : Window
         if (MessageBox.Show(
                 this,
                 $"Upload this icon to the wiki as '{suggestion.WikiFileName}'?\n\nCheck it against the in-game " +
-                "icon first — nobody on this wiki can delete a file once it is uploaded.",
+                "icon first — only a wiki admin can delete a file once it is uploaded.",
                 "Upload an item icon",
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Warning) != MessageBoxResult.OK)
