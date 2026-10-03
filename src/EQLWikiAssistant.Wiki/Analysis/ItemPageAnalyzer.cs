@@ -78,7 +78,6 @@ public static class ItemPageAnalyzer
     public const string LoreField = "lore";
     public const string CategoryField = "category";
     public const string FlagsField = "flags";
-    public const string LegacyFlagsField = "flags (legacy)";
     public const string FlagProseField = "flags (descriptive text)";
     public const string ClassesField = "Class";
     public const string RacesField = "Race";
@@ -312,15 +311,14 @@ public static class ItemPageAnalyzer
     private static void AddFlagFindings(List<FieldFinding> findings, ParsedItem captured, StatsBlock? block)
     {
         IReadOnlyList<string> onWiki = block is null ? [] : ReadFlagLine(block);
-        string[] legacy = [.. onWiki.Where(FlagDialect.IsLegacy)];
         string[] prose = [.. onWiki.Where(FlagDialect.IsProse)];
 
-        if (legacy.Length > 0)
-            findings.Add(new FieldFinding(
-                LegacyFlagsField, FieldVerdict.Differs, null, string.Join(", ", legacy),
-                "These are pre-EQL flags with no current equivalent, so they are dropped rather than translated. " +
-                "'LORE ITEM' (carry one) is not the same property as 'Lore Equipped' (equip one), and 'MAGIC ITEM' " +
-                "has no counterpart at all."));
+        // **There is no separate "legacy flags" finding, and removing it was the fix** (user, 2026-10-02, on
+        // `Drake-Hide Mask`): the differences table showed two rows for one line, a `flags (legacy)` row listing the
+        // legacy tokens and a `flags` row listing them again beside the current ones. It was not redundant when it
+        // was written — the comparison below ran against the legacy-*filtered* list then, so the legacy row was the
+        // only place those tokens were reported. Fixing that on 2026-10-01 made this row say a second time what the
+        // `flags` row already says, and nobody noticed because both were correct.
 
         // **Prose on the flags line stops the rewrite, and that is the whole reason this is checked before
         // comparing.** The line is regenerated *whole*, so rewriting one that carries `This is a meal!` would

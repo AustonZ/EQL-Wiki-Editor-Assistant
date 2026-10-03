@@ -241,8 +241,6 @@ public static class ItemPageEditor
                     continue;
                 }
 
-                if (finding.Field == ItemPageAnalyzer.LegacyFlagsField) continue; // handled with the flags line
-
                 if (finding.Field.EndsWith(" Effect", StringComparison.Ordinal))
                 {
                     block = WriteEffectLine(block, wanted, changes, ref addedUnformattedLine);

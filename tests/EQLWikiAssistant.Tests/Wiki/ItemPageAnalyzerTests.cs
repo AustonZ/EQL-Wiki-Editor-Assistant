@@ -295,17 +295,26 @@ public class ItemPageAnalyzerTests
         Assert.Equal(FieldVerdict.Differs, analysis.Find(ItemPageAnalyzer.FlagsField)!.Verdict);
     }
 
-    /// <summary>Legacy flags are dropped rather than translated: LORE ITEM (carry one) is a different property from
-    /// Lore Equipped (equip one), and MAGIC ITEM has no counterpart at all.</summary>
+    /// <summary>
+    /// Legacy flags are dropped rather than translated — LORE ITEM (carry one) is a different property from Lore
+    /// Equipped (equip one), and MAGIC ITEM has no counterpart at all — and they are reported **once**, on the
+    /// ordinary `flags` row (user, 2026-10-02, on `Drake-Hide Mask`: the table showed two rows for one line).
+    ///
+    /// The count is the assertion that matters and is the negative control against the duplicate: the row showing
+    /// the whole line as the page wrote it already says everything a separate legacy row said.
+    /// </summary>
     [Fact]
-    public void LegacyFlagsAreReportedAsDiscarded()
+    public void LegacyFlagsAreReportedOnceOnTheOrdinaryFlagsRow()
     {
         ItemPageAnalysis analysis = Analyze(
             Captured(name: "Cloak of Scales", flags: ["Lore Equipped", "No Trade"]), "Cloak of Scales");
 
-        FieldFinding finding = analysis.Find(ItemPageAnalyzer.LegacyFlagsField)!;
+        Assert.Equal(1, analysis.Findings.Count(f => f.Field.StartsWith("flags", StringComparison.Ordinal)));
+
+        FieldFinding finding = analysis.Find(ItemPageAnalyzer.FlagsField)!;
+        Assert.True(finding.IsChange);
         Assert.Contains("MAGIC ITEM", finding.OnWiki);
-        Assert.Contains("no current equivalent", finding.Explanation);
+        Assert.Equal("Lore Equipped, No Trade", finding.Captured);
     }
 
     /// <summary>EQL dropped these strings but they may still mean something the UI stopped exposing — in original

@@ -225,6 +225,25 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
     noise. `ItemPageAnalyzer.SameFlags` compares as a **multiset** (sorted, case-insensitive), so a page that
     genuinely repeats a flag is still a difference, and a match leaves the line exactly as the page wrote it. Whether
     alphabetical order is the house style is a formatting question, not a data one.
+  - **There is no separate "legacy flags" finding, and the differences table carries one row per flags line** (bug
+    found by the user, 2026-10-02, on `Drake-Hide Mask`, whose line is `MAGIC ITEM  LORE ITEM  NO DROP`). The table
+    showed `flags (legacy)` listing the legacy tokens and then `flags` listing them again beside the current ones —
+    two rows describing one line.
+    - **It was not redundant when it was written, which is why nobody noticed.** The comparison then ran against the
+      legacy-*filtered* list, so that row was the only place those tokens were reported. The 2026-10-01 fix below
+      made the `flags` row compare the line as the page wrote it — legacy tokens included — and that is what made the
+      older row a second copy. A fix can leave a duplicate behind without either half being wrong.
+    - **The "legacy on the wiki, no flags in game" case keeps working**, which is the thing worth checking before
+      deleting a finding: `ALegacyOnlyFlagsLineIsRemovedWhenTheCaptureHasNoFlags` asserts on `FlagsField`, not on the
+      removed row, and still passes. The new test asserts the *count* of flags rows, so the duplicate cannot come
+      back unnoticed.
+    - **Corpus: `Differs` 28 → 22 with everything else byte-identical** — 20 already correct and 23 would change
+      either way, and the edit-summary census is unchanged, so the six rows that went were purely a second telling.
+      What the tool writes did not move at all.
+    - **The one thing lost is a report, on a case measured at zero**: the Attunable-beats-No-Trade branch returns
+      before the comparison, so a page carrying a legacy flag *and* `Attunable` is no longer counted as needing a
+      change. 0 of 1,183 cached pages are like that, and such a page still shows its whole flags line, legacy tokens
+      and all, as the `Unverifiable` row's wiki-side value.
   - **The flag vocabulary is open-ended, and flags are copied through blindly — do not build a known-flags list**
     (user, 2026-09-24). Whatever the game displays is exactly what the wiki should say, *whether or not the tool
     knows what it means*. The 101 verified windows happen to contain only `No Trade`, `Lore Equipped`,
