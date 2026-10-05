@@ -489,6 +489,11 @@ $RECYCLE.BIN/
 /samples/*
 !/samples/README.md
 
+# The UI font is a personal modification of Windows' Arial, whose licence forbids distributing it, so the font,
+# its archived predecessors and its build scripts stay on this machine (README.md stays tracked).
+/fonts/*
+!/fonts/README.md
+
 # Local caches / ledger / mapping overrides if ever pointed at the repo instead of app-data.
 /.local-data/
 *.eqlwiki-cache/
