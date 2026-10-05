@@ -507,9 +507,8 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   counts as matching.
 - **`StatsBlockLineOrder` records the blueprint's line layout**, each entry naming the wiki labels that share a
   line. **The formatting pass reads it; the data pass does not** — the diff compares fields and does not care where
-  they sit. (An earlier note here said nothing read it yet, which stopped being true when `ItemPagePrettifier`
-  landed. The difference matters: it means removing an entry is not free by default, only when nothing on either
-  side carries that label.) A label no entry names is not dropped — it keeps its own line before `Class:` and is
+  they sit. So removing an entry is not free by default, only when nothing on either side carries that label. A
+  label no entry names is not dropped — it keeps its own line before `Class:` and is
   reported.
 - **The blueprint and the game have gaps in both directions**, all on the user's TODO: it lists labels no capture
   has produced (`Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`) and
@@ -534,6 +533,8 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
     order because a format that rewrites the number has to run before the sign rule asks whether the value is a bare
     number. It was spread across the analyzer and the mapping, which is how a caller ends up applying two of the
     three and writing a *plausible* wrong value.
+  - **`WikiMapping.CurrentVersion` is 8 for it**, on the usual test: a settled row for an item carrying `Skill Mod`
+    would otherwise never be offered the newly mapped line.
 
 **The blueprint's 2026-09-30 revision (oldid 179818), reconciled.** The user brought it over; its author's summary
 reads "Added proper formatting". Most of it ratified what the tool already did, which is the useful finding — three
@@ -784,27 +785,11 @@ recorded an incomplete convention as the convention.
   reported 300 differing fields and "76 of 85 pages are stale", when a levelled item's stats are *legitimately*
   higher than the wiki's level-0 figures (Bladestopper +7 shows AC 43 against a correct 25). Filtering to eligible
   items dropped that to 19.
-- **Baseline on the verified corpus, re-measured 2026-10-01**, eligible items only: 45 of 94 distinct captures are
-  eligible (the rest are levelled), 42 have pages, **16 pages already correct and 26 would change** — 314 fields
-  match, 34 differ, 23 are missing on the wiki, 3 unverifiable, 2 need review, plus 7 compliance findings the tool
-  fixes. The move from 2026-09-29's 8/33 is **the user's own editing of the live wiki**, confirmed by running
-  `analyze` at the preceding commit and getting the same 16/26; the flags fix of that day moved only the field
-  verdicts (see the flags bullet above). The older figures below are kept because the *method* they illustrate is
-  the point.
-- **Superseded, 2026-09-29**: 44 of 94 eligible, 41 with pages, **8 already correct and 33 would change** — 285 fields
-  match, 27 differ, 49 are missing on the wiki, 3 unverifiable, 3 need review (the two food-prose lines, which are
-  human-by-design, plus one category), plus 13 compliance findings the tool fixes (11 era banners, 2 lore
-  placeholders). The differences are dominated by legacy flag lines being dropped, plus real staleness and several
-  `merchant_value` corrections. It also caught a typo on a live page (`Lore Equpped`).
-  - **This drifted from 2026-09-28's "5 already correct and 33 would change" because the user was editing the live
-    wiki with the tool that day**, not because anything in the code moved: three pages that did not exist now do (so
-    41 pages are analyzed rather than 38, which is most of the +25 matched fields), and three more are now correct.
-    `changed` held at 33 throughout.
-  - **The earlier "9 already correct and 29 would change" here was stale**, not a regression: it survived an update
-    that refreshed the field counts around it. Verified by re-running `analyze` at the commit before milestone 5's
-    pipeline work and getting the same 5/33, so nothing in that work moved it. Worth knowing because the split is
-    the number that *looks* like a regression when a rule changes — check it against a previous commit before
-    believing it, and against what the user has been editing.
+- **Baseline on the verified corpus** (2026-10-02), eligible items only: **30 pages already correct and 13 would
+  change.** About half of the distinct captures are eligible; the rest are levelled.
+  - **This split moves with the user's own editing of the live wiki**, which they do with this tool, so it is the
+    number that *looks* like a regression when a rule changes. Before believing that, run `analyze` at the preceding
+    commit in the same session: identical numbers at both mean the drift is the wiki, not the code.
 
 **Template compliance (`Wiki.Analysis.ComplianceChecker`).** What a page gets wrong on its own terms, independent of
 any capture. **Compliance changes what the page *says*; formatting changes only how it reads** — the latter belongs
@@ -1172,10 +1157,9 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
     well enough to lay out. Formatting first would have met a page it declines. A test pins exactly that sequence.
   - A page with nothing to do offers nothing — a prompt that appears when there is no work becomes noise the user
     learns to dismiss.
-  - **The plan's "a brand-new page goes through the formatter before its first commit" now applies, and is done**
-    (2026-10-01). This entry used to say it was not applicable because v1 never created pages. It does now, and the
-    formatter runs over the generated text *before* the proposal is ever shown, so a creation lands a finished page
-    in one revision. See "Creating a page for a new item" below.
+  - **A brand-new page goes through the formatter before its first commit**: the formatter runs over the generated
+    text *before* the proposal is ever shown, so a creation lands a finished page in one revision. See "Creating a
+    page for a new item" below.
 - `tools/WikiSpike -- prettify --cached <dir>` runs it over the real corpus and censuses what it did — the same
   methodology as `grammar` and `analyze`, and how both of the above bugs were found. `prettyshow <in> <out>` writes
   one page's result so it can be diffed by eye, because a census says nothing about whether the layout is any good.
@@ -1540,8 +1524,8 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — `RapidOcrEngine` loads three
   ONNX models in its constructor, the `MediaWikiClient` must keep one cookie container for its whole session, and
   the ledger and icon cache only mean anything shared. Measured: the window is responsive in ~485ms.
-- **The `.onnx`-copy trap is confirmed handled for `App`**, which this file previously listed as needing a real run:
-  the direct `PackageReference` does put the models in the app's own output, and the app starts.
+- **The `.onnx`-copy trap is handled for `App`**: the direct `PackageReference` puts the models in the app's own
+  output, and the app starts.
 - `WikitextDiff` is a real LCS line diff, replacing the spike tool's set subtraction — that was fine for eyeballing
   whether an edit is surgical, but it collapsed duplicate lines (real statsblocks repeat `<br>`) and paired a changed
   line with an unrelated one. Long unchanged runs fold away, because an item page can carry a `dropsfrom` table with
@@ -1649,9 +1633,8 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
   `RenderTargetBitmap` in a throwaway harness, because the review screen's detail panel cannot be reached without a
   live capture. That gallery is what confirms an Expander still opens — a broken template there would have hidden
   the wikitext editor entirely, which is a functional regression wearing a cosmetic change's clothes.
-  - **The detail panel in situ is verified** (user, 2026-10-01): they have now used every part of it against real
-    captures under this palette. This entry previously said it was unverified, and that note outlived the fact —
-    worth recording, because it was then repeated back to the user as outstanding work when it was not.
+  - **The detail panel in situ is verified** (user, 2026-10-01): they have used every part of it against real
+    captures under this palette.
   - **Its rearrangement was re-verified by rendering** (2026-10-01), when the capture moved to the top of the panel
     and the icons moved beside it: both layouts, a creation and an ordinary edit, at a wide and a narrow window, so
     the WrapPanel is seen actually reflowing the icon column below the screenshot rather than clipping it. Rendering
@@ -2116,25 +2099,21 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline, re-measured 2026-10-01 after the top-edge rewrite: **47 samples, 109 windows located (1 correctly
-  occluded), 2216 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and extra.
-  Parser warnings are 2, not 0**: both are `Convert to Guise of the Deceiver`, which is the trailing-region rule
-  working exactly as designed (see "The item window's trailing region" — an unknown line reaching the user is the
-  right outcome). This line previously claimed 0 warnings, which contradicted that section of this same file; the
-  corpus test gates structural, silent-wrong, wrong and missing, and has never gated warnings. Those
-  ratchets in `CorpusAccuracyTests` are all 0 and must stay there; a regression is now a real defect
-  rather than a known gap being re-measured. (It read 43 samples / 101 windows / 2094 fields when the user first
-  verified the whole set on 2026-09-24, and 47 / 109 / 2216 on 2026-10-01; the growth is captures added since, and
-  the occluded count fell from 2 to 1 when the HUD-panel bug above was fixed.) Under the previous configuration (RapidOCR reading window crops) the same
+- Baseline (2026-10-03): **48 samples, 110 windows located (1 correctly occluded), 2230 correct fields, and 0 for
+  every error count — structural, silent-wrong, wrong, missing and extra. Parser warnings are 2, not 0**: both are
+  `Convert to Guise of the Deceiver`, which is the trailing-region rule working exactly as designed (see "The item
+  window's trailing region" — an unknown line reaching the user is the right outcome). The corpus test gates
+  structural, silent-wrong, wrong and missing, never warnings. Those ratchets in `CorpusAccuracyTests` are all 0 and
+  must stay there; a regression is a real defect rather than a known gap being re-measured. Under the previous
+  configuration (RapidOCR reading window crops) the same
   corpus and the same ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them
   a glyph-level failure that exact template matching removed outright. `AccuracySpike --rapid` still scores the old
   configuration, so the comparison stays reproducible.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
     newly bootstrapped sample guards against regressions immediately; the flag only records whether a human has
     checked it against the screenshot, and the summary counts it (`48 samples scored (48 verified)`). **All 48 are
-    verified** as of 2026-10-03, when the user signed off `14-race-restricted-item.png`. Keep this line honest: it
-    has twice outlived the fact, having claimed `20-stalwart-seas-false-occlusion.png` was outstanding after the
-    user signed it off in `6f79395`.
+    verified** (2026-10-03). A status line in this file is a snapshot: check it against the repository before telling
+    the user something is still outstanding.
   - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure** — a sample that is
     located and parsed but compared against nothing. `AccuracySpike --bootstrap --only <substring>` adds one entry
     for it, merging into the tracked corpus rather than regenerating the whole file.
@@ -2171,9 +2150,10 @@ this controls whether they're *found*.
 +2`); the wiki only stores level-0 data. The `+X` suffix is always stripped before using the name to key the ledger
 or look up the wiki page. Real per-stat level-0 downscaling is **deferred** (the actual formula isn't safely
 reverse-engineerable from the wiki — see the plan's "Item leveling" and milestone 8 sections): a parsed item with
-`X>0` is treated as ineligible in v1 — warn the user, skip it, write no ledger row — via a placeholder
-`ILevelNormalizer` seam rather than guessed-at math. Don't implement real stat scaling without re-reading that plan
-section first; it documents what was already investigated (and ruled out) on the wiki side.
+`X>0` is treated as ineligible in v1 — warn the user, skip it, write no ledger row — by `ItemEligibility.Check`,
+which reports it as `IneligibilityReason.UnsupportedLevel`, rather than by guessed-at math. Don't implement real
+stat scaling without re-reading that plan section first; it documents what was already investigated (and ruled
+out) on the wiki side.
 
 **Exaltation eligibility.** Item windows can show "exaltation" slots (Ornamentation/Focus/Click/Worn/Proc), each
 either `empty` or holding `<Name> (Exaltation)`. A slot only appears once its tier unlocks it — below that, a native
