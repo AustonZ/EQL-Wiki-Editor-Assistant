@@ -12,6 +12,16 @@ public interface IMediaWikiClient
     /// error.</summary>
     Task<WikiPage?> FetchPageAsync(string title, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Which of these titles exist, in one request. Reads nothing but the page list, so it is the cheap way to ask
+    /// an existence question — <see cref="FetchPageAsync"/> would download each page's whole wikitext to answer it.
+    ///
+    /// A title the wiki cannot use at all (see <see cref="Wikitext.PageTitle"/>) simply does not come back, which is
+    /// the same answer as "no such page" and the right one for every caller here.
+    /// </summary>
+    Task<IReadOnlySet<string>> ExistingTitlesAsync(
+        IReadOnlyList<string> titles, CancellationToken cancellationToken = default);
+
     /// <summary>Logs in with a bot password. Required before <see cref="EditAsync"/>; reads work anonymously.</summary>
     Task LoginAsync(BotCredentials credentials, CancellationToken cancellationToken = default);
 

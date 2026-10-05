@@ -831,4 +831,236 @@ public class ItemPageAnalyzerTests
 
         Assert.False(analysis.IsAlreadyCoveredByAFieldFinding(era));
     }
+
+    // ---- an effect whose page is linked under a qualified title (user, 2026-10-03, `Rain Caller`) ----
+
+    /// <summary>`Rain Caller`'s statsblock, verbatim from the live page. Its effect links the *disambiguated* page
+    /// and displays the plain name, which is the shape the matching used to miss.</summary>
+    private static ItemPageDocument RainCaller() => ItemPageDocument.Parse(
+        "{{Itempage\n|itemname    = Rain Caller\n|lucy_img_ID = 1024\n|statsblock  = \n" +
+        "Lore Equipped, Attunable, Placeable<br>\n" +
+        "Slot: RANGE<br>\n" +
+        "Skill: Archery  Atk Delay: 45<br>\n" +
+        "DMG: 20<br>\n" +
+        "Effect:  [[Firestrike_(Effect)|Firestrike]] (Must Equip, Casting Time: Instant, Cooldown: 120s) at Level 40<br>\n" +
+        "Class: RNG<br>\n" +
+        "Race: ALL<br>\n}}")!;
+
+    private static ParsedItem RainCallerCapture() => Captured(name: "Rain Caller") with
+    {
+        Effects =
+        [
+            new EffectEntry("Click", "Firestrike", ["Must Equip"],
+                [new("Cast Time", "Instant"), new("Cooldown", "120 seconds"), new("Required Level", "40")]),
+        ],
+    };
+
+    /// <summary>
+    /// **The reported bug** (user, 2026-10-03): the tool added its own effect line and left the page's in place, so
+    /// one effect ended up stated twice.
+    ///
+    /// The cause was that an effect was matched by the page it *links to* rather than the name it *displays*. The
+    /// game shows `Firestrike`; the page links `Firestrike_(Effect)`; so nothing matched, the analyzer called the
+    /// effect `MissingOnWiki`, and the editor inserted a second line. The line-count assertion is what fails against
+    /// the old behaviour — the finding's verdict alone would have read as a plausible "the page is missing this".
+    /// </summary>
+    [Fact]
+    public void AnEffectLinkedUnderAQualifiedTitleIsStillTheSameEffect()
+    {
+        ItemPageDocument page = RainCaller();
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(RainCallerCapture(), page, "Rain Caller");
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis);
+
+        FieldFinding finding = analysis.Find("Click Effect")!;
+        Assert.Equal(FieldVerdict.Differs, finding.Verdict);
+        Assert.Null(analysis.Find(ItemPageAnalyzer.OrphanEffectField));
+
+        Assert.Equal(1, Occurrences(edit.NewWikitext, "Effect:"));
+        Assert.Equal(1, Occurrences(edit.NewWikitext, "[[Firestrike"));
+    }
+
+    /// <summary>
+    /// The write side, and the reason the match had to be the *displayed* name rather than either half being
+    /// "close enough": `Firestrike` and `Firestrike (Effect)` are both real pages and they are different spells —
+    /// 422 damage for 138 mana against 302 for none, the second's own page reading "None; this spell is found on
+    /// weapons". Normalizing the target to the effect's name repoints the item at the wrong figures with nothing
+    /// visible on the rendered page to say so.
+    /// </summary>
+    [Fact]
+    public void TheQualifiedLinkTargetSurvivesTheRewrite()
+    {
+        ItemPageDocument page = RainCaller();
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(RainCallerCapture(), page, "Rain Caller");
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis);
+
+        Assert.Contains(
+            "Effect: [[Firestrike_(Effect)|<span class='itemeff'>Firestrike</span>]] " +
+            "(Clicky, Must Equip, Casting Time: Instant, Cooldown: 120 seconds) at Level 40",
+            edit.NewWikitext);
+        Assert.DoesNotContain("[[Firestrike|", edit.NewWikitext);
+    }
+
+    /// <summary>A link the tool kept rather than chose is reported, so the user can confirm it points at the right
+    /// page (user, 2026-10-03). Only on a line being written — see ItemPageAnalyzer.LinkNote.</summary>
+    [Fact]
+    public void ALinkTheToolDidNotChooseIsReported()
+    {
+        FieldFinding finding = ItemPageAnalyzer
+            .Analyze(RainCallerCapture(), RainCaller(), "Rain Caller").Find("Click Effect")!;
+
+        Assert.Contains("Firestrike_(Effect)", finding.Explanation);
+    }
+
+    /// <summary>The control for that note: an ordinary page, whose link target *is* the effect's name, says nothing
+    /// about it. Without this a perfectly ordinary effect would carry the bar on every capture.</summary>
+    [Fact]
+    public void AnOrdinaryEffectLinkIsNotRemarkedOn()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \n" +
+            "Effect: [[Burn|<span class='itemeff'>Burn</span>]] (Combat)<br>\n}}")!;
+
+        ParsedItem captured = Captured(name: "Thing") with
+        {
+            Effects = [new EffectEntry("Combat", "Burn", [], [new("Required Level", "10")])],
+        };
+
+        FieldFinding finding = ItemPageAnalyzer.Analyze(captured, page, "Thing").Find("Combat Effect")!;
+
+        Assert.Equal(FieldVerdict.Differs, finding.Verdict);   // the level is genuinely new
+        Assert.Null(finding.Explanation);
+    }
+
+    // ---- an effect line the capture does not account for ----
+
+    /// <summary>
+    /// The other half of the duplicate-line bug (user, 2026-10-03). A line naming an effect the window does not
+    /// show was ignored outright, so the tool could add its own beside it and say nothing at all. It is reported
+    /// and left exactly as the page wrote it: only a human can tell a stale page from a page describing something
+    /// the window cannot display.
+    /// </summary>
+    [Fact]
+    public void AnEffectLineTheCaptureDoesNotShowIsReportedAndLeftAlone()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \n" +
+            "Effect: [[Burn|<span class='itemeff'>Burn</span>]] (Combat)<br>\n}}")!;
+
+        ParsedItem captured = Captured(name: "Thing") with
+        {
+            Effects = [new EffectEntry("Combat", "Chill", [], [])],
+        };
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, "Thing");
+        FieldFinding orphan = analysis.Find(ItemPageAnalyzer.OrphanEffectField)!;
+
+        Assert.Equal(FieldVerdict.NeedsReview, orphan.Verdict);
+        Assert.False(orphan.IsChange);
+        Assert.True(orphan.Blocks, "nobody has judged this line, so the item must not settle as done");
+        Assert.Contains("[[Burn", orphan.OnWiki);
+
+        // Left alone means left alone: the page's line is still there, beside the captured effect's new one.
+        string edited = ItemPageEditor.BuildEdit(page, analysis).NewWikitext;
+        Assert.Contains("[[Burn", edited);
+        Assert.Contains("[[Chill", edited);
+    }
+
+    /// <summary>A *legacy* page can write a focus effect as a statsblock line, where the modern convention gives it
+    /// its own parameter. The tool sets the parameter and reports the line rather than deleting it — and the message
+    /// says which of the two it is, since "an effect the window does not show" would be plainly untrue here.</summary>
+    [Fact]
+    public void AFocusEffectWrittenAsALineIsReportedAsThat()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \n" +
+            "Effect: [[Improved Healing III|<span class='itemeff'>Improved Healing III</span>]] (Worn)<br>\n}}")!;
+
+        ParsedItem captured = Captured(name: "Thing") with
+        {
+            Effects = [new EffectEntry("Focus", "Improved Healing III", [], [])],
+        };
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, "Thing");
+
+        FieldFinding orphan = analysis.Find(ItemPageAnalyzer.OrphanEffectField)!;
+        Assert.Contains("focus_effect", orphan.Explanation);
+        Assert.Equal(FieldVerdict.MissingOnWiki, analysis.Find("Focus Effect")!.Verdict);
+    }
+
+    /// <summary>The control: every effect line accounted for produces no orphan at all.</summary>
+    [Fact]
+    public void AnEffectLineTheCaptureMatchesIsNoOrphan()
+    {
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            RainCallerCapture(), RainCaller(), "Rain Caller");
+
+        Assert.Null(analysis.Find(ItemPageAnalyzer.OrphanEffectField));
+    }
+
+    // ---- which effects need a link target resolved ----
+
+    /// <summary>The page has the line, so its target is preserved and nothing is looked up — which is what keeps an
+    /// ordinary check from spending a request on a question already answered.</summary>
+    [Fact]
+    public void AnEffectThePageAlreadyCarriesNeedsNoLinkLookup() =>
+        Assert.Empty(ItemPageAnalyzer.EffectsNeedingALinkTarget(RainCallerCapture(), RainCaller()));
+
+    /// <summary>A page with no line for the effect is the one case where the tool picks the target itself, so that
+    /// is the case worth asking the wiki about.</summary>
+    [Fact]
+    public void AnEffectThePageIsMissingNeedsOne()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Rain Caller\n|statsblock = \nDMG: 20<br>\n}}")!;
+
+        Assert.Equal(
+            ["Firestrike"], ItemPageAnalyzer.EffectsNeedingALinkTarget(RainCallerCapture(), page));
+    }
+
+    /// <summary>A focus effect has no line and so no link: it goes in its own parameter as a bare name.</summary>
+    [Fact]
+    public void AFocusEffectNeedsNoLinkTarget()
+    {
+        ParsedItem captured = Captured(name: "Thing") with
+        {
+            Effects = [new EffectEntry("Focus", "Improved Healing III", [], [])],
+        };
+
+        Assert.Empty(ItemPageAnalyzer.EffectsNeedingALinkTarget(captured, null));
+    }
+
+    /// <summary>A resolved target is used for a line the tool writes from scratch, which is the only place it can
+    /// be: a page that has the line has a target of its own to keep.</summary>
+    [Fact]
+    public void AResolvedTargetIsUsedForALineTheToolWritesItself()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Rain Caller\n|statsblock = \nDMG: 20<br>\n}}")!;
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            RainCallerCapture(), page, "Rain Caller",
+            effectLinkTargets: new Dictionary<string, string> { ["Firestrike"] = "Firestrike (Effect)" });
+
+        FieldFinding finding = analysis.Find("Click Effect")!;
+        Assert.Equal(FieldVerdict.MissingOnWiki, finding.Verdict);
+        Assert.Contains("[[Firestrike (Effect)|<span class='itemeff'>Firestrike</span>]]", finding.Captured);
+        Assert.Contains("Firestrike (Effect)", finding.Explanation);
+    }
+
+    /// <summary>The control: with nothing resolved the effect's own name is linked, exactly as before this
+    /// existed.</summary>
+    [Fact]
+    public void WithNothingResolvedTheEffectsOwnNameIsLinked()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Rain Caller\n|statsblock = \nDMG: 20<br>\n}}")!;
+
+        FieldFinding finding = ItemPageAnalyzer
+            .Analyze(RainCallerCapture(), page, "Rain Caller").Find("Click Effect")!;
+
+        Assert.Contains("[[Firestrike|<span class='itemeff'>Firestrike</span>]]", finding.Captured);
+        Assert.Null(finding.Explanation);
+    }
+
+    private static int Occurrences(string text, string value) => text.Split(value).Length - 1;
 }

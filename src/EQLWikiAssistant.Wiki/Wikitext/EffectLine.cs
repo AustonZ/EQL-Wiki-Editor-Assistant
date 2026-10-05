@@ -42,7 +42,16 @@ public static class EffectLine
     /// effect line missing its cooldown looks complete while having quietly lost data, which is the failure mode
     /// this whole project is built to avoid.
     /// </summary>
-    public static EffectRender Render(EffectEntry effect, WikiMapping? mapping = null)
+    /// <param name="linkTarget">
+    /// The page the link should point at, when that is not simply the effect's name. **Preserved from the page
+    /// rather than chosen** (user, 2026-10-03): `Rain Caller` links `[[Firestrike_(Effect)|Firestrike]]`, and
+    /// `Firestrike` and `Firestrike (Effect)` are genuinely different spells — 422 damage and 138 mana for the
+    /// player spell against 302 and 0 for the item effect, whose own page says "None; this spell is found on
+    /// weapons". A capture only ever sees the *displayed* name, so the target is knowledge the page holds and the
+    /// window cannot, and normalizing it away would repoint the effect at the wrong numbers with nothing visible
+    /// to the reader. Null falls back to the name, which is what the tool writes when the page says nothing.
+    /// </param>
+    public static EffectRender Render(EffectEntry effect, WikiMapping? mapping = null, string? linkTarget = null)
     {
         ArgumentNullException.ThrowIfNull(effect);
         mapping ??= WikiMapping.Default;
@@ -89,7 +98,7 @@ public static class EffectLine
         if (cooldownGroup is not null) parenthetical.Add($"Cooldown Group: {cooldownGroup}");
 
         var line = new StringBuilder();
-        line.Append(WikiLabel).Append(": ").Append(Link(effect.Name));
+        line.Append(WikiLabel).Append(": ").Append(Link(effect.Name, linkTarget));
         if (parenthetical.Count > 0) line.Append(" (").Append(string.Join(", ", parenthetical)).Append(')');
         if (level is not null) line.Append(" at Level ").Append(level);
 
@@ -115,37 +124,95 @@ public static class EffectLine
         return trimmed;
     }
 
-    /// <summary>The wikilink form that carries the tooltip, with the name in both halves.</summary>
-    public static string Link(string effectName)
+    /// <summary>The wikilink form that carries the tooltip: the name in the display half, and in the target half
+    /// too unless the page already pointed somewhere else — see <see cref="Render"/>'s linkTarget.</summary>
+    public static string Link(string effectName, string? linkTarget = null)
     {
         ArgumentNullException.ThrowIfNull(effectName);
-        return $"[[{effectName}|<span class='itemeff'>{effectName}</span>]]";
+        string target = string.IsNullOrWhiteSpace(linkTarget) ? effectName : linkTarget.Trim();
+        return $"[[{target}|<span class='itemeff'>{effectName}</span>]]";
     }
 
     /// <summary>
-    /// The effect name from an existing line's value, however it is written — the modern
+    /// The effect's name as an existing line *displays* it, however the line is written — the modern
     /// <c>[[X|&lt;span…&gt;X&lt;/span&gt;]]</c>, a legacy bare <c>[[X]]</c>, or a piped link to a differently-titled
-    /// page (<c>[[Cold Awareness II (Spell)|Cold Awareness II]]</c>, which is real). Null if there is no link at all.
+    /// page (<c>[[Firestrike_(Effect)|Firestrike]]</c>, which is real). Null if there is no link at all.
     ///
     /// Reading the name is what separates "the same effect, written the old way" from "a different effect" — the
     /// first is a formatting correction, the second is a data change, and conflating them would be bad either way.
+    ///
+    /// **It is the display half, not the link target** (bug found by the user, 2026-10-03, on `Rain Caller`). This
+    /// read the target, which is the one half a capture can never see: the game shows `Firestrike` while the page
+    /// links `Firestrike_(Effect)`, so the effect matched nothing, was reported `MissingOnWiki`, and the editor
+    /// added a *second* effect line beside the one already there. The target is the page's own editorial choice and
+    /// is read by <see cref="TryReadTarget"/>; the displayed name is the only half that answers "is this the same
+    /// effect the window is showing me?".
     /// </summary>
     public static string? TryReadName(string wikiValue)
     {
         ArgumentNullException.ThrowIfNull(wikiValue);
+        if (!TryReadLink(wikiValue, out string? target, out string? display)) return null;
+
+        // No pipe means the link target *is* what the reader sees, so it is the name as well.
+        string name = StripMarkup(display ?? target!);
+        return name.Length == 0 ? null : name;
+    }
+
+    /// <summary>
+    /// The page an existing line links to, verbatim as the page wrote it (underscores included). Null if there is
+    /// no link.
+    ///
+    /// Kept separately from <see cref="TryReadName"/> because it is preserved rather than compared: see
+    /// <see cref="Render"/>'s linkTarget for why the tool must not normalize it to the effect's name.
+    /// </summary>
+    public static string? TryReadTarget(string wikiValue)
+    {
+        ArgumentNullException.ThrowIfNull(wikiValue);
+        if (!TryReadLink(wikiValue, out string? target, out _)) return null;
+        return target!.Length == 0 ? null : target;
+    }
+
+    /// <summary>
+    /// Whether a link target names a page other than the effect itself — a disambiguation somebody chose on
+    /// purpose, which the tool keeps and reports rather than rewrites.
+    ///
+    /// Underscores are spaces in a MediaWiki title, so <c>Firestrike_(Effect)</c> and <c>Firestrike (Effect)</c> are
+    /// the same page and neither counts as pointing elsewhere than the other.
+    /// </summary>
+    public static bool PointsElsewhere(string? linkTarget, string effectName)
+    {
+        ArgumentNullException.ThrowIfNull(effectName);
+        if (string.IsNullOrWhiteSpace(linkTarget)) return false;
+        return !string.Equals(
+            linkTarget.Replace('_', ' ').Trim(), effectName.Replace('_', ' ').Trim(),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Splits the first wikilink in a value into its target and its display half (null when unpiped).
+    /// Tolerant by contract, like the rest of the wikitext layer: no link, or an unterminated one, is false rather
+    /// than an exception or a guess.</summary>
+    private static bool TryReadLink(string wikiValue, out string? target, out string? display)
+    {
+        target = display = null;
 
         int open = wikiValue.IndexOf("[[", StringComparison.Ordinal);
-        if (open < 0) return null;
+        if (open < 0) return false;
         int close = wikiValue.IndexOf("]]", open + 2, StringComparison.Ordinal);
-        if (close < 0) return null;
+        if (close < 0) return false;
 
         string inner = wikiValue[(open + 2)..close];
-        // The link target is before the first pipe. It is the page name, which is the effect's real identity; the
-        // display half may be wrapped in markup or shortened.
         int pipe = inner.IndexOf('|');
-        string target = (pipe < 0 ? inner : inner[..pipe]).Trim();
-        return target.Length == 0 ? null : target;
+        target = (pipe < 0 ? inner : inner[..pipe]).Trim();
+        display = pipe < 0 ? null : inner[(pipe + 1)..].Trim();
+        return true;
     }
+
+    /// <summary>The display half without its markup, so the tooltip span's own name reads out as the plain name.
+    /// </summary>
+    private static string StripMarkup(string text) => MarkupTag.Replace(text, "").Trim();
+
+    private static readonly System.Text.RegularExpressions.Regex MarkupTag =
+        new("<[^>]*>", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     /// <summary>Whether an existing line already uses the tooltip-bearing link form. A line that does not is worth
     /// correcting even when its name and details are right, because the tooltip is functionality rather than

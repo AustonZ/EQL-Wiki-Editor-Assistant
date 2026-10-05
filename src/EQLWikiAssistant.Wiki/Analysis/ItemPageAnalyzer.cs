@@ -79,6 +79,7 @@ public static class ItemPageAnalyzer
     public const string CategoryField = "category";
     public const string FlagsField = "flags";
     public const string FlagProseField = "flags (descriptive text)";
+    public const string OrphanEffectField = "effect (not in the capture)";
     public const string ClassesField = "Class";
     public const string RacesField = "Race";
     public const string SlotsField = "Slot";
@@ -91,7 +92,8 @@ public static class ItemPageAnalyzer
         ItemPageDocument page,
         string pageTitle,
         WikiMapping? mapping = null,
-        string? wholePageWikitext = null)
+        string? wholePageWikitext = null,
+        IReadOnlyDictionary<string, string>? effectLinkTargets = null)
     {
         ArgumentNullException.ThrowIfNull(captured);
         ArgumentNullException.ThrowIfNull(page);
@@ -111,7 +113,7 @@ public static class ItemPageAnalyzer
         AddListFinding(findings, SlotsField, [.. captured.Slots.Select(mapping.ToWikiSlot)], block);
         AddStatFindings(findings, captured, block, mapping);
         AddCategoryFindings(findings, captured, page, mapping);
-        AddEffectFindings(findings, captured, page, block, mapping);
+        AddEffectFindings(findings, captured, page, block, mapping, effectLinkTargets);
         NormalizeSignsIfTheEditWouldBeInconsistent(findings);
 
         return new ItemPageAnalysis(
@@ -541,14 +543,11 @@ public static class ItemPageAnalyzer
     /// looks.
     /// </summary>
     private static void AddEffectFindings(
-        List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page, StatsBlock? block, WikiMapping mapping)
+        List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page, StatsBlock? block,
+        WikiMapping mapping, IReadOnlyDictionary<string, string>? effectLinkTargets)
     {
-        // Existing Effect: lines, by the effect they name. A statsblock can carry several.
-        var onWiki = new List<(string? Name, string Value)>();
-        if (block is not null)
-            foreach (StatsField field in block.AllFields()
-                         .Where(f => string.Equals(f.Label, EffectLine.WikiLabel, StringComparison.OrdinalIgnoreCase)))
-                onWiki.Add((EffectLine.TryReadName(field.Value), field.Value));
+        IReadOnlyList<ExistingEffect> onWiki = ExistingEffectLines(block);
+        var claimed = new HashSet<int>();
 
         foreach (EffectEntry effect in captured.Effects)
         {
@@ -556,19 +555,32 @@ public static class ItemPageAnalyzer
 
             if (mapping.IsFocusEffect(effect.Kind))
             {
+                // A focus effect has no line of its own; it belongs in the focus_effect parameter. A *legacy* page
+                // may still write one, and that line is deliberately left unclaimed so the loop below reports it —
+                // with a message saying it is this focus effect, not an effect the window never showed.
                 CompareFocusEffect(findings, field, effect, page);
                 continue;
             }
 
-            EffectRender render = EffectLine.Render(effect, mapping);
-            (string? Name, string Value) existing = onWiki.FirstOrDefault(
-                e => string.Equals(e.Name, effect.Name, StringComparison.OrdinalIgnoreCase));
+            int index = IndexOfEffect(onWiki, effect.Name);
+            if (index >= 0) claimed.Add(index);
+            ExistingEffect? existing = index < 0 ? null : onWiki[index];
+
+            // **The link target is preserved from the page, never chosen** — see EffectLine.Render. Only where the
+            // page has no line at all does the tool pick one, from the targets the caller resolved (a
+            // `<Name> (Effect)` page, when the wiki has one) and otherwise from the effect's own name.
+            string? target = existing?.Target;
+            if (target is null && effectLinkTargets is not null &&
+                effectLinkTargets.TryGetValue(effect.Name, out string? resolved))
+                target = resolved;
+
+            EffectRender render = EffectLine.Render(effect, mapping, target);
 
             if (!render.IsComplete)
             {
                 // Refuse rather than write a line that has quietly lost part of the effect.
                 findings.Add(new FieldFinding(
-                    field, FieldVerdict.NeedsReview, effect.Name, existing.Value,
+                    field, FieldVerdict.NeedsReview, effect.Name, existing?.Value,
                     $"This effect cannot be written in the wiki's convention yet: {string.Join(" ", render.Unsupported)}"));
                 continue;
             }
@@ -580,20 +592,110 @@ public static class ItemPageAnalyzer
             // so a review screen showed `Effect: ...` against `[[...]]` and the missing `Effect:` read as the
             // difference, drawing the eye away from the real one. `FieldFinding` documents these two as "the
             // rendered forms being compared", and they have to actually be that.
-            string? existingLine = existing.Value is null ? null : $"{EffectLine.WikiLabel}: {existing.Value}";
+            string? existingLine = existing is null ? null : $"{EffectLine.WikiLabel}: {existing.Value}";
 
-            if (existing.Value is null)
-                findings.Add(new FieldFinding(field, FieldVerdict.MissingOnWiki, wanted, null));
+            if (existing is null)
+            {
+                findings.Add(new FieldFinding(
+                    field, FieldVerdict.MissingOnWiki, wanted, null, LinkNote(target, effect.Name)));
+            }
             else if (string.Equals(existingLine, wanted, StringComparison.Ordinal))
+            {
                 findings.Add(new FieldFinding(field, FieldVerdict.Matches, wanted, existingLine));
+            }
             else
+            {
                 findings.Add(new FieldFinding(
                     field, FieldVerdict.Differs, wanted, existingLine,
-                    EffectLine.HasTooltipLink(existing.Value)
+                    LinkNote(target, effect.Name) ??
+                    (EffectLine.HasTooltipLink(existing.Value)
                         ? null
                         : "The existing link is the legacy [[Name]] form, which gets no tooltip. Rewriting it to " +
-                          "the itemeff span form is a functional fix, not a style change."));
+                          "the itemeff span form is a functional fix, not a style change.")));
+            }
         }
+
+        // **An effect line the capture does not account for is reported and left alone** (user, 2026-10-03). It is
+        // the other half of the duplicate-line bug: with the line unmatched and unmentioned, the tool could add its
+        // own beside it and say nothing at all. Only a human can decide which is right — the item may have lost the
+        // effect in a patch, or the page may describe a variant the window cannot show — so nothing is removed.
+        for (int i = 0; i < onWiki.Count; i++)
+        {
+            if (claimed.Contains(i)) continue;
+            ExistingEffect orphan = onWiki[i];
+            bool isCapturedFocus = orphan.Name is not null && captured.Effects.Any(
+                e => mapping.IsFocusEffect(e.Kind) &&
+                     string.Equals(e.Name, orphan.Name, StringComparison.OrdinalIgnoreCase));
+
+            findings.Add(new FieldFinding(
+                OrphanEffectField, FieldVerdict.NeedsReview, null,
+                $"{EffectLine.WikiLabel}: {orphan.Value}",
+                isCapturedFocus
+                    ? $"The capture shows '{orphan.Name}' as a focus effect, which belongs in " +
+                      $"{mapping.FocusEffectParameter} rather than a statsblock line. The parameter is being set; " +
+                      "this line is left for you to remove, since deleting somebody's line is not the tool's call."
+                    : "This effect line names an effect the captured window does not show at all. Left exactly as " +
+                      "the page wrote it — the item may have lost the effect, or the page may know something the " +
+                      "window cannot display."));
+        }
+    }
+
+    /// <summary>The note that tells the user the tool wrote a link it did not choose (user, 2026-10-03). Only on a
+    /// line being written: a line that already matches was left exactly as its editors wrote it, so there is nothing
+    /// for the tool to account for — and a bar on every capture of such a page is a bar nobody reads.</summary>
+    private static string? LinkNote(string? target, string effectName) =>
+        EffectLine.PointsElsewhere(target, effectName)
+            ? $"This effect links to [[{target}]] rather than [[{effectName}]], kept as the page wrote it — a " +
+              "qualified title is usually deliberate and the window cannot see it. Worth confirming it points at " +
+              "the right page."
+            : null;
+
+    /// <summary>Every <c>Effect:</c> line in the block, as the name it displays, the page it links to and its
+    /// verbatim value. A statsblock can carry several.</summary>
+    private static IReadOnlyList<ExistingEffect> ExistingEffectLines(StatsBlock? block)
+    {
+        if (block is null) return [];
+        return block.AllFields()
+            .Where(f => string.Equals(f.Label, EffectLine.WikiLabel, StringComparison.OrdinalIgnoreCase))
+            .Select(f => new ExistingEffect(
+                EffectLine.TryReadName(f.Value), EffectLine.TryReadTarget(f.Value), f.Value))
+            .ToList();
+    }
+
+    /// <summary>Which of a page's effect lines is this captured effect's, by the name the line displays. One home
+    /// for the rule, shared by the analysis and by <see cref="EffectsNeedingALinkTarget"/>.</summary>
+    private static int IndexOfEffect(IReadOnlyList<ExistingEffect> onWiki, string effectName)
+    {
+        for (int i = 0; i < onWiki.Count; i++)
+            if (string.Equals(onWiki[i].Name, effectName, StringComparison.OrdinalIgnoreCase))
+                return i;
+        return -1;
+    }
+
+    private sealed record ExistingEffect(string? Name, string? Target, string Value);
+
+    /// <summary>
+    /// The captured effects the page carries no line for — the only case where the tool has to choose a link target
+    /// of its own rather than keep the page's.
+    ///
+    /// Exposed so a caller can resolve those targets against the wiki (<see cref="MediaWiki.EffectPageLookup"/>)
+    /// *before* calling <see cref="Analyze"/>, which stays a pure, synchronous function. It shares the matching rule
+    /// with the analysis rather than restating it: two copies would drift into the caller resolving a target for a
+    /// line that is already there, or missing one for a line that is not.
+    /// </summary>
+    public static IReadOnlyList<string> EffectsNeedingALinkTarget(
+        ParsedItem captured, ItemPageDocument? page, WikiMapping? mapping = null)
+    {
+        ArgumentNullException.ThrowIfNull(captured);
+        mapping ??= WikiMapping.Default;
+
+        IReadOnlyList<ExistingEffect> onWiki = ExistingEffectLines(page?.ReadStatsBlock());
+        return captured.Effects
+            .Where(e => !mapping.IsFocusEffect(e.Kind))
+            .Select(e => e.Name)
+            .Where(name => IndexOfEffect(onWiki, name) < 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static void CompareFocusEffect(

@@ -128,15 +128,65 @@ public class EffectLineTests
     public void ACastTimeIsWrittenWithoutItsUnit(string captured, string expected) =>
         Assert.Contains(expected, EffectLine.Render(Effect("Worn", "X", modifiers: [new("Cast Time", captured)])).Line);
 
+    /// <summary>
+    /// The name an existing line *displays*, which is the only half a capture can compare against — the window
+    /// shows `Firestrike`, never the page the editor chose to link.
+    ///
+    /// The `(Spell)` and `(Effect)` rows are the regression: this used to return the link target, so a page writing
+    /// a qualified title matched nothing and the editor added a second effect line beside the one already there
+    /// (`Rain Caller`, 2026-10-03). Both fail against the old behaviour.
+    /// </summary>
     [Theory]
     [InlineData("[[Burn|<span class='itemeff'>Burn</span>]] (Combat) at Level 10", "Burn")]
     [InlineData("[[Enduring Breath]] (Worn)", "Enduring Breath")]                      // legacy bare link
-    [InlineData("[[Cold Awareness II (Spell)|Cold Awareness II]] (Any Slot)", "Cold Awareness II (Spell)")]
+    [InlineData("[[Cold Awareness II (Spell)|Cold Awareness II]] (Any Slot)", "Cold Awareness II")]
+    [InlineData("[[Firestrike_(Effect)|Firestrike]] (Must Equip) at Level 40", "Firestrike")]
     [InlineData(" [[Null Aura]] (Any Slot, Casting Time: 4.0)", "Null Aura")]
     [InlineData("no link at all", null)]
     [InlineData("[[unterminated", null)]
-    public void TryReadName_FindsTheLinkTargetHoweverItIsWritten(string value, string? expected) =>
+    public void TryReadName_FindsTheDisplayedNameHoweverTheLineIsWritten(string value, string? expected) =>
         Assert.Equal(expected, EffectLine.TryReadName(value));
+
+    /// <summary>The other half, kept apart from the name because it is preserved rather than compared.</summary>
+    [Theory]
+    [InlineData("[[Firestrike_(Effect)|Firestrike]] (Must Equip)", "Firestrike_(Effect)")]
+    [InlineData("[[Burn|<span class='itemeff'>Burn</span>]] (Combat)", "Burn")]
+    [InlineData("[[Enduring Breath]] (Worn)", "Enduring Breath")]
+    [InlineData("no link at all", null)]
+    public void TryReadTarget_FindsThePageTheLineLinksTo(string value, string? expected) =>
+        Assert.Equal(expected, EffectLine.TryReadTarget(value));
+
+    /// <summary>An underscore is a space in a MediaWiki title, so the two spellings are one page.</summary>
+    [Theory]
+    [InlineData("Firestrike_(Effect)", "Firestrike", true)]
+    [InlineData("Firestrike", "Firestrike", false)]
+    [InlineData("Null_Aura", "Null Aura", false)]
+    [InlineData(null, "Firestrike", false)]
+    public void PointsElsewhere_AsksWhetherTheTargetIsThisEffectsOwnPage(
+        string? target, string name, bool expected) =>
+        Assert.Equal(expected, EffectLine.PointsElsewhere(target, name));
+
+    /// <summary>
+    /// A preserved target keeps the page's link while the tool still modernizes the markup around it.
+    ///
+    /// This is the write side of the `Rain Caller` bug: `Firestrike` and `Firestrike (Effect)` are different spells
+    /// (422 damage against 302), so normalizing the target would repoint the effect at the wrong numbers with
+    /// nothing visible on the rendered page to say so.
+    /// </summary>
+    [Fact]
+    public void APreservedLinkTargetSurvivesTheRewrite() =>
+        Assert.Equal(
+            "Effect: [[Firestrike_(Effect)|<span class='itemeff'>Firestrike</span>]] (Combat) at Level 40",
+            EffectLine.Render(
+                Effect("Combat", "Firestrike", modifiers: [new("Required Level", "40")]),
+                linkTarget: "Firestrike_(Effect)").Line);
+
+    /// <summary>The control: with no target supplied the name fills both halves, exactly as before.</summary>
+    [Fact]
+    public void WithNoTargetTheEffectsOwnNameIsLinked() =>
+        Assert.Equal(
+            "Effect: [[Firestrike|<span class='itemeff'>Firestrike</span>]] (Combat)",
+            EffectLine.Render(Effect("Combat", "Firestrike")).Line);
 
     /// <summary>Distinguishing the two link forms is what separates a functional fix from a cosmetic one.</summary>
     [Theory]

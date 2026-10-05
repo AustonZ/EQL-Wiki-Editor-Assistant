@@ -116,8 +116,15 @@ public static class ItemPageCreator
     /// <param name="iconId">The icon id the library identified from the captured artwork, when it identified one
     /// clearly enough to write. Null leaves <c>lucy_img_ID</c> blank, which is reported as the page's one remaining
     /// gap exactly as before — see <see cref="ProposedPage.Gaps"/>.</param>
+    /// <param name="effectLinkTargets">
+    /// Where each effect's link should point, for the effects whose page is not simply their name — resolved by the
+    /// caller against the wiki (<see cref="MediaWiki.EffectPageLookup"/>) because this method is synchronous and
+    /// decides nothing on its own. A creation needs it for *every* effect: the skeleton has no lines, so there is
+    /// no existing target to preserve and the alternative is linking a bare name that may be a different spell.
+    /// </param>
     public static ProposedPage? Build(
-        ParsedItem captured, string title, WikiMapping? mapping = null, string? iconId = null)
+        ParsedItem captured, string title, WikiMapping? mapping = null, string? iconId = null,
+        IReadOnlyDictionary<string, string>? effectLinkTargets = null)
     {
         ArgumentNullException.ThrowIfNull(captured);
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
@@ -126,7 +133,8 @@ public static class ItemPageCreator
         ItemPageDocument? skeleton = ItemPageDocument.Parse(Skeleton(title, mapping, iconId));
         if (skeleton is null) return null;
 
-        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, skeleton, title, mapping);
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            captured, skeleton, title, mapping, effectLinkTargets: effectLinkTargets);
         ProposedEdit filled = ItemPageEditor.BuildEdit(skeleton, analysis, mapping);
 
         PrettifyResult formatted = ItemPagePrettifier.Format(filled.NewWikitext, mapping);

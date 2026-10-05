@@ -110,6 +110,41 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
             Timestamp: revision.GetProperty("timestamp").GetDateTimeOffset());
     }
 
+    public async Task<IReadOnlySet<string>> ExistingTitlesAsync(
+        IReadOnlyList<string> titles, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(titles);
+
+        var found = new HashSet<string>(StringComparer.Ordinal);
+        if (titles.Count == 0) return found;
+
+        // The API caps `titles` at 50 per request for an ordinary user, so ask in batches rather than letting a
+        // long list come back as an error.
+        foreach (string[] batch in titles.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.Ordinal)
+                     .Chunk(50))
+        {
+            using JsonDocument response = await GetAsync(new Dictionary<string, string>
+            {
+                ["action"] = "query",
+                ["titles"] = string.Join("|", batch),
+            }, cancellationToken).ConfigureAwait(false);
+
+            if (!response.RootElement.TryGetProperty("query", out JsonElement query) ||
+                !query.TryGetProperty("pages", out JsonElement pages))
+                continue;
+
+            foreach (JsonElement page in pages.EnumerateArray())
+            {
+                // "missing" is a page that does not exist, "invalid" a title the wiki will not accept at all.
+                // Neither is an error here: both mean there is nothing to link to.
+                if (page.TryGetProperty("missing", out _) || page.TryGetProperty("invalid", out _)) continue;
+                if (page.GetProperty("title").GetString() is { } title) found.Add(title);
+            }
+        }
+
+        return found;
+    }
+
     /// <summary>Who the wiki thinks this session is, and which rights it grants. Read-only, so it verifies a
     /// credential without leaving a revision anywhere — see <see cref="UserInfo"/> for why that matters.</summary>
     public async Task<UserInfo> GetUserInfoAsync(CancellationToken cancellationToken = default)

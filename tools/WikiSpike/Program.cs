@@ -651,7 +651,10 @@ async Task<int> PreviewEditsAsync()
                     }
                 }
 
-                ProposedPage? proposal = ItemPageCreator.Build(item, item.Name, null, iconId);
+                ProposedPage? proposal = ItemPageCreator.Build(
+                    item, item.Name, null, iconId,
+                    await EffectPageLookup.ResolveLinkTargetsAsync(
+                        client, ItemPageAnalyzer.EffectsNeedingALinkTarget(item, null)));
                 if (proposal is null) { Console.WriteLine("    could not generate a page"); continue; }
 
                 Console.WriteLine($"    summary: {proposal.Summary}");
@@ -668,7 +671,10 @@ async Task<int> PreviewEditsAsync()
         ItemPageDocument? page = ItemPageDocument.Parse(lookup.Page!.Wikitext);
         if (page is null) { Console.WriteLine("    the page is not an item page"); continue; }
 
-        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(item, page, lookup.Page!.Title);
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            item, page, lookup.Page!.Title,
+            effectLinkTargets: await EffectPageLookup.ResolveLinkTargetsAsync(
+                client, ItemPageAnalyzer.EffectsNeedingALinkTarget(item, page)));
         ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis);
 
         if (!edit.HasChanges) { Console.WriteLine("    already correct — no edit"); }

@@ -20,6 +20,10 @@ public class VerifiedPagesTests : IDisposable
 
     private sealed class FakeWiki : IMediaWikiClient
     {
+        public Task<IReadOnlySet<string>> ExistingTitlesAsync(
+            IReadOnlyList<string> titles, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
+
         public string? Content { get; set; }
         public int Fetches { get; private set; }
         public bool Fail { get; set; }

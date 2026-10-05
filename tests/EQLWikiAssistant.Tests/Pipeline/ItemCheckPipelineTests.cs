@@ -1523,6 +1523,23 @@ public class ItemCheckPipelineTests
             return Task.FromResult(Pages.GetValueOrDefault(title));
         }
 
+        /// <summary>Titles the wiki has besides the item pages above — the `<Name> (Effect)` pages an effect
+        /// link may resolve to. Counted, because "an effect the page already carries costs no extra request" is the
+        /// property worth pinning and only a counting fake can state it.</summary>
+        public HashSet<string> OtherTitles { get; } = new(StringComparer.Ordinal);
+        public int TitleChecks { get; private set; }
+
+        public Task<IReadOnlySet<string>> ExistingTitlesAsync(
+            IReadOnlyList<string> titles, CancellationToken cancellationToken = default)
+        {
+            TitleChecks++;
+            if (FailFetches) throw new WikiUnavailableException("eqlwiki.com could not be reached.");
+            IReadOnlySet<string> found = titles
+                .Where(t => Pages.ContainsKey(t) || OtherTitles.Contains(t))
+                .ToHashSet(StringComparer.Ordinal);
+            return Task.FromResult(found);
+        }
+
         public Task LoginAsync(BotCredentials credentials, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 

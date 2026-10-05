@@ -266,6 +266,10 @@ public class CheckedItemsLedgerTests
 
     private sealed class CountingClient : IMediaWikiClient
     {
+        public Task<IReadOnlySet<string>> ExistingTitlesAsync(
+            IReadOnlyList<string> titles, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
+
         public int Fetches { get; private set; }
 
         public Task<WikiPage?> FetchPageAsync(string title, CancellationToken cancellationToken = default)

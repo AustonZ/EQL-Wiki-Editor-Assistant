@@ -304,24 +304,36 @@ public static class ItemPageEditor
         return block.ReplaceLine(index, block.Lines[index].ReplaceText(wanted));
     }
 
-    /// <summary>An effect line is replaced whole — the rendered line already contains its own `Effect:` label — and
-    /// matched to the existing line by the effect's name, so the right one is rewritten when a page has several.</summary>
+    /// <summary>
+    /// An effect line is replaced whole — the rendered line already contains its own `Effect:` label — and matched
+    /// to the existing line by **the name that line displays**, so the right one is rewritten when a page has
+    /// several.
+    ///
+    /// **Displayed name, not link target** (bug found by the user, 2026-10-03, on `Rain Caller`). Matching on the
+    /// target meant a page writing `[[Firestrike_(Effect)|Firestrike]]` never matched the captured `Firestrike`, so
+    /// this method fell through to its insert and the page ended up with two effect lines for one effect. The
+    /// target is the page's own choice and the analyzer preserves it into <paramref name="wanted"/>; the displayed
+    /// name is the only half a capture can compare against. See EffectLine.TryReadName.
+    ///
+    /// An unreadable name matches nothing rather than the first effect line it finds, which is how the old loop
+    /// behaved: a rendered line always carries a link, so that branch could only ever have overwritten the wrong
+    /// line.
+    /// </summary>
     private static StatsBlock WriteEffectLine(
         StatsBlock block, string wanted, List<EditChange> changes, ref bool addedUnformattedLine)
     {
-        string? name = EffectLine.TryReadName(wanted);
+        if (EffectLine.TryReadName(wanted) is { } name)
+            for (int i = 0; i < block.Lines.Count; i++)
+            {
+                StatsField? effect = block.Lines[i].Fields.FirstOrDefault(
+                    f => string.Equals(f.Label, EffectLine.WikiLabel, StringComparison.OrdinalIgnoreCase));
+                if (effect is null) continue;
+                if (!string.Equals(EffectLine.TryReadName(effect.Value), name, StringComparison.OrdinalIgnoreCase))
+                    continue;
 
-        for (int i = 0; i < block.Lines.Count; i++)
-        {
-            StatsField? effect = block.Lines[i].Fields
-                .FirstOrDefault(f => string.Equals(f.Label, EffectLine.WikiLabel, StringComparison.OrdinalIgnoreCase));
-            if (effect is null) continue;
-            if (name is not null && !string.Equals(EffectLine.TryReadName(effect.Value), name, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            changes.Add(new EditChange(EditChangeKind.Updated, "effect"));
-            return block.ReplaceLine(i, block.Lines[i].ReplaceText(wanted));
-        }
+                changes.Add(new EditChange(EditChangeKind.Updated, "effect"));
+                return block.ReplaceLine(i, block.Lines[i].ReplaceText(wanted));
+            }
 
         changes.Add(new EditChange(EditChangeKind.Added, "effect"));
         addedUnformattedLine = true;

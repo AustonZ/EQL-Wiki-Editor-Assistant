@@ -286,6 +286,20 @@ public sealed class ItemCheckPipeline
         }
     }
 
+    /// <summary>
+    /// Where the effect links on a written line should point, for the effects this page has no line for.
+    ///
+    /// **Only the lines the tool writes itself are asked about.** An existing line's target is the page's own
+    /// editorial choice and is preserved rather than looked up — see <c>EffectLine.Render</c>. So an item with no
+    /// effects, or whose page already carries them, costs no request at all, and the one request this can make is
+    /// batched across however many effects need it.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> ResolveEffectLinksAsync(
+        ParsedItem item, ItemPageDocument? page, CancellationToken cancellationToken) =>
+        await EffectPageLookup.ResolveLinkTargetsAsync(
+                _wiki, ItemPageAnalyzer.EffectsNeedingALinkTarget(item, page, _mapping), cancellationToken)
+            .ConfigureAwait(false);
+
     private async Task<ItemCheckResult> AnalyzeAgainstWikiAsync(
         ParsedItem item,
         CapturedImage crop,
@@ -325,6 +339,19 @@ public sealed class ItemCheckPipeline
             // 2026-09-29). The screen's own message names the closest candidate when there is one.
             IconSuggestion? suggestion = await SuggestIconAsync(capturedIcon, cancellationToken).ConfigureAwait(false);
 
+            // A generated page needs a link target for every effect it writes, since it has no existing line whose
+            // target could be preserved. Resolved only where a page will actually be proposed, so the request is not
+            // spent on an item the tool has already decided not to create.
+            ProposedPage? creation = null;
+            if (lookup.MayCreate)
+            {
+                IReadOnlyDictionary<string, string> effectLinks =
+                    await ResolveEffectLinksAsync(item, null, cancellationToken).ConfigureAwait(false);
+                creation = ItemPageCreator.Build(
+                    item, item.Name, _mapping,
+                    suggestion is { IsConfident: true } ? suggestion.IconId : null, effectLinks);
+            }
+
             // Recorded, because "not on the wiki" is a real finding — but as NotOnWiki, which never lets a later
             // capture skip the fetch: somebody may have created the page since.
             RecordLedgerEntry(item.Name, null, CheckOutcome.NotOnWiki, null, fingerprint);
@@ -338,10 +365,7 @@ public sealed class ItemCheckPipeline
                 // Only a *confident* match reaches the wikitext. An unsure one still travels on the result, so the
                 // review screen can offer its shortlist — the id is left blank and reported as a gap, which keeps
                 // the item coming back until a human settles it.
-                Creation = lookup.MayCreate
-                    ? ItemPageCreator.Build(
-                        item, item.Name, _mapping, suggestion is { IsConfident: true } ? suggestion.IconId : null)
-                    : null,
+                Creation = creation,
                 IconSuggestion = suggestion,
                 ItemName = item.Name,
                 Item = item,
@@ -386,7 +410,9 @@ public sealed class ItemCheckPipeline
         }
 
         // `item` already carries the lore — see the top of this method for why that happens once, up there.
-        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(item, page, wikiPage.Title, _mapping);
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            item, page, wikiPage.Title, _mapping,
+            effectLinkTargets: await ResolveEffectLinksAsync(item, page, cancellationToken).ConfigureAwait(false));
         ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis, _mapping);
 
         (IconComparison? icon, string? iconNote, CapturedImage? wikiIcon) =

@@ -135,6 +135,10 @@ public class ItemPageLookupTests
     /// <summary>Records every title asked for, so a test can assert the lookup is not making speculative requests.</summary>
     private sealed class FakeClient : IMediaWikiClient
     {
+        public Task<IReadOnlySet<string>> ExistingTitlesAsync(
+            IReadOnlyList<string> titles, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
+
         private readonly Dictionary<string, string> _pages = new(StringComparer.Ordinal);
 
         public List<string> Requested { get; } = [];

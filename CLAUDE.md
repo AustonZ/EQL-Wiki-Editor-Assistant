@@ -759,8 +759,8 @@ recorded an incomplete convention as the convention.
   on every item they touch, and the analyzer reports it as `Differs` with that reason attached. **Contrast the
   `STR: 5` versus `STR: +5` case, which is purely cosmetic and deliberately left alone** — the line between them is
   whether it changes what the page *does* or only how it looks. `EffectLine.HasTooltipLink` is what distinguishes
-  them; `TryReadName` reads the link target so "same effect written the old way" is never confused with "a different
-  effect".
+  them; `TryReadName` reads the name the link *displays* and `TryReadTarget` the page it points at, so "same effect
+  written the old way" is never confused with "a different effect".
 - **A cast time is written without its unit.** The game says `12.0 seconds`, every real page says
   `Casting Time: 12.0`. Found by the corpus run flagging `Careless Lightning` as differing when only the unit did.
 - **Parenthetical order is fixed regardless of the order the window listed things**: kind, conditions,
@@ -778,7 +778,29 @@ recorded an incomplete convention as the convention.
 - **A rebuilt line completely replaces the old one** (user, 2026-09-25), including parts the window does not show:
   a live `Burn` page reads `(Combat, Casting Time: Instant)` where the game shows no cast time for that proc, and
   that `Casting Time: Instant` goes. This was raised as an open question and settled deliberately — no merging, the
-  capture is the whole truth for an effect line.
+  capture is the whole truth for an effect line **except its link target**, below.
+- **An effect is identified by the name its line displays, and the page it links to is kept as the page wrote it**
+  (bug found by the user, 2026-10-03, on `Rain Caller`, decided with them 2026-10-03). That page writes
+  `[[Firestrike_(Effect)|Firestrike]]`. Matching on the link target meant nothing matched the captured `Firestrike`,
+  so the effect was reported missing and the editor added a second line beside the real one.
+  - **The target is not the tool's to normalize**, because the two pages are different spells: `Firestrike` is the
+    Druid/Ranger spell at 422 damage and 138 mana, `Firestrike (Effect)` the weapon proc at 302 and none. A capture
+    only ever sees the displayed name, so rewriting the target to it would point the item at the wrong numbers with
+    nothing on the rendered page to show it. The rest of the line is rebuilt as usual; the target survives.
+  - **A kept target that is not the effect's own name is reported** on the finding (`ItemPageAnalyzer.LinkNote`), so
+    the user can confirm it points somewhere sensible. Only on a line being written: a line that already matches is
+    as its editors left it, and a bar on every capture of such a page would be a bar nobody reads.
+  - **A line the tool writes from scratch looks for a `<Name> (Effect)` page first** (`EffectPageLookup`), since there
+    is no target to keep and the bare name may be the player spell. One batched `ExistingTitlesAsync` request, made
+    only for effects the page has no line for (`ItemPageAnalyzer.EffectsNeedingALinkTarget`, which shares the matching
+    rule with the analysis so the two cannot drift), so a page already carrying its effects costs nothing extra. The
+    wiki has three such pages (Firestrike, Fungus Spores, Nature's Melody), each with a same-named bare twin.
+  - **An `Effect:` line the capture does not account for is reported, never removed** (`OrphanEffectField`,
+    `NeedsReview`). It is the other half of the same bug: unmentioned, the tool could add its own line beside it and
+    say nothing. The item may have lost the effect, or the page may know something the window cannot show, so only
+    a human can choose. A legacy page writing a *focus* effect as a line gets a message saying so, since the focus
+    effect is being written to `focus_effect` and "an effect the window does not show" would be untrue. Measured at
+    0 across the verified corpus, so it adds no noise there.
 - **`WikiSpike analyze [--detail]` runs the analyzer over every verified capture against the live wiki** — the
   wiki-side equivalent of `AccuracySpike`, and the only thing that finds a rule this wrong. **It must apply
   eligibility first**, which is a mistake worth not repeating: an initial run analyzed levelled items too and
@@ -849,8 +871,8 @@ the compliance checker — which is what keeps "what would change" reviewable se
 - The flags line is regenerated whole (it has no labels to edit in place, and legacy flags are discarded rather than
   translated), and **an item with genuinely no flags loses the line** rather than keeping an empty one — 20 of the
   101 verified windows have no flags, and a blanked line leaves a bare `<br>` behind.
-- An effect line is matched to the existing one **by the effect's name**, so the right line is rewritten on a page
-  carrying several.
+- An effect line is matched to the existing one **by the name that line displays**, so the right line is rewritten
+  on a page carrying several, and a qualified link target is never mistaken for a different effect.
 - `ProposedEdit.NeedsReformatting` is true when a line was added but not positioned — the precise trigger the
   prettifier follow-up needs. `Deferred` carries what the tool declined — now only compliance it cannot fix, since a
   missing parameter is written rather than deferred (see the minimal-edit rule above).
