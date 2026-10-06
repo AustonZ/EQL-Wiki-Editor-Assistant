@@ -209,6 +209,10 @@ public class ItemPageCreatorTests
         var windows = ExpectedCorpus.Load(RepoPaths.ExpectedItemsFile).Samples
             .SelectMany(s => s.Windows)
             .Where(w => !w.Occluded && !string.IsNullOrWhiteSpace(w.Name) && w.Name != ExpectedCorpus.TodoMarker)
+            // A Lore-tab capture carries the name and the prose and nothing else, and the pipeline never generates
+            // a page from one (it returns LoreRecorded first). Token of Reclamation is in the corpus only that way
+            // (15c), so without this the test demanded a statsblock from a view that has none.
+            .Where(w => !IsLoreTabView(w))
             .GroupBy(w => w.Name!, StringComparer.Ordinal)
             .Select(g => g.First())
             .ToList();
@@ -237,4 +241,10 @@ public class ItemPageCreatorTests
             Assert.False(again.Changed, $"{window.Name} generated a page the formatter would change again.");
         }
     }
+
+    /// <summary>The shape a Lore-tab capture has in the ground truth: lore, and no Description-tab data at all.
+    /// Every Description capture in the corpus has at least a class list or a stat.</summary>
+    private static bool IsLoreTabView(ExpectedWindow window) =>
+        window.Lore is not null && window.Stats.Count == 0 && window.Classes.Count == 0
+        && window.Races.Count == 0 && window.Flags.Count == 0;
 }
