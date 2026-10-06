@@ -5,11 +5,17 @@ using EQLWikiAssistant.Core.Ocr;
 namespace EQLWikiAssistant.TestSupport.Accuracy;
 
 /// <summary>Everything one screenshot produced, so callers can score it, bootstrap from it, or print it without
-/// each re-running the (slow) pipeline in its own way.</summary>
-public sealed record CorpusSample(string File, IReadOnlyList<LocatedWindow> Windows, IReadOnlyList<ParsedItem?> Items)
+/// each re-running the (slow) pipeline in its own way. <see cref="Font"/> is the font it was read in.</summary>
+public sealed record CorpusSample(
+    string File, IReadOnlyList<LocatedWindow> Windows, IReadOnlyList<ParsedItem?> Items, UiFont Font = UiFont.Arial)
 {
     public int Occluded => Windows.Count(w => w.PossiblyOccluded);
     public int Warnings => Items.Sum(i => i?.Warnings.Count ?? 0);
+
+    /// <summary>Windows whose pixels say they were drawn in a different font from the one the sample was read in.
+    /// Always a defect in the corpus rather than in the reader: the sample's ground truth names the wrong font, so
+    /// its I's and l's were read by the wrong rule.</summary>
+    public int FontMismatches => Windows.Count(w => w.DrawnIn is { } drawn && drawn != Font);
 }
 
 /// <summary>
@@ -30,7 +36,8 @@ public static class CorpusRunner
 
     /// <summary>Locates and parses one screenshot. Items are index-aligned with windows; an occluded window
     /// yields a null item, because it is deliberately never parsed.</summary>
-    public static async Task<CorpusSample> RunAsync(string path, IOcrEngine engine, CancellationToken cancellationToken = default)
+    public static async Task<CorpusSample> RunAsync(
+        string path, IOcrEngine engine, UiFont font, CancellationToken cancellationToken = default)
     {
         CapturedImage image = await ImageFile.LoadAsync(path);
         IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, engine, cancellationToken);
@@ -39,7 +46,7 @@ public static class CorpusRunner
             .Select(w => w.PossiblyOccluded ? null : ItemParser.Parse(w.Lines, w.ActiveTab))
             .ToList();
 
-        return new CorpusSample(Path.GetFileName(path), windows, items);
+        return new CorpusSample(Path.GetFileName(path), windows, items, font);
     }
 
     /// <summary>Scores a run against ground truth. Samples on disk with no expected entry are reported as
@@ -83,7 +90,12 @@ public static class CorpusRunner
     /// instead of freezing today's bugs in as "correct".</summary>
     public static ExpectedSample Bootstrap(CorpusSample sample)
     {
-        var entry = new ExpectedSample { File = sample.File, Verified = false };
+        var entry = new ExpectedSample
+        {
+            File = sample.File,
+            Verified = false,
+            Font = sample.Font == UiFont.Arial ? null : sample.Font,
+        };
 
         foreach ((LocatedWindow window, ParsedItem? item) in sample.Windows.Zip(sample.Items))
         {

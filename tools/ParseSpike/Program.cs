@@ -23,9 +23,9 @@ Console.WriteLine($"Loaded {args[0]} ({image.Width}x{image.Height})");
 // The shipping configuration reads window crops with the glyph atlas and keeps RapidOCR for the full-frame
 // locate pass; --rapid falls back to RapidOCR for both, to compare against the old behaviour.
 using var rapid = new RapidOcrEngine();
-IOcrEngine engine = args.Contains("--rapid")
-    ? rapid
-    : new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+UiFont font = SampleFonts.For(args[0], args);
+IOcrEngine engine = args.Contains("--rapid") ? rapid : SampleFonts.Engine(rapid, font);
+Console.WriteLine($"Reading as {UiFonts.DisplayName(font)} (--font to override)");
 
 IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, engine);
 Console.WriteLine($"Located {windows.Count} window(s):");

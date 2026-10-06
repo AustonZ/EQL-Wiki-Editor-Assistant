@@ -1,4 +1,4 @@
-using EQLWikiAssistant.Core.Glyphs;
+using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.TestSupport;
 using EQLWikiAssistant.TestSupport.Accuracy;
@@ -54,14 +54,20 @@ public class CorpusAccuracyTests
             return;
         }
 
-        // The shipping configuration: RapidOCR finds the windows, the glyph atlas reads inside them.
+        // The shipping configuration: RapidOCR finds the windows, the glyph atlas reads inside them — each sample in
+        // the UI font its ground truth names (absent means Arial).
+        ExpectedCorpus expected = ExpectedCorpus.Load(RepoPaths.ExpectedItemsFile);
         using var rapid = new RapidOcrEngine();
-        var engine = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
         var samples = new List<CorpusSample>();
         foreach (string file in files)
-            samples.Add(await CorpusRunner.RunAsync(file, engine));
+        {
+            UiFont font = SampleFonts.For(file, [], expected);
+            samples.Add(await CorpusRunner.RunAsync(file, SampleFonts.Engine(rapid, font), font));
+        }
 
-        ExpectedCorpus expected = ExpectedCorpus.Load(RepoPaths.ExpectedItemsFile);
+        // A sample whose pixels contradict the font its ground truth names was read by the wrong l/I rule, so its
+        // scores would be measuring the mislabel rather than the reader.
+        Assert.Equal(0, samples.Sum(s => s.FontMismatches));
         AccuracyReport report = CorpusRunner.Score(samples, expected);
 
         _output.WriteLine(report.Render(

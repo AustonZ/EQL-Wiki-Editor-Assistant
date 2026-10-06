@@ -1,3 +1,4 @@
+using EQLWikiAssistant.Core.Ocr;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -77,6 +78,15 @@ public sealed class ExpectedSample
     /// <summary>True once a human has compared this entry against the screenshot. Unverified samples are scored
     /// but treated as advisory — they can't gate a build, because nobody has confirmed they're right.</summary>
     public bool Verified { get; set; }
+
+    /// <summary>The UI font the screenshot was captured in. <b>Absent means Arial</b> — every sample captured before
+    /// the user's custom font existed — so those entries never change; only a sample in another font names it.
+    /// The reader is configured from this, and a sample whose pixels disagree is reported, because ground truth
+    /// read in the wrong font would confuse I and l.</summary>
+    public UiFont? Font { get; set; }
+
+    [JsonIgnore]
+    public UiFont FontOrArial => Font ?? UiFont.Arial;
 
     /// <summary>In the locator's own order (<c>OrderBy(Y).ThenBy(X)</c>), matched to actuals by index.</summary>
     public List<ExpectedWindow> Windows { get; set; } = [];

@@ -91,8 +91,9 @@ public class ItemCheckPipelineTests
         IReadOnlyList<OcrLine> lines,
         bool occluded = false,
         bool hasLoreTab = false,
-        ItemWindowTab tab = ItemWindowTab.Description) =>
-        new(new Rect(0, 0, 400, 600), lines, hasLoreTab, occluded, tab);
+        ItemWindowTab tab = ItemWindowTab.Description,
+        UiFont? drawnIn = null) =>
+        new(new Rect(0, 0, 400, 600), lines, hasLoreTab, occluded, tab, drawnIn);
 
     private static (ItemCheckPipeline Pipeline, FakeWiki Wiki, CheckedItemsLedger Ledger) Build(
         LocatedWindow window, string? pageWikitext = null, string pageTitle = "Earring of Bashing")
@@ -574,6 +575,80 @@ public class ItemCheckPipelineTests
         Assert.NotEmpty(results[0].Warnings);
         Assert.Equal(0, ledger.Count);
         Assert.Equal(0, wiki.Fetches);
+    }
+
+    // ---- the UI font (user, 2026-10-05) ----
+
+    /// <summary>
+    /// A window the game drew in a different font from the one the reader was set to is refused, like an occluded
+    /// one: nothing read from it is used, no ledger row, no wiki traffic.
+    ///
+    /// The case this exists for: the tool set to EQL Wiki Assistant while the game draws Arial. The reader then
+    /// takes every bare bar as an l, so a capital I is lost — "Iron" reads "lron", a page that does not exist, and
+    /// the tool would offer to create it. The window's own pixels say which font it is, so the contradiction is
+    /// caught here rather than published.
+    /// </summary>
+    [Fact]
+    public async Task AWindowDrawnInAnotherFontIsRefusedAndWritesNoRow()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines, drawnIn: UiFont.Arial), EarringPage());
+        pipeline.ConfiguredFont = UiFont.EqlWikiAssistant;
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.WrongFont, results[0].Status);
+        string warning = Assert.Single(results[0].Warnings);
+        Assert.Contains("Arial", warning);
+        Assert.Contains("EQL Wiki Assistant", warning);
+        Assert.Equal(0, ledger.Count);
+        Assert.Equal(0, wiki.Fetches);
+    }
+
+    /// <summary>The control: a window drawn in the configured font goes through as normal.</summary>
+    [Fact]
+    public async Task AWindowDrawnInTheConfiguredFontIsChecked()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) =
+            Build(Window(EarringLines, drawnIn: UiFont.EqlWikiAssistant), EarringPage());
+        pipeline.ConfiguredFont = UiFont.EqlWikiAssistant;
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.NotEqual(ItemCheckStatus.WrongFont, results[0].Status);
+        Assert.True(wiki.Fetches > 0);
+    }
+
+    /// <summary>No evidence is not a contradiction. A window read without the glyph engine carries no font, and
+    /// refusing it would refuse every window the moment the evidence went missing for some other reason.</summary>
+    [Fact]
+    public async Task AWindowWithNoFontEvidenceIsChecked()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines, drawnIn: null), EarringPage());
+        pipeline.ConfiguredFont = UiFont.EqlWikiAssistant;
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.NotEqual(ItemCheckStatus.WrongFont, results[0].Status);
+    }
+
+    /// <summary>Whatever the user does with a wrong-font result, it gets no row: it was never read, so it was never
+    /// checked. Shares one rule with the occluded and ineligible cases, so the paths cannot drift apart.</summary>
+    [Fact]
+    public async Task AWrongFontResultIsNeverRecorded()
+    {
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines, drawnIn: UiFont.Arial), EarringPage());
+        pipeline.ConfiguredFont = UiFont.EqlWikiAssistant;
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        // An empty item name would also stop a row being written, so give the result one: the status alone has to
+        // be what refuses it, or this test could pass without the rule it is about.
+        ItemCheckResult named = results[0] with { ItemName = "Earring of Bashing" };
+        pipeline.RecordSkipped(named);
+        pipeline.RecordCheckedByHand(named);
+
+        Assert.Equal(0, ledger.Count);
     }
 
     /// <summary>A page that agrees but still needs a human is `Flagged`, not `Matched` — and `Flagged` never lets a

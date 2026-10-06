@@ -1,13 +1,26 @@
 using System.Text;
+using EQLWikiAssistant.Core.Ocr;
 
 namespace EQLWikiAssistant.Core.Glyphs;
 
 /// <summary>One labelled glyph shape. <see cref="Labels"/> is a list because two characters can be genuinely
-/// pixel-identical in this font — measured, not hypothetical: lowercase 'l' and uppercase 'I' are both a bare
-/// 2x9 vertical bar with no serif or crossbar to separate them.</summary>
-public sealed record AtlasEntry(IReadOnlyList<string> Labels, int BaselineOffset, GlyphBitmap Bitmap, int Advance = 0)
+/// pixel-identical in a font — measured, not hypothetical: in Arial, lowercase 'l' and uppercase 'I' are both a bare
+/// 2x9 vertical bar with no serif or crossbar to separate them.
+///
+/// <see cref="Font"/> is null for a shape every known <see cref="UiFont"/> draws — 87 of Arial's 89 — and names the
+/// font for a shape only that font draws (Arial's r; EQL Wiki Assistant's r and serifed I). The reader matches every
+/// entry whatever font it is configured for, so a capture in the other font still reads, and the tag is what lets
+/// it say which font it actually saw.</summary>
+public sealed record AtlasEntry(
+    IReadOnlyList<string> Labels, int BaselineOffset, GlyphBitmap Bitmap, int Advance = 0, UiFont? Font = null)
 {
     public bool IsAmbiguous => Labels.Count > 1;
+
+    /// <summary>What identifies this entry beyond its shape, for anything keyed by entry rather than by pixels —
+    /// learned advances above all. The labels alone are not enough once two fonts each draw their own 'r': keyed
+    /// by "r", Arial's 4px cell and EQL Wiki Assistant's 5px one would collapse into whichever was smaller, and every
+    /// wide r would then be followed by a phantom space.</summary>
+    public string Key => Font is null ? string.Concat(Labels) : $"{string.Concat(Labels)}@{Font}";
 
     /// <summary>Whether this glyph's cell width is known. Advances are learned from real text rather than from
     /// the sheet (whose characters are all space-separated by design), so a glyph that never appeared immediately
@@ -32,7 +45,7 @@ public sealed record AtlasEntry(IReadOnlyList<string> Labels, int BaselineOffset
 /// </summary>
 public sealed class GlyphAtlas
 {
-    public const string FormatVersion = "1";
+    public const string FormatVersion = "2";
 
     public IReadOnlyList<AtlasEntry> Entries { get; }
 
@@ -121,17 +134,80 @@ public sealed class GlyphAtlas
             .OrderBy(e => e.Labels[0], StringComparer.Ordinal)]);
     }
 
+    /// <summary>
+    /// Adds a second font's glyph sheet to an atlas built from the first, keeping one entry per distinct shape.
+    ///
+    /// A shape both sheets contain stays shared (untagged), keeping the existing entry — its labels, and the
+    /// advance learned for it from real windows. A shape only the existing atlas has is tagged as
+    /// <paramref name="existingFont"/>'s, and one only the new sheet has is added tagged as
+    /// <paramref name="sheetFont"/>'s, with no advance until <c>GlyphSpike advances</c> learns one.
+    ///
+    /// <b>A shared shape must not gain a label it did not have</b>, or this would silently assert that two
+    /// characters look alike in a font where they were never seen to: the new sheet may only spell a subset of
+    /// what the existing entry already says (EQL Wiki Assistant's bar is "l" where Arial's is "l" or "I"), and
+    /// anything else is refused as a mislabelled sheet. Entries already tagged with another font are kept as they
+    /// are, so fonts can be merged in one at a time.
+    /// </summary>
+    public static GlyphAtlas MergeFont(GlyphAtlas existing, UiFont existingFont, GlyphAtlas sheet, UiFont sheetFont)
+    {
+        if (existingFont == sheetFont)
+            throw new ArgumentException("Merging a font into itself would tag nothing; rebuild the atlas instead.");
+
+        var sheetShapes = sheet.Entries.ToDictionary(e => (e.Bitmap, e.BaselineOffset));
+        var merged = new List<AtlasEntry>();
+        foreach (AtlasEntry entry in existing.Entries)
+        {
+            if (entry.Font is not null && entry.Font != sheetFont)
+            {
+                merged.Add(entry);
+                continue;
+            }
+
+            if (sheetShapes.TryGetValue((entry.Bitmap, entry.BaselineOffset), out AtlasEntry? same))
+            {
+                IEnumerable<string> novel = same.Labels.Except(entry.Labels);
+                if (novel.Any())
+                    throw new ArgumentException(
+                        $"The {sheetFont} sheet labels a shape '{string.Concat(same.Labels)}' that the atlas has as " +
+                        $"'{string.Concat(entry.Labels)}'. A shared shape may not gain a label; the sheet is mislabelled.");
+                merged.Add(entry with { Font = null });
+            }
+            else if (entry.Font is null)
+            {
+                merged.Add(entry with { Font = existingFont });
+            }
+            // An entry already tagged as the sheet's font but absent from its sheet is stale and is dropped: the
+            // sheet is the authority on what that font draws.
+        }
+
+        var existingShapes = existing.Entries.Select(e => (e.Bitmap, e.BaselineOffset)).ToHashSet();
+        merged.AddRange(sheet.Entries
+            .Where(e => !existingShapes.Contains((e.Bitmap, e.BaselineOffset)))
+            .Select(e => e with { Font = sheetFont, Advance = 0 }));
+
+        return new GlyphAtlas([.. merged
+            .OrderBy(e => e.Labels[0], StringComparer.Ordinal)
+            .ThenBy(e => e.Font is null ? "" : e.Font.ToString(), StringComparer.Ordinal)]);
+    }
+
     public string Save()
     {
         var sb = new StringBuilder();
         sb.AppendLine($"# EQL UI glyph atlas, format {FormatVersion}");
-        sb.AppendLine("# labels<TAB>baselineOffset<TAB>width<TAB>height<TAB>levels<TAB>advance");
+        sb.AppendLine("# labels<TAB>baselineOffset<TAB>width<TAB>height<TAB>levels<TAB>advance[<TAB>font]");
         sb.AppendLine("# levels is one ramp level 0-6 per pixel, row-major. advance is the glyph's cell width, 0 if unknown.");
-        sb.AppendLine("# Multiple labels on one line means those characters are pixel-identical in this font.");
+        sb.AppendLine("# Multiple labels on one line means those characters are pixel-identical in that font.");
+        sb.AppendLine("# font is present only on a shape a single UI font draws; every other shape is drawn by all of them.");
         foreach (AtlasEntry entry in Entries)
-            sb.AppendLine(string.Join('\t',
+        {
+            var fields = new List<object>
+            {
                 string.Concat(entry.Labels), entry.BaselineOffset,
-                entry.Bitmap.Width, entry.Bitmap.Height, entry.Bitmap.Encode(), entry.Advance));
+                entry.Bitmap.Width, entry.Bitmap.Height, entry.Bitmap.Encode(), entry.Advance,
+            };
+            if (entry.Font is not null) fields.Add(entry.Font);
+            sb.AppendLine(string.Join('\t', fields));
+        }
         return sb.ToString();
     }
 
@@ -148,14 +224,15 @@ public sealed class GlyphAtlas
             // the '#' entry on load, and the only symptom was one unreadable character in an otherwise perfect
             // round-trip. Comment text deliberately contains no tabs.
             string[] parts = trimmed.Split('\t');
-            if (parts.Length is not (5 or 6)) continue;
+            if (parts.Length is not (5 or 6 or 7)) continue;
 
             IReadOnlyList<string> labels = [.. parts[0].Select(c => c.ToString())];
             entries.Add(new AtlasEntry(
                 labels,
                 int.Parse(parts[1]),
                 GlyphBitmap.Decode(int.Parse(parts[2]), int.Parse(parts[3]), parts[4]),
-                parts.Length == 6 ? int.Parse(parts[5]) : 0));
+                parts.Length >= 6 ? int.Parse(parts[5]) : 0,
+                parts.Length == 7 ? UiFonts.Parse(parts[6]) : null));
         }
         return new GlyphAtlas(entries);
     }

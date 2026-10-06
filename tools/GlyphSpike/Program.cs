@@ -14,6 +14,12 @@ using EQLWikiAssistant.TestSupport;
 //   GlyphSpike segment <image> [x,y,w,h]        text bands / runs / glyph boxes the segmenter finds
 //   GlyphSpike cluster <image> [x,y,w,h]        cluster glyphs by exact equality and render each distinct shape
 //   GlyphSpike atlas <image> [x,y,w,h] --out f  build the labelled atlas from the Notes Window glyph sheet
+//   GlyphSpike atlas <image> [x,y,w,h] --font <sheet font> --merge-into <atlas> [--existing-font Arial] --out f
+//                                               add a second UI font's sheet to an existing atlas: shapes both
+//                                               fonts draw stay shared, the rest are tagged with their font
+//   GlyphSpike read <image> [x,y,w,h] [--font <name>] [--atlas f]
+//                                               read a region through the real engine, in a UI font (app default
+//                                               unless given)
 //
 // The whole approach rests on the font being a deterministic bitmap blit: see GlyphRamp for the measurements.
 
@@ -154,6 +160,45 @@ static int Atlas(CapturedImage image, Rect region, string[] args)
 
     int characters = SheetRows().Sum(r => r.Length);
     Console.WriteLine($"  {characters} character(s) -> {atlas.Entries.Count} distinct shape(s)");
+
+    // Merging a second font's sheet into an existing atlas, rather than replacing it: shapes both fonts draw keep
+    // their entry and the advance learned for it, and only the shapes unique to each font are tagged. See
+    // GlyphAtlas.MergeFont for why a shared shape may never gain a label here.
+    int mergeIndex = Array.IndexOf(args, "--merge-into");
+    if (mergeIndex >= 0 && mergeIndex + 1 < args.Length)
+    {
+        int fontIndex = Array.IndexOf(args, "--font");
+        if (fontIndex < 0 || fontIndex + 1 >= args.Length)
+        {
+            Console.Error.WriteLine("  !! --merge-into needs --font <the sheet's UI font>");
+            return 1;
+        }
+        int existingIndex = Array.IndexOf(args, "--existing-font");
+        UiFont sheetFont = UiFonts.Parse(args[fontIndex + 1]);
+        UiFont existingFont = existingIndex >= 0 && existingIndex + 1 < args.Length
+            ? UiFonts.Parse(args[existingIndex + 1])
+            : UiFont.Arial;
+        GlyphAtlas existing = GlyphAtlas.Parse(File.ReadAllText(args[mergeIndex + 1]));
+
+        try
+        {
+            atlas = GlyphAtlas.MergeFont(existing, existingFont, atlas, sheetFont);
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine($"  !! {ex.Message}");
+            return 1;
+        }
+
+        Console.WriteLine($"  merged into {args[mergeIndex + 1]}: {atlas.Entries.Count} shape(s), " +
+                          $"{atlas.Entries.Count(e => e.Font is null)} shared");
+        foreach (AtlasEntry entry in atlas.Entries.Where(e => e.Font is not null))
+        {
+            Console.WriteLine($"  only {UiFonts.DisplayName(entry.Font!.Value)} draws '{string.Concat(entry.Labels)}' " +
+                              $"({entry.Bitmap.Width}x{entry.Bitmap.Height}):");
+            Console.Write(entry.Bitmap.Render());
+        }
+    }
     foreach (AtlasEntry entry in atlas.Ambiguous)
     {
         Console.WriteLine($"  ambiguous: {string.Join(" = ", entry.Labels)}  ({entry.Bitmap.Width}x{entry.Bitmap.Height}) " +
@@ -287,15 +332,19 @@ static int ReadRegion(CapturedImage image, Rect region, string[] args)
         ? GlyphAtlas.Parse(File.ReadAllText(args[atlasIndex + 1]))
         : GlyphAtlas.Bundled;
 
+    int fontIndex = Array.IndexOf(args, "--font");
+    UiFont font = fontIndex >= 0 && fontIndex + 1 < args.Length ? UiFonts.Parse(args[fontIndex + 1]) : UiFonts.AppDefault;
+
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-    IReadOnlyList<OcrLine> lines = GlyphReader.Read(image, region, atlas);
+    IReadOnlyList<OcrLine> lines = GlyphReader.Read(image, region, atlas, font);
     stopwatch.Stop();
 
-    Console.WriteLine($"{args[1]} region {region.X},{region.Y} {region.Width}x{region.Height}");
+    Console.WriteLine($"{args[1]} region {region.X},{region.Y} {region.Width}x{region.Height}, read as {UiFonts.DisplayName(font)}");
     Console.WriteLine($"  {lines.Count} line(s) in {stopwatch.ElapsedMilliseconds}ms");
     Console.WriteLine();
     foreach (OcrLine line in lines)
-        Console.WriteLine($"  [{line.BoundingBox.X,4},{line.BoundingBox.Y,4}] {line.Text}");
+        Console.WriteLine($"  [{line.BoundingBox.X,4},{line.BoundingBox.Y,4}] {line.Text}" +
+                          (line.DrawnIn is { } drawn ? $"   (drawn in {UiFonts.DisplayName(drawn)})" : ""));
     return 0;
 }
 
@@ -336,7 +385,7 @@ static async Task<int> Advances(string[] args)
     }
 
     var updated = new GlyphAtlas([.. atlas.Entries.Select(e =>
-        advances.TryGetValue(string.Concat(e.Labels), out int advance)
+        advances.TryGetValue(e.Key, out int advance)
             ? e with { Advance = GlyphReader.ClampAdvance(advance, e.Bitmap.Width) }
             : e)]);
 
@@ -345,7 +394,7 @@ static async Task<int> Advances(string[] args)
     // higher cluster. A threshold is only safe if the two clusters don't touch — which is exactly what a bare
     // pixel-gap rule failed to give, so this is the check that the advance model actually separates them.
     var cells = updated.Entries.Where(e => e.HasAdvance)
-        .ToDictionary(e => string.Concat(e.Labels), e => e.Advance);
+        .ToDictionary(e => e.Key, e => e.Advance);
     var histogram = new SortedDictionary<int, int>();
     foreach ((string label, int distance) in observations)
         if (cells.TryGetValue(label, out int advance))
@@ -358,7 +407,7 @@ static async Task<int> Advances(string[] args)
     int known = updated.Entries.Count(e => e.HasAdvance);
     Console.WriteLine($"  {known}/{updated.Entries.Count} shape(s) have a learned advance");
     foreach (AtlasEntry entry in updated.Entries.Where(e => !e.HasAdvance))
-        Console.WriteLine($"    no advance for '{string.Concat(entry.Labels)}' (falls back to the gap threshold)");
+        Console.WriteLine($"    no advance for '{entry.Key}' (falls back to the gap threshold)");
 
     File.WriteAllText(atlasPath, updated.Save());
     Console.WriteLine($"  wrote {atlasPath}");

@@ -20,10 +20,15 @@ public enum ItemWindowTab
 ///
 /// <see cref="HasLoreTab"/> means the window *offers* a Lore tab (it drives the two-capture lore flow);
 /// <see cref="ActiveTab"/> says which tab is actually on screen in this capture.
+///
+/// <see cref="DrawnIn"/> is the UI font the window's text was drawn in, when its lines say — null when no line
+/// carried a font-specific character, or when they disagreed. Like the active tab, it is read from pixels, which is
+/// why it is decided here rather than by the parser.
 /// </summary>
 public sealed record LocatedWindow(
     Rect Bounds,
     IReadOnlyList<OcrLine> Lines,
     bool HasLoreTab,
     bool PossiblyOccluded,
-    ItemWindowTab ActiveTab = ItemWindowTab.Description);
+    ItemWindowTab ActiveTab = ItemWindowTab.Description,
+    UiFont? DrawnIn = null);

@@ -2094,6 +2094,42 @@ builds the labelled atlas, `verify` reads a real region back.
   and the same ground truth. `AccuracySpike --rapid` and `ParseSpike --rapid` still run the old configuration for
   comparison.
 
+**Two UI fonts (`Core.Ocr.UiFont`, 2026-10-05).** The game lets the player choose its UI font, and the user now
+plays in **EQL Wiki Assistant**: their own modification of Windows' Arial with a serifed capital I (so it can never be
+an l) and a 1px-wider r (so `rn` stops reading as `m`). It lives in `fonts/`, gitignored, because Arial's licence
+forbids modifying or distributing it — `fonts/README.md` records every version and how to rebuild it. The tool reads
+both fonts; Arial reading is exactly what it was.
+- **One atlas serves both, because 87 of the 89 shapes are byte-identical in the game.** Measured from the in-game
+  glyph sheet in each font: only the I and the r differ. So the atlas keeps one entry per distinct shape and tags the
+  three that belong to a single font (`AtlasEntry.Font`: Arial's r, EQL Wiki Assistant's r and serifed I). Merged with
+  `GlyphSpike atlas ... --font <name> --merge-into <atlas>`, which refuses a shared shape gaining a label — a
+  mislabelled sheet must not teach the reader that two characters look alike.
+- **The font changes one rule: what the bare bar means.** `GlyphReader.ResolveBar`: in EQL Wiki Assistant it is always
+  an l; in Arial the word decides, as before. **Arial keeps its known limitation deliberately** (user, 2026-10-05) — it
+  reads the lore word "lost" as "Iost", and is not to be improved on; a test pins it so nobody does by accident.
+- **The font is an explicit setting, not detected, by the user's decision.** `UiFonts.AppDefault` is EQL Wiki Assistant
+  until the settings window exists (milestone 6), and every `GlyphOcrEngine` must be given a font — no default, so no
+  caller makes the choice by accident. Reading it from the game is a future feature: the per-character UI ini
+  (`C:\Users\Public\Daybreak Game Company\Installed Games\EverQuest Legends\UI_<char>_<server>_<loadout>.ini`)
+  carries it as `[Fonts] Font.us.0=Arial`, but the player switches loadout on the fly, so which file applies is itself
+  a question.
+- **A capture in the other font is refused, not misread** (`ItemCheckStatus.WrongFont`, no ledger row). Read as EQL
+  Wiki Assistant, an Arial capture turns every capital I into an l, plausibly: "Iron" reads "lron", a page that does
+  not exist, which the tool would offer to create. So each line records the font it was drawn in when it holds a
+  font-specific shape (`OcrLine.DrawnIn`), the locator takes the window's verdict from them (`LocatedWindow.DrawnIn`
+  — every window's own "Description" tab has an r), and the pipeline compares it with `ConfiguredFont`, which the
+  composition root sets from the same variable it gives the reader. This is a guard on the explicit setting, not
+  detection driving behaviour: the reader always reads by the setting.
+- **Advances are keyed by entry, not label** (`AtlasEntry.Key`). Two r's keyed by "r" collapsed into the smaller
+  cell, and every wide r would have been followed by a phantom space.
+- **The corpus needed no regeneration.** Each ground-truth entry names its font, absent meaning Arial, so the 48
+  Arial samples are untouched and new-font samples are simply added (`15a-eql-wiki-assistant-font.png` onward).
+  `SampleFonts` decides the font every tool reads a screenshot in: `--font`, else the sample's ground truth, else the
+  app default. A sample whose pixels contradict its declared font is a corpus defect and fails the corpus test.
+- **One shared glyph gained an advance**: `)` had none (no Arial sample ever had it directly followed by another
+  glyph) and learned 4px from the first new-font capture. Re-scored before anything else changed: the Arial corpus
+  was identical, 2230 correct and 0 everywhere.
+
 **Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to OCR
 settings or parser rules must be judged by a number, not by eyeballing warning counts — 18 tunable OCR parameters
 against ~100 item windows is unmeasurable by eye, and the failure that matters most (a *silently* wrong value) is
@@ -2121,8 +2157,9 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline (2026-10-03): **48 samples, 110 windows located (1 correctly occluded), 2230 correct fields, and 0 for
-  every error count — structural, silent-wrong, wrong, missing and extra. Parser warnings are 2, not 0**: both are
+- Baseline (2026-10-05): **49 samples — 48 in Arial, 1 in EQL Wiki Assistant — 113 windows located (1 correctly
+  occluded), 2305 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
+  extra. Parser warnings are 2, not 0**: both are
   `Convert to Guise of the Deceiver`, which is the trailing-region rule working exactly as designed (see "The item
   window's trailing region" — an unknown line reaching the user is the right outcome). The corpus test gates
   structural, silent-wrong, wrong and missing, never warnings. Those ratchets in `CorpusAccuracyTests` are all 0 and
@@ -2133,9 +2170,9 @@ invisible that way by definition.
   configuration, so the comparison stays reproducible.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
     newly bootstrapped sample guards against regressions immediately; the flag only records whether a human has
-    checked it against the screenshot, and the summary counts it (`48 samples scored (48 verified)`). **All 48 are
-    verified** (2026-10-03). A status line in this file is a snapshot: check it against the repository before telling
-    the user something is still outstanding.
+    checked it against the screenshot, and the summary counts it (`49 samples scored (49 verified)`). **All 49 are
+    verified** (2026-10-05). A status line in this file is a snapshot: check it against the repository before
+    telling the user something is still outstanding.
   - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure** — a sample that is
     located and parsed but compared against nothing. `AccuracySpike --bootstrap --only <substring>` adds one entry
     for it, merging into the tracked corpus rather than regenerating the whole file.
@@ -2326,7 +2363,9 @@ $env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracy
 # Glyph matching: read a region's raw pixel intensities (the --probe of this work; measure before tuning),
 # then read it back through the real engine:
 dotnet run --project tools/GlyphSpike -- dump "samples/some screenshot.png" 864,373,12,12 [--raw]
-dotnet run --project tools/GlyphSpike -- read "samples/some screenshot.png" 774,279,388,522
+dotnet run --project tools/GlyphSpike -- read "samples/some screenshot.png" 774,279,388,522 [--font Arial]
+# ParseSpike, AccuracySpike and WikiSpike's screenshot commands take --font too; without it a sample is read in the
+# font its ground truth names (absent = Arial) and any other screenshot in the app default (EQL Wiki Assistant).
 
 # Regenerate the atlas from the in-game Notes Window glyph sheet. The region only has to *contain* the character
 # rows as consecutive bands — it is matched by glyph-count sequence, not by coordinates, because the sheet can
@@ -2335,6 +2374,12 @@ dotnet run --project tools/GlyphSpike -- read "samples/some screenshot.png" 774,
 dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,700,570,250 \
   --out src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
 dotnet run --project tools/GlyphSpike -- advances "samples/any screenshot.png"   # updates the atlas in place
+
+# A second UI font: merge its glyph sheet into the existing atlas instead of replacing it. Shapes both fonts draw
+# stay shared; the rest are tagged with their font. Then rerun `advances` so the new shapes learn their cells.
+dotnet run --project tools/GlyphSpike -- atlas "samples/15a-eql-wiki-assistant-font.png" 1330,860,650,112 \
+  --font EqlWikiAssistant --merge-into src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas \
+  --out src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
 
 # Wiki side. Reads are anonymous, so fetch/roundtrip/grammar need no credential:
 dotnet run --project tools/WikiSpike -- fetch "Earring of Bashing"       # page source + parsed v1 fields
@@ -2402,8 +2447,10 @@ dotnet run --project tools/CaptureSpike -- capture "<title>" "samples/NN-descrip
 Arrange the game, alt-tab to a terminal, then capture — Graphics Capture reads an unfocused window fine. Samples
 are named `NN-description.png` (with a sub-letter for variants of one scenario, e.g. `06a`/`06b`), and the golden
 tests reference those names directly, so renaming one means updating the tests. Current coverage is the geometry
-and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*`) and one race-restricted item
-(`14`); exaltation and eligibility captures are still to come.
+and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*`), one race-restricted item
+(`14`) and the custom UI font (`15*`, each named in its ground truth as `"font": "EqlWikiAssistant"`); exaltation
+and eligibility captures are still to come. **A capture in a font other than the app default needs `--font` when
+bootstrapping**, or its ground truth will be read by the wrong l/I rule.
 
 **A sample can come from the debug-capture archive rather than a fresh capture.** A Debug build already files every
 frame under `%APPDATA%\EQLWikiAssistant\debug-captures`, named after the items in it, so an interesting item the

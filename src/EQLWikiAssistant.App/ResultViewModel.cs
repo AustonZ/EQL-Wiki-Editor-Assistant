@@ -465,6 +465,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private static string StatusTextFor(ItemCheckStatus status) => status switch
     {
         ItemCheckStatus.Occluded => "Occluded",
+        ItemCheckStatus.WrongFont => "Wrong font",
         ItemCheckStatus.Ineligible => "Not eligible",
         ItemCheckStatus.AlreadyChecked => "Already checked",
         ItemCheckStatus.LoreRecorded => "Lore recorded",
@@ -481,7 +482,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         _ when IsDone => Palette.Done,
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Palette.Attention,
         { Status: ItemCheckStatus.EditProposed } => Palette.Warning,
-        { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded } => Palette.Attention,
+        { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont } => Palette.Attention,
         _ => Palette.Neutral,
     };
 

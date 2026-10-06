@@ -1,0 +1,58 @@
+namespace EQLWikiAssistant.Core.Ocr;
+
+/// <summary>
+/// The font the game draws its UI text in. The game lets a player choose it; these are the two the glyph reader
+/// knows.
+///
+/// They render <b>pixel-identically except for two characters</b> — measured from the in-game glyph sheet, 87 of
+/// the 89 shapes Arial produces are byte-identical in both — so one atlas serves both and each font contributes
+/// only what is unique to it (see <c>AtlasEntry.Font</c>):
+/// <list type="bullet">
+/// <item><b>I</b>: in Arial a bare 2x9 bar, the very same pixels as lowercase <b>l</b>. EQL Wiki Assistant gives it
+/// serifs, so there the bar is only ever an l.</item>
+/// <item><b>r</b>: EQL Wiki Assistant's is one pixel wider with its arm a quarter-pixel longer, so that "rn" stops
+/// reading as "m". Its tip pixel differs from Arial's, which also makes the two r's distinct shapes.</item>
+/// </list>
+/// </summary>
+public enum UiFont
+{
+    /// <summary>Windows' Arial, the game's default. The bare bar is genuinely ambiguous between l and I, and the
+    /// reader resolves it from the surrounding word — a known limitation, deliberately not improved on here.</summary>
+    Arial,
+
+    /// <summary>The user's personal modification of Arial (<c>fonts/</c>, gitignored): a serifed I and a wider r.
+    /// Nothing is guessed: every character it can draw has a shape of its own.</summary>
+    EqlWikiAssistant,
+}
+
+public static class UiFonts
+{
+    /// <summary>
+    /// The font the tool assumes the game is drawing in, until there is a settings window to choose it in
+    /// (user, 2026-10-05: "default to our special font, since we have no settings UI yet").
+    ///
+    /// <b>An explicit choice rather than detection, by the user's decision.</b> A capture that contradicts it is
+    /// still caught — the two r shapes differ, so the reader records which font a line was drawn in and the
+    /// pipeline refuses a window that disagrees with this setting (see <c>ItemCheckStatus.WrongFont</c>). Without
+    /// that, an Arial capture read as EQL Wiki Assistant would turn every capital I into an l, silently.
+    ///
+    /// Reading the setting from the game is a future feature: the per-character UI ini
+    /// (<c>UI_&lt;character&gt;_&lt;server&gt;_&lt;loadout&gt;.ini</c>) carries it as <c>[Fonts] Font.us.0=Arial</c>,
+    /// but the player can switch loadout on the fly, so which file applies is itself a question.
+    /// </summary>
+    public const UiFont AppDefault = UiFont.EqlWikiAssistant;
+
+    /// <summary>The font's name as the game's font option shows it.</summary>
+    public static string DisplayName(UiFont font) => font switch
+    {
+        UiFont.EqlWikiAssistant => "EQL Wiki Assistant",
+        _ => font.ToString(),
+    };
+
+    /// <summary>Parses a font name as the tools and the corpus file write it (the enum name, any case).</summary>
+    public static UiFont Parse(string text) =>
+        Enum.TryParse(text, ignoreCase: true, out UiFont font) && Enum.IsDefined(font)
+            ? font
+            : throw new ArgumentException(
+                $"'{text}' is not a UI font. Known: {string.Join(", ", Enum.GetNames<UiFont>())}.", nameof(text));
+}

@@ -14,6 +14,11 @@ public enum ItemCheckStatus
     /// checked, and a row would make it look handled forever.</summary>
     Occluded,
 
+    /// <summary>The window was drawn in a different UI font from the one the tool is set to read, so nothing read
+    /// from it was used. **No ledger row**, for the same reason as <see cref="Occluded"/>. The font decides what the
+    /// bare vertical bar means, so reading through the wrong one confuses capital I and lowercase l silently.</summary>
+    WrongFont,
+
     /// <summary>A foreign exaltation or a levelled item. **No ledger row**, for the same reason.</summary>
     Ineligible,
 

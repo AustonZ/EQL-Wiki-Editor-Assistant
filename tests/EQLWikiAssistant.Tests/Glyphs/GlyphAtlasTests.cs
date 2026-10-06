@@ -1,4 +1,5 @@
 using EQLWikiAssistant.Core.Glyphs;
+using EQLWikiAssistant.Core.Ocr;
 
 namespace EQLWikiAssistant.Tests.Glyphs;
 
@@ -120,9 +121,15 @@ public class GlyphAtlasTests
     {
         GlyphAtlas atlas = GlyphAtlas.Bundled;
 
-        // 90 characters typed on the sheet, 89 distinct shapes: 'l' and 'I' are the same bare vertical bar.
-        Assert.Equal(89, atlas.Entries.Count);
-        Assert.Equal(90, atlas.Entries.Sum(e => e.Labels.Count));
+        // Each UI font sees the shared shapes plus its own. Arial: 90 characters typed on the sheet, 89 distinct
+        // shapes, because 'l' and 'I' are the same bare vertical bar. EQL Wiki Assistant: the same sheet gives 90
+        // distinct shapes — its I has serifs — and only the I and the r differ from Arial's (UiFontTests pins which).
+        AtlasEntry[] arial = [.. atlas.Entries.Where(e => e.Font is null or UiFont.Arial)];
+        AtlasEntry[] custom = [.. atlas.Entries.Where(e => e.Font is null or UiFont.EqlWikiAssistant)];
+        Assert.Equal(89, arial.Length);
+        Assert.Equal(90, arial.Sum(e => e.Labels.Count));
+        Assert.Equal(90, custom.Length);
+        Assert.Equal(91, atlas.Entries.Count);
 
         AtlasEntry ambiguous = Assert.Single(atlas.Ambiguous);
         Assert.Equal(["l", "I"], ambiguous.Labels);

@@ -87,6 +87,22 @@ public sealed class ItemCheckPipeline
     public bool ReCheckAnyway { get; set; }
 
     /// <summary>
+    /// The UI font the window reader is set to read, so a window drawn in a different one can be refused rather
+    /// than misread. Null skips the check (the tests' fakes produce no font evidence at all).
+    ///
+    /// <b>This must be the same value the reader was given</b>, which is why the composition root sets both from one
+    /// variable. The reader cannot refuse a window itself — it only ever sees one line at a time — so the window
+    /// verdict (<c>LocatedWindow.DrawnIn</c>) is compared here, where the whole window is known.
+    /// </summary>
+    public UiFont? ConfiguredFont { get; set; }
+
+    /// <summary>The statuses that never get a ledger row, whatever the user does with them: nothing was read from
+    /// the window, or what was read is ineligible. One rule shared by every path that records, so a new status
+    /// cannot be excluded by one and recorded by another.</summary>
+    private static bool NeverGetsALedgerRow(ItemCheckStatus status) =>
+        status is ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont or ItemCheckStatus.Ineligible;
+
+    /// <summary>
     /// Run before anything is written to the wiki. Returns null when the write may proceed, or a message for the
     /// user explaining why it may not — which both commit methods turn into a <see cref="CommitStatus.Failed"/>
     /// result rather than an exception.
@@ -175,6 +191,24 @@ public sealed class ItemCheckPipeline
                 ItemName = "",
                 WindowImage = crop,
                 Warnings = ["This window is partly covered, so nothing was read from it. Move it clear and capture again."],
+            };
+
+        // A window drawn in another UI font than the reader was set to is refused the same way, and for the same
+        // reason: what was read from it cannot be trusted. The font decides what the bare bar means, so an Arial
+        // capture read as EQL Wiki Assistant turns every capital I into an l — "Iron" becomes "lron", a page that
+        // does not exist, which the tool would then offer to create.
+        if (ConfiguredFont is { } configured && window.DrawnIn is { } drawn && drawn != configured)
+            return new ItemCheckResult
+            {
+                Status = ItemCheckStatus.WrongFont,
+                ItemName = "",
+                WindowImage = crop,
+                Warnings =
+                [
+                    $"This window is drawn in {UiFonts.DisplayName(drawn)}, but the tool is set to read " +
+                    $"{UiFonts.DisplayName(configured)}, so nothing was read from it. Switch the game's font to " +
+                    $"{UiFonts.DisplayName(configured)} and capture again.",
+                ],
             };
 
         ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
@@ -793,8 +827,7 @@ public sealed class ItemCheckPipeline
     public void RecordSkipped(ItemCheckResult result, string? note = null)
     {
         ArgumentNullException.ThrowIfNull(result);
-        // These two never get a row at all, whatever the user does with them.
-        if (result.Status is ItemCheckStatus.Occluded or ItemCheckStatus.Ineligible) return;
+        if (NeverGetsALedgerRow(result.Status)) return;
         if (string.IsNullOrWhiteSpace(result.ItemName)) return;
 
         RecordLedgerEntry(
@@ -954,8 +987,7 @@ public sealed class ItemCheckPipeline
     public void RecordCheckedByHand(ItemCheckResult result, string? note = null)
     {
         ArgumentNullException.ThrowIfNull(result);
-        // These never get a row at all, whatever the user says about them: nothing was read from them.
-        if (result.Status is ItemCheckStatus.Occluded or ItemCheckStatus.Ineligible) return;
+        if (NeverGetsALedgerRow(result.Status)) return;
         if (string.IsNullOrWhiteSpace(result.ItemName)) return;
 
         RecordLedgerEntry(

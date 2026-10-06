@@ -47,10 +47,21 @@ public static class ItemWindowLocator
                 ? ItemWindowTab.Lore
                 : ItemWindowTab.Description;
 
-            windows.Add(new LocatedWindow(bounds.Value, lines, loreTab is not null, PossiblyOccluded: false, activeTab));
+            windows.Add(new LocatedWindow(
+                bounds.Value, lines, loreTab is not null, PossiblyOccluded: false, activeTab, DrawnIn(lines)));
         }
 
         return windows.OrderBy(w => w.Bounds.Y).ThenBy(w => w.Bounds.X).ToList();
+    }
+
+    /// <summary>The font a window was drawn in, from the lines that could tell: their one shared answer, or null
+    /// when none could or they disagree. Every item window can tell — its own "Description" tab label holds an r,
+    /// and the two fonts draw different r's — so null in practice means a non-glyph engine (RapidOCR) read it.
+    /// A disagreement would mean a misread rather than a window in two fonts, so it claims nothing.</summary>
+    public static UiFont? DrawnIn(IReadOnlyList<OcrLine> lines)
+    {
+        List<UiFont> seen = [.. lines.Where(l => l.DrawnIn is not null).Select(l => l.DrawnIn!.Value).Distinct()];
+        return seen.Count == 1 ? seen[0] : null;
     }
 
     /// <summary>"Description" tab label, tolerant of OCR noise (e.g. "Descripbon").</summary>

@@ -108,11 +108,15 @@ public static class GlyphReader
     /// margin without coming close to legitimate text.</summary>
     public const int MinContrast = 64;
 
-    public static IReadOnlyList<OcrLine> Read(CapturedImage image, Rect region, GlyphAtlas atlas)
+    /// <summary>Reads the region's text. <paramref name="font"/> is the UI font the caller says the game is drawing
+    /// in, and it changes exactly one thing: what the bare vertical bar means — see <see cref="ResolveBar"/>.
+    /// Every atlas entry is matched regardless, so a capture in the other font still reads, and each line records
+    /// the font it was actually drawn in when it held a character only one font draws.</summary>
+    public static IReadOnlyList<OcrLine> Read(CapturedImage image, Rect region, GlyphAtlas atlas, UiFont font)
     {
         List<GlyphMatch> matches = FindMatches(image, region, atlas);
         List<GlyphMatch> accepted = ResolveOverlaps(matches);
-        return BuildLines(accepted);
+        return BuildLines(accepted, font);
     }
 
     /// <summary>Learns each glyph's cell width from real text: the tightest spacing observed to a following glyph
@@ -137,7 +141,7 @@ public static class GlyphReader
                 int advance = ordered[i].Left - ordered[i - 1].Left;
                 if (advance < minPlausible || advance > maxPlausible) continue;
 
-                string key = string.Concat(ordered[i - 1].Entry.Labels);
+                string key = ordered[i - 1].Entry.Key;
                 advances[key] = advances.TryGetValue(key, out int best) ? Math.Min(best, advance) : advance;
                 observations?.Add((key, advance));
             }
@@ -342,7 +346,7 @@ public static class GlyphReader
     /// before the left-hand one — reversing reading order for the parser downstream.</summary>
     public const int BaselineTolerance = 2;
 
-    private static List<OcrLine> BuildLines(List<GlyphMatch> accepted)
+    private static List<OcrLine> BuildLines(List<GlyphMatch> accepted, UiFont font)
     {
         var lines = new List<OcrLine>();
         foreach (List<GlyphMatch> row in ClusterRows(accepted))
@@ -354,12 +358,12 @@ public static class GlyphReader
             {
                 if (i > 0 && ordered[i].Left - ordered[i - 1].Right - 1 >= ColumnGapColumns)
                 {
-                    Emit(lines, segment);
+                    Emit(lines, segment, font);
                     segment = [];
                 }
                 segment.Add(ordered[i]);
             }
-            Emit(lines, segment);
+            Emit(lines, segment, font);
         }
         return lines;
     }
@@ -387,7 +391,7 @@ public static class GlyphReader
         return rows;
     }
 
-    private static void Emit(List<OcrLine> lines, List<GlyphMatch> segment)
+    private static void Emit(List<OcrLine> lines, List<GlyphMatch> segment, UiFont font)
     {
         if (segment.Count == 0) return;
         if (segment.Count == 1 && segment[0].Entry.Bitmap.InkWeight < LoneGlyphMinInk) return;
@@ -409,9 +413,34 @@ public static class GlyphReader
         int left = segment.Min(m => m.Left);
         int top = segment.Min(m => m.Top);
         var bounds = new Rect(left, top, segment.Max(m => m.Right) - left + 1, segment.Max(m => m.Bottom) - top + 1);
-        string resolved = ResolveAmbiguous(text.ToString());
-        lines.Add(new OcrLine(resolved, bounds, [new OcrWord(resolved, bounds)]));
+        string resolved = ResolveBar(text.ToString(), font);
+        lines.Add(new OcrLine(resolved, bounds, [new OcrWord(resolved, bounds)], DrawnIn(segment)));
     }
+
+    /// <summary>The font a run of glyphs was drawn in, from the characters only one font draws: that font if every
+    /// such character agrees, null if there are none or they disagree. Most lines carry no such character — only
+    /// 'r' and the serifed 'I' differ — so most say nothing, and the window's verdict comes from the few that do.</summary>
+    private static UiFont? DrawnIn(List<GlyphMatch> segment)
+    {
+        List<UiFont> fonts = [.. segment.Where(m => m.Entry.Font is not null).Select(m => m.Entry.Font!.Value).Distinct()];
+        return fonts.Count == 1 ? fonts[0] : null;
+    }
+
+    /// <summary>
+    /// What the bare vertical bar means in the configured font.
+    ///
+    /// In <see cref="UiFont.EqlWikiAssistant"/> it is <b>always 'l'</b>: that font gives the capital I serifs, so a
+    /// bar is never an I, and there is nothing to decide. In <see cref="UiFont.Arial"/> the two really are the same
+    /// pixels and <see cref="ResolveAmbiguous"/> decides from the word — the guess a human makes too, and a known
+    /// limitation (it reads the lore word "lost" as "Iost"), deliberately left exactly as it was rather than
+    /// improved on (user, 2026-10-05).
+    ///
+    /// The font is the caller's statement, not a detection. If the game is really drawing the other font, an
+    /// Arial capture read as EQL Wiki Assistant turns every capital I into an l — which is why each line also
+    /// records the font it was drawn in, and the pipeline refuses a window that contradicts the setting.
+    /// </summary>
+    public static string ResolveBar(string text, UiFont font) =>
+        font == UiFont.EqlWikiAssistant ? text.Replace(AmbiguousMarker, 'l') : ResolveAmbiguous(text);
 
     /// <summary>Placeholder for the one shape the font renders identically for two characters, before context
     /// decides which it is. Deliberately a character that cannot occur in game text, so a bug that leaves one

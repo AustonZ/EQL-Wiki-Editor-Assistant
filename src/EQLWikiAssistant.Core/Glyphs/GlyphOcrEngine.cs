@@ -14,7 +14,16 @@ public sealed class GlyphOcrEngine : IOcrEngine
 {
     private readonly GlyphAtlas _atlas;
 
-    public GlyphOcrEngine(GlyphAtlas? atlas = null) => _atlas = atlas ?? GlyphAtlas.Bundled;
+    /// <summary>The UI font this engine reads as. Required rather than defaulted: it decides what the bare bar
+    /// means (see <see cref="GlyphReader.ResolveBar"/>), so a caller that never thought about it would be making
+    /// that call by accident.</summary>
+    public UiFont Font { get; }
+
+    public GlyphOcrEngine(UiFont font, GlyphAtlas? atlas = null)
+    {
+        Font = font;
+        _atlas = atlas ?? GlyphAtlas.Bundled;
+    }
 
     public Task<IReadOnlyList<OcrLine>> RecognizeAsync(
         CapturedImage image, OcrIntent intent = OcrIntent.FullFrame, CancellationToken cancellationToken = default)
@@ -23,7 +32,7 @@ public sealed class GlyphOcrEngine : IOcrEngine
         cancellationToken.ThrowIfCancellationRequested();
 
         var region = new Rect(0, 0, image.Width, image.Height);
-        return Task.FromResult(GlyphReader.Read(image, region, _atlas));
+        return Task.FromResult(GlyphReader.Read(image, region, _atlas, Font));
     }
 }
 

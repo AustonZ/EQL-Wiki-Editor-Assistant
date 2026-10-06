@@ -401,7 +401,7 @@ async Task<int> CompareIconsAsync()
 
     CapturedImage image = await ImageFile.LoadAsync(args[1]);
     using var rapid = new RapidOcrEngine();
-    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+    IOcrEngine ocr = SampleFonts.Engine(rapid, args[1], args);
     IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
 
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
@@ -502,7 +502,7 @@ async Task<int> DiffIconPixelsAsync()
 
     CapturedImage image = await ImageFile.LoadAsync(args[1]);
     using var rapid = new RapidOcrEngine();
-    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+    IOcrEngine ocr = SampleFonts.Engine(rapid, args[1], args);
     IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
 
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
@@ -588,7 +588,7 @@ async Task<int> PreviewEditsAsync()
 
     CapturedImage image = await ImageFile.LoadAsync(args[1]);
     using var rapid = new RapidOcrEngine();
-    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
+    IOcrEngine ocr = SampleFonts.Engine(rapid, args[1], args);
     IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
 
@@ -990,7 +990,6 @@ int ShowPrettified()
 async Task<int> MeasureIconsAcrossCorpusAsync()
 {
     using var rapid = new RapidOcrEngine();
-    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
     using var http = new HttpClient();
     http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
@@ -1005,7 +1004,7 @@ async Task<int> MeasureIconsAcrossCorpusAsync()
     foreach (string file in Directory.EnumerateFiles(RepoPaths.SamplesDirectory, "*.png").OrderBy(f => f))
     {
         CapturedImage image = await ImageFile.LoadAsync(file);
-        foreach (LocatedWindow window in await ItemWindowLocator.LocateAsync(image, ocr))
+        foreach (LocatedWindow window in await ItemWindowLocator.LocateAsync(image, SampleFonts.Engine(rapid, file, args)))
         {
             if (window.PossiblyOccluded || window.ActiveTab != ItemWindowTab.Description) continue;
 
@@ -1151,7 +1150,6 @@ async Task<int> MeasureIconSearchAsync()
     Console.WriteLine($"library: {library.Count} icon(s)");
 
     using var rapid = new RapidOcrEngine();
-    IOcrEngine ocr = new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
 
     // One row per distinct item, with the id its own wiki page claims.
@@ -1161,7 +1159,7 @@ async Task<int> MeasureIconSearchAsync()
     foreach (string file in Directory.EnumerateFiles(RepoPaths.SamplesDirectory, "*.png").OrderBy(f => f))
     {
         CapturedImage image = await ImageFile.LoadAsync(file);
-        foreach (LocatedWindow window in await ItemWindowLocator.LocateAsync(image, ocr))
+        foreach (LocatedWindow window in await ItemWindowLocator.LocateAsync(image, SampleFonts.Engine(rapid, file, args)))
         {
             ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
             if (string.IsNullOrWhiteSpace(item.Name) || !seen.Add(item.Name)) continue;

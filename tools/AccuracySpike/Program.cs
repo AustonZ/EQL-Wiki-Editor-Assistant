@@ -18,6 +18,9 @@ using EQLWikiAssistant.TestSupport.Accuracy;
 //   AccuracySpike --json <path>        write the summary counts as JSON
 //   AccuracySpike --expected <path>    score against a ground-truth file other than the tracked one
 //                                      (e.g. a candidate still under review)
+//   AccuracySpike --font <name>        read the selected samples in this UI font (Arial, EqlWikiAssistant) rather
+//                                      than the one their ground truth names; needed to bootstrap a new sample
+//                                      captured in a font other than the app default
 //
 // --bootstrap never overwrites the tracked file; it writes a candidate for you to review and copy in. Every
 // field the parser flagged is emitted as "?TODO" so the known misses become ground truth a human supplies,
@@ -44,17 +47,20 @@ var stopwatch = Stopwatch.StartNew();
 // --rapid scores the old configuration (RapidOCR for both passes), which is what makes this an A/B rather than
 // just a new number: the same corpus, the same ground truth, only the window-crop engine swapped.
 using var rapid = new RapidOcrEngine();
-IOcrEngine engine = args.Contains("--rapid")
-    ? rapid
-    : new RoutingOcrEngine(fullFrame: rapid, windowCrop: new GlyphOcrEngine());
 Console.WriteLine($"  window-crop engine: {(args.Contains("--rapid") ? "RapidOCR" : "glyph atlas")}");
+ExpectedCorpus? truthForFonts = File.Exists(expectedPath) ? ExpectedCorpus.Load(expectedPath) : null;
 
 var samples = new List<CorpusSample>();
 foreach (string file in files)
 {
-    CorpusSample sample = await CorpusRunner.RunAsync(file, engine);
+    // Each sample is read in its own font: its ground truth names it (absent means Arial), or --font overrides.
+    UiFont font = SampleFonts.For(file, args, truthForFonts);
+    IOcrEngine engine = args.Contains("--rapid") ? rapid : SampleFonts.Engine(rapid, font);
+    CorpusSample sample = await CorpusRunner.RunAsync(file, engine, font);
     samples.Add(sample);
-    Console.WriteLine($"  {sample.File,-56} {sample.Windows.Count} window(s), {sample.Occluded} occluded, {sample.Warnings} warning(s)");
+    string fontNote = font == UiFont.Arial ? "" : $" [{UiFonts.DisplayName(font)}]";
+    string mismatch = sample.FontMismatches > 0 ? $"  !! {sample.FontMismatches} window(s) drawn in another font" : "";
+    Console.WriteLine($"  {sample.File,-56} {sample.Windows.Count} window(s), {sample.Occluded} occluded, {sample.Warnings} warning(s){fontNote}{mismatch}");
 }
 stopwatch.Stop();
 

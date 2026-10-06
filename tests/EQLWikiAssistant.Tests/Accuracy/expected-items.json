@@ -7177,6 +7177,255 @@
       ]
     },
     {
+      "file": "15a-eql-wiki-assistant-font.png",
+      "verified": true,
+      "font": "EqlWikiAssistant",
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Ivandyr's Hoop",
+          "level": 3,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "ROG",
+            "SHM",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC",
+            "BER"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Ear"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "AC",
+              "value": "9"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "HP",
+              "value": "9"
+            },
+            {
+              "label": "Intelligence",
+              "value": "9"
+            },
+            {
+              "label": "SV. Void",
+              "value": "3"
+            },
+            {
+              "label": "Wisdom",
+              "value": "9"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Worn"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Charge",
+              "name": "Spirit Tap",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "0.3 seconds"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "1 seconds"
+                },
+                {
+                  "label": "Cooldown Group",
+                  "value": "3"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Kavruul`s Mystic Pouch",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.4"
+            },
+            {
+              "label": "Weight Red",
+              "value": "100"
+            },
+            {
+              "label": "Capacity",
+              "value": "10"
+            },
+            {
+              "label": "Size Cap",
+              "value": "GIANT"
+            },
+            {
+              "label": "Container",
+              "value": "CLOSED."
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "142 platinum 8 gold 5 silver 7 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Cloak of Scales",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade"
+          ],
+          "classes": [
+            "WAR",
+            "SHD",
+            "MNK",
+            "SHM",
+            "NEC",
+            "BST"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Back"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "22"
+            },
+            {
+              "label": "Weight",
+              "value": "0.6"
+            },
+            {
+              "label": "HP",
+              "value": "75"
+            },
+            {
+              "label": "Mana",
+              "value": "75"
+            },
+            {
+              "label": "End",
+              "value": "75"
+            },
+            {
+              "label": "Strength",
+              "value": "15"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Intelligence",
+              "value": "15"
+            },
+            {
+              "label": "Wisdom",
+              "value": "15"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Focus",
+              "name": "White Dragonscale Cloak"
+            },
+            {
+              "kind": "Click",
+              "name": "Shield of the Immaculate"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "name": "Improved Damage III",
+              "conditions": [],
+              "modifiers": []
+            },
+            {
+              "kind": "Click",
+              "name": "Cure Disease",
+              "conditions": [
+                "Must Equip"
+              ],
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "6 seconds"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "20-stalwart-seas-false-occlusion.png",
       "verified": true,
       "windows": [

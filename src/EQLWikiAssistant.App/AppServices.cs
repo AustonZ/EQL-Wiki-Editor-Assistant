@@ -77,8 +77,11 @@ public sealed class AppServices : IDisposable
 
         // The full-frame pass keeps RapidOCR (it scans 3D world content and finds the Description anchors); window
         // crops go through exact glyph matching. See CLAUDE.md — this split is the whole extraction-accuracy story.
+        // The UI font is one value given to both the reader and the pipeline's wrong-font guard, so they cannot
+        // disagree. It is the app default until the settings window exists (milestone 6).
+        UiFont font = UiFonts.AppDefault;
         _rapidOcr = new RapidOcrEngine();
-        IOcrEngine ocr = new RoutingOcrEngine(fullFrame: _rapidOcr, windowCrop: new GlyphOcrEngine());
+        IOcrEngine ocr = new RoutingOcrEngine(fullFrame: _rapidOcr, windowCrop: new GlyphOcrEngine(font));
 
         Wiki = MediaWikiClient.Create(Endpoint);
         Ledger = CheckedItemsLedger.Load(AppPaths.LedgerFile);
@@ -119,6 +122,10 @@ public sealed class AppServices : IDisposable
         // commit never logged in, because logging in was each caller's job and that caller did not). The pipeline
         // runs this before either commit writes, and turns a refusal into an ordinary failed-commit message.
         Pipeline.BeforeWriting = EnsureLoggedInAsync;
+
+        // The same font the window reader was given above: a window the game drew in a different one is refused
+        // rather than read, because the font decides whether a bare bar is an l or an I.
+        Pipeline.ConfiguredFont = font;
 
         // **And the gate is not enough on its own**, because a session can die after it has been passed (user,
         // 2026-10-02). The gate only asks whether this process has logged in; the wiki can expire the session
