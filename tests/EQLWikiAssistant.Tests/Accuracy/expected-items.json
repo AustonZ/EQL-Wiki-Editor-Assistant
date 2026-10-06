@@ -7426,6 +7426,409 @@
       ]
     },
     {
+      "file": "15b-r-and-rn-words.png",
+      "verified": true,
+      "font": "EqlWikiAssistant",
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Ripened Heartfruit",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "RNG",
+            "DRU"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Arydryidriyorn",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "RNG"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Secondary"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "HP",
+              "value": "75"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "18"
+            },
+            {
+              "label": "Weight",
+              "value": "0.6"
+            },
+            {
+              "label": "Accuracy",
+              "value": "+12.5%"
+            },
+            {
+              "label": "Delay",
+              "value": "21"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "10"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.857"
+            },
+            {
+              "label": "Strength",
+              "value": "13"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Wisdom",
+              "value": "13"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click",
+              "name": "Bladestopper"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc",
+              "name": "Short Sword of the Ykesha"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Click",
+              "name": "Rune IV",
+              "conditions": [
+                "Must Equip"
+              ],
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "40"
+                },
+                {
+                  "label": "Cooldown",
+                  "value": "600 seconds"
+                }
+              ]
+            },
+            {
+              "kind": "Combat",
+              "name": "Ykesha",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "37"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Khyldorn the Blood Drinker",
+          "level": 6,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Primary"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "GIANT"
+            },
+            {
+              "label": "Accuracy",
+              "value": "+16.6%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "59"
+            },
+            {
+              "label": "Weight",
+              "value": "3.3"
+            },
+            {
+              "label": "Delay",
+              "value": "43"
+            },
+            {
+              "label": "Skill",
+              "value": "2H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "34"
+            },
+            {
+              "label": "Ratio",
+              "value": "1.372"
+            },
+            {
+              "label": "Strength",
+              "value": "16"
+            },
+            {
+              "label": "SV. Void",
+              "value": "6"
+            },
+            {
+              "label": "Intelligence",
+              "value": "13"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc",
+              "name": "Pugius"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Combat",
+              "name": "Rising Dexterity",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "15"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Arrow Shaft Mold",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 silver",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Blade of Abrogation",
+          "level": 7,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "No Trade",
+            "Quest",
+            "Placeable"
+          ],
+          "classes": [
+            "SHD"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Primary"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Accuracy",
+              "value": "+19.8%"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "35"
+            },
+            {
+              "label": "Weight",
+              "value": "2.2"
+            },
+            {
+              "label": "Delay",
+              "value": "39"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Slashing"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "19"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.897"
+            },
+            {
+              "label": "Strength",
+              "value": "14"
+            },
+            {
+              "label": "SV. Void",
+              "value": "7"
+            },
+            {
+              "label": "Intelligence",
+              "value": "10"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc",
+              "name": "Shimmering Ruby Stiletto"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Combat",
+              "name": "Ignite",
+              "conditions": [],
+              "modifiers": []
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "15c-lowercase-l-lore.png",
+      "verified": true,
+      "font": "EqlWikiAssistant",
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Token of Reclamation",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "lore": "These tokens recover lost items",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "20-stalwart-seas-false-occlusion.png",
       "verified": true,
       "windows": [

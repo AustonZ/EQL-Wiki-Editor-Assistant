@@ -2124,6 +2124,8 @@ both fonts; Arial reading is exactly what it was.
   cell, and every wide r would have been followed by a phantom space.
 - **The corpus needed no regeneration.** Each ground-truth entry names its font, absent meaning Arial, so the 48
   Arial samples are untouched and new-font samples are simply added (`15a-eql-wiki-assistant-font.png` onward).
+  `15c-lowercase-l-lore.png` is the case the font exists for: Token of Reclamation's lore reads "recover lost items"
+  in it, and the same pixels read with the Arial rule (`ParseSpike --font Arial`) still give "Iost".
   `SampleFonts` decides the font every tool reads a screenshot in: `--font`, else the sample's ground truth, else the
   app default. A sample whose pixels contradict its declared font is a corpus defect and fails the corpus test.
 - **One shared glyph gained an advance**: `)` had none (no Arial sample ever had it directly followed by another
@@ -2157,8 +2159,8 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline (2026-10-05): **49 samples — 48 in Arial, 1 in EQL Wiki Assistant — 113 windows located (1 correctly
-  occluded), 2305 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
+- Baseline (2026-10-05): **51 samples — 48 in Arial, 3 in EQL Wiki Assistant — 119 windows located (1 correctly
+  occluded), 2417 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
   extra. Parser warnings are 2, not 0**: both are
   `Convert to Guise of the Deceiver`, which is the trailing-region rule working exactly as designed (see "The item
   window's trailing region" — an unknown line reaching the user is the right outcome). The corpus test gates
@@ -2170,7 +2172,7 @@ invisible that way by definition.
   configuration, so the comparison stays reproducible.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
     newly bootstrapped sample guards against regressions immediately; the flag only records whether a human has
-    checked it against the screenshot, and the summary counts it (`49 samples scored (49 verified)`). **All 49 are
+    checked it against the screenshot, and the summary counts it (`51 samples scored (51 verified)`). **All 51 are
     verified** (2026-10-05). A status line in this file is a snapshot: check it against the repository before
     telling the user something is still outstanding.
   - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure** — a sample that is
