@@ -19,7 +19,7 @@ namespace EQLWikiAssistant.App;
 /// </summary>
 public partial class App : Application
 {
-    /// <summary>Beside the ledger and the mapping, in the user's own app-data — never beside the executable, and
+    /// <summary>Beside the ledger and the settings, in the user's own app-data — never beside the executable, and
     /// never containing a screenshot. Only the exception's own text reaches it.</summary>
     public static string ErrorLogFile => Path.Combine(AppPaths.Root, "errors.log");
 

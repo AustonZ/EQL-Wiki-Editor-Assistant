@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace EQLWikiAssistant.Wiki.Mapping;
@@ -157,9 +155,13 @@ public sealed record StatMapping(
 ///
 /// **This is data, not code** — the repo's standing rule, because the wiki's conventions are expected to keep
 /// changing and a wiki-side change should be a config edit rather than a release. <see cref="Default"/> is the
-/// built-in baseline; <see cref="Load"/> reads a user-edited copy from app-data. The plan puts the full mapping
-/// (category rules, era templates, line ordering) in milestone 6 with a Settings window; this is the subset the
-/// diff needs, landing with milestone 4 exactly as the plan anticipated.
+/// built-in mapping, and in v1 the only one: the settings window shows it read-only.
+///
+/// **There is deliberately no file format** (user, 2026-10-05). There used to be one, and it was lossy: it carried
+/// stat renames and parameter names and silently dropped signs, units, the Skill Mod format, slot renames, effect
+/// kinds and every ordering — so the day a <c>wiki-mapping.json</c> appeared, the tool would have written wrong
+/// pages with nothing saying why. It was never used and nothing tested it, so it was removed rather than patched.
+/// A format comes back with a mapping editor, and must round-trip everything this class holds.
 ///
 /// **An unmapped stat is reported, never dropped.** That is the whole reason <see cref="StatDisposition"/> has no
 /// "ignore" member: a stat the tool has never seen is how a game patch announces itself, and silently discarding it
@@ -432,29 +434,6 @@ public sealed class WikiMapping
 
     private IReadOnlyDictionary<string, StatMapping>? _byWikiLabel;
 
-    public static WikiMapping Load(string path)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        return JsonSerializer.Deserialize<WikiMappingFile>(File.ReadAllText(path), JsonOptions)?.ToMapping()
-            ?? throw new InvalidOperationException($"'{path}' does not contain a wiki mapping.");
-    }
-
-    public async Task SaveAsync(string path, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        await File.WriteAllTextAsync(
-            path, JsonSerializer.Serialize(WikiMappingFile.From(this), JsonOptions), cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = { new JsonStringEnumConverter() },
-    };
-
     private static WikiMapping CreateDefault()
     {
         // (game label, wiki label). Confident mappings only — see UnmappedGameLabels for what was deliberately
@@ -612,62 +591,5 @@ public sealed class WikiMapping
                 "bookcontents", "dropsfrom", "soldby", "foraged", "playercrafted", "recipes", "relatedquests",
             ],
         };
-    }
-
-    /// <summary>The on-disk shape. Separate from the model so the JSON stays a flat, hand-editable file rather than
-    /// a serialization of whatever the model happens to look like.</summary>
-    private sealed class WikiMappingFile
-    {
-        public int Version { get; set; } = CurrentVersion;
-        public string TemplateName { get; set; } = "Itempage";
-        public Dictionary<string, string> Parameters { get; set; } = [];
-        public Dictionary<string, string> Stats { get; set; } = [];
-        public List<string> NotStoredStats { get; set; } = [];
-        public List<string> UnmappedGameLabels { get; set; } = [];
-
-        public static WikiMappingFile From(WikiMapping mapping) => new()
-        {
-            Version = mapping.Version,
-            TemplateName = mapping.TemplateName,
-            Parameters = new Dictionary<string, string>
-            {
-                ["itemName"] = mapping.ItemNameParameter,
-                ["iconId"] = mapping.IconIdParameter,
-                ["statsBlock"] = mapping.StatsBlockParameter,
-                ["focusEffect"] = mapping.FocusEffectParameter,
-                ["merchantValue"] = mapping.MerchantValueParameter,
-                ["notes"] = mapping.NotesParameter,
-            },
-            Stats = mapping.Stats.Values
-                .Where(s => s.Disposition == StatDisposition.Stored && s.WikiLabel is not null)
-                .ToDictionary(s => s.GameLabel, s => s.WikiLabel!, StringComparer.Ordinal),
-            NotStoredStats = [.. mapping.Stats.Values
-                .Where(s => s.Disposition == StatDisposition.NotStored)
-                .Select(s => s.GameLabel)],
-            UnmappedGameLabels = [.. mapping.UnmappedGameLabels],
-        };
-
-        public WikiMapping ToMapping()
-        {
-            var map = new Dictionary<string, StatMapping>(StringComparer.OrdinalIgnoreCase);
-            foreach ((string game, string wiki) in Stats)
-                map[game] = new StatMapping(game, wiki, StatDisposition.Stored);
-            foreach (string game in NotStoredStats)
-                map[game] = new StatMapping(game, null, StatDisposition.NotStored);
-
-            return new WikiMapping
-            {
-                Version = Version,
-                TemplateName = TemplateName,
-                ItemNameParameter = Parameters.GetValueOrDefault("itemName", "itemname"),
-                IconIdParameter = Parameters.GetValueOrDefault("iconId", "lucy_img_ID"),
-                StatsBlockParameter = Parameters.GetValueOrDefault("statsBlock", "statsblock"),
-                FocusEffectParameter = Parameters.GetValueOrDefault("focusEffect", "focus_effect"),
-                MerchantValueParameter = Parameters.GetValueOrDefault("merchantValue", "merchant_value"),
-                NotesParameter = Parameters.GetValueOrDefault("notes", "notes"),
-                Stats = map,
-                UnmappedGameLabels = UnmappedGameLabels,
-            };
-        }
     }
 }

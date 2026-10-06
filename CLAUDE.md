@@ -71,7 +71,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   `MainWindow` (capture trigger + review/diff screen), `ResultViewModel`, `LedgerWindow`/`LedgerRowViewModel` (what
   has been checked and what still wants a human), and **`Theme.xaml`/`Palette.cs`/`DarkTitleBar.cs`** (the one
   permanent dark palette — see "The dark palette" below; Theme.xaml is the only file in the app with a hex colour in
-  it). The settings/mapping editor is still to come (milestone 6).
+  it), and `SettingsWindow` (the UI font, the wiki login and a read-only view of the mapping — see "The settings
+  window" below).
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
 - `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
@@ -188,7 +189,8 @@ JSON stored in app-data, with built-in defaults — translates between the inter
 template/param names, the `statsblock` line grammar (order, labels, flag spellings), lore wrapper syntax
 (`{{Item Lore|...}}`), placeholder templates to strip (`{{Item Lore Missing}}` is always removed when the tool
 touches a page), and class/slot/skill → category name rules. A wiki-side convention change should mean editing this
-mapping, not shipping new code. There's a Settings window in the app for viewing/editing it.
+mapping, not shipping new code. **In v1 the mapping is built in and the settings window shows it read-only** (user,
+2026-10-05); an editor, and the file format it needs, come later — see "The settings window".
 
 **`statsblock` is free text, not template params.** Most item data (flags, slot, stats, resists, effects, class/race
 restrictions, etc.) lives in the `Itempage` template's `statsblock` parameter as `<br>`-joined lines
@@ -494,7 +496,8 @@ hazards.
     rather than from measured data.
 
 **The wiki mapping (`Wiki.Mapping.WikiMapping`).** The game↔wiki translation, as **data with built-in defaults**
-(`WikiMapping.Default`, `Load`/`SaveAsync` for a user-edited copy in app-data) — the plan's mapping layer arriving
+(`WikiMapping.Default`, the only mapping in v1 — the lossy file format it once had was removed, see "The settings
+window") — the plan's mapping layer arriving
 with milestone 4 as it predicted, covering the subset the diff needs. Built by censusing both sides: 37 distinct
 stat labels across the 101 verified windows against 49 across 744 real pages.
 - The bulk is straightforward renaming (`Weight`→`WT`, `Strength`→`STR`, `SV. Fire`→`SV Fire`, `Base Dmg`→`DMG`,
@@ -1600,8 +1603,36 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
   - The retry sends the *new* session's CSRF token — a token belongs to the session that issued it — and the upload
     rebuilds its multipart form, which cannot be sent twice. Both are asserted, and four of the five new tests fail
     against the previous behaviour.
-- **Still to come here**: logging in needs `WikiSpike login` once — there is no in-app credential dialog yet
-  (milestone 7), and no settings/mapping editor (milestone 6).
+- **Logging in is entered in the app** (Settings > Wiki account) as of 2026-10-05; `WikiSpike login` still works and
+  writes the same Credential Manager entry.
+
+**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Three pages: the UI font, the wiki login,
+and the wiki mapping. Modal and disabled during a capture, like the ledger window — and here for a reason of its own:
+the capture in progress is reading with the configured font.
+- **The font is saved in `settings.json` (`Pipeline.AppSettings`) and switches without a restart.**
+  `AppServices.UseFontAsync` is the one place after start-up that the font changes, and it sets the reader and the
+  pipeline's wrong-font guard together; apart, a window would be read in one font and checked against the other. A
+  damaged or unknown settings file loads as the defaults rather than refusing to start — nothing in it is hard to
+  choose again, and a wrong font is loud anyway.
+- **A bot password is checked against the wiki before it is stored, and never stored if the wiki rejects it**
+  (`AppServices.SaveCredentialAsync`). The check is `WikiSpike whoami` in-app: a throwaway session logs in and asks
+  for `meta=userinfo` rights, so it writes nothing and never disturbs the app's own session. An anonymous result
+  counts as a failure — the login "succeeded" but would edit as an IP address. Saving or removing a credential calls
+  `MediaWikiClient.ForgetSession`, so the next write logs in with the new one rather than carrying on under the old.
+  The rights are listed one per line, editing required (red if missing) and create/upload optional (amber).
+- **The mapping is shown, not edited** (user, 2026-10-05), and showing it **found a latent bug that is now gone**.
+  `AppServices` loaded `%APPDATA%\EQLWikiAssistant\wiki-mapping.json` if one existed, but that file format carried
+  only stat renames and parameter names: it silently dropped signs, units (`Weight Reduction`'s `%`), the Skill Mod
+  format, slot renames, effect kinds, the statsblock line order, the parameter order and the block parameters. No
+  such file had ever been written and nothing tested the format, so it was harmless — until the day one appeared,
+  when the tool would have written wrong pages with nothing saying why. By the user's decision it was **removed
+  rather than patched**: the app always uses `WikiMapping.Default`, and a format comes back with an editor, designed
+  to round-trip everything the mapping holds.
+  - **The stat table's examples are produced by the mapping itself** (`StatMapping.ToWikiValue` on `5`, `100` or a
+    skill-mod sample), so the view cannot drift from what the tool writes.
+- **Verified by rendering every page** (a throwaway harness, as before), which found the one layout bug: the mapping
+  tables share their column widths, so the template table's long parameter-order value widened its column until
+  the note beside it wrapped a character per line — a 6,900px-tall page. The value column is now capped and wraps.
 
 **The dark palette (`App/Theme.xaml`, `App/Palette.cs`, 2026-09-30).** One permanent palette, no theme switch — the
 user asked for the colours changed, not for a setting. Pulled ahead of milestone 7 because it was bothering them.
@@ -2107,9 +2138,9 @@ both fonts; Arial reading is exactly what it was.
 - **The font changes one rule: what the bare bar means.** `GlyphReader.ResolveBar`: in EQL Wiki Assistant it is always
   an l; in Arial the word decides, as before. **Arial keeps its known limitation deliberately** (user, 2026-10-05) — it
   reads the lore word "lost" as "Iost", and is not to be improved on; a test pins it so nobody does by accident.
-- **The font is an explicit setting, not detected, by the user's decision.** `UiFonts.AppDefault` is EQL Wiki Assistant
-  until the settings window exists (milestone 6), and every `GlyphOcrEngine` must be given a font — no default, so no
-  caller makes the choice by accident. Reading it from the game is a future feature: the per-character UI ini
+- **The font is an explicit setting, not detected, by the user's decision.** It is chosen in Settings > UI font and
+  saved in `settings.json`; `UiFonts.AppDefault` (EQL Wiki Assistant) applies when nothing is saved. Every
+  `GlyphOcrEngine` must be given a font — no default, so no caller makes the choice by accident. Reading it from the game is a future feature: the per-character UI ini
   (`C:\Users\Public\Daybreak Game Company\Installed Games\EverQuest Legends\UI_<char>_<server>_<loadout>.ini`)
   carries it as `[Fonts] Font.us.0=Arial`, but the player switches loadout on the fly, so which file applies is itself
   a question.
@@ -2337,8 +2368,8 @@ dotnet build                                                    # build everythi
 dotnet test                                                     # run all tests
 dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test class
 # Run the app. Ctrl+Shift+E captures the game window from wherever you are — you never have to leave the game.
-# Reads are anonymous, so it only needs a credential the first time you save (store one with `WikiSpike login`).
-# Its state (ledger, mapping, icon cache) lives in %APPDATA%\EQLWikiAssistant — see Pipeline.AppPaths.
+# Reads are anonymous, so it only needs a credential the first time you save (enter one under Settings > Wiki account).
+# Its state (ledger, settings, icon cache) lives in %APPDATA%\EQLWikiAssistant — see Pipeline.AppPaths.
 dotnet run --project src/EQLWikiAssistant.App
 
 # OCR tuning against a real sample screenshot (feed it native resolution — upscaling hurts this engine):

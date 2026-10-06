@@ -28,8 +28,8 @@ public enum UiFont
 public static class UiFonts
 {
     /// <summary>
-    /// The font the tool assumes the game is drawing in, until there is a settings window to choose it in
-    /// (user, 2026-10-05: "default to our special font, since we have no settings UI yet").
+    /// The font the tool assumes the game is drawing in when the user has not chosen one in the settings window
+    /// (user, 2026-10-05: "default to our special font").
     ///
     /// <b>An explicit choice rather than detection, by the user's decision.</b> A capture that contradicts it is
     /// still caught — the two r shapes differ, so the reader records which font a line was drawn in and the

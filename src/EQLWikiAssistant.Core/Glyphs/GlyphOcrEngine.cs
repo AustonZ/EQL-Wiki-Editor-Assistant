@@ -16,8 +16,11 @@ public sealed class GlyphOcrEngine : IOcrEngine
 
     /// <summary>The UI font this engine reads as. Required rather than defaulted: it decides what the bare bar
     /// means (see <see cref="GlyphReader.ResolveBar"/>), so a caller that never thought about it would be making
-    /// that call by accident.</summary>
-    public UiFont Font { get; }
+    /// that call by accident.
+    ///
+    /// Settable because the user can change it in the settings window without restarting. The app changes it only
+    /// while no capture is running, and together with the pipeline's wrong-font guard, in one setter.</summary>
+    public UiFont Font { get; set; }
 
     public GlyphOcrEngine(UiFont font, GlyphAtlas? atlas = null)
     {

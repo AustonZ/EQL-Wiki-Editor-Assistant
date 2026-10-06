@@ -153,6 +153,25 @@ public class MediaWikiClientTests
         Assert.False(client.IsLoggedIn);
     }
 
+    /// <summary>Saving a new bot password must not leave the old session writing. Forgetting it makes the next write
+    /// refuse before sending anything, which is what sends the app's write gate back to log in with the new one.</summary>
+    [Fact]
+    public async Task ForgetSession_MakesTheNextWriteLogInAgain()
+    {
+        var handler = new StubHandler(
+            Json("""{"query":{"tokens":{"logintoken":"t"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+        await client.LoginAsync(new BotCredentials("Editor@assistant", "old"));
+
+        client.ForgetSession();
+
+        Assert.False(client.IsLoggedIn);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.EditAsync("Sandbox", "text", "summary", DateTimeOffset.UtcNow));
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
     /// <summary>basetimestamp is the difference between a patch and a revert: without it, an edit saved by somebody
     /// else between our read and our write is silently overwritten.</summary>
     [Fact]

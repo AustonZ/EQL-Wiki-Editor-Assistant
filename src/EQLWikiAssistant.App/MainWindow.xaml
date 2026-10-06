@@ -39,6 +39,9 @@
                 <Button x:Name="LedgerButton" Click="OnLedgerClick" Padding="12,4" Margin="16,0,0,0"
                         Content="Checked items…"
                         ToolTip="Everything checked so far, and what is still waiting for a human" />
+                <Button x:Name="SettingsButton" Click="OnSettingsClick" Padding="12,4" Margin="8,0,0,0"
+                        Content="Settings…"
+                        ToolTip="The game's UI font, the wiki login, and the wiki mapping" />
                 <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="16,0,0,0" Foreground="{StaticResource TextMutedBrush}" />
 
                 <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a

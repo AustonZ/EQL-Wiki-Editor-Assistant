@@ -433,6 +433,17 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
     }
 
     /// <summary>
+    /// Stops treating this session as logged in, so the next write logs in again first. For when the credential
+    /// changes: a session opened with the old bot password must not carry on writing after the user saves a new one.
+    /// Nothing is sent — the next login simply replaces the session.
+    /// </summary>
+    public void ForgetSession()
+    {
+        IsLoggedIn = false;
+        _csrfToken = null;
+    }
+
+    /// <summary>
     /// Drops the session this client believed in and asks the host for a new one.
     ///
     /// **Forgetting comes first, and happens even when there is no way to log in again.** The app's write gate
@@ -442,8 +453,7 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
     /// </summary>
     private async Task<bool> TryReestablishSessionAsync(CancellationToken cancellationToken)
     {
-        IsLoggedIn = false;
-        _csrfToken = null;
+        ForgetSession();
 
         if (ReestablishSession is null) return false;
         if (!await ReestablishSession(cancellationToken).ConfigureAwait(false) || !IsLoggedIn) return false;

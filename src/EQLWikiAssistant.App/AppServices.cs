@@ -47,6 +47,7 @@ public sealed class AppServices : IDisposable
     public const string GameWindowTitle = "EverQuest";
 
     private readonly RapidOcrEngine _rapidOcr;
+    private readonly GlyphOcrEngine _windowReader;
     private readonly HttpClient _http;
 
     public MediaWikiClient Wiki { get; }
@@ -71,6 +72,9 @@ public sealed class AppServices : IDisposable
     /// — which keeps the common path (check an item, find it already correct) free of credentials entirely.</summary>
     public bool IsLoggedIn => Wiki.IsLoggedIn;
 
+    /// <summary>What the user chose in the settings window, as last saved.</summary>
+    public AppSettings Settings { get; private set; }
+
     public AppServices()
     {
         AppPaths.EnsureExists();
@@ -78,14 +82,18 @@ public sealed class AppServices : IDisposable
         // The full-frame pass keeps RapidOCR (it scans 3D world content and finds the Description anchors); window
         // crops go through exact glyph matching. See CLAUDE.md — this split is the whole extraction-accuracy story.
         // The UI font is one value given to both the reader and the pipeline's wrong-font guard, so they cannot
-        // disagree. It is the app default until the settings window exists (milestone 6).
-        UiFont font = UiFonts.AppDefault;
+        // disagree — here, and afterwards only through UseFontAsync, which sets both.
+        Settings = AppSettings.Load(AppPaths.SettingsFile);
         _rapidOcr = new RapidOcrEngine();
-        IOcrEngine ocr = new RoutingOcrEngine(fullFrame: _rapidOcr, windowCrop: new GlyphOcrEngine(font));
+        _windowReader = new GlyphOcrEngine(Settings.Font);
+        IOcrEngine ocr = new RoutingOcrEngine(fullFrame: _rapidOcr, windowCrop: _windowReader);
 
         Wiki = MediaWikiClient.Create(Endpoint);
         Ledger = CheckedItemsLedger.Load(AppPaths.LedgerFile);
-        Mapping = File.Exists(AppPaths.MappingFile) ? WikiMapping.Load(AppPaths.MappingFile) : WikiMapping.Default;
+
+        // The built-in mapping, always. There is no mapping file in v1: the format that existed was lossy, and the
+        // settings window shows this mapping read-only (user, 2026-10-05). See WikiMapping.
+        Mapping = WikiMapping.Default;
 
         _http = new HttpClient();
         _http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
@@ -125,7 +133,7 @@ public sealed class AppServices : IDisposable
 
         // The same font the window reader was given above: a window the game drew in a different one is refused
         // rather than read, because the font decides whether a bare bar is an l or an I.
-        Pipeline.ConfiguredFont = font;
+        Pipeline.ConfiguredFont = Settings.Font;
 
         // **And the gate is not enough on its own**, because a session can die after it has been passed (user,
         // 2026-10-02). The gate only asks whether this process has logged in; the wiki can expire the session
@@ -169,6 +177,80 @@ public sealed class AppServices : IDisposable
         return (frame, null, captured);
     }
 
+    /// <summary>
+    /// Switches the UI font the tool reads, and saves the choice.
+    ///
+    /// **The one place after start-up that the font changes, and it changes both halves together**: the reader that
+    /// decides what a bare bar means, and the pipeline's guard that refuses a window drawn in the other font. Set
+    /// apart, a window would be read in one font and checked against the other. Only call it while no capture is
+    /// running — the settings window is modal and is disabled during a capture, which is what guarantees that.
+    /// </summary>
+    public async Task UseFontAsync(UiFont font)
+    {
+        _windowReader.Font = font;
+        Pipeline.ConfiguredFont = font;
+        Settings = Settings with { Font = font };
+        await Settings.SaveAsync(AppPaths.SettingsFile);
+    }
+
+    /// <summary>
+    /// Asks the wiki what a bot password may do, **without writing anything** — the in-app form of
+    /// <c>WikiSpike whoami</c>. A throwaway session does the asking, so the app's own session is never touched by a
+    /// credential that may turn out to be wrong.
+    ///
+    /// Asked rather than discovered by attempting an edit: a failed attempt is still a revision in somebody's page
+    /// history, and an ordinary editor on this wiki cannot delete one.
+    /// </summary>
+    public static async Task<CredentialCheck> CheckCredentialAsync(
+        BotCredentials credentials, CancellationToken cancellationToken = default)
+    {
+        using MediaWikiClient client = MediaWikiClient.Create(Endpoint);
+        try
+        {
+            await client.LoginAsync(credentials, cancellationToken);
+            return new CredentialCheck(await client.GetUserInfoAsync(cancellationToken), null);
+        }
+        catch (MediaWikiException ex)
+        {
+            return new CredentialCheck(null, $"The wiki rejected it ({ex.Code}): {ex.Message}");
+        }
+        catch (WikiUnavailableException ex)
+        {
+            return new CredentialCheck(null, $"Could not reach the wiki: {ex.Message}");
+        }
+        catch (HttpRequestException ex)
+        {
+            return new CredentialCheck(null, $"Could not reach the wiki: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Checks a new bot password and stores it only if the wiki accepts it with the right to edit. **A credential the
+    /// wiki rejects is never stored**: it would sit in Credential Manager and fail at the moment of saving an edit,
+    /// which is the worst moment to find out.
+    ///
+    /// On success the app's session is forgotten, so the next write logs in with the new credential rather than
+    /// carrying on under the old one.
+    /// </summary>
+    public async Task<CredentialCheck> SaveCredentialAsync(
+        BotCredentials credentials, CancellationToken cancellationToken = default)
+    {
+        CredentialCheck check = await CheckCredentialAsync(credentials, cancellationToken);
+        if (!check.MayBeStored) return check;
+
+        Credentials.Write(credentials);
+        Wiki.ForgetSession();
+        return check;
+    }
+
+    /// <summary>Removes the stored bot password. The current session is forgotten too, so nothing more is written
+    /// under it.</summary>
+    public bool ForgetCredential()
+    {
+        Wiki.ForgetSession();
+        return Credentials.Delete();
+    }
+
     /// <summary>Logs in for a commit, using the bot password in Windows Credential Manager. Returns why it could not
     /// rather than throwing, since "no credential stored yet" is an ordinary first-run state.</summary>
     public async Task<string?> EnsureLoggedInAsync(CancellationToken cancellationToken = default)
@@ -194,7 +276,7 @@ public sealed class AppServices : IDisposable
         BotCredentials? credentials = Credentials.Read();
         if (credentials is null)
             return "No bot password is stored. Create one at https://eqlwiki.com/Special:BotPasswords with the " +
-                   "\"Edit existing pages\" right, then run: dotnet run --project tools/WikiSpike -- login";
+                   "\"Edit existing pages\" right, then enter it under Settings > Wiki account.";
 
         try
         {
@@ -220,4 +302,28 @@ public sealed class AppServices : IDisposable
         _http.Dispose();
         _rapidOcr.Dispose();
     }
+}
+
+/// <summary>
+/// What the wiki said about a bot password. <see cref="Info"/> is null when it could not be asked at all —
+/// rejected, or the wiki unreachable — and <see cref="Problem"/> says which.
+/// </summary>
+public sealed record CredentialCheck(UserInfo? Info, string? Problem)
+{
+    /// <summary>
+    /// Whether this credential is worth keeping: the wiki accepted it, the login actually stuck, and it may edit.
+    ///
+    /// **An anonymous session counts as a failure even though the login "succeeded"** — that is the failure that
+    /// matters most with a fresh bot password, because it would otherwise edit as the user's IP address.
+    /// </summary>
+    public bool MayBeStored => Info is { IsAnonymous: false, CanEdit: true };
+
+    /// <summary>Why <see cref="MayBeStored"/> is false, in words for the user.</summary>
+    public string? Refusal => Problem ?? Info switch
+    {
+        { IsAnonymous: true } => "The login did not stick: the wiki still sees an anonymous session.",
+        { CanEdit: false } => "This bot password may not edit pages. Re-create it at Special:BotPasswords with " +
+                              "the \"Edit existing pages\" grant.",
+        _ => null,
+    };
 }

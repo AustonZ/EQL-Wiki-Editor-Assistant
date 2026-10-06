@@ -1,9 +1,9 @@
 namespace EQLWikiAssistant.Pipeline;
 
 /// <summary>
-/// Where the tool keeps its own state: the ledger, the user's edited mapping, the icon cache.
+/// Where the tool keeps its own state: the ledger, the settings, the icon cache.
 ///
-/// All under the roaming app-data folder, as the plan specifies, rather than beside the executable — the mapping and
+/// All under the roaming app-data folder, as the plan specifies, rather than beside the executable — the settings and
 /// the ledger are the user's data and must survive reinstalling the tool. Nothing here holds a screenshot: captures
 /// are processed in memory and never written to disk.
 /// </summary>
@@ -15,8 +15,8 @@ public static class AppPaths
     /// <summary>The checked-items ledger. JSON — see <c>CheckedItemsLedger</c> for why not SQLite.</summary>
     public static string LedgerFile => Path.Combine(Root, "checked-items.json");
 
-    /// <summary>The user's edited wiki mapping, if they have one; the built-in defaults apply when absent.</summary>
-    public static string MappingFile => Path.Combine(Root, "wiki-mapping.json");
+    /// <summary>The user's settings — today only the UI font the game draws in. See <c>AppSettings</c>.</summary>
+    public static string SettingsFile => Path.Combine(Root, "settings.json");
 
     /// <summary>The wiki's list of pages marked "Verified for EQLegends", cached so it can be answered offline and
     /// on the ledger-skip path where no wiki request happens at all.</summary>

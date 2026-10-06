@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         // frozen window if it happens here. The capture button stays disabled until it is ready.
         CaptureButton.IsEnabled = false;
         LedgerButton.IsEnabled = false;
+        SettingsButton.IsEnabled = false;
         StatusText.Text = "Loading the OCR models…";
         _ = StartUpAsync();
 
@@ -74,6 +75,7 @@ public partial class MainWindow : Window
             _services.Pipeline.ReCheckAnyway = ReCheckBox.IsChecked == true;
             CaptureButton.IsEnabled = true;
             LedgerButton.IsEnabled = true;
+            SettingsButton.IsEnabled = true;
             UpdateLedgerText();
             StatusText.Text = "Ready. Press the hotkey with an item window open in game.";
         }
@@ -100,6 +102,9 @@ public partial class MainWindow : Window
         // The ledger too: a capture writes rows, so a ledger view opened mid-capture would show some of them stale.
         // The window being modal stops a capture starting while it is open; this is the same guard the other way.
         LedgerButton.IsEnabled = false;
+        // Settings too: the capture in progress reads with the configured font, so switching it mid-capture would
+        // read part of a frame in each.
+        SettingsButton.IsEnabled = false;
         BusyPanel.Visibility = Visibility.Visible;
 
         try
@@ -159,6 +164,7 @@ public partial class MainWindow : Window
             _capturing = false;
             CaptureButton.IsEnabled = true;
             LedgerButton.IsEnabled = true;
+            SettingsButton.IsEnabled = true;
             BusyPanel.Visibility = Visibility.Collapsed;
         }
     }
@@ -542,6 +548,14 @@ public partial class MainWindow : Window
 
         // A row may have been forgotten while it was open.
         UpdateLedgerText();
+    }
+
+    /// <summary>The UI font, the wiki login and the mapping. Modal, and disabled during a capture — see
+    /// <see cref="SettingsWindow"/>.</summary>
+    private void OnSettingsClick(object sender, RoutedEventArgs e)
+    {
+        if (_services is null) return;
+        new SettingsWindow(_services) { Owner = this }.ShowDialog();
     }
 
     /// <summary>Counts the unsettled rows alongside the total, because over a long session that is the number worth

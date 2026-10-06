@@ -64,6 +64,14 @@ public static class CategoryRules
         ["WRIST"] = "Wrist",
     };
 
+    /// <summary>Class code -> the category it earns (<c>BRD</c> -> <c>Bard Equipment</c>), for showing the rules.
+    /// <see cref="Derive"/> is what applies them, including that only an item with a slot earns one.</summary>
+    public static IEnumerable<KeyValuePair<string, string>> ClassCategories =>
+        ClassNames.Select(c => KeyValuePair.Create(c.Key, $"{c.Value} Equipment"));
+
+    /// <summary>Wiki slot name -> the category it earns, for showing the rules.</summary>
+    public static IReadOnlyDictionary<string, string> SlotCategoryNames => SlotCategories;
+
     /// <summary>The token the game uses for "every class", which expands to all of them.</summary>
     public const string AllClasses = "ALL";
 

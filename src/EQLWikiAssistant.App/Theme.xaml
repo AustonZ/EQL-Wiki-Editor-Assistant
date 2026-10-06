@@ -259,6 +259,23 @@
         </Style.Triggers>
     </Style>
 
+    <!-- The bot-password field in Settings. Its default template is as light as a TextBox's and takes the same
+         setters; see the TextBox style above for why the selection is translucent. -->
+    <Style TargetType="PasswordBox">
+        <Setter Property="Background" Value="{StaticResource SunkenBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
+        <Setter Property="SelectionBrush" Value="{StaticResource TextSelectionBrush}" />
+        <Setter Property="SelectionOpacity" Value="0.35" />
+        <Style.Triggers>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- ============================ combo box ============================ -->
 
     <Style x:Key="ComboToggle" TargetType="ToggleButton">
