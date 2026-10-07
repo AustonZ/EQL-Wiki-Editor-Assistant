@@ -197,6 +197,9 @@ public sealed class ItemCheckPipeline
         // reason: what was read from it cannot be trusted. The font decides what the bare bar means, so an Arial
         // capture read as EQL Wiki Assistant turns every capital I into an l — "Iron" becomes "lron", a page that
         // does not exist, which the tool would then offer to create.
+        //
+        // Both remedies are offered, the tool's first (user, 2026-10-07): it is one click in Settings, while the game's
+        // font is a per-character, per-loadout setting that the user chose deliberately.
         if (ConfiguredFont is { } configured && window.DrawnIn is { } drawn && drawn != configured)
             return new ItemCheckResult
             {
@@ -205,9 +208,10 @@ public sealed class ItemCheckPipeline
                 WindowImage = crop,
                 Warnings =
                 [
-                    $"This window is drawn in {UiFonts.DisplayName(drawn)}, but the tool is set to read " +
-                    $"{UiFonts.DisplayName(configured)}, so nothing was read from it. Switch the game's font to " +
-                    $"{UiFonts.DisplayName(configured)} and capture again.",
+                    $"This window is drawn in-game using the '{UiFonts.DisplayName(drawn)}' font, but the tool is set " +
+                    $"to read the '{UiFonts.DisplayName(configured)}' font, so nothing was read from it. Switch the " +
+                    $"tool to '{UiFonts.DisplayName(drawn)}' under Settings > UI font, or switch the game's font to " +
+                    $"'{UiFonts.DisplayName(configured)}', then capture again.",
                 ],
             };
 
