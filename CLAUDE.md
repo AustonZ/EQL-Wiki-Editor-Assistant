@@ -2533,8 +2533,11 @@ Arrange the game, alt-tab to a terminal, then capture — Graphics Capture reads
 are named `NN-description.png` (with a sub-letter for variants of one scenario, e.g. `06a`/`06b`), and the golden
 tests reference those names directly, so renaming one means updating the tests. Current coverage is the geometry
 and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*`), one race-restricted item
-(`14`) and the custom UI font (`15*`, each named in its ground truth as `"font": "EqlWikiAssistant"`); exaltation
-and eligibility captures are still to come. **A capture in a font other than the app default needs `--font` when
+(`14`) and the custom UI font (`15*`, each named in its ground truth as `"font": "EqlWikiAssistant"`). Exaltations are
+covered already, though no sample was taken for them: 57 levelled windows carry 11 native and 27 foreign filled slots,
+and `ItemEligibilityTests.EveryRealWindowIsJudgedAsItsGroundTruthSays` judges every one. A foreign exaltation on a
+`+0` item cannot exist in game (an exaltation can only be added to a levelled item), and no sample has a filled
+Ornamentation slot; unit tests cover both. **A capture in a font other than the app default needs `--font` when
 bootstrapping**, or its ground truth will be read by the wrong l/I rule.
 
 **A sample can come from the capture archive rather than a fresh capture.** With Settings > Saved captures on, the app
