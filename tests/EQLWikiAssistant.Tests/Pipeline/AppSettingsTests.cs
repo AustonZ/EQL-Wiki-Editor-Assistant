@@ -52,6 +52,31 @@ public class AppSettingsTests : IDisposable
         Assert.Equal(UiFont.Arial, loaded.Font);
     }
 
+    /// <summary>Off unless chosen: a kept frame is a full screenshot with other players' names in it. A file written
+    /// before the setting existed must load as off too, not as whatever happened to be convenient.</summary>
+    [Fact]
+    public void CapturesAreNotKeptUnlessChosen()
+    {
+        Assert.False(AppSettings.Load(_path).KeepCaptures);
+
+        File.WriteAllText(_path, """{ "font": "Arial" }""");
+        Assert.False(AppSettings.Load(_path).KeepCaptures);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task KeepingCapturesRoundTrips(bool keep)
+    {
+        var chord = new HotKeyChord(HotKeyModifiers.Control, 82);
+        await new AppSettings { Font = UiFont.Arial, HotKey = chord, KeepCaptures = keep }.SaveAsync(_path);
+
+        AppSettings loaded = AppSettings.Load(_path);
+        Assert.Equal(keep, loaded.KeepCaptures);
+        Assert.Equal(chord, loaded.HotKey);
+        Assert.Equal(UiFont.Arial, loaded.Font);
+    }
+
     /// <summary>The acceptability rule is derived, so it is not saved — and a file from the build that did save it
     /// (the user's own, 2026-10-07, reproduced verbatim) still loads.</summary>
     [Fact]

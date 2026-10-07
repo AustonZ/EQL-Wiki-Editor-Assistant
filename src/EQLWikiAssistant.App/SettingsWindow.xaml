@@ -78,6 +78,7 @@
                  SelectionChanged="OnPageSelected">
             <ListBoxItem Content="UI font" Padding="12,6" />
             <ListBoxItem Content="Capture hotkey" Padding="12,6" />
+            <ListBoxItem Content="Saved captures" Padding="12,6" />
             <ListBoxItem Content="Wiki account" Padding="12,6" />
             <ListBoxItem Content="Wiki mapping" Padding="12,6" />
         </ListBox>
@@ -129,6 +130,32 @@
                     <TextBlock Text="Which combinations work" Style="{StaticResource SectionHeading}" />
                     <TextBlock Style="{StaticResource Prose}"
                                Text="It needs Ctrl, Alt or Win, so it can never fire while you type in chat. If another program already uses the combination, Windows refuses it and your current hotkey keeps working. The Capture now button works whatever happens here." />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ============================ Saved captures ============================ -->
+            <ScrollViewer x:Name="CapturesPage" VerticalScrollBarVisibility="Auto" Padding="24,18" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Saved captures" Style="{StaticResource PageHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="Keeps a copy of each captured screenshot, named after the items in it, so a problem can be reported by naming the item instead of going back into the game for it." />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <CheckBox x:Name="KeepCapturesBox" Content="Keep a copy of each capture" VerticalAlignment="Center"
+                                  Checked="OnKeepCapturesChanged" Unchecked="OnKeepCapturesChanged" />
+                        <TextBlock x:Name="KeepCapturesSavedText" VerticalAlignment="Center" Margin="12,0,0,0"
+                                   Foreground="{StaticResource DoneBrush}" />
+                    </StackPanel>
+
+                    <TextBlock Style="{StaticResource Prose}" Margin="0,14,0,0">
+                        <Hyperlink Click="OnOpenCapturesFolderClick">
+                            <Run x:Name="CapturesFolderText" />
+                        </Hyperlink>
+                    </TextBlock>
+
+                    <TextBlock Text="What is kept" Style="{StaticResource SectionHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="The whole game window, exactly as captured: other players' names and chat included. The copies stay in this folder on this computer and nothing sends them anywhere. Only the newest 50 are kept. Turning this off keeps the ones already saved; delete them from the folder if you want them gone." />
                 </StackPanel>
             </ScrollViewer>
 

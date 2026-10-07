@@ -6,7 +6,8 @@ using EQLWikiAssistant.Core.Ocr;
 namespace EQLWikiAssistant.Pipeline;
 
 /// <summary>
-/// What the user has chosen in the settings window: the UI font the game draws in, and the capture hotkey.
+/// What the user has chosen in the settings window: the UI font the game draws in, the capture hotkey, and whether
+/// captured frames are kept on disk.
 ///
 /// **A file that cannot be read loads as the defaults rather than throwing**, the same rule the ledger follows and
 /// for a stronger reason: there is nothing here that cannot be chosen again in a few seconds, so refusing to start
@@ -23,6 +24,10 @@ public sealed record AppSettings
 
     /// <summary>The global hotkey that captures the game window. Ctrl+Shift+E unless the user chose another.</summary>
     public HotKeyChord HotKey { get; init; } = HotKeyChord.Default;
+
+    /// <summary>Whether each captured frame is kept in app-data. **Off unless chosen**: a frame is a full screenshot,
+    /// with other players' names and chat in it, and otherwise never touches the disk.</summary>
+    public bool KeepCaptures { get; init; }
 
     public static AppSettings Load(string path)
     {

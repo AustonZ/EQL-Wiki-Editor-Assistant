@@ -135,9 +135,11 @@ public partial class MainWindow : Window
             StatusText.Text = BusyLabel.Text;
             IReadOnlyList<ItemCheckResult> results = await _services.Pipeline.CheckAsync(frame);
 
-            // Debug builds keep the frame, named after what was in it, so a bug can be reported by naming an item
-            // rather than by keeping it in the game. Release builds write nothing — see DebugCaptureArchive.
-            string? archived = DebugCaptureArchive.Save(frame, results.Select(r => r.ItemName));
+            // Kept when Settings > Saved captures says so, named after what was in it, so a bug can be reported by
+            // naming an item rather than by keeping it in the game — see CaptureArchive.
+            string? archived = _services.Settings.KeepCaptures
+                ? CaptureArchive.Save(frame, results.Select(r => r.ItemName))
+                : null;
 
             // Results accumulate across captures rather than replacing each other (user, 2026-09-28), so an item
             // just updated stays on screen to refer back to while working on the next one. Closing one is explicit.

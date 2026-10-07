@@ -1556,13 +1556,17 @@ a global hotkey is worth having.
   whether an edit is surgical, but it collapsed duplicate lines (real statsblocks repeat `<br>`) and paired a changed
   line with an unrelated one. Long unchanged runs fold away, because an item page can carry a `dropsfrom` table with
   nothing to do with the edit and a reviewer scrolling past it is a reviewer who stops reading.
-- **Debug builds archive each captured frame** (`App.DebugCaptureArchive`, user 2026-09-29), named after the items in
-  it, so a bug can be reported by naming an item rather than by keeping it in the game. The list entry's tooltip
-  carries the path.
-  - **Debug only, and never inside the repository.** A frame is a full screenshot and can hold character names, other
-    players' names and chat — the reason `samples/` is gitignored and the reason the pipeline otherwise keeps every
-    frame in memory. These go to `%APPDATA%\EQLWikiAssistant\debug-captures`, outside any working copy, so no commit
-    can pick one up by accident. A release build writes nothing, and the newest 50 are kept.
+- **Each captured frame can be kept on disk** (`App.CaptureArchive`, user 2026-09-29), named after the items in it, so
+  a bug can be reported by naming an item rather than by keeping it in the game. The list entry's tooltip carries the
+  path.
+  - **Off unless chosen, and never inside the repository.** A frame is a full screenshot and can hold character names,
+    other players' names and chat — the reason `samples/` is gitignored and the reason the pipeline otherwise keeps
+    every frame in memory. These go to `%APPDATA%\EQLWikiAssistant\debug-captures`, outside any working copy, so no
+    commit can pick one up by accident, and the newest 50 are kept.
+  - **It is a setting (Settings > Saved captures, `AppSettings.KeepCaptures`), not a build flavour** (user,
+    2026-10-07). It began as Debug-only, which was the same thing while the tool only ever ran from `dotnet run`; once
+    it ran as an installed Release build, the archive the corpus draws samples from would have silently stopped. The
+    folder keeps its old name so the frames already in it stay found.
 - **Logging in is the pipeline's gate, not each caller's job** (bug found by the user, 2026-09-30). Reads are
   anonymous and only a write needs the credential, so the login was done by the review screen's commit handler —
   and **the formatting commit never did it**. "Save the formatting" on a page with no data change threw
@@ -1607,9 +1611,10 @@ a global hotkey is worth having.
 - **Logging in is entered in the app** (Settings > Wiki account) as of 2026-10-05; `WikiSpike login` still works and
   writes the same Credential Manager entry.
 
-**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Four pages: the UI font, the capture hotkey,
-the wiki login, and the wiki mapping. Modal and disabled during a capture, like the ledger window — and here for a
-reason of its own: the capture in progress is reading with the configured font.
+**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Five pages: the UI font, the capture hotkey,
+whether captures are kept (see the archive bullet under "The review UI"), the wiki login, and the wiki mapping. Modal
+and disabled during a capture, like the ledger window — and here for a reason of its own: the capture in progress is
+reading with the configured font.
 - **The capture hotkey is saved beside the font and changes without a restart** (2026-10-07). `AppServices` owns it
   rather than the main window, so `UseHotKeyAsync` is its one home the way `UseFontAsync` is the font's.
   - **The new combination is registered before the old one is released**, so a refusal — another program already
@@ -2404,6 +2409,12 @@ dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test c
 # Its state (ledger, settings, icon cache) lives in %APPDATA%\EQLWikiAssistant — see Pipeline.AppPaths.
 dotnet run --project src/EQLWikiAssistant.App
 
+# Or install a Release build to %LOCALAPPDATA%\Programs\EQLWikiAssistant, with the icon library beside it and a Start
+# menu shortcut, so the app you use never locks the build you are working on. Run again to update; it refuses while
+# the installed copy is running. Both copies share the same %APPDATA% state. The build carries the commit it came
+# from in its product version (1.0.0+<commit>, with -modified for uncommitted changes).
+powershell -ExecutionPolicy Bypass -File tools/install.ps1
+
 # OCR tuning against a real sample screenshot (feed it native resolution — upscaling hurts this engine):
 dotnet run --project tools/OcrSpike -- "samples/some screenshot.png" --crop x,y,w,h --save out.png
 
@@ -2517,9 +2528,9 @@ and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*
 and eligibility captures are still to come. **A capture in a font other than the app default needs `--font` when
 bootstrapping**, or its ground truth will be read by the wrong l/I rule.
 
-**A sample can come from the debug-capture archive rather than a fresh capture.** A Debug build already files every
-frame under `%APPDATA%\EQLWikiAssistant\debug-captures`, named after the items in it, so an interesting item the
-user has already looked at is usually sitting there — which is how `14-race-restricted-item.png` was added without
-asking them to go and find the item again. Copy it into `samples/` under the naming convention, then
+**A sample can come from the capture archive rather than a fresh capture.** With Settings > Saved captures on, the app
+files every frame under `%APPDATA%\EQLWikiAssistant\debug-captures`, named after the items in it, so an interesting
+item the user has already looked at is usually sitting there — which is how `14-race-restricted-item.png` was added
+without asking them to go and find the item again. Copy it into `samples/` under the naming convention, then
 `AccuracySpike --bootstrap --only <substring>` merges one entry into the tracked ground truth without touching the
 others.

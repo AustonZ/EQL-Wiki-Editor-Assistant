@@ -54,6 +54,9 @@ public partial class SettingsWindow : Window
         ShowHotKey();
         if (services.HotKeyProblem is { } problem) ShowHotKeyStatus(problem, Palette.Attention);
 
+        KeepCapturesBox.IsChecked = services.Settings.KeepCaptures;
+        CapturesFolderText.Text = CaptureArchive.Directory;
+
         RefreshStoredLogin();
         ShowMapping(services.Mapping);
 
@@ -68,7 +71,7 @@ public partial class SettingsWindow : Window
 
         if (_recording) StopRecording();
 
-        ScrollViewer[] pages = [FontPage, HotKeyPage, AccountPage, MappingPage];
+        ScrollViewer[] pages = [FontPage, HotKeyPage, CapturesPage, AccountPage, MappingPage];
         for (int i = 0; i < pages.Length; i++)
             pages[i].Visibility = PageList.SelectedIndex == i ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -112,6 +115,34 @@ public partial class SettingsWindow : Window
             "a stroke that starts a word is read as I. That is right for item names and wrong in lore, where \"lost\" " +
             "reads \"Iost\" — a known limitation of this font.",
     };
+
+    // ============================ Saved captures ============================
+
+    private async void OnKeepCapturesChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+
+        bool keep = KeepCapturesBox.IsChecked == true;
+        KeepCapturesSavedText.Text = "";
+        try
+        {
+            await _services.UseKeepCapturesAsync(keep);
+            KeepCapturesSavedText.Foreground = Palette.Done;
+            KeepCapturesSavedText.Text = keep ? "Saved. Applies from the next capture." : "Saved.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Already in effect for this session; only remembering it failed.
+            KeepCapturesSavedText.Foreground = Palette.Attention;
+            KeepCapturesSavedText.Text = $"In use now, but could not be saved: {ex.Message}";
+        }
+    }
+
+    private void OnOpenCapturesFolderClick(object sender, RoutedEventArgs e)
+    {
+        string folder = Directory.Exists(CaptureArchive.Directory) ? CaptureArchive.Directory : AppPaths.Root;
+        Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"\"{folder}\"", UseShellExecute = true });
+    }
 
     private void OnOpenSettingsFolderClick(object sender, RoutedEventArgs e)
     {

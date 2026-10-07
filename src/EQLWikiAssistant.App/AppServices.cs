@@ -283,6 +283,12 @@ public sealed class AppServices : IDisposable
         await Settings.SaveAsync(AppPaths.SettingsFile);
     }
 
+    public async Task UseKeepCapturesAsync(bool keep)
+    {
+        Settings = Settings with { KeepCaptures = keep };
+        await Settings.SaveAsync(AppPaths.SettingsFile);
+    }
+
     /// <summary>
     /// Asks the wiki what a bot password may do, **without writing anything** — the in-app form of
     /// <c>WikiSpike whoami</c>. A throwaway session does the asking, so the app's own session is never touched by a

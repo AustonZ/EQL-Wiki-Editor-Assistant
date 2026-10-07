@@ -6,35 +6,31 @@ using EQLWikiAssistant.Pipeline;
 namespace EQLWikiAssistant.App;
 
 /// <summary>
-/// Keeps the last few captured frames on disk, in debug builds only, so a bug can be reported by naming an item
-/// rather than by keeping it in the game (user, 2026-09-29).
+/// Keeps the last few captured frames on disk, when Settings > Saved captures says to, so a bug can be reported by
+/// naming an item rather than by keeping it in the game (user, 2026-09-29), and so a frame worth adding to the sample
+/// corpus is already on disk.
 ///
-/// **Debug builds only, and never inside the repository.** A captured frame is a full screenshot: it can hold
+/// **Off unless chosen, and never inside the repository.** A captured frame is a full screenshot: it can hold
 /// character names, other players' names and chat, which is exactly why `samples/` is gitignored and why the pipeline
 /// otherwise keeps every frame in memory. These land in the user's own app-data folder, outside any working copy, so
-/// there is nothing for a commit to pick up by accident. A release build writes nothing at all.
+/// there is nothing for a commit to pick up by accident. It was once tied to Debug builds; it became a setting when
+/// the tool started running as a Release build (user, 2026-10-07), so the one person who wants it keeps it.
 ///
 /// **Named after the items in the frame**, because that is how a bug gets reported — "the icon for Lake Pebble is
 /// wrong" should lead straight to the file, without the user having to remember when they captured it.
 /// </summary>
-public static class DebugCaptureArchive
+public static class CaptureArchive
 {
     /// <summary>How many frames to keep. Enough to cover a testing session and still bounded, since each is a
     /// full-resolution screenshot.</summary>
     public const int Keep = 50;
 
+    /// <summary>Named from when this was a Debug-build feature, and kept so the frames already there stay found.</summary>
     public static string Directory => Path.Combine(AppPaths.Root, "debug-captures");
 
-    /// <summary>Whether this build archives captures at all. False in release.</summary>
-    public static bool Enabled =>
-#if DEBUG
-        true;
-#else
-        false;
-#endif
-
     /// <summary>
-    /// Writes the frame and returns its path, or null when this build does not archive or the write failed.
+    /// Writes the frame and returns its path, or null when the write failed. Whether to call it at all is the
+    /// caller's, from <c>AppSettings.KeepCaptures</c>.
     ///
     /// A failure is swallowed: not being able to keep a debugging aid is never a reason to fail the capture the user
     /// actually asked for.
@@ -43,8 +39,6 @@ public static class DebugCaptureArchive
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(itemNames);
-
-        if (!Enabled) return null;
 
         try
         {
