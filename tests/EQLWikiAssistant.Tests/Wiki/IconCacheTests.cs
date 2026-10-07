@@ -123,6 +123,51 @@ public class IconCacheTests : IDisposable
         Assert.Equal(["584", "584"], source.Requested);
     }
 
+    /// <summary>Re-downloading asks the wiki even for an icon already on disk — that is its whole point — and also
+    /// for one remembered as missing, which is the other answer somebody's upload makes stale.</summary>
+    [Fact]
+    public async Task ReDownloadingAsksTheWikiWhateverIsCached()
+    {
+        var source = new FakeSource("584");
+        var cache = new IconCache(_directory, source);
+        await cache.GetAsync("584");
+        await cache.GetAsync("999");
+
+        Assert.Equal([1, 2, 3, 4], await cache.RedownloadAsync("584"));
+        Assert.Null(await cache.RedownloadAsync("999"));
+
+        Assert.Equal(["584", "999", "584", "999"], source.Requested);
+        Assert.Equal(new IconCacheContents(1, 4, 1), cache.Describe());
+    }
+
+    [Fact]
+    public async Task ForgetSaysWhetherAnythingWasCached()
+    {
+        var cache = new IconCache(_directory, new FakeSource("584"));
+        await cache.GetAsync("584");
+        await cache.GetAsync("999");
+
+        Assert.True(cache.Forget("584"));
+        Assert.True(cache.Forget("999"));
+        Assert.False(cache.Forget("584"));
+        Assert.False(cache.Forget("123"));
+    }
+
+    [Fact]
+    public async Task DescribeCountsIconsTheirSizeAndAbsences()
+    {
+        var cache = new IconCache(_directory, new FakeSource("1", "2"));
+        Assert.Equal(new IconCacheContents(0, 0, 0), cache.Describe());
+
+        await cache.GetAsync("1");
+        await cache.GetAsync("2");
+        await cache.GetAsync("3");
+        Assert.Equal(new IconCacheContents(2, 8, 1), cache.Describe());
+
+        cache.Clear();
+        Assert.Equal(new IconCacheContents(0, 0, 0), cache.Describe());
+    }
+
     /// <summary>Icon ids come from a wiki parameter and are therefore untrusted. A value with path separators in it
     /// must not be able to write outside the cache directory.</summary>
     [Theory]

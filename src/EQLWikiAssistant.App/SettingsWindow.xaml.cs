@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Input;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
@@ -14,7 +17,8 @@ using EQLWikiAssistant.Wiki.MediaWiki;
 namespace EQLWikiAssistant.App;
 
 /// <summary>
-/// The UI font, the capture hotkey, the wiki login, and a read-only view of the wiki mapping (milestone 6).
+/// The UI font, the capture hotkey, whether captures are kept, the wiki icon cache, the wiki login, and a read-only
+/// view of the wiki mapping (milestone 6).
 ///
 /// **Opened modally, and not while a capture runs**, for the same reason as the ledger window and one more: the font
 /// is read by the capture in progress, so changing it halfway through would read half a frame in each font. The main
@@ -57,6 +61,9 @@ public partial class SettingsWindow : Window
         KeepCapturesBox.IsChecked = services.Settings.KeepCaptures;
         CapturesFolderText.Text = CaptureArchive.Directory;
 
+        IconCacheFolderText.Text = AppPaths.IconCacheDirectory;
+        ShowIconCache();
+
         RefreshStoredLogin();
         ShowMapping(services.Mapping);
 
@@ -71,7 +78,7 @@ public partial class SettingsWindow : Window
 
         if (_recording) StopRecording();
 
-        ScrollViewer[] pages = [FontPage, HotKeyPage, CapturesPage, AccountPage, MappingPage];
+        ScrollViewer[] pages = [FontPage, HotKeyPage, CapturesPage, IconCachePage, AccountPage, MappingPage];
         for (int i = 0; i < pages.Length; i++)
             pages[i].Visibility = PageList.SelectedIndex == i ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -141,6 +148,120 @@ public partial class SettingsWindow : Window
     private void OnOpenCapturesFolderClick(object sender, RoutedEventArgs e)
     {
         string folder = Directory.Exists(CaptureArchive.Directory) ? CaptureArchive.Directory : AppPaths.Root;
+        Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"\"{folder}\"", UseShellExecute = true });
+    }
+
+    // ============================ Icon cache ============================
+
+    private void ShowIconCache()
+    {
+        IconCacheContents contents = _services.Icons.Describe();
+        string icons = contents.Icons == 1 ? "1 icon" : $"{contents.Icons:N0} icons";
+        IconCacheSummary.Text = contents.Missing == 0
+            ? $"{icons} cached ({FormatSize(contents.Bytes)})."
+            : $"{icons} cached ({FormatSize(contents.Bytes)}), and {contents.Missing:N0} remembered as not on the " +
+              $"wiki. Those are asked about again after {IconCache.MissingIconLifetime.TotalHours:N0} hours, in case " +
+              "somebody has uploaded one.";
+        ClearIconCacheButton.IsEnabled = contents.Icons + contents.Missing > 0;
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes < 1024 ? $"{bytes} bytes" : bytes < 1024 * 1024 ? $"{bytes / 1024.0:N0} KB" : $"{bytes / 1048576.0:N1} MB";
+
+    private void OnIconIdKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        OnRedownloadIconClick(sender, e);
+    }
+
+    private async void OnRedownloadIconClick(object sender, RoutedEventArgs e)
+    {
+        string iconId = IconIdBox.Text.Trim();
+        RedownloadedIconFrame.Visibility = Visibility.Collapsed;
+        if (iconId.Length == 0 || !iconId.All(char.IsAsciiDigit))
+        {
+            ShowRedownload("A lucy_img_ID is a number, such as 584.", Palette.Attention);
+            return;
+        }
+
+        string file = IconLibraryFolder.WikiFileNameFor(iconId);
+        RedownloadIconButton.IsEnabled = false;
+        ShowRedownload($"Downloading {file}…", Palette.Muted);
+        try
+        {
+            byte[]? bytes = await _services.Icons.RedownloadAsync(iconId);
+            if (bytes is null)
+            {
+                ShowRedownload($"The wiki has no {file}. Nothing is cached for it.", Palette.Attention);
+            }
+            else
+            {
+                RedownloadedIcon.Source = Decode(bytes);
+                RedownloadedIconFrame.Visibility = RedownloadedIcon.Source is null ? Visibility.Collapsed : Visibility.Visible;
+                ShowRedownload($"Downloaded {file} ({FormatSize(bytes.Length)}). Captures use this copy from now on.",
+                    Palette.Done);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            // Nothing is lost: the old copy is gone, and the next capture that needs the icon fetches it again.
+            ShowRedownload($"Could not download {file}: {ex.Message} The next capture that needs it will try again.",
+                Palette.Attention);
+        }
+        finally
+        {
+            RedownloadIconButton.IsEnabled = true;
+            ShowIconCache();
+        }
+    }
+
+    private void ShowRedownload(string text, Brush brush)
+    {
+        RedownloadStatus.Text = text;
+        RedownloadStatus.Foreground = brush;
+        RedownloadResult.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>The downloaded file as an image, or null if it is not one WPF can read — the bytes are the wiki's.</summary>
+    private static BitmapSource? Decode(byte[] bytes)
+    {
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = new MemoryStream(bytes);
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or FileFormatException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private void OnClearIconCacheClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            IconCacheContents before = _services.Icons.Describe();
+            _services.Icons.Clear();
+            ClearIconCacheStatus.Foreground = Palette.Done;
+            ClearIconCacheStatus.Text = before.Icons == 1 ? "Cleared 1 icon." : $"Cleared {before.Icons:N0} icons.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ClearIconCacheStatus.Foreground = Palette.Attention;
+            ClearIconCacheStatus.Text = $"Could not clear it all: {ex.Message}";
+        }
+        ShowIconCache();
+    }
+
+    private void OnOpenIconCacheFolderClick(object sender, RoutedEventArgs e)
+    {
+        string folder = Directory.Exists(AppPaths.IconCacheDirectory) ? AppPaths.IconCacheDirectory : AppPaths.Root;
         Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"\"{folder}\"", UseShellExecute = true });
     }
 

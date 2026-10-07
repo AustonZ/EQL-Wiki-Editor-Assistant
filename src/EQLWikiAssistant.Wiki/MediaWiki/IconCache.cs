@@ -80,18 +80,44 @@ public sealed class IconCache
         return bytes;
     }
 
-    /// <summary>Forgets one icon, so the next request re-fetches it. The Settings window's "re-download this icon".</summary>
-    public void Forget(string iconId)
+    /// <summary>Forgets one icon, so the next request re-fetches it. True if anything was cached for it — the file, or
+    /// a remembered "the wiki has none".</summary>
+    public bool Forget(string iconId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(iconId);
+        bool had = File.Exists(PathFor(iconId)) || File.Exists(MissingMarkerFor(iconId));
         File.Delete(PathFor(iconId));
         File.Delete(MissingMarkerFor(iconId));
+        return had;
+    }
+
+    /// <summary>
+    /// Fetches one icon from the wiki now, whatever the cache holds — the Settings window's "re-download this icon",
+    /// for the rare file somebody has replaced on the wiki. Null means the wiki has no such file, which is then
+    /// remembered like any other answer.
+    /// </summary>
+    public async Task<byte[]?> RedownloadAsync(string iconId, CancellationToken cancellationToken = default)
+    {
+        Forget(iconId);
+        return await GetAsync(iconId, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Empties the cache entirely.</summary>
     public void Clear()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
+    }
+
+    /// <summary>What the cache holds right now: icon files and their total size, and remembered absences — expired
+    /// ones included, since they stay on disk until the icon is next asked for.</summary>
+    public IconCacheContents Describe()
+    {
+        if (!Directory.Exists(_directory)) return new IconCacheContents(0, 0, 0);
+
+        var directory = new DirectoryInfo(_directory);
+        FileInfo[] icons = directory.GetFiles("item_*.png");
+        int missing = directory.GetFiles("item_*.missing.json").Length;
+        return new IconCacheContents(icons.Length, icons.Sum(f => f.Length), missing);
     }
 
     /// <summary>Icon ids come from a wiki parameter, so they are untrusted: a value with a slash or a `..` in it
@@ -128,6 +154,9 @@ public sealed class IconCache
 
     private sealed record MissingIcon(DateTimeOffset RecordedAt);
 }
+
+/// <summary>What an <see cref="IconCache"/> holds: icon files, their total size in bytes, and remembered absences.</summary>
+public sealed record IconCacheContents(int Icons, long Bytes, int Missing);
 
 /// <summary>Downloads icons from a MediaWiki site, resolving the file's real URL first.</summary>
 public sealed class WikiIconSource(HttpClient http, Uri endpoint) : IIconSource

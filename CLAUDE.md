@@ -71,8 +71,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   `MainWindow` (capture trigger + review/diff screen), `ResultViewModel`, `LedgerWindow`/`LedgerRowViewModel` (what
   has been checked and what still wants a human), and **`Theme.xaml`/`Palette.cs`/`DarkTitleBar.cs`** (the one
   permanent dark palette — see "The dark palette" below; Theme.xaml is the only file in the app with a hex colour in
-  it), and `SettingsWindow` (the UI font, the capture hotkey, the wiki login and a read-only view of the mapping —
-  see "The settings window" below).
+  it), and `SettingsWindow` (the UI font, the capture hotkey, kept captures, the icon cache, the wiki login and a
+  read-only view of the mapping — see "The settings window" below).
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
 - `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
@@ -1073,7 +1073,8 @@ and pressing something. See "Identifying an item's icon" below.
   this project most wants to avoid; showing the artwork is a better defence against it than a number.
 - **The cache** keeps each `File:item_<ID>.png` on disk, keyed by id, and is consulted before any network call —
   icons are static and heavily shared (three corpus breastplates all use id 624, so three items cost one download).
-  No expiry; "clear icon cache" / "re-download this icon" belong in Settings. A **missing** icon is cached too, with
+  No expiry; Settings > Icon cache clears it or re-downloads one icon (`IconCache.Clear`/`RedownloadAsync`). A
+  **missing** icon is cached too, with
   a short TTL, since that is the one fact here that changes when somebody uploads a file. Icon ids come from a wiki
   parameter and are sanitized before they touch a path.
 - **The decoder port closed the last dev-only gap here** (2026-09-28). Decoding a downloaded PNG used to go through
@@ -1611,8 +1612,9 @@ a global hotkey is worth having.
 - **Logging in is entered in the app** (Settings > Wiki account) as of 2026-10-05; `WikiSpike login` still works and
   writes the same Credential Manager entry.
 
-**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Five pages: the UI font, the capture hotkey,
-whether captures are kept (see the archive bullet under "The review UI"), the wiki login, and the wiki mapping. Modal
+**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Six pages: the UI font, the capture hotkey,
+whether captures are kept (see the archive bullet under "The review UI"), the wiki icon cache, the wiki login, and the
+wiki mapping. Modal
 and disabled during a capture, like the ledger window — and here for a reason of its own: the capture in progress is
 reading with the configured font.
 - **The capture hotkey is saved beside the font and changes without a restart** (2026-10-07). `AppServices` owns it
@@ -1656,6 +1658,13 @@ reading with the configured font.
   counts as a failure — the login "succeeded" but would edit as an IP address. Saving or removing a credential calls
   `MediaWikiClient.ForgetSession`, so the next write logs in with the new one rather than carrying on under the old.
   The rights are listed one per line, editing required (red if missing) and create/upload optional (amber).
+  **Verified live by the user** (2026-10-07).
+- **The icon cache page re-downloads one icon or clears the lot** (2026-10-07), for the rare wiki icon file somebody
+  replaces. Re-downloading asks the wiki whatever is cached — a remembered "no such file" included, since an upload
+  is what makes that stale — and shows the fetched artwork, so whoever asked sees what the wiki now holds. A failed
+  download loses nothing: the next capture that needs the icon fetches it again. The game's own icon library is a
+  different thing and untouched here; its index rebuilds itself when the folder changes. Verified with a real
+  re-download against the live wiki; clearing is covered by tests only, since it would have emptied the user's cache.
 - **The mapping is shown, not edited** (user, 2026-10-05), and showing it **found a latent bug that is now gone**.
   `AppServices` loaded `%APPDATA%\EQLWikiAssistant\wiki-mapping.json` if one existed, but that file format carried
   only stat renames and parameter names: it silently dropped signs, units (`Weight Reduction`'s `%`), the Skill Mod

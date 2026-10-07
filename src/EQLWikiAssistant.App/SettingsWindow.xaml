@@ -79,6 +79,7 @@
             <ListBoxItem Content="UI font" Padding="12,6" />
             <ListBoxItem Content="Capture hotkey" Padding="12,6" />
             <ListBoxItem Content="Saved captures" Padding="12,6" />
+            <ListBoxItem Content="Icon cache" Padding="12,6" />
             <ListBoxItem Content="Wiki account" Padding="12,6" />
             <ListBoxItem Content="Wiki mapping" Padding="12,6" />
         </ListBox>
@@ -156,6 +157,53 @@
                     <TextBlock Text="What is kept" Style="{StaticResource SectionHeading}" />
                     <TextBlock Style="{StaticResource Prose}"
                                Text="The whole game window, exactly as captured: other players' names and chat included. The copies stay in this folder on this computer and nothing sends them anywhere. Only the newest 50 are kept. Turning this off keeps the ones already saved; delete them from the folder if you want them gone." />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ============================ Icon cache ============================ -->
+            <ScrollViewer x:Name="IconCachePage" VerticalScrollBarVisibility="Auto" Padding="24,18" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Icon cache" Style="{StaticResource PageHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="Icons downloaded from the wiki to compare with what you capture. Each is fetched once and kept, because a wiki icon file almost never changes. When one has been replaced on the wiki, re-download it here." />
+
+                    <TextBlock x:Name="IconCacheSummary" Margin="0,16,0,0" />
+                    <TextBlock Style="{StaticResource Prose}" Margin="0,6,0,0">
+                        <Hyperlink Click="OnOpenIconCacheFolderClick">
+                            <Run x:Name="IconCacheFolderText" />
+                        </Hyperlink>
+                    </TextBlock>
+
+                    <TextBlock Text="Re-download one icon" Style="{StaticResource SectionHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="Fetches the icon from the wiki now, whatever is cached. Use the number from the page's lucy_img_ID." />
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <TextBlock Text="lucy_img_ID" VerticalAlignment="Center" />
+                        <TextBox x:Name="IconIdBox" Width="100" Margin="10,0,0,0" VerticalAlignment="Center"
+                                 FontFamily="Consolas" KeyDown="OnIconIdKeyDown" />
+                        <Button x:Name="RedownloadIconButton" Content="Re-download" Click="OnRedownloadIconClick"
+                                Padding="12,4" Margin="8,0,0,0" />
+                    </StackPanel>
+                    <StackPanel x:Name="RedownloadResult" Orientation="Horizontal" Margin="0,12,0,0" Visibility="Collapsed">
+                        <!-- The fetched file at 2x, so whoever asked can see the artwork the wiki now holds. -->
+                        <Border x:Name="RedownloadedIconFrame" Background="{StaticResource SunkenBrush}" BorderThickness="1"
+                                BorderBrush="{StaticResource BorderStrongBrush}" Padding="4" Margin="0,0,12,0"
+                                VerticalAlignment="Top" Visibility="Collapsed">
+                            <Image x:Name="RedownloadedIcon" Width="80" Height="80"
+                                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                        </Border>
+                        <TextBlock x:Name="RedownloadStatus" Style="{StaticResource Prose}" VerticalAlignment="Center"
+                                   MaxWidth="520" />
+                    </StackPanel>
+
+                    <TextBlock Text="Clear the cache" Style="{StaticResource SectionHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="Deletes every cached icon. Harmless: each is fetched again the next time a capture needs it. The game's own icon library, which identifies a new item's icon, is not affected." />
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="ClearIconCacheButton" Content="Clear icon cache" Click="OnClearIconCacheClick"
+                                Padding="12,4" />
+                        <TextBlock x:Name="ClearIconCacheStatus" VerticalAlignment="Center" Margin="12,0,0,0" />
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
