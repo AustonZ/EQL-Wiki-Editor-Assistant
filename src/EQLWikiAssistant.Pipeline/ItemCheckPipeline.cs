@@ -277,11 +277,12 @@ public sealed class ItemCheckPipeline
             noIconBecause is null ? null : $"The icon was not compared: {noIconBecause}.";
 
         // Cropped whatever the verdict: the review screen shows it beside the wiki's copy so the user can settle by
-        // eye anything the comparison declines or gets wrong.
+        // eye anything the comparison declines or gets wrong. The icon's own cell rather than the fingerprinted strip,
+        // so it shows at the same scale as the wiki's file — see ItemIconReader.IconCell.
         CapturedImage? iconCrop = window.ActiveTab == ItemWindowTab.Description
             ? frame.Crop(new Rect(
-                window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
-                ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height))
+                window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
+                ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height))
             : null;
 
         string? lore = PendingLoreFor(item.Name);

@@ -1012,6 +1012,12 @@ and pressing something. See "Identifying an item's icon" below.
   left of the item's name — nothing to trace, unlike the window outline. `ItemIconReader.IconStrip` is the region it
   occupies, measured across all 43 screenshots (`LocateSpike --icon`): window-relative x 12..52, y 52..100, with the
   name and flag rows starting at x ≈ 56.
+  - **What the review screen shows is a tighter crop, `ItemIconReader.IconCell`: x 12..55, y 54..97, 44x44** — the
+    40x40 artwork's own cell at the game's ~1.1x (user, 2026-10-07). Shown in the same 160px box as the wiki file,
+    the two sprites then match in scale and position; the strip's spare background had made the captured one look
+    smaller. Measured over 119 sample icons with the fingerprint's ink floor (28): ink starts at y 54 on 60 and ends
+    at y 97 on 54, starts at x 12 on 48, and never passes x 55 with the scan widened beyond it. **The strip, not the
+    cell, is still what gets fingerprinted**, because every icon threshold below was measured through it.
 - **An exact pixel diff is not possible against these files, and this was tested rather than assumed.** The idea is
   sound in principle — the wiki icons were pulled programmatically from the game's own assets and PNG is lossless,
   so a fixed offset and a byte comparison ought to work. It fails on measurement (`WikiSpike icondiff`):

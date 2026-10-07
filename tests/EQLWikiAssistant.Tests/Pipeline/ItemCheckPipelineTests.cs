@@ -257,6 +257,24 @@ public class ItemCheckPipelineTests
     /// now existed. The review screen then showed the wiki's icon beside an empty box, which its near-black
     /// background rendered as a small dark rectangle indistinguishable from corrupt artwork.
     /// </summary>
+    /// <summary>The icon shown is the 44x44 cell the game draws its 40x40 artwork into, not the wider strip that is
+    /// fingerprinted, so it scales the same as the wiki's file beside it (user, 2026-10-07).</summary>
+    [Fact]
+    public async Task TheShownIconIsTheIconsOwnCell()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines), EarringPage());
+        CapturedImage frame = FrameWithIcon();
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(frame);
+
+        CapturedImage shown = Assert.IsType<CapturedImage>(results[0].CapturedIconImage);
+        Assert.Equal((44, 44), (shown.Width, shown.Height));
+        // Its first pixel is the frame's at the cell's corner (the test window sits at the frame's origin).
+        Rect cell = ItemIconReader.IconCell;
+        int at = (cell.Y * frame.Width + cell.X) * 4;
+        Assert.Equal(frame.Pixels[at..(at + 4)], shown.Pixels[..4]);
+    }
+
     [Fact]
     public async Task TheCapturedIconSurvivesAPageBeingCreatedAfterTheFirstCheck()
     {

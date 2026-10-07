@@ -24,6 +24,17 @@ public static class ItemIconReader
     public static readonly Rect IconStrip = new(X: 10, Y: 50, Width: 45, Height: 52);
 
     /// <summary>
+    /// The icon's own cell, for **showing** it: the 40x40 artwork as the game draws it, at its ~1.1x, so 44x44.
+    /// Cropped to this and drawn in the same box as the wiki's 40x40 file, the two sprites come out the same size,
+    /// where the strip's spare background made the captured one look smaller (user, 2026-10-07).
+    ///
+    /// Measured, not derived: across 119 icons in the sample set the ink starts at y 54 on 60 of them and ends at
+    /// y 97 on 54 (44 rows), starts at x 12 on 48, and never reaches past x 55 even with the scan widened beyond it.
+    /// <see cref="IconStrip"/> stays the region fingerprinted, because every icon threshold was measured through it.
+    /// </summary>
+    public static readonly Rect IconCell = new(X: 12, Y: 54, Width: 44, Height: 44);
+
+    /// <summary>
     /// Fingerprints the icon of a located window, or returns false when there is nothing usable to fingerprint.
     ///
     /// Returning false is an ordinary outcome with several real causes, all of which must not produce a confident
