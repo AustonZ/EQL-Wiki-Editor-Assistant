@@ -132,8 +132,15 @@ public partial class MainWindow : Window
 
         try
         {
+            // **Off the UI thread, all of it** (user, 2026-10-07: the window hung, and the progress label never moved
+            // past the screenshot). Both OCR engines do their work synchronously and hand back a finished task, so
+            // awaiting them here ran the whole full-frame pass on this thread: nothing could repaint, and every
+            // progress report queued behind it. The ledger and the pending-lore table are locked for exactly this,
+            // since the review screen's buttons stay live while a capture runs.
+            AppServices services = _services;
             ShowBusy("Taking game screenshot…");
-            (CapturedImage? frame, string? problem, string? captured) = await _services.CaptureGameWindowAsync();
+            (CapturedImage? frame, string? problem, string? captured) =
+                await Task.Run(() => services.CaptureGameWindowAsync());
             if (frame is null)
             {
                 StatusText.Text = problem;
@@ -148,12 +155,14 @@ public partial class MainWindow : Window
                 _ when p.Of == 1 => "Checking the item against the wiki…",
                 _ => $"Checking item {p.Window} of {p.Of} against the wiki…",
             }));
-            IReadOnlyList<ItemCheckResult> results = await _services.Pipeline.CheckAsync(frame, progress: progress);
+            IReadOnlyList<ItemCheckResult> results =
+                await Task.Run(() => services.Pipeline.CheckAsync(frame, progress: progress));
 
             // Kept when Settings > Saved captures says so, named after what was in it, so a bug can be reported by
-            // naming an item rather than by keeping it in the game — see CaptureArchive.
-            string? archived = _services.Settings.KeepCaptures
-                ? CaptureArchive.Save(frame, results.Select(r => r.ItemName))
+            // naming an item rather than by keeping it in the game — see CaptureArchive. Encoding a full frame as PNG
+            // takes long enough to be felt, so it is off the UI thread too.
+            string? archived = services.Settings.KeepCaptures
+                ? await Task.Run(() => CaptureArchive.Save(frame, results.Select(r => r.ItemName).ToList()))
                 : null;
 
             // Results accumulate across captures rather than replacing each other (user, 2026-09-28), so an item

@@ -30,6 +30,49 @@ public class CheckedItemsLedgerTests
             WikiPageTitle = wikiPageTitle,
         };
 
+    /// <summary>
+    /// A capture records rows on a background thread while the review screen can record, enumerate and save on the
+    /// UI thread (2026-10-07). Unguarded, enumerating during a write throws "collection was modified", and two saves
+    /// race on the one temporary file. Hammered from both sides here; the final file must hold every row.
+    /// </summary>
+    [Fact]
+    public async Task RecordingEnumeratingAndSavingAtOnceIsSafe()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"eqlwiki-ledger-{Guid.NewGuid():N}.json");
+        try
+        {
+            var ledger = new CheckedItemsLedger();
+            const int rows = 4000;
+
+            Task writer = Task.Run(() =>
+            {
+                for (int i = 0; i < rows; i++) ledger.Record(Entry(name: $"Item {i}"));
+            });
+            Task reader = Task.Run(async () =>
+            {
+                while (!writer.IsCompleted)
+                {
+                    _ = ledger.Entries.Count(e => e.Outcome == CheckOutcome.Matched);
+                    await ledger.SaveAsync(path);
+                }
+            });
+            Task otherSaver = Task.Run(async () =>
+            {
+                while (!writer.IsCompleted) await ledger.SaveAsync(path);
+            });
+
+            await Task.WhenAll(writer, reader, otherSaver);
+            await ledger.SaveAsync(path);
+
+            Assert.Equal(rows, CheckedItemsLedger.Load(path).Count);
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(path + ".tmp");
+        }
+    }
+
     [Fact]
     public void AnItemNeverSeenIsNotChecked() =>
         Assert.Equal(

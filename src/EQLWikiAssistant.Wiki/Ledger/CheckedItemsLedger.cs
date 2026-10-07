@@ -125,15 +125,33 @@ public sealed class CheckedItemsLedger
     private readonly Dictionary<string, LedgerEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly TimeProvider _time;
 
+    /// <summary>
+    /// **Guards every read and write of the rows.** A capture runs on a background thread so the window stays
+    /// responsive (user, 2026-10-07), and the review screen's buttons — Save, Skip, mark as checked — can record a
+    /// row on the UI thread at the same moment. A <see cref="Dictionary{TKey,TValue}"/> written from two threads at
+    /// once can corrupt itself, and enumerating it during a write throws.
+    /// </summary>
+    private readonly object _gate = new();
+
+    /// <summary>One save at a time: every save writes the same temporary file before moving it into place.</summary>
+    private readonly SemaphoreSlim _saving = new(1, 1);
+
     public CheckedItemsLedger(TimeProvider? time = null) => _time = time ?? TimeProvider.System;
 
     /// <summary>How long a settled row stays trusted. Null — the default — means forever, because a checked item
     /// does not drift on its own; the fingerprint and mapping version are what actually invalidate a row.</summary>
     public TimeSpan? MaximumAge { get; set; }
 
-    public int Count => _entries.Count;
+    public int Count
+    {
+        get { lock (_gate) return _entries.Count; }
+    }
 
-    public IEnumerable<LedgerEntry> Entries => _entries.Values;
+    /// <summary>A snapshot, so a caller can enumerate it while a capture records rows.</summary>
+    public IEnumerable<LedgerEntry> Entries
+    {
+        get { lock (_gate) return [.. _entries.Values]; }
+    }
 
     /// <summary>
     /// Whether this capture needs the wiki, and why. **Consult this before fetching anything.**
@@ -173,22 +191,27 @@ public sealed class CheckedItemsLedger
     public LedgerEntry? Find(string itemName, string entityKind = ItemKind)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(itemName);
-        return _entries.GetValueOrDefault(KeyFor(itemName, entityKind));
+        lock (_gate) return _entries.GetValueOrDefault(KeyFor(itemName, entityKind));
     }
 
     /// <summary>Records a check, replacing any earlier row for the same item.</summary>
     public void Record(LedgerEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        _entries[KeyFor(entry.ItemName, entry.EntityKind)] = entry;
+        lock (_gate) _entries[KeyFor(entry.ItemName, entry.EntityKind)] = entry;
     }
 
     /// <summary>Forgets an item, so the next capture treats it as new. The "re-check" action's permanent form, and
     /// what an ineligible item needs if a row was somehow written for it.</summary>
-    public bool Remove(string itemName, string entityKind = ItemKind) =>
-        _entries.Remove(KeyFor(itemName, entityKind));
+    public bool Remove(string itemName, string entityKind = ItemKind)
+    {
+        lock (_gate) return _entries.Remove(KeyFor(itemName, entityKind));
+    }
 
-    public void Clear() => _entries.Clear();
+    public void Clear()
+    {
+        lock (_gate) _entries.Clear();
+    }
 
     /// <summary>Keys are case-insensitive because the same item captured twice must key the same way, and OCR is
     /// not the only thing that varies case — the wiki's own pages disagree about it too.</summary>
@@ -225,13 +248,22 @@ public sealed class CheckedItemsLedger
         string full = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
 
-        string temporary = full + ".tmp";
-        await File.WriteAllTextAsync(
-            temporary,
-            JsonSerializer.Serialize(new LedgerFile { Entries = [.. _entries.Values] }, JsonOptions),
-            cancellationToken).ConfigureAwait(false);
+        await _saving.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // The rows are read once this save has its turn, never before: a snapshot taken while waiting could be
+            // older than the one the save ahead of it just wrote, and would put rows back that are gone.
+            string json;
+            lock (_gate) json = JsonSerializer.Serialize(new LedgerFile { Entries = [.. _entries.Values] }, JsonOptions);
 
-        File.Move(temporary, full, overwrite: true);
+            string temporary = full + ".tmp";
+            await File.WriteAllTextAsync(temporary, json, cancellationToken).ConfigureAwait(false);
+            File.Move(temporary, full, overwrite: true);
+        }
+        finally
+        {
+            _saving.Release();
+        }
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()

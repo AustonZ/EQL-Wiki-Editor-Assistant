@@ -1554,6 +1554,16 @@ a global hotkey is worth having.
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — `RapidOcrEngine` loads three
   ONNX models in its constructor, the `MediaWikiClient` must keep one cookie container for its whole session, and
   the ledger and icon cache only mean anything shared. Measured: the window is responsive in ~485ms.
+- **A capture runs off the UI thread: the screenshot, the whole check, and saving the frame** (bug found by the
+  user, 2026-10-07: the window hung and the progress label stuck on "Taking game screenshot"). Both OCR engines are
+  synchronous behind an async signature — they return `Task.FromResult` — so awaiting the pipeline from a click
+  handler ran the full-frame pass *on the UI thread*. Nothing repainted, and the "Finding item windows" report sat
+  queued behind the work it described, which is why the screenshot looked like the slow step. Hence `Task.Run`.
+  - **That made the shared state genuinely concurrent**, because the review screen's buttons stay live during a
+    capture: Save on one item can record a ledger row while the capture records another. `CheckedItemsLedger` is
+    locked (and serializes its saves, reading the rows only once a save has its turn, so an older snapshot never
+    lands over a newer one), and so is the pipeline's pending-lore table. `RecordingEnumeratingAndSavingAtOnceIsSafe`
+    fails with the locks removed. `VerifiedPages` and `MediaWikiClient` only ever swap a reference, which is safe.
 - **The `.onnx`-copy trap is handled for `App`**: the direct `PackageReference` puts the models in the app's own
   output, and the app starts.
 - `WikitextDiff` is a real LCS line diff, replacing the spike tool's set subtraction — that was fine for eyeballing

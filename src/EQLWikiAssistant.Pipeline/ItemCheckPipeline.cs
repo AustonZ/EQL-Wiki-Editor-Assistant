@@ -49,6 +49,12 @@ public sealed class ItemCheckPipeline
     /// already the stateful part of this flow.</summary>
     private readonly Dictionary<string, string> _pendingLore = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Locked because a capture runs on a background thread while the review screen stays live.</summary>
+    private string? PendingLoreFor(string itemName)
+    {
+        lock (_pendingLore) return _pendingLore.GetValueOrDefault(itemName);
+    }
+
     /// <param name="icons">The icon cache, or null to skip the icon check. Optional because the check is flag-only:
     /// the tool never writes an icon id, so running without one is degraded rather than wrong.</param>
     /// <param name="decoder">Decodes a downloaded icon. Needed alongside <paramref name="icons"/>.</param>
@@ -230,7 +236,8 @@ public sealed class ItemCheckPipeline
         // else; the Description capture is what gets analyzed.
         if (window.ActiveTab == ItemWindowTab.Lore)
         {
-            if (!string.IsNullOrWhiteSpace(item.Lore)) _pendingLore[item.Name] = item.Lore!;
+            if (!string.IsNullOrWhiteSpace(item.Lore))
+                lock (_pendingLore) _pendingLore[item.Name] = item.Lore!;
             else warnings.Add("The Lore tab was captured but no lore text could be read from it.");
 
             return new ItemCheckResult
@@ -277,7 +284,7 @@ public sealed class ItemCheckPipeline
                 ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height))
             : null;
 
-        _pendingLore.TryGetValue(item.Name, out string? lore);
+        string? lore = PendingLoreFor(item.Name);
         bool needsLore = window.HasLoreTab && lore is null;
 
         string fingerprint = ItemFingerprint.Compute(item, capturedIcon, lore);
@@ -863,7 +870,7 @@ public sealed class ItemCheckPipeline
         if (previous.Item is not { } item)
             throw new InvalidOperationException("This result has no parsed item, so there is nothing to re-analyze.");
 
-        _pendingLore.TryGetValue(item.Name, out string? lore);
+        string? lore = PendingLoreFor(item.Name);
         string fingerprint = ItemFingerprint.Compute(item, previous.CapturedIcon, lore);
 
         try
