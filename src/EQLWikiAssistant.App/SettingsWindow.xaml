@@ -6,7 +6,8 @@
         mc:Ignorable="d"
         Title="Settings" Height="720" Width="980" MinWidth="720" MinHeight="480"
         WindowStartupLocation="CenterOwner"
-        Style="{StaticResource DarkWindow}">
+        Style="{StaticResource DarkWindow}"
+        PreviewKeyDown="OnPreviewKeyDown">
     <Window.Resources>
         <Style x:Key="PageHeading" TargetType="TextBlock">
             <Setter Property="FontSize" Value="18" />
@@ -64,7 +65,7 @@
     <DockPanel>
         <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0" Padding="10,8">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Close" IsCancel="True" Padding="16,4" MinWidth="80" />
+                <Button x:Name="CloseButton" DockPanel.Dock="Right" Content="Close" IsCancel="True" Padding="16,4" MinWidth="80" />
                 <TextBlock VerticalAlignment="Center" Foreground="{StaticResource TextDimBrush}" TextTrimming="CharacterEllipsis">
                     <Hyperlink Click="OnOpenSettingsFolderClick">
                         <TextBlock x:Name="SettingsPathText" />
@@ -76,6 +77,7 @@
         <ListBox x:Name="PageList" DockPanel.Dock="Left" Width="180" BorderThickness="0,0,1,0" Padding="0,8"
                  SelectionChanged="OnPageSelected">
             <ListBoxItem Content="UI font" Padding="12,6" />
+            <ListBoxItem Content="Capture hotkey" Padding="12,6" />
             <ListBoxItem Content="Wiki account" Padding="12,6" />
             <ListBoxItem Content="Wiki mapping" Padding="12,6" />
         </ListBox>
@@ -101,6 +103,32 @@
                     <TextBlock Text="If the setting is wrong" Style="{StaticResource SectionHeading}" />
                     <TextBlock Style="{StaticResource Prose}"
                                Text="A window drawn in the other font is refused and shown as Wrong font rather than read, so a mismatch is never silent. Nothing is recorded for a refused window: switch the setting or the game's font, and capture again." />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ============================ Capture hotkey ============================ -->
+            <ScrollViewer x:Name="HotKeyPage" VerticalScrollBarVisibility="Auto" Padding="24,18" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Capture hotkey" Style="{StaticResource PageHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="Captures the game window from anywhere, so you never have to leave the game. Choose a combination the game does not use: Windows hands the keystroke to this tool, and the game never sees it." />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <!-- Shows the live hotkey, or while recording the keys held so far. -->
+                        <Border x:Name="HotKeyBox" Background="{StaticResource SunkenBrush}" BorderThickness="1"
+                                BorderBrush="{StaticResource BorderStrongBrush}" Padding="12,5" MinWidth="220">
+                            <TextBlock x:Name="HotKeyText" FontWeight="SemiBold" FontSize="14" />
+                        </Border>
+                        <Button x:Name="ChangeHotKeyButton" Content="Change…" Click="OnChangeHotKeyClick" MinWidth="80"
+                                Padding="12,4" Margin="10,0,0,0" />
+                        <Button x:Name="ResetHotKeyButton" Click="OnResetHotKeyClick" Padding="12,4" Margin="8,0,0,0" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="HotKeyStatus" Style="{StaticResource Prose}" Margin="0,12,0,0" />
+
+                    <TextBlock Text="Which combinations work" Style="{StaticResource SectionHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="It needs Ctrl, Alt or Win, so it can never fire while you type in chat. If another program already uses the combination, Windows refuses it and your current hotkey keeps working. The Capture now button works whatever happens here." />
                 </StackPanel>
             </ScrollViewer>
 

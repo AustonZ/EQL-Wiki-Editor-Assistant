@@ -1,8 +1,11 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using EQLWikiAssistant.Core.Input;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
 using EQLWikiAssistant.Wiki.Mapping;
@@ -11,7 +14,7 @@ using EQLWikiAssistant.Wiki.MediaWiki;
 namespace EQLWikiAssistant.App;
 
 /// <summary>
-/// The UI font, the wiki login, and a read-only view of the wiki mapping (milestone 6).
+/// The UI font, the capture hotkey, the wiki login, and a read-only view of the wiki mapping (milestone 6).
 ///
 /// **Opened modally, and not while a capture runs**, for the same reason as the ledger window and one more: the font
 /// is read by the capture in progress, so changing it halfway through would read half a frame in each font. The main
@@ -30,6 +33,9 @@ public partial class SettingsWindow : Window
     /// <summary>True while the controls are being filled in, so selecting the saved font does not save it again.</summary>
     private bool _loading = true;
 
+    /// <summary>True while the next key combination pressed in this window becomes the hotkey.</summary>
+    private bool _recording;
+
     public SettingsWindow(AppServices services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -44,6 +50,10 @@ public partial class SettingsWindow : Window
         FontBox.SelectedIndex = Array.IndexOf(Fonts, services.Settings.Font);
         DescribeFont(services.Settings.Font);
 
+        ResetHotKeyButton.Content = $"Reset to {HotKeyChord.Default}";
+        ShowHotKey();
+        if (services.HotKeyProblem is { } problem) ShowHotKeyStatus(problem, Palette.Attention);
+
         RefreshStoredLogin();
         ShowMapping(services.Mapping);
 
@@ -56,9 +66,11 @@ public partial class SettingsWindow : Window
         // Fires during InitializeComponent, before the pages exist as fields.
         if (FontPage is null) return;
 
-        FontPage.Visibility = PageList.SelectedIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
-        AccountPage.Visibility = PageList.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
-        MappingPage.Visibility = PageList.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
+        if (_recording) StopRecording();
+
+        ScrollViewer[] pages = [FontPage, HotKeyPage, AccountPage, MappingPage];
+        for (int i = 0; i < pages.Length; i++)
+            pages[i].Visibility = PageList.SelectedIndex == i ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // ============================ UI font ============================
@@ -110,6 +122,157 @@ public partial class SettingsWindow : Window
             UseShellExecute = true,
         });
     }
+
+    // ============================ Capture hotkey ============================
+
+    private void ShowHotKey()
+    {
+        HotKeyText.Foreground = _services.HotKeyProblem is null ? Palette.Text : Palette.Attention;
+        HotKeyText.Text = _services.HotKeyProblem is null
+            ? _services.Settings.HotKey.ToString()
+            : $"{_services.Settings.HotKey} (not active)";
+        ResetHotKeyButton.IsEnabled = _services.Settings.HotKey != HotKeyChord.Default || _services.HotKeyProblem is not null;
+    }
+
+    private void ShowHotKeyStatus(string text, Brush brush)
+    {
+        HotKeyStatus.Foreground = brush;
+        HotKeyStatus.Text = text;
+    }
+
+    private void OnChangeHotKeyClick(object sender, RoutedEventArgs e)
+    {
+        if (_recording)
+        {
+            StopRecording();
+            ShowHotKeyStatus("", Palette.Muted);
+            return;
+        }
+
+        // Released while recording, or the current combination could never be recorded: Windows hands a registered
+        // combination to its hotkey and never to a window. Every way out of recording puts it back.
+        _services.SuspendHotKey();
+        _recording = true;
+        // Esc cancels the recording rather than closing the window, so the Close button gives up its claim on it.
+        CloseButton.IsCancel = false;
+        ChangeHotKeyButton.Content = "Cancel";
+        HotKeyBox.BorderBrush = (Brush)FindResource("AccentBrush");
+        HotKeyText.Foreground = Palette.Muted;
+        HotKeyText.Text = "Press the new combination…";
+        ShowHotKeyStatus(
+            "Hold Ctrl, Alt or Win and press a key. Esc cancels. Windows keeps some Win combinations for itself: if a " +
+            "key does nothing, Windows has it, and no program can use it.", Palette.Muted);
+        Keyboard.Focus(HotKeyBox);
+    }
+
+    /// <summary>Ends recording. <paramref name="resume"/> is false only when a combination is about to be applied,
+    /// which re-registers a hotkey itself — and the caller resumes afterwards in case it was refused.</summary>
+    private void StopRecording(bool resume = true)
+    {
+        _recording = false;
+        CloseButton.IsCancel = true;
+        ChangeHotKeyButton.Content = "Change…";
+        HotKeyBox.BorderBrush = (Brush)FindResource("BorderStrongBrush");
+        if (resume) _services.ResumeHotKey();
+        ShowHotKey();
+    }
+
+    /// <summary>However the window closes, a hotkey suspended for recording comes back.</summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        _services.ResumeHotKey();
+        base.OnClosed(e);
+    }
+
+    /// <summary>
+    /// While recording, every key goes to the recording and nowhere else — not to focus navigation, not to the Close
+    /// button, not to the window's menu on Alt. Held modifiers are shown as they go down; the first other key
+    /// completes the combination.
+    /// </summary>
+    private async void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!_recording) return;
+        e.Handled = true;
+
+        // Alt combinations arrive as Key.System, with the real key alongside.
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        HotKeyModifiers modifiers = ModifiersHeld();
+
+        if (key == Key.Escape && modifiers == HotKeyModifiers.None)
+        {
+            StopRecording();
+            ShowHotKeyStatus("", Palette.Muted);
+            return;
+        }
+
+        var chord = new HotKeyChord(modifiers, (uint)KeyInterop.VirtualKeyFromKey(key));
+        if (HotKeyChord.IsModifierKey(chord.VirtualKey))
+        {
+            HotKeyText.Text = $"{chord}+…";
+            return;
+        }
+
+        if (chord.Problem is { } problem)
+        {
+            StopRecording();
+            ShowHotKeyStatus($"{chord} was not used. {problem}", Palette.Attention);
+            return;
+        }
+
+        StopRecording(resume: false);
+        await ApplyHotKeyAsync(chord);
+    }
+
+    private async void OnResetHotKeyClick(object sender, RoutedEventArgs e)
+    {
+        if (_recording) StopRecording();
+        await ApplyHotKeyAsync(HotKeyChord.Default);
+    }
+
+    private async Task ApplyHotKeyAsync(HotKeyChord chord)
+    {
+        bool unchanged = chord == _services.Settings.HotKey;
+        try
+        {
+            string? problem = await _services.UseHotKeyAsync(chord);
+            // A refused combination leaves the recording's suspension in place; this puts the old hotkey back.
+            _services.ResumeHotKey();
+            ShowHotKey();
+            if (problem is not null)
+                ShowHotKeyStatus($"{problem} {_services.Settings.HotKey} is still the hotkey.", Palette.Attention);
+            else if (unchanged)
+                ShowHotKeyStatus($"{chord} is still the hotkey.", Palette.Done);
+            else
+                ShowHotKeyStatus($"Saved. {chord} now captures the game window.", Palette.Done);
+        }
+        catch (IOException ex)
+        {
+            // The hotkey is already live for this session; only remembering it failed.
+            ShowHotKey();
+            ShowHotKeyStatus($"In use now, but could not be saved: {ex.Message}", Palette.Attention);
+        }
+    }
+
+    /// <summary>
+    /// The modifiers physically held right now, asked of Windows rather than of WPF (bug found by the user,
+    /// 2026-10-07: Win+Ctrl+R recorded as Ctrl+R). WPF's <c>Keyboard.Modifiers</c> only knows keys that reached this
+    /// window, and the shell keeps the Win key's own press for itself — so WPF never saw Win go down.
+    /// <c>GetAsyncKeyState</c> reports the keyboard as it is, wherever its keys were delivered.
+    /// </summary>
+    private static HotKeyModifiers ModifiersHeld()
+    {
+        HotKeyModifiers modifiers = HotKeyModifiers.None;
+        if (IsDown(0x11)) modifiers |= HotKeyModifiers.Control; // VK_CONTROL
+        if (IsDown(0x12)) modifiers |= HotKeyModifiers.Alt; // VK_MENU
+        if (IsDown(0x10)) modifiers |= HotKeyModifiers.Shift; // VK_SHIFT
+        if (IsDown(0x5B) || IsDown(0x5C)) modifiers |= HotKeyModifiers.Windows; // VK_LWIN, VK_RWIN
+        return modifiers;
+
+        static bool IsDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
 
     // ============================ Wiki account ============================
 

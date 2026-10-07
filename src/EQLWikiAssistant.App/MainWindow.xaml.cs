@@ -21,13 +21,16 @@ namespace EQLWikiAssistant.App;
 /// </summary>
 public partial class MainWindow : Window
 {
-    /// <summary>Ctrl+Shift+E. Registered globally so it fires while the game has focus, which is the whole point —
-    /// Graphics Capture reads an unfocused window fine, so the user never has to leave the game to capture.</summary>
-    private const uint VkE = 0x45;
-
     private readonly ObservableCollection<ResultViewModel> _results = [];
     private AppServices? _services;
-    private GlobalHotKey? _hotKey;
+
+    /// <summary>
+    /// True while the Settings or Checked items window is open. **The hotkey is global and bypasses modality**, so
+    /// without this a press from inside the game would start a capture behind a dialog that is in the middle of
+    /// changing the font it reads with, or editing the ledger it writes to — the two things those windows are modal
+    /// to prevent. The buttons are covered by modality; the hotkey is covered here.
+    /// </summary>
+    private bool _dialogOpen;
     private bool _capturing;
 
     public MainWindow()
@@ -43,28 +46,36 @@ public partial class MainWindow : Window
         SettingsButton.IsEnabled = false;
         StatusText.Text = "Loading the OCR models…";
         _ = StartUpAsync();
+    }
 
-        try
-        {
-            _hotKey = new GlobalHotKey(HotKeyModifiers.Control | HotKeyModifiers.Shift, VkE);
-            // The hotkey runs its own message-only window on its own thread, so this arrives off the UI thread.
-            _hotKey.Pressed += (_, _) => Dispatcher.Invoke(() =>
-            {
-                // Front first, so the capture's progress and its result are both visible without alt-tabbing. The
-                // game window is captured from the frame grabbed inside CaptureAsync, which reads it unfocused, so
-                // stealing focus here cannot spoil the capture.
-                ComeToTheFront();
-                _ = CaptureAsync();
-            });
-            HotKeyLabel.Text = "Hotkey: Ctrl+Shift+E";
-        }
-        catch (Exception ex)
-        {
-            // Another application may already own the combination. That is a degraded tool, not a broken one — the
-            // Capture button still works — so it is reported rather than fatal.
-            HotKeyLabel.Text = "Hotkey unavailable";
-            HotKeyLabel.ToolTip = ex.Message;
-        }
+    /// <summary>
+    /// The capture hotkey fired. It is registered globally so it fires while the game has focus, which is the whole
+    /// point — Graphics Capture reads an unfocused window fine, so the user never has to leave the game to capture.
+    /// It arrives on the hotkey's own thread, hence the dispatch.
+    /// </summary>
+    private void OnHotKeyPressed(object? sender, EventArgs e) => Dispatcher.Invoke(() =>
+    {
+        if (_dialogOpen) return;
+
+        // Front first, so the capture's progress and its result are both visible without alt-tabbing. The game window
+        // is captured from the frame grabbed inside CaptureAsync, which reads it unfocused, so stealing focus here
+        // cannot spoil the capture.
+        ComeToTheFront();
+        _ = CaptureAsync();
+    });
+
+    /// <summary>Says which hotkey is live — or, when Windows refused the saved one, that none is and why. A refused
+    /// hotkey is a degraded tool rather than a broken one, since the Capture button still works.</summary>
+    private void UpdateHotKeyLabel()
+    {
+        if (_services is null) return;
+
+        HotKeyLabel.Text = _services.HotKeyProblem is null
+            ? $"Hotkey: {_services.Settings.HotKey}"
+            : "Hotkey unavailable";
+        HotKeyLabel.ToolTip = _services.HotKeyProblem is { } problem
+            ? $"{problem} Choose another under Settings > Capture hotkey."
+            : null;
     }
 
     private async Task StartUpAsync()
@@ -73,6 +84,8 @@ public partial class MainWindow : Window
         {
             _services = await Task.Run(() => new AppServices());
             _services.Pipeline.ReCheckAnyway = ReCheckBox.IsChecked == true;
+            _services.HotKeyPressed += OnHotKeyPressed;
+            UpdateHotKeyLabel();
             CaptureButton.IsEnabled = true;
             LedgerButton.IsEnabled = true;
             SettingsButton.IsEnabled = true;
@@ -543,8 +556,16 @@ public partial class MainWindow : Window
     {
         if (_services is null) return;
 
-        new LedgerWindow(_services.Ledger, _services.Mapping.Version, _services.SaveLedgerAsync) { Owner = this }
-            .ShowDialog();
+        _dialogOpen = true;
+        try
+        {
+            new LedgerWindow(_services.Ledger, _services.Mapping.Version, _services.SaveLedgerAsync) { Owner = this }
+                .ShowDialog();
+        }
+        finally
+        {
+            _dialogOpen = false;
+        }
 
         // A row may have been forgotten while it was open.
         UpdateLedgerText();
@@ -555,7 +576,19 @@ public partial class MainWindow : Window
     private void OnSettingsClick(object sender, RoutedEventArgs e)
     {
         if (_services is null) return;
-        new SettingsWindow(_services) { Owner = this }.ShowDialog();
+
+        _dialogOpen = true;
+        try
+        {
+            new SettingsWindow(_services) { Owner = this }.ShowDialog();
+        }
+        finally
+        {
+            _dialogOpen = false;
+        }
+
+        // The hotkey may have changed while it was open.
+        UpdateHotKeyLabel();
     }
 
     /// <summary>Counts the unsettled rows alongside the total, because over a long session that is the number worth
@@ -612,7 +645,6 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        _hotKey?.Dispose();
         _services?.Dispose();
         base.OnClosed(e);
     }

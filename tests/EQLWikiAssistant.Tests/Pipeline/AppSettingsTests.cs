@@ -1,3 +1,4 @@
+using EQLWikiAssistant.Core.Input;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
 
@@ -38,6 +39,54 @@ public class AppSettingsTests : IDisposable
         await new AppSettings { Font = UiFont.Arial }.SaveAsync(_path);
 
         Assert.Contains("\"Arial\"", File.ReadAllText(_path));
+    }
+
+    [Fact]
+    public async Task TheHotKeyRoundTrips()
+    {
+        var chord = new HotKeyChord(HotKeyModifiers.Control | HotKeyModifiers.Alt, 0x78);
+        await new AppSettings { Font = UiFont.Arial, HotKey = chord }.SaveAsync(_path);
+
+        AppSettings loaded = AppSettings.Load(_path);
+        Assert.Equal(chord, loaded.HotKey);
+        Assert.Equal(UiFont.Arial, loaded.Font);
+    }
+
+    /// <summary>The acceptability rule is derived, so it is not saved — and a file from the build that did save it
+    /// (the user's own, 2026-10-07, reproduced verbatim) still loads.</summary>
+    [Fact]
+    public async Task TheDerivedProblemIsNotSavedAndAnOldFileCarryingItStillLoads()
+    {
+        await new AppSettings().SaveAsync(_path);
+        Assert.DoesNotContain("problem", File.ReadAllText(_path), StringComparison.OrdinalIgnoreCase);
+
+        File.WriteAllText(_path, """
+            {
+              "font": "EqlWikiAssistant",
+              "hotKey": {
+                "modifiers": "Control",
+                "virtualKey": 82,
+                "problem": null
+              }
+            }
+            """);
+        Assert.Equal(new HotKeyChord(HotKeyModifiers.Control, 82), AppSettings.Load(_path).HotKey);
+    }
+
+    /// <summary>A file saved before the hotkey existed, or carrying one the settings window would refuse, falls back
+    /// to the default hotkey — without losing the font chosen beside it.</summary>
+    [Theory]
+    [InlineData("""{ "font": "Arial" }""")]
+    [InlineData("""{ "font": "Arial", "hotKey": null }""")]
+    [InlineData("""{ "font": "Arial", "hotKey": { "modifiers": "Shift", "virtualKey": 69 } }""")]
+    [InlineData("""{ "font": "Arial", "hotKey": { "modifiers": "Control", "virtualKey": 0 } }""")]
+    public void AMissingOrUnacceptableHotKeyFallsBackAlone(string content)
+    {
+        File.WriteAllText(_path, content);
+
+        AppSettings loaded = AppSettings.Load(_path);
+        Assert.Equal(HotKeyChord.Default, loaded.HotKey);
+        Assert.Equal(UiFont.Arial, loaded.Font);
     }
 
     /// <summary>Nothing in this file is hard to choose again, so a damaged one must not stop the tool starting.</summary>

@@ -4,6 +4,7 @@ using EQLWikiAssistant.Capture;
 using EQLWikiAssistant.Core.Glyphs;
 using EQLWikiAssistant.Core.Locate;
 using EQLWikiAssistant.Core.Icons;
+using EQLWikiAssistant.Core.Input;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Ocr;
 using EQLWikiAssistant.Pipeline;
@@ -49,6 +50,7 @@ public sealed class AppServices : IDisposable
     private readonly RapidOcrEngine _rapidOcr;
     private readonly GlyphOcrEngine _windowReader;
     private readonly HttpClient _http;
+    private GlobalHotKey? _hotKey;
 
     public MediaWikiClient Wiki { get; }
     public CheckedItemsLedger Ledger { get; }
@@ -74,6 +76,18 @@ public sealed class AppServices : IDisposable
 
     /// <summary>What the user chose in the settings window, as last saved.</summary>
     public AppSettings Settings { get; private set; }
+
+    /// <summary>
+    /// The capture hotkey was pressed. Raised on the hotkey's own thread, so a handler touching the UI must marshal.
+    ///
+    /// **The hotkey lives here rather than in the main window** so that changing it has one home, the way the font
+    /// does: the settings window asks <see cref="UseHotKeyAsync"/>, and whoever listens keeps listening.
+    /// </summary>
+    public event EventHandler? HotKeyPressed;
+
+    /// <summary>Why the saved hotkey is not registered — usually another program holding the same combination — or
+    /// null when it is. Capturing still works from the button either way.</summary>
+    public string? HotKeyProblem { get; private set; }
 
     public AppServices()
     {
@@ -142,6 +156,82 @@ public sealed class AppServices : IDisposable
         Wiki.ReestablishSession = ReestablishSessionAsync;
 
         Capturer = new WindowCapturer();
+
+        // Last, so a refused combination costs nothing else: the tool starts, the Capture button works, and the
+        // settings window says why the hotkey does not.
+        _hotKey = TryRegister(Settings.HotKey, out string? problem);
+        HotKeyProblem = problem;
+    }
+
+    /// <summary>
+    /// Makes <paramref name="chord"/> the capture hotkey, and saves it. Returns why not, leaving the current hotkey
+    /// working, when the combination is unacceptable or Windows refuses it.
+    ///
+    /// **The new combination is registered before the old one is released**, so a refusal — another program already
+    /// holding it, which is the common case — changes nothing. While suspended for recording there is no old one
+    /// registered, and <see cref="ResumeHotKey"/> puts it back after a refusal. Choosing the combination already in use
+    /// is accepted rather than refused (user, 2026-10-07: re-entering the same keys is how someone backs out of a
+    /// mistake), and simply re-registers it.
+    /// </summary>
+    public async Task<string?> UseHotKeyAsync(HotKeyChord chord)
+    {
+        ArgumentNullException.ThrowIfNull(chord);
+        if (chord.Problem is { } unacceptable) return unacceptable;
+        if (chord == Settings.HotKey && _hotKey is not null) return null;
+
+        GlobalHotKey? registered = TryRegister(chord, out string? problem);
+        if (registered is null) return problem;
+
+        _hotKey?.Dispose();
+        _hotKey = registered;
+        _hotKeySuspended = false;
+        HotKeyProblem = null;
+
+        Settings = Settings with { HotKey = chord };
+        await Settings.SaveAsync(AppPaths.SettingsFile);
+        return null;
+    }
+
+    /// <summary>
+    /// Releases the hotkey while the settings window records a new one. **Windows delivers a registered combination to
+    /// its hotkey and never to a window**, so without this the current combination could not be recorded at all —
+    /// pressing it while recording did nothing visible (bug found by the user, 2026-10-07). Nothing is lost: captures
+    /// are ignored while the settings window is open anyway. Always paired with <see cref="ResumeHotKey"/>.
+    /// </summary>
+    public void SuspendHotKey()
+    {
+        _hotKey?.Dispose();
+        _hotKey = null;
+        _hotKeySuspended = true;
+    }
+
+    /// <summary>Re-registers the saved hotkey after recording, unless a new one has already replaced it. Safe to call
+    /// more than once. If the saved combination was taken in the meantime, <see cref="HotKeyProblem"/> says so.</summary>
+    public void ResumeHotKey()
+    {
+        if (!_hotKeySuspended) return;
+        _hotKeySuspended = false;
+        _hotKey = TryRegister(Settings.HotKey, out string? problem);
+        HotKeyProblem = problem;
+    }
+
+    private bool _hotKeySuspended;
+
+    private GlobalHotKey? TryRegister(HotKeyChord chord, out string? problem)
+    {
+        try
+        {
+            var hotKey = new GlobalHotKey(chord);
+            hotKey.Pressed += (_, _) => HotKeyPressed?.Invoke(this, EventArgs.Empty);
+            problem = null;
+            return hotKey;
+        }
+        catch (InvalidOperationException)
+        {
+            // RegisterHotKey's only ordinary failure: the combination is taken, by another program or by Windows.
+            problem = $"Windows would not register {chord}: another program, or Windows itself, already uses it.";
+            return null;
+        }
     }
 
     /// <summary>
@@ -297,6 +387,7 @@ public sealed class AppServices : IDisposable
 
     public void Dispose()
     {
+        _hotKey?.Dispose();
         Capturer.Dispose();
         Wiki.Dispose();
         _http.Dispose();

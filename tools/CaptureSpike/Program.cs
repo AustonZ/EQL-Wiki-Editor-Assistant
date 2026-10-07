@@ -1,4 +1,5 @@
 using EQLWikiAssistant.Capture;
+using EQLWikiAssistant.Core.Input;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.TestSupport;
 

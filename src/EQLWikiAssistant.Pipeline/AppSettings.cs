@@ -1,11 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using EQLWikiAssistant.Core.Input;
 using EQLWikiAssistant.Core.Ocr;
 
 namespace EQLWikiAssistant.Pipeline;
 
 /// <summary>
-/// What the user has chosen in the settings window. Today that is only the UI font the game draws in.
+/// What the user has chosen in the settings window: the UI font the game draws in, and the capture hotkey.
 ///
 /// **A file that cannot be read loads as the defaults rather than throwing**, the same rule the ledger follows and
 /// for a stronger reason: there is nothing here that cannot be chosen again in a few seconds, so refusing to start
@@ -20,6 +21,9 @@ public sealed record AppSettings
     /// See <see cref="UiFont"/>.</summary>
     public UiFont Font { get; init; } = UiFonts.AppDefault;
 
+    /// <summary>The global hotkey that captures the game window. Ctrl+Shift+E unless the user chose another.</summary>
+    public HotKeyChord HotKey { get; init; } = HotKeyChord.Default;
+
     public static AppSettings Load(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -29,7 +33,12 @@ public sealed record AppSettings
         {
             AppSettings? settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions);
             // An enum outside the known members (a font a newer build knew about) is as unreadable as a corrupt file.
-            return settings is not null && Enum.IsDefined(settings.Font) ? settings : Default;
+            if (settings is null || !Enum.IsDefined(settings.Font)) return Default;
+
+            // A hotkey is judged on its own: one the settings window would refuse falls back to the default without
+            // costing the font choice beside it. A file written before the hotkey existed has none, and gets the
+            // default the same way.
+            return settings.HotKey is { Problem: null } ? settings : settings with { HotKey = HotKeyChord.Default };
         }
         catch (JsonException)
         {

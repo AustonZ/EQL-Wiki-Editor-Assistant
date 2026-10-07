@@ -71,8 +71,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   `MainWindow` (capture trigger + review/diff screen), `ResultViewModel`, `LedgerWindow`/`LedgerRowViewModel` (what
   has been checked and what still wants a human), and **`Theme.xaml`/`Palette.cs`/`DarkTitleBar.cs`** (the one
   permanent dark palette — see "The dark palette" below; Theme.xaml is the only file in the app with a hex colour in
-  it), and `SettingsWindow` (the UI font, the wiki login and a read-only view of the mapping — see "The settings
-  window" below).
+  it), and `SettingsWindow` (the UI font, the capture hotkey, the wiki login and a read-only view of the mapping —
+  see "The settings window" below).
 - `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
 - `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
@@ -1491,8 +1491,9 @@ testable) and that it includes the two steps preview skipped, the ledger and the
   on return values: "an unchanged, already-matched item costs zero wiki traffic" is the property the ledger exists
   for, and only a counting fake can state it.
 
-**The review UI (`App`, milestone 5).** `Ctrl+Shift+E` captures the game window while it still has focus — Graphics
-Capture reads an unfocused window fine, which is the whole reason a global hotkey is worth having.
+**The review UI (`App`, milestone 5).** `Ctrl+Shift+E` (or whatever is set under Settings > Capture hotkey) captures
+the game window while it still has focus — Graphics Capture reads an unfocused window fine, which is the whole reason
+a global hotkey is worth having.
 - **The game window is found by process name (`eqgame`), never by title** (bug found by the user, 2026-09-29, and
   reproduced exactly). Matching `"EverQuest"` as a title substring also matched their browser on
   `Dragon Bone Bracelet - EverQuest Legends Wiki - Vivaldi` and their Discord on
@@ -1606,9 +1607,39 @@ Capture reads an unfocused window fine, which is the whole reason a global hotke
 - **Logging in is entered in the app** (Settings > Wiki account) as of 2026-10-05; `WikiSpike login` still works and
   writes the same Credential Manager entry.
 
-**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Three pages: the UI font, the wiki login,
-and the wiki mapping. Modal and disabled during a capture, like the ledger window — and here for a reason of its own:
-the capture in progress is reading with the configured font.
+**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Four pages: the UI font, the capture hotkey,
+the wiki login, and the wiki mapping. Modal and disabled during a capture, like the ledger window — and here for a
+reason of its own: the capture in progress is reading with the configured font.
+- **The capture hotkey is saved beside the font and changes without a restart** (2026-10-07). `AppServices` owns it
+  rather than the main window, so `UseHotKeyAsync` is its one home the way `UseFontAsync` is the font's.
+  - **The new combination is registered before the old one is released**, so a refusal — another program already
+    holding it, which is the ordinary failure — leaves the current hotkey working. That needed two `GlobalHotKey`s to
+    exist at once, which they could not: every instance registered the same window class name, so the second failed
+    outright. Each now numbers its own class, and a refused registration destroys its window and class so it cannot
+    spoil the next attempt. `HotKeyChordTests` registers real (unused) combinations to pin both, and both tests fail
+    against the shared class name.
+  - **Ctrl, Alt or Win is required** (`HotKeyChord.Problem`, in `Core.Input` so the portable settings loader and the
+    window share it). The hotkey is global and swallows its keystroke, so a bare key or a Shift+key would fire while
+    typing in game chat and eat the character. A saved hotkey that fails the rule falls back to the default on load
+    without costing the font beside it.
+  - **A refused hotkey at start-up is not fatal**: the main window reads "Hotkey unavailable" with the reason, the
+    settings page says it is not active, and the Capture button works regardless.
+  - **The hotkey is ignored while Settings or Checked items is open** (`MainWindow._dialogOpen`). It is global and
+    bypasses modality, so a press from inside the game would otherwise start a capture behind a dialog that is
+    changing the font it reads with or the ledger it writes to — the very things those windows are modal to prevent.
+    Found while adding this page, not reported; it was live from the day the settings window shipped.
+  - **While recording, the window takes every key** (`PreviewKeyDown`, handled), so Tab, Alt and Esc do not reach
+    focus navigation, the window menu or the Close button; Esc cancels the recording instead, the Close button giving
+    up `IsCancel` for its duration.
+  - **The hotkey is released while recording** (`SuspendHotKey`/`ResumeHotKey`; bug found by the user, 2026-10-07).
+    Windows delivers a registered combination to its hotkey and never to a window, so re-entering the current one
+    — how someone backs out of a mistake — did nothing at all. Every way out of recording (accepted, refused,
+    cancelled, page switched, window closed) puts it back; a refused new combination restores the old one. Verified
+    against real registrations: the saved combination is free while recording and held again afterwards.
+  - **Modifiers are read with `GetAsyncKeyState`, not WPF's `Keyboard.Modifiers`** (bug found by the user,
+    2026-10-07: Win+Ctrl+R recorded as Ctrl+R). WPF only knows keys delivered to its window, and the shell keeps the
+    Win key's own press. Some Win combinations never arrive at all (Win+Alt+W did not) — Windows owns those, no
+    program can register them, and the page says so rather than pretending to wait.
 - **The font is saved in `settings.json` (`Pipeline.AppSettings`) and switches without a restart.**
   `AppServices.UseFontAsync` is the one place after start-up that the font changes, and it sets the reader and the
   pipeline's wrong-font guard together; apart, a window would be read in one font and checked against the other. A
@@ -2367,7 +2398,8 @@ to configure.
 dotnet build                                                    # build everything
 dotnet test                                                     # run all tests
 dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test class
-# Run the app. Ctrl+Shift+E captures the game window from wherever you are — you never have to leave the game.
+# Run the app. Ctrl+Shift+E (changeable under Settings > Capture hotkey) captures the game window from wherever you
+# are — you never have to leave the game.
 # Reads are anonymous, so it only needs a credential the first time you save (enter one under Settings > Wiki account).
 # Its state (ledger, settings, icon cache) lives in %APPDATA%\EQLWikiAssistant — see Pipeline.AppPaths.
 dotnet run --project src/EQLWikiAssistant.App

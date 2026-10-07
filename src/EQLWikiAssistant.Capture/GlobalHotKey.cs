@@ -1,17 +1,7 @@
 using EQLWikiAssistant.Capture.Interop;
+using EQLWikiAssistant.Core.Input;
 
 namespace EQLWikiAssistant.Capture;
-
-/// <summary>Modifier flags for <see cref="GlobalHotKey"/>, matching Win32's MOD_* RegisterHotKey flags.</summary>
-[Flags]
-public enum HotKeyModifiers : uint
-{
-    None = 0,
-    Alt = NativeMethods.MOD_ALT,
-    Control = NativeMethods.MOD_CONTROL,
-    Shift = NativeMethods.MOD_SHIFT,
-    Windows = NativeMethods.MOD_WIN,
-}
 
 /// <summary>
 /// A single system-wide hotkey, so a capture can be triggered while the game window has focus. Runs its own
@@ -24,8 +14,17 @@ public enum HotKeyModifiers : uint
 /// </summary>
 public sealed class GlobalHotKey : IDisposable
 {
-    private const int HotKeyId = 0xB00; // arbitrary, unique within this process's hotkey registrations
-    private const string WindowClassName = "EQLWikiAssistant.GlobalHotKey.MessageWindow";
+    private const int HotKeyId = 0xB00; // arbitrary; registrations are per window, and each instance has its own
+
+    /// <summary>
+    /// Numbers each instance's window class, because **two instances must be able to exist at once**: changing the
+    /// hotkey registers the new combination before releasing the old, so a combination Windows refuses leaves the
+    /// old one working. With one shared class name the second <c>RegisterClassExW</c> fails and no change is possible.
+    /// </summary>
+    private static int _instanceCount;
+
+    private readonly string _windowClassName =
+        $"EQLWikiAssistant.GlobalHotKey.MessageWindow.{Interlocked.Increment(ref _instanceCount)}";
 
     private readonly HotKeyModifiers _modifiers;
     private readonly uint _virtualKey;
@@ -37,6 +36,10 @@ public sealed class GlobalHotKey : IDisposable
     private Exception? _startupException;
 
     public event EventHandler? Pressed;
+
+    public GlobalHotKey(HotKeyChord chord) : this(chord.Modifiers, chord.VirtualKey)
+    {
+    }
 
     public GlobalHotKey(HotKeyModifiers modifiers, uint virtualKey)
     {
@@ -64,13 +67,13 @@ public sealed class GlobalHotKey : IDisposable
                 cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.WNDCLASSEX>(),
                 lpfnWndProc = _wndProc,
                 hInstance = hInstance,
-                lpszClassName = WindowClassName,
+                lpszClassName = _windowClassName,
             };
             if (NativeMethods.RegisterClassExW(ref wndClass) == 0)
                 throw new InvalidOperationException("RegisterClassExW failed.", new System.ComponentModel.Win32Exception());
 
             _hwnd = NativeMethods.CreateWindowExW(
-                0, WindowClassName, null, 0, 0, 0, 0, 0,
+                0, _windowClassName, null, 0, 0, 0, 0, 0,
                 new IntPtr(NativeMethods.HWND_MESSAGE_PARENT), IntPtr.Zero, hInstance, IntPtr.Zero);
             if (_hwnd == IntPtr.Zero)
                 throw new InvalidOperationException("CreateWindowExW failed.", new System.ComponentModel.Win32Exception());
@@ -83,6 +86,10 @@ public sealed class GlobalHotKey : IDisposable
         }
         catch (Exception ex)
         {
+            // Release what was created, so a refused combination leaves nothing behind. This matters now that a
+            // refusal is ordinary — another program holding the combination the user just tried.
+            if (_hwnd != IntPtr.Zero) NativeMethods.DestroyWindow(_hwnd);
+            NativeMethods.UnregisterClassW(_windowClassName, IntPtr.Zero);
             _startupException = ex;
             _started.Set();
             return;
@@ -98,7 +105,7 @@ public sealed class GlobalHotKey : IDisposable
 
         NativeMethods.UnregisterHotKey(_hwnd, HotKeyId);
         NativeMethods.DestroyWindow(_hwnd);
-        NativeMethods.UnregisterClassW(WindowClassName, IntPtr.Zero);
+        NativeMethods.UnregisterClassW(_windowClassName, IntPtr.Zero);
     }
 
     private IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
