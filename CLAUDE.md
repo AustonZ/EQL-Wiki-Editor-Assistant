@@ -20,8 +20,11 @@ The full design rationale, wiki research findings, and milestone plan live in
 
 - **No network traffic interception, no game memory access.** Both violate the game's EULA. The only inputs are
   local screenshots (via Windows Graphics Capture) and the public MediaWiki API.
-- **Screenshots and OCR never leave the local machine.** No cloud OCR/vision APIs, ever. Only wikitext and wiki
-  images are fetched over the network (inbound), and only user-approved edits are sent (outbound).
+- **Screenshots and OCR never leave the local machine.** No cloud OCR/vision APIs, ever. Wikitext and wiki images
+  are fetched over the network (inbound); **nothing goes to the wiki unless the user takes an action they would
+  reasonably expect to send it** (user, 2026-10-07, clarifying the original "only user-approved edits"). The purpose
+  is to never publish anything unknowingly and never add load to the wiki for nothing — so a preview rendered by the
+  wiki's `action=parse` when the user presses Preview is fine, and one fired automatically on every capture is not.
 - **Never commit real screenshots.** They may contain private info (character/player names, chat). They belong in
   `samples/`, which is gitignored except for `samples/README.md`.
 - **Wiki data is untrusted and often malformed.** Item pages are human-edited and partly imported from the old
@@ -1631,7 +1634,7 @@ reading with the configured font.
     without costing the font beside it.
   - **A refused hotkey at start-up is not fatal**: the main window reads "Hotkey unavailable" with the reason, the
     settings page says it is not active, and the Capture button works regardless.
-  - **The hotkey is ignored while Settings or Checked items is open** (`MainWindow._dialogOpen`). It is global and
+  - **The hotkey is ignored while Settings or History is open** (`MainWindow._dialogOpen`). It is global and
     bypasses modality, so a press from inside the game would otherwise start a capture behind a dialog that is
     changing the font it reads with or the ledger it writes to — the very things those windows are modal to prevent.
     Found while adding this page, not reported; it was live from the day the settings window shipped.
@@ -1751,6 +1754,8 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
 **The ledger view (`App.LedgerWindow`, 2026-09-29).** What has been checked, and — the reason it exists — what is
 still waiting for a human. Built ahead of milestone 6 by the user's agreement, because over a long session the
 unsettled rows are the state that accumulates silently and nothing else surfaces them.
+- **Shown to the user as "History"** (renamed from "Checked items", user 2026-10-07). The status bar's "N need
+  attention" opens it already filtered to those rows (`LedgerWindow`'s `filter` argument).
 - **It judges nothing.** "Would the next capture skip this?" is answered by calling `CheckedItemsLedger.Consult` with
   the row's **own** fingerprint, which is exactly the question "if I captured this same, unchanged item again now,
   would it skip the wiki?" — so the `Next capture` column is the production rule's own answer rather than a second

@@ -369,18 +369,15 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// <summary>What the comparison concluded, in words, including when it declined to conclude anything. The
     /// images are shown regardless, so this is a starting point for the user's own look rather than a verdict they
     /// have to take on trust.</summary>
+    /// <summary>The comparison's verdict in plain words. **No distance figure** (user, 2026-10-07): a number on a
+    /// scale only the algorithm knows tells the reader nothing, and the tiles below are the real evidence.</summary>
     public string IconVerdict => Result.Icon switch
     {
-        { Matches: true } icon => $"These look like the same artwork (difference {icon.Distance:F3}, " +
-                                  $"threshold {IconFingerprint.SameIconThreshold:F2}). Check by eye if you like.",
-        { Matches: false } icon when Result.IconSuggestion is { CanApplyToPage: true } =>
-            $"These do not look like the same artwork (difference {icon.Distance:F3}, threshold " +
-            $"{IconFingerprint.SameIconThreshold:F2}). The library says the in-game icon is " +
-            $"{Result.IconSuggestion.IconId} — compare the third tile, then decide.",
-        { Matches: false } icon => $"These do not look like the same artwork (difference {icon.Distance:F3}, " +
-                                   $"threshold {IconFingerprint.SameIconThreshold:F2}). The tool never changes an " +
-                                   "icon id on its own — decide which side is wrong.",
-        _ => Result.IconNote ?? "The icons were not compared.",
+        { Matches: true } => "Appears to be correct.",
+        { Matches: false } when Result.IconSuggestion is { CanApplyToPage: true } =>
+            $"May be incorrect. The in-game icon looks like {Result.IconSuggestion.IconId}: compare the third tile.",
+        { Matches: false } => "May be incorrect. Compare the two and decide which is wrong.",
+        _ => Result.IconNote ?? "Not compared.",
     };
 
     /// <summary>
@@ -807,12 +804,11 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         // them the tool will never do anything.
         if (result.Icon is { Matches: false } icon && !_iconActioned)
             yield return
-                $"The icon on the page (lucy_img_ID {icon.IconId}) does not look like the one in the window " +
-                $"(difference {icon.Distance:F2} against a threshold of {IconFingerprint.SameIconThreshold:F2}). " +
+                $"The page's icon (lucy_img_ID {icon.IconId}) may be incorrect. " +
                 (result.IconSuggestion is { CanApplyToPage: true } fix
-                    ? $"The library matched the in-game artwork to {fix.IconId} — compare the two and use the "
-                      + "button in the Icon panel if you agree."
-                    : "The tool never changes an icon id on its own — check by eye which side is wrong.");
+                    ? $"The in-game icon looks like {fix.IconId}: compare them, and use the button in the Icon " +
+                      "panel if you agree."
+                    : "Compare the two by eye.");
 
         if (result.IconNote is { } note) yield return note;
 

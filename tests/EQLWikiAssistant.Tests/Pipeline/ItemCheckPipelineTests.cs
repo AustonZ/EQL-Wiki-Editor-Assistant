@@ -350,6 +350,27 @@ public class ItemCheckPipelineTests
         Assert.Equal(before + 1, wiki.Fetches); // the page's own fetch, and nothing more
     }
 
+    /// <summary>Each stage is announced as it starts, finding the windows before checking any, so the screen can say
+    /// what is really taking the time.</summary>
+    [Fact]
+    public async Task EachStageIsReportedAsItStarts()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines), EarringPage());
+        var heard = new List<CheckProgress>();
+
+        await pipeline.CheckAsync(BlankFrame(), progress: new Recorder<CheckProgress>(heard));
+
+        Assert.Equal(
+            [new CheckProgress(CheckStage.FindingWindows), new CheckProgress(CheckStage.CheckingWindow, 1, 1)],
+            heard);
+    }
+
+    /// <summary>Synchronous, unlike <see cref="Progress{T}"/>, which posts to a context a test does not have.</summary>
+    private sealed class Recorder<T>(List<T> into) : IProgress<T>
+    {
+        public void Report(T value) => into.Add(value);
+    }
+
     /// <summary>A page the tool wants to change does not get one yet: that edit rebuilds the layout anyway, and
     /// offering both at once would bury the data diff under a reflow.</summary>
     [Fact]

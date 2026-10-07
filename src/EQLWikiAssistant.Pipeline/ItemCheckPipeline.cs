@@ -132,12 +132,17 @@ public sealed class ItemCheckPipeline
     /// Runs the whole read-only pipeline over one captured frame. Every window found is reported, including the ones
     /// nothing could be done with — a frame may hold several item windows, and a window the tool refused is exactly
     /// what the user needs to be told about.
+    ///
+    /// <paramref name="progress"/> hears each stage as it starts, so a caller can say what is actually happening —
+    /// finding the windows is the full-frame OCR pass and the slowest step, and a label that lumps it in with taking
+    /// the screenshot makes the screenshot look slow (user, 2026-10-07).
     /// </summary>
     public async Task<IReadOnlyList<ItemCheckResult>> CheckAsync(
-        CapturedImage frame, CancellationToken cancellationToken = default)
+        CapturedImage frame, CancellationToken cancellationToken = default, IProgress<CheckProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(frame);
 
+        progress?.Report(new CheckProgress(CheckStage.FindingWindows));
         IReadOnlyList<LocatedWindow> windows = await _locator
             .LocateAsync(frame, cancellationToken).ConfigureAwait(false);
 
@@ -147,8 +152,11 @@ public sealed class ItemCheckPipeline
             await _verified.RefreshAsync(cancellationToken).ConfigureAwait(false);
 
         var results = new List<ItemCheckResult>();
-        foreach (LocatedWindow window in windows)
-            results.Add(await CheckWindowAsync(frame, window, cancellationToken).ConfigureAwait(false));
+        for (int i = 0; i < windows.Count; i++)
+        {
+            progress?.Report(new CheckProgress(CheckStage.CheckingWindow, i + 1, windows.Count));
+            results.Add(await CheckWindowAsync(frame, windows[i], cancellationToken).ConfigureAwait(false));
+        }
 
         return results;
     }

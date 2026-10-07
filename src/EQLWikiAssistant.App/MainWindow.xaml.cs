@@ -25,7 +25,7 @@ public partial class MainWindow : Window
     private AppServices? _services;
 
     /// <summary>
-    /// True while the Settings or Checked items window is open. **The hotkey is global and bypasses modality**, so
+    /// True while the Settings or History window is open. **The hotkey is global and bypasses modality**, so
     /// without this a press from inside the game would start a capture behind a dialog that is in the middle of
     /// changing the font it reads with, or editing the ledger it writes to — the two things those windows are modal
     /// to prevent. The buttons are covered by modality; the hotkey is covered here.
@@ -38,11 +38,14 @@ public partial class MainWindow : Window
         InitializeComponent();
         DarkTitleBar.Apply(this);
         ResultsList.ItemsSource = _results;
+        _results.CollectionChanged += (_, _) =>
+            ResultsHeader.Visibility = _results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         // Built off the UI thread: RapidOcrEngine loads three ONNX models in its constructor, which is seconds of a
         // frozen window if it happens here. The capture button stays disabled until it is ready.
         CaptureButton.IsEnabled = false;
         LedgerButton.IsEnabled = false;
+        AttentionLink.IsEnabled = false;
         SettingsButton.IsEnabled = false;
         StatusText.Text = "Loading the OCR models…";
         _ = StartUpAsync();
@@ -76,6 +79,11 @@ public partial class MainWindow : Window
         HotKeyLabel.ToolTip = _services.HotKeyProblem is { } problem
             ? $"{problem} Choose another under Settings > Capture hotkey."
             : null;
+        EmptyState.Text = _services.HotKeyProblem is null
+            ? $"Open an item window in game and press {_services.Settings.HotKey}.\n\nEvery item window in the " +
+              "capture is checked against the wiki and listed on the left."
+            : "Open an item window in game and press Capture now.\n\nEvery item window in the capture is checked " +
+              "against the wiki and listed on the left.";
     }
 
     private async Task StartUpAsync()
@@ -88,6 +96,7 @@ public partial class MainWindow : Window
             UpdateHotKeyLabel();
             CaptureButton.IsEnabled = true;
             LedgerButton.IsEnabled = true;
+            AttentionLink.IsEnabled = true;
             SettingsButton.IsEnabled = true;
             UpdateLedgerText();
             StatusText.Text = "Ready. Press the hotkey with an item window open in game.";
@@ -115,6 +124,7 @@ public partial class MainWindow : Window
         // The ledger too: a capture writes rows, so a ledger view opened mid-capture would show some of them stale.
         // The window being modal stops a capture starting while it is open; this is the same guard the other way.
         LedgerButton.IsEnabled = false;
+        AttentionLink.IsEnabled = false;
         // Settings too: the capture in progress reads with the configured font, so switching it mid-capture would
         // read part of a frame in each.
         SettingsButton.IsEnabled = false;
@@ -122,8 +132,7 @@ public partial class MainWindow : Window
 
         try
         {
-            BusyLabel.Text = "Capturing the game window…";
-            StatusText.Text = BusyLabel.Text;
+            ShowBusy("Taking game screenshot…");
             (CapturedImage? frame, string? problem, string? captured) = await _services.CaptureGameWindowAsync();
             if (frame is null)
             {
@@ -131,9 +140,15 @@ public partial class MainWindow : Window
                 return;
             }
 
-            BusyLabel.Text = "Reading the item windows and checking them against the wiki…";
-            StatusText.Text = BusyLabel.Text;
-            IReadOnlyList<ItemCheckResult> results = await _services.Pipeline.CheckAsync(frame);
+            // Each stage named as it starts (user, 2026-10-07): finding the windows is the slow full-frame OCR pass,
+            // and folding it into the screenshot's label made taking the screenshot look slow.
+            var progress = new Progress<CheckProgress>(p => ShowBusy(p.Stage switch
+            {
+                CheckStage.FindingWindows => "Finding item windows in screenshot…",
+                _ when p.Of == 1 => "Checking the item against the wiki…",
+                _ => $"Checking item {p.Window} of {p.Of} against the wiki…",
+            }));
+            IReadOnlyList<ItemCheckResult> results = await _services.Pipeline.CheckAsync(frame, progress: progress);
 
             // Kept when Settings > Saved captures says so, named after what was in it, so a bug can be reported by
             // naming an item rather than by keeping it in the game — see CaptureArchive.
@@ -179,9 +194,17 @@ public partial class MainWindow : Window
             _capturing = false;
             CaptureButton.IsEnabled = true;
             LedgerButton.IsEnabled = true;
+            AttentionLink.IsEnabled = true;
             SettingsButton.IsEnabled = true;
             BusyPanel.Visibility = Visibility.Collapsed;
         }
+    }
+
+    /// <summary>The busy label and the status line say the same thing while work is under way.</summary>
+    private void ShowBusy(string text)
+    {
+        BusyLabel.Text = text;
+        StatusText.Text = text;
     }
 
     /// <summary>
@@ -255,6 +278,10 @@ public partial class MainWindow : Window
         _results.Remove(view);
         if (_results.Count > 0 && ResultsList.SelectedItem is null) ResultsList.SelectedIndex = 0;
     }
+
+    /// <summary>Closes every item. No confirmation, like closing one: a tab is a view of a capture, and closing it
+    /// changes nothing on the wiki or in the ledger.</summary>
+    private void OnCloseAllClick(object sender, RoutedEventArgs e) => _results.Clear();
 
     private void OnResultSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => ShowSelected();
 
@@ -554,15 +581,20 @@ public partial class MainWindow : Window
     /// Modal, deliberately: the ledger is shared state that a capture writes to, so a view of it left open beside one
     /// would show rows that were already wrong. See <see cref="LedgerWindow"/>.
     /// </summary>
-    private void OnLedgerClick(object sender, RoutedEventArgs e)
+    private void OnLedgerClick(object sender, RoutedEventArgs e) => ShowHistory(LedgerFilter.All);
+
+    /// <summary>The status bar's attention count, opening History on exactly those rows (user, 2026-10-07).</summary>
+    private void OnAttentionClick(object sender, RoutedEventArgs e) => ShowHistory(LedgerFilter.NeedsAttention);
+
+    private void ShowHistory(LedgerFilter filter)
     {
         if (_services is null) return;
 
         _dialogOpen = true;
         try
         {
-            new LedgerWindow(_services.Ledger, _services.Mapping.Version, _services.SaveLedgerAsync) { Owner = this }
-                .ShowDialog();
+            new LedgerWindow(_services.Ledger, _services.Mapping.Version, _services.SaveLedgerAsync, filter)
+                { Owner = this }.ShowDialog();
         }
         finally
         {
@@ -616,16 +648,10 @@ public partial class MainWindow : Window
 
     private void UpdateLedgerText()
     {
-        if (_services is null)
-        {
-            LedgerText.Text = "";
-            return;
-        }
-
-        LedgerSummary summary = LedgerSummary.Of(_services.Ledger.Entries);
-        LedgerText.Text = summary.NeedsAttention == 0
-            ? $"{summary.Total} checked"
-            : $"{summary.Total} checked · {summary.NeedsAttention} need attention";
+        LedgerSummary? summary = _services is null ? null : LedgerSummary.Of(_services.Ledger.Entries);
+        LedgerTotalRun.Text = summary is null ? "" : $"{summary.Total} checked";
+        LedgerSeparatorRun.Text = summary is { NeedsAttention: > 0 } ? " · " : "";
+        AttentionRun.Text = summary is { NeedsAttention: > 0 } ? $"{summary.NeedsAttention} need attention" : "";
     }
 
     /// <summary>The capture is tightly packed top-down BGRA32, which is exactly <c>Bgra32</c>'s layout, so this is a

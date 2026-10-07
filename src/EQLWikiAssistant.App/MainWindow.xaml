@@ -4,8 +4,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EQLWikiAssistant.App"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
-        Title="EQLWiki Editor Assistant" Height="900" Width="1300"
+        Title="EQLWiki Editor Assistant" Height="900" Width="1300" MinWidth="650" MinHeight="400"
         Style="{StaticResource DarkWindow}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -18,6 +19,9 @@
             <Setter Property="FontFamily" Value="Consolas" />
             <Setter Property="FontSize" Value="12" />
         </Style>
+
+        <!-- One size for every icon tile: a 40x40 wiki file at 4x. -->
+        <sys:Double x:Key="IconTileSize">160</sys:Double>
 
         <Style x:Key="SectionHeading" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -33,16 +37,17 @@
             <StackPanel Orientation="Horizontal">
                 <Button x:Name="CaptureButton" Click="OnCaptureClick" Padding="12,4" FontWeight="SemiBold"
                         Content="Capture now" ToolTip="Capture the game window and check every item window in it" />
+                <!-- Beside the button it is the shortcut for (user, 2026-10-07). -->
+                <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMutedBrush}" />
                 <CheckBox x:Name="ReCheckBox" Content="Re-check anyway" VerticalAlignment="Center" Margin="16,0,0,0"
                           Checked="OnReCheckChanged" Unchecked="OnReCheckChanged"
                           ToolTip="Ask the wiki even for items the ledger has already settled" />
                 <Button x:Name="LedgerButton" Click="OnLedgerClick" Padding="12,4" Margin="16,0,0,0"
-                        Content="Checked items…"
-                        ToolTip="Everything checked so far, and what is still waiting for a human" />
+                        Content="History…"
+                        ToolTip="Everything checked so far, and what still needs attention" />
                 <Button x:Name="SettingsButton" Click="OnSettingsClick" Padding="12,4" Margin="8,0,0,0"
                         Content="Settings…"
                         ToolTip="The game's UI font, the wiki login, and the wiki mapping" />
-                <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="16,0,0,0" Foreground="{StaticResource TextMutedBrush}" />
 
                 <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a
                      status line were too quiet to read as "working" (user, 2026-09-28). -->
@@ -59,7 +64,12 @@
                 <TextBlock x:Name="StatusText" Text="Ready." />
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock x:Name="LedgerText" Foreground="{StaticResource TextMutedBrush}" />
+                <!-- The attention count opens History filtered to exactly those rows (user, 2026-10-07). -->
+                <TextBlock Foreground="{StaticResource TextMutedBrush}">
+                    <Run x:Name="LedgerTotalRun" /><Run x:Name="LedgerSeparatorRun" /><Hyperlink
+                        x:Name="AttentionLink" Click="OnAttentionClick"
+                        ToolTip="Show them in History"><Run x:Name="AttentionRun" /></Hyperlink>
+                </TextBlock>
             </StatusBarItem>
         </StatusBar>
 
@@ -72,16 +82,25 @@
 
             <!-- Every window found in the frame, including the ones nothing could be done with: a window the tool
                  refused is exactly what the user needs to be told about. -->
-            <ListBox x:Name="ResultsList" Grid.Column="0" SelectionChanged="OnResultSelected"
+            <DockPanel Grid.Column="0">
+            <!-- Closing everything at once, for the end of a session. Like closing one, it changes nothing on the
+                 wiki or in the ledger: a tab is only a view of a capture. -->
+            <Border DockPanel.Dock="Top" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,0,1,1"
+                    Padding="8,4" x:Name="ResultsHeader" Visibility="Collapsed">
+                <TextBlock HorizontalAlignment="Right">
+                    <Hyperlink Click="OnCloseAllClick" ToolTip="Close every item">Close all</Hyperlink>
+                </TextBlock>
+            </Border>
+            <ListBox x:Name="ResultsList" SelectionChanged="OnResultSelected"
                      HorizontalContentAlignment="Stretch" BorderThickness="0,0,1,0" BorderBrush="{StaticResource BorderBrushKey}">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Grid Margin="2,5" ToolTip="{Binding CaptureTip}">
+                        <Grid Margin="2,0" ToolTip="{Binding CaptureTip}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
+                            <StackPanel Grid.Column="0" Margin="0,5">
                                 <TextBlock Text="{Binding ItemName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                 <StackPanel Orientation="Horizontal">
                                     <!-- A settled item reads "Done" in green here rather than keeping its orange
@@ -95,13 +114,16 @@
                             </StackPanel>
                             <!-- The list accumulates across captures, so finishing with an item has to be an
                                  explicit act rather than something the next capture does for you. -->
-                            <Button Grid.Column="1" Content="✕" Click="OnCloseResultClick" Padding="6,0"
+                            <!-- The full height of the row, so the cross sits centred and is easy to hit (user,
+                                 2026-10-07). The row's vertical margin lives on the text for the same reason. -->
+                            <Button Grid.Column="1" Content="✕" Click="OnCloseResultClick" Padding="8,0"
                                     Style="{StaticResource QuietButton}"
-                                    VerticalAlignment="Top" ToolTip="Close this item" />
+                                    VerticalAlignment="Stretch" ToolTip="Close this item" />
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+            </DockPanel>
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" />
 
@@ -113,9 +135,12 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
                        Text="Open an item window in game and press Ctrl+Shift+E.&#10;&#10;Every item window in the capture is checked against the wiki and listed on the left." />
 
+            <!-- No padding on the scroller itself: it sat inside the scrolling area, so clipped content stopped short
+                 of the border above and below (user, 2026-10-07). The panel's own margin scrolls with it instead. -->
             <ScrollViewer Grid.Column="2" x:Name="DetailScroller" VerticalScrollBarVisibility="Auto"
-                          Padding="16,10,16,16" Visibility="Collapsed">
-                <StackPanel x:Name="DetailPanel" DataContext="{Binding SelectedItem, ElementName=ResultsList}">
+                          Visibility="Collapsed">
+                <StackPanel x:Name="DetailPanel" DataContext="{Binding SelectedItem, ElementName=ResultsList}"
+                            Margin="16,10,16,16">
                     <TextBlock Text="{Binding ItemName}" FontSize="21" FontWeight="Bold" TextWrapping="Wrap" />
 
                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
@@ -165,8 +190,10 @@
                                        Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
                                        MaxWidth="380" HorizontalAlignment="Left"
                                        Visibility="{Binding HasIconColumnHint, Converter={StaticResource BoolToVis}}" />
-                            <StackPanel Orientation="Horizontal">
-                                <StackPanel Margin="0,0,20,0">
+                            <!-- Wraps rather than clips: three tiles need ~560px, more than the content column has at the minimum
+                                 window width (rendered, 2026-10-07). -->
+                            <WrapPanel Orientation="Horizontal">
+                                <StackPanel Margin="0,0,20,8">
                                     <TextBlock Text="In game" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                     <!-- Collapsed when there is no image, rather than left as an empty Border: its
                                          near-black background renders as a small dark rectangle that looks exactly
@@ -174,17 +201,23 @@
                                          (user, 2026-09-29). An absent icon has to look absent. -->
                                     <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
                                             Visibility="{Binding HasCapturedIcon, Converter={StaticResource BoolToVis}}">
-                                        <Image x:Name="CapturedIconImage" Stretch="None" Margin="4"
-                                               RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                        <!-- Fitted into the same box as the wiki file (user, 2026-10-07). The
+                                             strip is a little larger than a 40x40 file, so drawn at the same 4x it
+                                             came out bigger and the pair looked unbalanced. -->
+                                        <Image x:Name="CapturedIconImage" Stretch="Uniform" Margin="4"
+                                               Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
                                     </Border>
                                     <TextBlock Text="not captured" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
                                                Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>
-                                <StackPanel Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Margin="0,0,20,8"
+                                            Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}">
                                     <TextBlock Text="On the wiki" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                     <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
                                             Visibility="{Binding HasWikiIcon, Converter={StaticResource BoolToVis}}">
-                                        <Image x:Name="WikiIconImage" Stretch="None" Margin="4"
+                                        <Image x:Name="WikiIconImage" Stretch="Uniform" Margin="4"
+                                               Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
                                                RenderOptions.BitmapScalingMode="NearestNeighbor" />
                                     </Border>
                                     <TextBlock Text="none on the page" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
@@ -195,22 +228,23 @@
                                      safety argument for writing lucy_img_ID automatically**: the match is perceptual
                                      and no threshold separates a lucky win from a real one, so the user confirming by
                                      eye is what makes a 96.7% identifier safe to act on. -->
-                                <!-- **The left margin is not decoration**: this tile's Border paints a background,
+                                <!-- **The gap before this tile is not decoration**: its Border paints a background,
                                      and with no gap it overpaints the last letter of the wiki column's "none on the
-                                     page" label, which is wider than the tile above it. Invisible until a third tile
-                                     existed, because nothing used to sit to the right of that label (rendered,
-                                     2026-10-02). The captured column spaces itself the same way. -->
-                                <StackPanel Margin="20,0,0,0"
+                                     page" label, which is wider than the tile above it (rendered, 2026-10-02). Every
+                                     tile now carries the gap on its right rather than this one on its left, so a
+                                     tile that wraps to a new line starts flush (rendered, 2026-10-07). -->
+                                <StackPanel Margin="0,0,0,8"
                                             Visibility="{Binding ShowMatchedIcon, Converter={StaticResource BoolToVis}}">
                                     <TextBlock Text="{Binding MatchedIconCaption}" FontSize="11"
                                                Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                     <Border BorderBrush="{Binding MatchedIconBorderBrush}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
                                             Visibility="{Binding HasMatchedIcon, Converter={StaticResource BoolToVis}}">
-                                        <Image x:Name="MatchedIconImage" Stretch="None" Margin="4"
+                                        <Image x:Name="MatchedIconImage" Stretch="Uniform" Margin="4"
+                                               Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
                                                RenderOptions.BitmapScalingMode="NearestNeighbor" />
                                     </Border>
                                 </StackPanel>
-                            </StackPanel>
+                            </WrapPanel>
 
                             <!-- One button, two jobs. On a creation it publishes the file the generated id already
                                  names; on an existing page whose icon is wrong it does whatever is needed to point

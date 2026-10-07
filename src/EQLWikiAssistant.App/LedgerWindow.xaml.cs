@@ -41,7 +41,8 @@ public partial class LedgerWindow : Window
         (LedgerFilter.Matched, "Matched"),
     ];
 
-    public LedgerWindow(CheckedItemsLedger ledger, int mappingVersion, Func<Task> save)
+    public LedgerWindow(
+        CheckedItemsLedger ledger, int mappingVersion, Func<Task> save, LedgerFilter filter = LedgerFilter.All)
     {
         ArgumentNullException.ThrowIfNull(ledger);
         ArgumentNullException.ThrowIfNull(save);
@@ -54,7 +55,7 @@ public partial class LedgerWindow : Window
 
         RowsGrid.ItemsSource = _rows;
         FilterBox.ItemsSource = Filters.Select(f => f.Label);
-        FilterBox.SelectedIndex = 0;
+        FilterBox.SelectedIndex = Math.Max(0, Array.FindIndex(Filters, f => f.Filter == filter));
         LedgerPathText.Text = AppPaths.LedgerFile;
 
         Refresh();
