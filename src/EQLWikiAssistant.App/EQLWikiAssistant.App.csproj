@@ -23,6 +23,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationDisplayName>EQLWiki Editor Assistant</ApplicationDisplayName>
+    <!-- The wiki's logo with a pencil. Windows without an Icon of their own take this one, taskbar included. -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
