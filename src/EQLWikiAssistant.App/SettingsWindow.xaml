@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:EQLWikiAssistant.App"
         mc:Ignorable="d"
         Title="Settings" Height="720" Width="980" MinWidth="720" MinHeight="480"
         WindowStartupLocation="CenterOwner"
@@ -62,6 +63,8 @@
         </Style>
     </Window.Resources>
 
+    <!-- A grid only so the in-app dialog can sit over everything. -->
+    <Grid>
     <DockPanel>
         <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0" Padding="10,8">
             <DockPanel>
@@ -311,4 +314,6 @@
             </ScrollViewer>
         </Grid>
     </DockPanel>
+        <local:OverlayDialog x:Name="Dialog" />
+    </Grid>
 </Window>

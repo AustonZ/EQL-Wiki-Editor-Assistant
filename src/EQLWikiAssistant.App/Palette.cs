@@ -21,6 +21,9 @@ internal static class Palette
     public static Brush Text => Named("TextBrush");
     public static Brush Muted => Named("TextMutedBrush");
     public static Brush Dim => Named("TextDimBrush");
+    public static Brush Accent => Named("AccentBrush");
+    public static Brush Raised => Named("RaisedBrush");
+    public static Brush Surface => Named("SurfaceBrush");
 
     /// <summary>Matched or edited: the item is done and will not come back.</summary>
     public static Brush Done => Named("DoneBrush");

@@ -22,6 +22,16 @@ public interface IMediaWikiClient
     Task<IReadOnlySet<string>> ExistingTitlesAsync(
         IReadOnlyList<string> titles, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Renders wikitext as the wiki would, without saving it — the review's Preview page.
+    ///
+    /// **A read, but one that sends the text to the wiki**, so it is only ever called when the user asks to see a
+    /// preview (user, 2026-10-07): nothing reaches the wiki unless the user did something they would expect to send it,
+    /// and an automatic render on every capture would also be load on the wiki for nothing. Anonymous: it needs no
+    /// session and changes nothing.
+    /// </summary>
+    Task<RenderedPage> RenderAsync(string title, string wikitext, CancellationToken cancellationToken = default);
+
     /// <summary>Logs in with a bot password. Required before <see cref="EditAsync"/>; reads work anonymously.</summary>
     Task LoginAsync(BotCredentials credentials, CancellationToken cancellationToken = default);
 

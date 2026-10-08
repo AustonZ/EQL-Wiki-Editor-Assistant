@@ -181,6 +181,46 @@
         </Setter>
     </Style>
 
+    <!-- The buttons that write to the wiki, filled with the accent so the one action that cannot be taken back is the
+         one that stands out (user, 2026-10-07: anything that changes the wiki stays a clear, solid button). White on
+         #0E4B75 measures 9.6. -->
+    <Style x:Key="WikiWriteButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource SelectionBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="14,5" />
+        <!-- Its own template, because the shared one's hover trigger paints the chrome grey by name, which no setter
+             here can outrank. -->
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="3"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#1663A0" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#0B3B5C" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Background" Value="#28282B" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#333337" />
+                            <Setter Property="Foreground" Value="#6A6A6E" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- The list's per-item close button is deliberately borderless; the shared style would give it a box. -->
     <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Background" Value="Transparent" />

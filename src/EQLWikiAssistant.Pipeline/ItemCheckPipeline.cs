@@ -540,13 +540,23 @@ public sealed class ItemCheckPipeline
 
         // A page that already agrees is settled here and now — there is nothing for the user to approve. Anything
         // wanting a human is Flagged instead, which never counts as done however unchanged the next capture is.
+        //
+        // **A page this tool edited or created keeps saying so** when a later check finds it agreeing, which is the
+        // expected sequel to a save: the review's "Edit again" re-checks the page it has just written. Recording that
+        // as Matched would erase a Created row — the one most worth finding again, since its drops and vendors are
+        // what nobody has filled in yet.
         if (result.Status == ItemCheckStatus.AlreadyCorrect)
+        {
+            CheckOutcome? earlier = _ledger.Find(item.Name)?.Outcome;
             RecordLedgerEntry(
                 item.Name,
                 wikiPage.Title,
-                result.NeedsAttention ? CheckOutcome.Flagged : CheckOutcome.Matched,
+                result.NeedsAttention ? CheckOutcome.Flagged
+                    : earlier is CheckOutcome.Edited or CheckOutcome.Created ? earlier.Value
+                    : CheckOutcome.Matched,
                 wikiPage.RevisionId,
                 fingerprint);
+        }
 
         return result;
     }
@@ -603,6 +613,23 @@ public sealed class ItemCheckPipeline
 
         return new IconSuggestion(
             found.IconId, found.Distance, found.Margin, found.IsConfident, found.Candidates, image, onWiki);
+    }
+
+    /// <summary>
+    /// Renders the text on screen as the wiki would, for the review's Preview page — the page being edited, or the one
+    /// about to be created, under its own title so the item box's links resolve as they will once saved.
+    ///
+    /// **Only on the user's request.** It sends the text to the wiki, so it is never part of a check: nothing goes to
+    /// the wiki unless the user did something they would expect to send it (user, 2026-10-07). Writes nothing, and
+    /// touches neither the ledger nor the page.
+    /// </summary>
+    public Task<RenderedPage> PreviewAsync(
+        ItemCheckResult result, string wikitext, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        string title = result.Page?.Title ?? result.Creation?.Title
+            ?? throw new InvalidOperationException("Only a page being edited or created can be previewed.");
+        return _wiki.RenderAsync(title, wikitext, cancellationToken);
     }
 
     /// <summary>

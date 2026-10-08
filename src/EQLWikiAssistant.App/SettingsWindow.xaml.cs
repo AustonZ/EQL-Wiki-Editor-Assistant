@@ -40,7 +40,7 @@ public partial class SettingsWindow : Window
     /// <summary>True while the next key combination pressed in this window becomes the hotkey.</summary>
     private bool _recording;
 
-    public SettingsWindow(AppServices services)
+    public SettingsWindow(AppServices services, SettingsPage page = SettingsPage.Font)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -67,7 +67,7 @@ public partial class SettingsWindow : Window
         RefreshStoredLogin();
         ShowMapping(services.Mapping);
 
-        PageList.SelectedIndex = 0;
+        PageList.SelectedIndex = (int)page;
         _loading = false;
     }
 
@@ -494,16 +494,14 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void OnRemoveStoredClick(object sender, RoutedEventArgs e)
+    private async void OnRemoveStoredClick(object sender, RoutedEventArgs e)
     {
-        MessageBoxResult answer = MessageBox.Show(
-            this,
-            "Remove the stored bot password from Windows Credential Manager? Checking items still works; saving an " +
-            "edit will need one entered again.",
-            "Remove stored login",
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Question);
-        if (answer != MessageBoxResult.OK) return;
+        if (!await Dialog.AskAsync(
+                "Remove the stored login?",
+                "The bot password is removed from Windows Credential Manager. Checking items still works; saving an " +
+                "edit will need one entered again.",
+                "Remove"))
+            return;
 
         _services.ForgetCredential();
         CheckPanel.Visibility = Visibility.Collapsed;
@@ -664,6 +662,18 @@ public partial class SettingsWindow : Window
         yield return new MappingRow("= column", $"{mapping.ParameterAlignmentWidth} characters",
             "The width of the longest parameter name the blueprint declares.", Palette.Text);
     }
+}
+
+/// <summary>The pages of <see cref="SettingsWindow"/>, in the order its page list shows them — the value is the
+/// list's index, so the two must stay in step.</summary>
+public enum SettingsPage
+{
+    Font,
+    HotKey,
+    Captures,
+    IconCache,
+    Account,
+    Mapping,
 }
 
 /// <summary>One row of a mapping table: what the game says, what the wiki writes, and why when it is not obvious.</summary>

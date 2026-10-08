@@ -55,6 +55,77 @@ public class MediaWikiClientTests
         Assert.Equal("Water Flask", (await client.FetchPageAsync("Water flask"))!.Title);
     }
 
+    /// <summary>A preview renders the text it is given rather than any saved revision, needs no session, and never
+    /// asks for a token — it is a read, even though it carries the text to the wiki. The skin's stylesheets come from
+    /// one page view, made once per session rather than once per preview.</summary>
+    [Fact]
+    public async Task RenderAsync_SendsTheTextForParsingAndReadsTheRendering()
+    {
+        static HttpResponseMessage Parsed() => Json("""
+            {"parse":{"title":"Water Flask","text":"<p>Hi</p>","headhtml":"<!DOCTYPE html><html><head></head><body>",
+              "categorieshtml":"<div id=\"catlinks\"></div>"}}
+            """);
+        var handler = new StubHandler(
+            Parsed(),
+            Html("""<head><link rel="stylesheet" href="/load.php?modules=skins.EQLImmersive.core&amp;only=styles"></head>"""),
+            Parsed());
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint);
+
+        RenderedPage page = await client.RenderAsync("Water Flask", "{{Itempage}}");
+
+        string request = handler.Requests[0];
+        Assert.Contains("action=parse", request);
+        Assert.Contains("text=%7B%7BItempage%7D%7D", request);
+        Assert.Contains("contentmodel=wikitext", request);
+        Assert.DoesNotContain("token", request);
+        Assert.Equal("<p>Hi</p>", page.BodyHtml);
+        Assert.Contains("catlinks", page.CategoriesHtml);
+        Assert.Equal(["/load.php?modules=skins.EQLImmersive.core&only=styles"], page.Stylesheets);
+
+        RenderedPage again = await client.RenderAsync("Water Flask", "{{Itempage}}");
+        Assert.Equal(3, handler.Requests.Count);
+        Assert.Equal(page.Stylesheets, again.Stylesheets);
+    }
+
+    /// <summary>Only the wiki's own style bundles are carried into a preview — not an icon link, not a feed, and not a
+    /// stylesheet from anywhere else.</summary>
+    [Fact]
+    public void OnlyTheWikisOwnStylesheetsAreTaken()
+    {
+        IReadOnlyList<string> found = RenderedPage.SkinStylesheets("""
+            <link rel="stylesheet" href="/load.php?modules=skins.a&amp;only=styles">
+            <link rel="stylesheet" href="https://elsewhere.example/evil.css">
+            <link rel="icon" href="/favicon.ico">
+            <link rel="stylesheet" href="/load.php?modules=site.styles&amp;only=styles">
+            <link rel="stylesheet" href="/load.php?modules=skins.a&amp;only=styles">
+            """);
+
+        Assert.Equal(["/load.php?modules=skins.a&only=styles", "/load.php?modules=site.styles&only=styles"], found);
+    }
+
+    /// <summary>Everything the wiki returns is site-relative, and a document handed to a browser as a string has no
+    /// site — so the base goes first in the head, ahead of the stylesheets it has to resolve. A stylesheet the head
+    /// already links is not linked twice.</summary>
+    [Fact]
+    public void ARenderedPageResolvesTheWikisOwnLinks()
+    {
+        var page = new RenderedPage(
+            "Kavruul`s <Pouch>",
+            "<!DOCTYPE html><html><head><link rel=\"stylesheet\" href=\"/load.php?a=1&amp;b=2\"></head><body class=\"x\">",
+            "<p>body</p>",
+            "<div id=\"catlinks\"></div>",
+            ["/load.php?a=1&b=2", "/load.php?skin=1"]);
+
+        string html = page.ToDocument(Endpoint);
+
+        Assert.Contains("<head><base href=\"https://eqlwiki.com/\"><link", html);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "a=1&amp;b=2"));
+        Assert.Contains("<link rel=\"stylesheet\" href=\"/load.php?skin=1\"></head>", html);
+        Assert.Contains("Kavruul`s &lt;Pouch&gt;", html);
+        Assert.Contains("<p>body</p>", html);
+        Assert.EndsWith("</body></html>", html);
+    }
+
     /// <summary>MediaWiki reports errors with HTTP 200 and an "error" object, so the status code proves nothing.
     /// Unwrapping it centrally is what gives every call site the wiki's own error code.</summary>
     [Fact]
@@ -382,6 +453,11 @@ public class MediaWikiClientTests
         Assert.Equal("assertuserfailed", ex.Code);
         Assert.False(client.IsLoggedIn);
     }
+
+    private static HttpResponseMessage Html(string body) => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent(body, Encoding.UTF8, "text/html"),
+    };
 
     private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
     {

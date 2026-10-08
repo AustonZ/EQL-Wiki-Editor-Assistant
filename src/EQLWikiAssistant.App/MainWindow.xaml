@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EQLWikiAssistant.App"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
         Title="EQL Wiki Editor Assistant" Height="900" Width="1300" MinWidth="700" MinHeight="400"
         Style="{StaticResource DarkWindow}">
@@ -37,6 +38,8 @@
         </Style>
     </Window.Resources>
 
+    <!-- A grid only so the in-app dialog can sit over everything. -->
+    <Grid>
     <DockPanel>
         <!-- A plain header rather than a ToolBar: WPF's ToolBar restyles a CheckBox into a flat toggle with no box,
              which makes a setting look like a button, and adds an overflow chevron that never has anything in it. -->
@@ -57,8 +60,11 @@
 
                 <Button x:Name="CaptureButton" Click="OnCaptureClick" Padding="12,4" FontWeight="SemiBold"
                         Content="Capture now" ToolTip="Capture the game window and check every item window in it" />
-                <!-- Beside the button it is the shortcut for (user, 2026-10-07). -->
-                <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMutedBrush}" />
+                <!-- Beside the button it is the shortcut for (user, 2026-10-07), and a link straight to the page that
+                     changes it. -->
+                <TextBlock VerticalAlignment="Center" Margin="10,0,0,0">
+                    <Hyperlink x:Name="HotKeyLink" Click="OnHotKeyLinkClick"><Run x:Name="HotKeyRun" /></Hyperlink>
+                </TextBlock>
 
                 <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a
                      status line were too quiet to read as "working" (user, 2026-09-28). -->
@@ -234,9 +240,54 @@
                     </StackPanel>
                 </ScrollViewer>
 
+            <!-- **The edit pane is a step-by-step review** (user, 2026-10-07): a timeline over five pages, one shown at a
+                 time and sliding between them — Differences, Preview, Submit, Formatting, Done. The screenshot pane
+                 beside it never moves. An item with nothing to step through (occluded, ineligible, already checked, ...)
+                 shows the first page alone, with no timeline. -->
+            <DockPanel Grid.Column="1" x:Name="EditPane">
+                <Border DockPanel.Dock="Top" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,0,0,1"
+                        Padding="12,8" Visibility="{Binding HasReview, Converter={StaticResource BoolToVis}}">
+                    <ItemsControl ItemsSource="{Binding Steps}" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Hit-testable only where going back is allowed, rather than disabled: a disabled
+                                         button greys its text, which would hide the step's own colour. -->
+                                    <Button Style="{StaticResource QuietButton}" Click="OnStepClick" Padding="4,2"
+                                            IsHitTestVisible="{Binding CanJump}" Focusable="{Binding CanJump}"
+                                            Cursor="Hand" ToolTip="{Binding Tip}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Grid Width="20" Height="20" VerticalAlignment="Center">
+                                                <Ellipse Fill="{Binding Marker}" />
+                                                <TextBlock Text="{Binding MarkerText}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{Binding MarkerForeground}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}"
+                                                       FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Rectangle Width="22" Height="1" Margin="4,0" VerticalAlignment="Center"
+                                               Fill="{StaticResource BorderStrongBrush}"
+                                               Visibility="{Binding HasConnector, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
+                <!-- The pages overlap here, one visible at a time; changing page slides one out and the next in. -->
+                <Grid x:Name="PageHost" ClipToBounds="True">
+
+            <!-- 1. Differences. -->
             <!-- No padding on the scroller itself: it sat inside the scrolling area, so clipped content stopped short
                  of the border above and below (user, 2026-10-07). The panel's own margin scrolls with it instead. -->
-            <ScrollViewer Grid.Column="1" x:Name="DetailScroller" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer x:Name="DetailScroller" VerticalScrollBarVisibility="Auto">
                 <StackPanel x:Name="DetailPanel" Margin="16,10,16,16">
                     <!-- The name, status and screenshot land here when the area is too narrow for their own pane. -->
                     <StackPanel x:Name="InlineShotHost" Margin="0,0,0,4" Visibility="Collapsed" />
@@ -501,10 +552,95 @@
                     </DataGrid>
 
 
-                    <TextBlock Text="The edit" Style="{StaticResource SectionHeading}"
-                               Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}" />
-                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
-                            Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
+                    <!-- **The editor is open at the bottom of the first page** (user, 2026-10-07): the findings say what the
+                         tool would change, and this is where the user changes it further. What is in it is what Preview
+                         renders and Submit saves. -->
+                    <Expander Header="Raw wikitext" Margin="0,14,0,0" IsExpanded="True"
+                              Visibility="{Binding HasEditor, Converter={StaticResource BoolToVis}}">
+                        <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
+                                 FontFamily="Consolas" FontSize="12" Height="320" VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto" Margin="0,6,0,0" />
+                    </Expander>
+
+                    <!-- **A creation shows its wikitext outright, not behind an Expander** (user, 2026-10-01).
+                         There is no original to diff against, so the generated page is not a detail to drill into —
+                         it is the whole thing being reviewed, and it must not be collapsible. -->
+                    <StackPanel Margin="0,14,0,0"
+                                Visibility="{Binding IsCreation, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="The page to create" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
+                                   Text="Generated from the blueprint. Drops, vendors and quests are left blank for you to fill in." />
+                        <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
+                                 FontFamily="Consolas" FontSize="12" Height="320" VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto" />
+                    </StackPanel>
+
+                    <!-- Next, or settle it here: "the wiki is right" is the only way a flagged item becomes done, and
+                         without it an item whose page the user has decided is correct would come back on every capture
+                         forever. Skipping writes nothing to the wiki, so it is a link. -->
+                    <WrapPanel Margin="0,14,0,0" Orientation="Horizontal">
+                        <Button Content="Next" Click="OnNextClick" Padding="20,5" Margin="0,0,10,6" FontWeight="SemiBold"
+                                IsEnabled="{Binding CanGoNext}"
+                                Visibility="{Binding HasReview, Converter={StaticResource BoolToVis}}" />
+                        <Button Content="The wiki is right — mark as checked" Click="OnMarkCheckedClick" Padding="14,5"
+                                Margin="0,0,10,6"
+                                ToolTip="Records the item as checked without changing the page. It comes back only if the item itself changes."
+                                Visibility="{Binding CanMarkChecked, Converter={StaticResource BoolToVis}}" />
+                        <TextBlock VerticalAlignment="Center" Margin="0,0,0,6"
+                                   Visibility="{Binding CanSkip, Converter={StaticResource BoolToVis}}">
+                            <Hyperlink Click="OnSkipClick"
+                                       ToolTip="Leave it for now. It comes back on the next capture.">Skip for now</Hyperlink>
+                        </TextBlock>
+                    </WrapPanel>
+
+                    <TextBlock Text="{Binding Outcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
+                               Margin="0,6,0,0" TextWrapping="Wrap"
+                               Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 2. Preview: the wiki's own rendering, asked for only now (see ItemCheckPipeline.PreviewAsync). The browser
+                 is a native window WPF cannot draw over, so it is hidden whenever something has to be (a dialog, a
+                 slide) and shown once its page has loaded. -->
+            <DockPanel x:Name="PreviewPage" Visibility="Collapsed">
+                <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0"
+                        Padding="16,10">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Back" Click="OnBackClick" Padding="14,5" Margin="0,0,8,0" />
+                        <Button Content="Next" Click="OnPreviewNextClick" Padding="20,5" FontWeight="SemiBold"
+                                IsEnabled="{Binding HasChangesToSubmit}" />
+                    </StackPanel>
+                </Border>
+                <TextBlock DockPanel.Dock="Top" Margin="16,10,16,8" TextWrapping="Wrap"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           Text="The wiki's own rendering of the text you are about to save. Nothing has been saved." />
+                <Grid>
+                    <TextBlock x:Name="PreviewStatus" Margin="16,8" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextMutedBrush}" />
+                    <wv2:WebView2 x:Name="PreviewBrowser" Visibility="Hidden" />
+                </Grid>
+            </DockPanel>
+
+            <!-- 3. Submit: the last look before anything is written. **This page is the confirmation** (user,
+                 2026-10-07): it shows exactly what Save writes, so there is no "are you sure?" after it. -->
+            <ScrollViewer x:Name="SubmitPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="16,10,16,16">
+                    <StackPanel x:Name="SubmitShotHost" Margin="0,0,0,4" Visibility="Collapsed" />
+
+                    <TextBlock Text="{Binding SubmitHeading}" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" />
+                    <!-- Large, because for a creation the title is the part only the user can judge. -->
+                    <TextBox Text="{Binding SubmitTitle, Mode=OneWay}" IsReadOnly="True" FontSize="19" FontWeight="Bold"
+                             TextWrapping="Wrap" Background="Transparent" BorderThickness="0" Padding="0"
+                             Margin="-2,2,0,0" />
+
+                    <Border Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}"
+                            BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,10,0,0"
+                            Visibility="{Binding HasSubmitNotice, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding SubmitNotice}" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}" />
+                    </Border>
+
+                    <TextBlock Text="What will be written" Style="{StaticResource SectionHeading}" />
+                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3">
                         <ItemsControl ItemsSource="{Binding Diff}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -524,79 +660,52 @@
                         </ItemsControl>
                     </Border>
 
-                    <Expander Header="Edit raw wikitext" Margin="0,10,0,0"
-                              Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
-                        <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
-                                 FontFamily="Consolas" FontSize="12" Height="260" VerticalScrollBarVisibility="Auto"
-                                 HorizontalScrollBarVisibility="Auto" Margin="0,6,0,0" />
-                    </Expander>
+                    <TextBlock Text="Edit summary" Style="{StaticResource SectionHeading}" />
+                    <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Padding="4,3"
+                             FontFamily="Consolas" FontSize="12" />
 
-                    <StackPanel Margin="0,14,0,0"
-                                Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="Edit summary" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
-                        <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Padding="4,3"
-                                 FontFamily="Consolas" FontSize="12" />
-
-                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                            <Button Content="Save to the wiki" Click="OnCommitClick" Padding="14,5"
-                                    FontWeight="SemiBold" IsEnabled="{Binding CanAct}" />
-                            <Button Content="Skip for now" Click="OnSkipClick" Padding="14,5" Margin="8,0,0,0"
-                                    IsEnabled="{Binding CanSkip}" />
-                        </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                        <Button Content="Back" Click="OnBackClick" Padding="14,5" Margin="0,0,8,0"
+                                IsEnabled="{Binding IsNotBusy}" />
+                        <!-- A TextBlock rather than string content, so no underscore in it is eaten as an access key. -->
+                        <Button Style="{StaticResource WikiWriteButton}" Click="OnSaveClick" IsEnabled="{Binding CanSave}">
+                            <TextBlock Text="{Binding SaveButtonText}" />
+                        </Button>
                     </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
 
-                    <!-- **A creation shows its wikitext outright, not behind an Expander** (user, 2026-10-01).
-                         There is no original to diff against, so the generated page is not a detail to drill into —
-                         it is the whole thing being reviewed, and it must not be collapsible. -->
-                    <StackPanel Margin="0,14,0,0"
-                                Visibility="{Binding IsCreation, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="The page to create" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
-                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
-                                   Text="Generated from the blueprint. Drops, vendors and quests are left blank for you to fill in." />
-                        <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
-                                 FontFamily="Consolas" FontSize="12" Height="320" VerticalScrollBarVisibility="Auto"
-                                 HorizontalScrollBarVisibility="Auto" />
-
-                        <TextBlock Text="Edit summary" Style="{StaticResource SectionHeading}" Margin="0,12,0,4" />
-                        <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Padding="4,3"
-                                 FontFamily="Consolas" FontSize="12" />
-
-                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                            <Button Content="Create the page" Click="OnCreateClick" Padding="14,5"
-                                    FontWeight="SemiBold" IsEnabled="{Binding CanCreatePage}" />
-                            <Button Content="Skip for now" Click="OnSkipClick" Padding="14,5" Margin="8,0,0,0"
-                                    IsEnabled="{Binding CanSkip}" />
-                        </StackPanel>
-                    </StackPanel>
-
-                    <!-- The only way a flagged item becomes done. Without it, an item whose page the user has
-                         decided is correct stays flagged and re-fetches on every capture forever. -->
-                    <!-- A DockPanel rather than a horizontal StackPanel, which gives its children unlimited width
-                         so the note never wrapped and ran off the edge once the edit pane got narrower. -->
-                    <DockPanel Margin="0,12,0,0"
-                               Visibility="{Binding CanMarkChecked, Converter={StaticResource BoolToVis}}">
-                        <Button DockPanel.Dock="Left" Content="The wiki is right — mark as checked" Click="OnMarkCheckedClick"
-                                Padding="14,5" VerticalAlignment="Center" />
-                        <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                                   MaxWidth="520" HorizontalAlignment="Left"
-                                   Text="Records the item as checked without changing the page. It comes back only if the item changes." />
-                    </DockPanel>
+            <!-- 4. Formatting: always its own edit, never folded into the data one, because a reformatting commit with
+                 no data changes is what makes page history reviewable. -->
+            <ScrollViewer x:Name="FormattingPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="16,10,16,16">
+                    <StackPanel x:Name="FormattingShotHost" Margin="0,0,0,4" Visibility="Collapsed" />
 
                     <TextBlock Text="{Binding Outcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
-                               Margin="0,12,0,0" TextWrapping="Wrap"
+                               Margin="0,0,0,10" TextWrapping="Wrap"
                                Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
 
-                    <!-- The formatting follow-up: its own edit, never folded into the data one, because a single
-                         reformatting commit with no data changes is what makes page history reviewable. -->
-                    <StackPanel Visibility="{Binding HasFormatting, Converter={StaticResource BoolToVis}}"
-                                Margin="0,18,0,0">
-                        <Border Background="{StaticResource NoticeInfoBackBrush}" BorderBrush="{StaticResource NoticeInfoBorderBrush}" BorderThickness="1" CornerRadius="3"
-                                Padding="10,7">
+                    <TextBlock x:Name="FormattingGood" Text="Formatting looks good." FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource DoneBrush}" Visibility="Collapsed" />
+
+                    <ItemsControl ItemsSource="{Binding FormattingNotes}" Margin="0,8,0,0"
+                                  Visibility="{Binding HasFormattingNotes, Converter={StaticResource BoolToVis}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}"
+                                        BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,0,0,4">
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <StackPanel Visibility="{Binding HasFormatting, Converter={StaticResource BoolToVis}}">
+                        <Border Background="{StaticResource NoticeInfoBackBrush}" BorderBrush="{StaticResource NoticeInfoBorderBrush}"
+                                BorderThickness="1" CornerRadius="3" Padding="10,7" Margin="0,4,0,0">
                             <StackPanel>
                                 <TextBlock FontWeight="SemiBold" Foreground="{StaticResource NoticeInfoTextBrush}"
-                                           Text="The page can also be tidied — as a separate edit" />
-                                <!-- Worded for both cases: after a data edit, and on a page whose data already
-                                     agreed, where there is no edit above to keep readable (user, 2026-09-29). -->
+                                           Text="The page can be tidied — as a separate edit" />
                                 <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeInfoBodyBrush}" Margin="0,3,0,0"
                                            Text="Layout only: nothing the page says changes. Saved as its own edit." />
                             </StackPanel>
@@ -622,28 +731,65 @@
                             </ItemsControl>
                         </Border>
 
-                        <!-- Editable for the same reason the data edit is: the formatter positions a field it has
-                             no rule for as best it can, and the user may want it somewhere else (user,
-                             2026-09-28). What is in this box is what gets saved. -->
-                        <Expander Header="Edit raw wikitext" Margin="0,10,0,0">
+                        <!-- **Collapsed by default** (user, 2026-10-07), to discourage formatting by hand: the formatter is
+                             meant to be deterministic and trusted. Still editable, because it has to put a field it has
+                             no rule for somewhere and the user may disagree. What is in the box is what gets saved. -->
+                        <Expander Header="Raw wikitext" Margin="0,10,0,0">
                             <TextBox Text="{Binding FormattedWikitext, UpdateSourceTrigger=PropertyChanged}"
                                      AcceptsReturn="True" FontFamily="Consolas" FontSize="12" Height="260"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                      Margin="0,6,0,0" />
                         </Expander>
 
-                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                            <Button Content="Save the formatting" Click="OnCommitFormattingClick" Padding="14,5"
+                        <WrapPanel Orientation="Horizontal" Margin="0,12,0,0">
+                            <Button Content="Accept the formatting" Style="{StaticResource WikiWriteButton}"
+                                    Click="OnAcceptFormattingClick" Margin="0,0,8,6"
                                     IsEnabled="{Binding CanCommitFormatting}" />
-                            <TextBlock Text="{Binding FormattingOutcome}" VerticalAlignment="Center"
-                                       Margin="12,0,0,0" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
+                            <Button Content="Skip" Click="OnSkipFormattingClick" Padding="14,5" Margin="0,0,8,6"
+                                    IsEnabled="{Binding IsNotBusy}" ToolTip="Leave the layout as it is" />
+                            <Button Content="Make another edit" Click="OnEditAgainClick" Padding="14,5" Margin="0,0,0,6"
+                                    IsEnabled="{Binding IsNotBusy}"
+                                    ToolTip="Back to the first page, compared afresh against the page as it now stands" />
+                        </WrapPanel>
                     </StackPanel>
 
+                    <Button x:Name="FormattingNextButton" Content="Next" Click="OnSkipFormattingClick" Padding="20,5"
+                            FontWeight="SemiBold" HorizontalAlignment="Left" Margin="0,14,0,0" Visibility="Collapsed" />
                 </StackPanel>
             </ScrollViewer>
+
+            <!-- 5. Done: the page as readers now see it. -->
+            <DockPanel x:Name="DonePage" Visibility="Collapsed">
+                <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0"
+                        Padding="16,10">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Done" Click="OnDoneClick" Padding="20,5" FontWeight="SemiBold" Margin="0,0,8,0"
+                                ToolTip="Close this item" />
+                        <Button Content="Edit again" Click="OnEditAgainClick" Padding="14,5"
+                                IsEnabled="{Binding IsNotBusy}"
+                                ToolTip="Back to the first page, compared afresh against the page as it now stands" />
+                    </StackPanel>
+                </Border>
+                <StackPanel DockPanel.Dock="Top" Margin="16,10,16,8">
+                    <TextBlock Text="{Binding Outcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
+                               TextWrapping="Wrap" Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock Text="{Binding FormattingOutcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding HasFormattingOutcome, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock Text="The page as it now reads on the wiki." Foreground="{StaticResource TextMutedBrush}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+                <Grid>
+                    <TextBlock x:Name="DoneStatus" Margin="16,8" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextMutedBrush}" />
+                    <wv2:WebView2 x:Name="DoneBrowser" Visibility="Hidden" />
+                </Grid>
+            </DockPanel>
+                </Grid>
+            </DockPanel>
             </Grid>
         </Grid>
     </DockPanel>
+        <local:OverlayDialog x:Name="Dialog" />
+    </Grid>
 </Window>

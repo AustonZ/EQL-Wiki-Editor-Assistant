@@ -335,6 +335,10 @@ public class CheckedItemsLedgerTests
             throw new NotSupportedException();
 
         // This fake exists to answer reads; nothing here uploads.
+        public Task<RenderedPage> RenderAsync(
+            string title, string wikitext, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<UploadResult> UploadFileAsync(
             string fileName, byte[] content, string description, string comment,
             CancellationToken cancellationToken = default) =>

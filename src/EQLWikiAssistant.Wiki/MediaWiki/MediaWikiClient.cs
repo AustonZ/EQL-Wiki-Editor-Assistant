@@ -145,6 +145,65 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         return found;
     }
 
+    public async Task<RenderedPage> RenderAsync(
+        string title, string wikitext, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentNullException.ThrowIfNull(wikitext);
+
+        // POSTed because a whole item page is far too long for a query string. It is still a read: action=parse saves
+        // nothing, and with `text` it renders what it is given rather than any stored revision.
+        using JsonDocument response = await PostAsync(new Dictionary<string, string>
+        {
+            ["action"] = "parse",
+            ["title"] = title,
+            ["text"] = wikitext,
+            ["contentmodel"] = "wikitext",
+            ["prop"] = "text|headhtml|categorieshtml",
+            ["disablelimitreport"] = "1",
+            ["disableeditsection"] = "1",
+        }, cancellationToken).ConfigureAwait(false);
+
+        JsonElement parse = response.RootElement.GetProperty("parse");
+        return new RenderedPage(
+            Title: parse.TryGetProperty("title", out JsonElement t) ? t.GetString() ?? title : title,
+            HeadHtml: parse.TryGetProperty("headhtml", out JsonElement head) ? head.GetString() ?? "" : "",
+            BodyHtml: parse.TryGetProperty("text", out JsonElement text) ? text.GetString() ?? "" : "",
+            CategoriesHtml: parse.TryGetProperty("categorieshtml", out JsonElement cats) ? cats.GetString() ?? "" : "",
+            Stylesheets: await SkinStylesheetsAsync(cancellationToken).ConfigureAwait(false));
+    }
+
+    private IReadOnlyList<string>? _skinStylesheets;
+
+    /// <summary>
+    /// The skin's stylesheets, which <c>action=parse</c> does not link: read once per session from a page view of
+    /// <c>Special:BlankPage</c>, the smallest page the wiki serves with its full skin.
+    ///
+    /// **A preview without them is still a preview**, just an unstyled one, so a failure here is swallowed and simply
+    /// not remembered — the next preview asks again. An unreachable wiki is the exception, and is reported by the parse
+    /// request that follows rather than here.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> SkinStylesheetsAsync(CancellationToken cancellationToken)
+    {
+        if (_skinStylesheets is not null) return _skinStylesheets;
+
+        try
+        {
+            using HttpResponseMessage response = await _http
+                .GetAsync(new Uri(_endpoint, "index.php?title=Special:BlankPage"), cancellationToken)
+                .ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return [];
+
+            string html = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            return _skinStylesheets = RenderedPage.SkinStylesheets(html);
+        }
+        catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException) &&
+                                   !cancellationToken.IsCancellationRequested)
+        {
+            return [];
+        }
+    }
+
     /// <summary>Who the wiki thinks this session is, and which rights it grants. Read-only, so it verifies a
     /// credential without leaving a revision anywhere — see <see cref="UserInfo"/> for why that matters.</summary>
     public async Task<UserInfo> GetUserInfoAsync(CancellationToken cancellationToken = default)

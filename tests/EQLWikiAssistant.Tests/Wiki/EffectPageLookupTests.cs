@@ -107,6 +107,10 @@ public class EffectPageLookupTests
             string title, string wikitext, string summary, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<RenderedPage> RenderAsync(
+            string title, string wikitext, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<UploadResult> UploadFileAsync(
             string fileName, byte[] content, string description, string comment,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();

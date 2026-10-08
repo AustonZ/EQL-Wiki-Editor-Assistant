@@ -38,6 +38,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         DarkTitleBar.Apply(this);
         ResultsList.ItemsSource = _results;
+        Dialog.Opened += (_, _) => UpdateBrowserVisibility();
+        Dialog.Closed += (_, _) => UpdateBrowserVisibility();
         _results.CollectionChanged += (_, _) =>
             ResultsHeader.Visibility = _results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
@@ -58,7 +60,8 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnHotKeyPressed(object? sender, EventArgs e) => Dispatcher.Invoke(() =>
     {
-        if (_dialogOpen) return;
+        // An in-app dialog as well: it is waiting on an answer about what is on screen.
+        if (_dialogOpen || Dialog.IsOpen) return;
 
         // Front first, so the capture's progress and its result are both visible without alt-tabbing. The game window
         // is captured from the frame grabbed inside CaptureAsync, which reads it unfocused, so stealing focus here
@@ -73,12 +76,12 @@ public partial class MainWindow : Window
     {
         if (_services is null) return;
 
-        HotKeyLabel.Text = _services.HotKeyProblem is null
+        HotKeyRun.Text = _services.HotKeyProblem is null
             ? $"Hotkey: {_services.Settings.HotKey}"
             : $"Hotkey {_services.Settings.HotKey} unavailable";
-        HotKeyLabel.ToolTip = _services.HotKeyProblem is { } problem
-            ? $"{problem} Choose another under Settings > Capture hotkey."
-            : null;
+        HotKeyLink.ToolTip = _services.HotKeyProblem is { } problem
+            ? $"{problem} Click to choose another."
+            : "Change the hotkey";
         EmptyState.Text = _services.HotKeyProblem is null
             ? $"Open an item window in game and press {_services.Settings.HotKey}, or press Capture now.\n\n" +
               "Every item window in the " +
@@ -107,9 +110,8 @@ public partial class MainWindow : Window
             // trap. Fatal (user, 2026-10-07): nothing in the window works without the services, so it says why in a
             // dialog and exits rather than sitting there in a state that only looks usable.
             App.Record(ex);
-            MessageBox.Show(
-                this, $"Could not start: {ex.Message}\n\nThe details are in:\n{App.ErrorLogFile}", Title,
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            await Dialog.TellAsync(
+                "Could not start", $"{ex.Message}\n\nThe details are in:\n{App.ErrorLogFile}", DialogTone.Error);
             Application.Current.Shutdown();
         }
     }
@@ -214,7 +216,7 @@ public partial class MainWindow : Window
     private void ReportCaptureProblem(string message)
     {
         StatusText.Text = message;
-        MessageBox.Show(this, message, "Nothing to check", MessageBoxButton.OK, MessageBoxImage.Warning);
+        _ = Dialog.TellAsync("Nothing to check", message, DialogTone.Warning);
     }
 
     /// <summary>The busy label and the status line say the same thing while work is under way.</summary>
@@ -306,21 +308,36 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// The narrowest the edit pane may get with the screenshot pane beside it. Below this the screenshot moves to the
-    /// top of the edit pane, where it scrolls with the rest (user, 2026-10-07: "above when especially narrow").
+    /// top of the page being shown, where it scrolls with the rest (user, 2026-10-07: "above when especially narrow").
     /// </summary>
     private const double NarrowestEditPane = 420;
 
-    /// <summary>Puts the screenshot beside the edit pane, or above it when there is not room for both.</summary>
-    private void OnDetailAreaSizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        bool beside = e.NewSize.Width >= (double)FindResource("ShotPaneWidth") + NarrowestEditPane;
-        System.Windows.Controls.Panel target = beside ? ShotPaneHost : InlineShotHost;
-        if (ShotStack.Parent == target) return;
+    private void OnDetailAreaSizeChanged(object sender, SizeChangedEventArgs e) => PlaceScreenshot();
 
-        ((System.Windows.Controls.Panel)ShotStack.Parent).Children.Remove(ShotStack);
-        target.Children.Add(ShotStack);
+    /// <summary>
+    /// Puts the screenshot beside the edit pane, or at the top of the page on show when there is not room for both.
+    ///
+    /// **Not on the two browser pages in a narrow window**: they are native windows that WPF cannot put anything above
+    /// inside a scroller, so there the screenshot waits, hidden, on the page it was last on.
+    /// </summary>
+    private void PlaceScreenshot()
+    {
+        bool beside = DetailArea.ActualWidth >= (double)FindResource("ShotPaneWidth") + NarrowestEditPane;
+        System.Windows.Controls.Panel? target = beside ? ShotPaneHost
+            : _shownPage == SubmitPage ? SubmitShotHost
+            : _shownPage == FormattingPage ? FormattingShotHost
+            : _shownPage is null || _shownPage == DetailScroller ? InlineShotHost
+            : null;
+
         ShotPane.Visibility = beside ? Visibility.Visible : Visibility.Collapsed;
-        InlineShotHost.Visibility = beside ? Visibility.Collapsed : Visibility.Visible;
+        if (target is not null && ShotStack.Parent != target)
+        {
+            ((System.Windows.Controls.Panel)ShotStack.Parent).Children.Remove(ShotStack);
+            target.Children.Add(ShotStack);
+        }
+
+        foreach (System.Windows.Controls.Panel host in new[] { InlineShotHost, SubmitShotHost, FormattingShotHost })
+            host.Visibility = ShotStack.Parent == host ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>
@@ -330,11 +347,29 @@ public partial class MainWindow : Window
     /// </summary>
     private async void OnReCheckClick(object sender, RoutedEventArgs e)
     {
-        if (ResultsList.SelectedItem is not ResultViewModel { CanReCheck: true } view || _services is null) return;
+        if (ResultsList.SelectedItem is not ResultViewModel { CanReCheck: true } view) return;
+        await ReloadFromWikiAsync(view, $"Checking {view.ItemName} against the wiki…", "re-checked");
+    }
+
+    /// <summary>
+    /// "Edit again" and "Make another edit": back to the first page, compared afresh against the page as it now
+    /// stands (user, 2026-10-07). After a save that is the only honest starting point — the earlier comparison was
+    /// against a revision that is no longer there.
+    /// </summary>
+    private async void OnEditAgainClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel { Result.Item: not null } view) return;
+        await ReloadFromWikiAsync(view, $"Comparing {view.ItemName} against the wiki again…", "compared again");
+    }
+
+    /// <summary>Re-analyzes one item against the wiki and shows it from its first page.</summary>
+    private async Task ReloadFromWikiAsync(ResultViewModel view, string busy, string done)
+    {
+        if (_services is null) return;
 
         AppServices services = _services;
         view.IsBusy = true;
-        ShowBusy($"Checking {view.ItemName} against the wiki…");
+        ShowBusy(busy);
         BusyPanel.Visibility = Visibility.Visible;
         try
         {
@@ -344,8 +379,13 @@ public partial class MainWindow : Window
             view.LoreImage = lore;
             await services.SaveLedgerAsync();
             UpdateLedgerText();
-            ShowSelected();
-            StatusText.Text = $"'{view.ItemName}' re-checked.";
+            if (ResultsList.SelectedItem == view)
+            {
+                ShowImages(view);
+                ShowStep(view, animate: true);
+            }
+
+            StatusText.Text = $"'{view.ItemName}' {done}.";
         }
         catch (WikiUnavailableException ex)
         {
@@ -367,6 +407,14 @@ public partial class MainWindow : Window
         EmptyState.Visibility = selected ? Visibility.Collapsed : Visibility.Visible;
 
         var view = ResultsList.SelectedItem as ResultViewModel;
+        ShowImages(view);
+        // Each item keeps its own page of the review; switching items shows it in place, without a slide.
+        if (view is not null) ShowStep(view, animate: false);
+        else UpdateBrowserVisibility();
+    }
+
+    private void ShowImages(ResultViewModel? view)
+    {
         WindowImage.Source = view?.Result.WindowImage is { } image ? Bitmaps.From(image) : null;
         LoreImage.Source = view?.LoreImage is { } lore ? Bitmaps.From(lore) : null;
 
@@ -397,13 +445,10 @@ public partial class MainWindow : Window
         if (view.Result.IconSuggestion is not { } suggestion) return;
 
         bool upload = suggestion.NeedsUpload;
-        if (upload && MessageBox.Show(
-                this,
-                $"Upload this icon to the wiki as '{suggestion.WikiFileName}'?\n\nCheck it against the in-game " +
-                "icon first — only a wiki admin can delete a file once it is uploaded.",
-                "Upload an item icon",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Warning) != MessageBoxResult.OK)
+        if (upload && !await Dialog.AskAsync(
+                $"Upload '{suggestion.WikiFileName}'?",
+                "Check it against the in-game icon first — only a wiki admin can delete a file once it is uploaded.",
+                "Upload", tone: DialogTone.Warning, writesToWiki: true))
             return;
 
         view.IsBusy = true;
@@ -433,120 +478,250 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// Creates the page for an item the wiki has never heard of.
-    ///
-    /// **The title is in the prompt** because it is the part the user is the only one able to judge. It is not
-    /// permanent, which an earlier version of this prompt claimed: any editor can move a page, and an admin can delete
-    /// one (user, 2026-10-07).
-    /// </summary>
-    private async void OnCreateClick(object sender, RoutedEventArgs e)
+    // ============================ the step-by-step review ============================
+
+    private FrameworkElement? _shownPage;
+    private ReviewStep _shownStep;
+    private ResultViewModel? _shownView;
+    private int _slide;
+    private bool _sliding;
+
+    private FrameworkElement PageFor(ReviewStep step) => step switch
     {
-        if (ResultsList.SelectedItem is not ResultViewModel view || _services is null) return;
-        if (view.Result.Creation is not { } creation) return;
+        ReviewStep.Preview => PreviewPage,
+        ReviewStep.Submit => SubmitPage,
+        ReviewStep.Formatting => FormattingPage,
+        ReviewStep.Done => DonePage,
+        _ => DetailScroller,
+    };
 
-        // **Asked of the text on screen, not of the proposal.** The box is editable and typing the icon ID is the
-        // first thing the user does on a creation, so the proposal's answer is "missing" on every page the tool
-        // generates and would warn about a gap the user had just filled in (bug found by the user, 2026-10-02).
-        // `ItemPageCreator.HasIconId` is the same question `CreateAsync` asks of the saved text to decide the
-        // ledger outcome, which is what keeps the dialog and the ledger row agreeing about the same page.
-        string warning = ItemPageCreator.HasIconId(view.Wikitext, _services.Mapping)
-            ? ""
-            : "\n\nIt has no lucy_img_ID, so the item box will show no artwork until one is added.";
+    private FrameworkElement[] Pages => [DetailScroller, PreviewPage, SubmitPage, FormattingPage, DonePage];
 
-        if (MessageBox.Show(
-                this,
-                $"Create the page '{creation.Title}'?{warning}",
-                "Create a wiki page",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Warning) != MessageBoxResult.OK)
-            return;
+    /// <summary>Moves an item to another page of its review, sliding if it is the one on screen.</summary>
+    private void GoTo(ResultViewModel view, ReviewStep step)
+    {
+        view.Step = step;
+        if (ResultsList.SelectedItem == view) ShowStep(view, animate: true);
+    }
 
-        view.IsBusy = true;
-        try
+    /// <summary>
+    /// Shows the page the selected item is on, and does whatever arriving there needs — rendering the preview, building
+    /// the final diff, loading the live page.
+    /// </summary>
+    private void ShowStep(ResultViewModel view, bool animate)
+    {
+        ReviewStep step = view.HasReview ? view.Step : ReviewStep.Differences;
+        FrameworkElement incoming = PageFor(step);
+        FrameworkElement? outgoing = _shownPage;
+        bool forward = step >= _shownStep;
+        bool sameItem = view == _shownView;
+
+        _shownPage = incoming;
+        _shownStep = step;
+        _shownView = view;
+
+        // Anything left over from an interrupted slide is put away first.
+        int slide = ++_slide;
+        foreach (FrameworkElement page in Pages)
         {
-            CommitResult commit = await _services.Pipeline
-                .CreateAsync(view.Result, view.Wikitext, view.Summary);
-            await _services.SaveLedgerAsync();
-            UpdateLedgerText();
-
-            view.Outcome = commit.Status == CommitStatus.Committed
-                ? $"Created as revision {commit.RevisionId}."
-                : null;
-
-            view.Settled = commit.Status == CommitStatus.Committed;
-
-            // Normally finds nothing — the generated text is laid out before it is ever shown. It is offered anyway
-            // because the box is editable, and a hand-edit is exactly what a formatting pass is for.
-            view.Formatting = commit.Formatting;
-            foreach (string note in commit.FormattingNotes)
-                if (!view.Warnings.Contains(note))
-                    view.Warnings.Add(note);
-
-            StatusText.Text = view.Outcome ?? commit.Error ?? "The page was not created.";
-
-            if (commit.Status == CommitStatus.Failed)
-                MessageBox.Show(this, commit.Error, "Nothing was written", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (page == incoming || page == outgoing) continue;
+            page.BeginAnimation(OpacityProperty, null);
+            page.RenderTransform = null;
+            page.Visibility = Visibility.Collapsed;
         }
-        catch (WikiUnavailableException ex)
+
+        incoming.Visibility = Visibility.Visible;
+        if (incoming != outgoing && incoming is System.Windows.Controls.ScrollViewer scroller) scroller.ScrollToTop();
+        PlaceScreenshot();
+
+        if (!animate || !sameItem || outgoing is null || outgoing == incoming || PageHost.ActualWidth <= 0)
         {
-            ReportWikiUnavailable(ex, "The page was not created");
+            if (outgoing is not null && outgoing != incoming) outgoing.Visibility = Visibility.Collapsed;
+            incoming.RenderTransform = null;
+            _sliding = false;
         }
-        finally
+        else
         {
-            view.IsBusy = false;
+            Slide(outgoing, incoming, forward, slide);
+        }
+
+        UpdateBrowserVisibility();
+        _ = ArriveAsync(view, step);
+    }
+
+    /// <summary>The slide itself: the old page out one side, the new one in from the other.</summary>
+    private void Slide(FrameworkElement outgoing, FrameworkElement incoming, bool forward, int slide)
+    {
+        _sliding = true;
+        double distance = PageHost.ActualWidth * (forward ? 1 : -1);
+        var duration = TimeSpan.FromMilliseconds(220);
+        var ease = new System.Windows.Media.Animation.CubicEase
+        {
+            EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
+        };
+
+        var outMove = new System.Windows.Media.TranslateTransform();
+        var inMove = new System.Windows.Media.TranslateTransform(distance, 0);
+        outgoing.RenderTransform = outMove;
+        incoming.RenderTransform = inMove;
+
+        var arrive = new System.Windows.Media.Animation.DoubleAnimation(distance, 0, duration) { EasingFunction = ease };
+        arrive.Completed += (_, _) =>
+        {
+            // A newer page change has taken over; leave its elements alone.
+            if (slide != _slide) return;
+            outgoing.Visibility = Visibility.Collapsed;
+            outgoing.RenderTransform = null;
+            incoming.RenderTransform = null;
+            _sliding = false;
+            UpdateBrowserVisibility();
+        };
+
+        outMove.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0, -distance, duration) { EasingFunction = ease });
+        inMove.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, arrive);
+    }
+
+    /// <summary>What each page needs on arrival. Only ever acts for the item still on screen.</summary>
+    private async Task ArriveAsync(ResultViewModel view, ReviewStep step)
+    {
+        if (_services is null) return;
+
+        switch (step)
+        {
+            case ReviewStep.Preview:
+                await ShowPreviewAsync(view);
+                break;
+
+            case ReviewStep.Submit:
+                view.RefreshSubmitDiff();
+                // Asked of the text on screen, not of the proposal — typing the icon ID is the first thing the user
+                // does on a creation (bug found by the user, 2026-10-02). Same question CreateAsync asks of the saved
+                // text, so the warning and the ledger row agree.
+                view.SubmitNotice = view.IsCreation && !ItemPageCreator.HasIconId(view.Wikitext, _services.Mapping)
+                    ? "It has no lucy_img_ID, so the item box will show no artwork until one is added."
+                    : null;
+                break;
+
+            case ReviewStep.Formatting:
+                bool nothingToLayOut = view.Formatting is null;
+                bool quiet = nothingToLayOut && !view.HasFormattingNotes;
+                FormattingGood.Visibility = quiet ? Visibility.Visible : Visibility.Collapsed;
+                FormattingNextButton.Visibility = nothingToLayOut ? Visibility.Visible : Visibility.Collapsed;
+
+                // Nothing to do and nothing to say: a moment to read that, then on (user, 2026-10-07).
+                if (quiet)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1.2));
+                    if (ResultsList.SelectedItem == view && view.Step == ReviewStep.Formatting && !Dialog.IsOpen)
+                        GoTo(view, ReviewStep.Done);
+                }
+
+                break;
+
+            case ReviewStep.Done:
+                await ShowLivePageAsync(view);
+                break;
         }
     }
 
-    private async void OnCommitClick(object sender, RoutedEventArgs e)
+    private void OnStepClick(object sender, RoutedEventArgs e)
     {
-        if (ResultsList.SelectedItem is not ResultViewModel view || _services is null) return;
+        if ((sender as FrameworkElement)?.DataContext is not StepViewModel { CanJump: true } step) return;
+        if (ResultsList.SelectedItem is not ResultViewModel view) return;
+        GoTo(view, step.Step);
+    }
 
-        // Confirmed explicitly, because this writes to a public wiki under the user's own account and cannot be
-        // undone by this tool — an ordinary editor here cannot delete a revision.
-        if (MessageBox.Show(
-                this,
-                $"Save this edit to '{view.PageTitle}'?\n\n{view.Summary}",
-                "Save to the wiki",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Question) != MessageBoxResult.OK)
+    /// <summary>
+    /// The first page's Next: on to Preview when there is something to save, or — for a page that already agrees and
+    /// was settled by the check — straight to its formatting.
+    /// </summary>
+    private void OnNextClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel { CanGoNext: true } view || _services is null) return;
+
+        if (view.HasChangesToSubmit)
+        {
+            GoTo(view, ReviewStep.Preview);
             return;
+        }
 
+        // No request: the page was fetched by the check and nothing has changed it since.
+        if (view.Result.Page is { } page)
+        {
+            (FormattingProposal? proposal, IReadOnlyList<string> notes) = _services.Pipeline.PrepareFormatting(page);
+            view.SetFormatting(proposal, notes);
+        }
+
+        view.SkippedSubmit = true;
+        GoTo(view, ReviewStep.Formatting);
+    }
+
+    private void OnBackClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel { Step: > ReviewStep.Differences } view) return;
+        GoTo(view, view.Step - 1);
+    }
+
+    private void OnPreviewNextClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel view) return;
+        GoTo(view, ReviewStep.Submit);
+    }
+
+    /// <summary>
+    /// Saves the edit or creates the page — what the Submit page exists for.
+    ///
+    /// **No confirmation** (user, 2026-10-07): the Submit page shows exactly what is written, under the title it goes
+    /// to, and reaching it took two deliberate steps, so a dialog asking again would be the same question twice.
+    /// </summary>
+    private async void OnSaveClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel { CanSave: true } view || _services is null) return;
+
+        bool creating = view.IsCreation;
         view.IsBusy = true;
+        StatusText.Text = creating ? "Creating the page…" : "Saving the edit…";
         try
         {
-            // Logging in is the pipeline's gate now, not this handler's — see AppServices.BeforeWriting. Doing it
-            // here as well is what let the formatting commit ship without it.
-            CommitResult commit = await _services.Pipeline.CommitAsync(view.Result, view.Wikitext, view.Summary);
+            // Logging in is the pipeline's gate, not this handler's — see AppServices.BeforeWriting.
+            CommitResult commit = creating
+                ? await _services.Pipeline.CreateAsync(view.Result, view.Wikitext, view.Summary)
+                : await _services.Pipeline.CommitAsync(view.Result, view.Wikitext, view.Summary);
             await _services.SaveLedgerAsync();
             UpdateLedgerText();
 
-            view.Outcome = commit.Status switch
+            string? outcome = commit.Status switch
             {
+                CommitStatus.Committed when creating => $"Created as revision {commit.RevisionId}.",
                 CommitStatus.Committed => $"Saved as revision {commit.RevisionId}.",
                 CommitStatus.NoChange => "The wiki found the text identical — recorded as a match.",
                 _ => null,
             };
 
+            if (outcome is null)
+            {
+                StatusText.Text = commit.Error ?? "Nothing was written.";
+                await Dialog.TellAsync("Nothing was written", commit.Error ?? "The wiki did not accept the edit.",
+                    DialogTone.Warning);
+                return;
+            }
+
             // Settled only when the write actually landed — a refused or failed commit leaves the item wanting
             // attention, which is exactly what the status is read for.
-            view.Settled = commit.Status is CommitStatus.Committed or CommitStatus.NoChange;
+            view.Outcome = outcome;
+            view.Settled = true;
+            view.Written = true;
 
-            // The formatting pass has already run against the page as it now stands; offering it is a prompt, never
-            // an automatic second write.
-            view.Formatting = commit.Formatting;
-            foreach (string note in commit.FormattingNotes)
-                if (!view.Warnings.Contains(note))
-                    view.Warnings.Add(note);
-
-            StatusText.Text = view.Outcome ?? commit.Error ?? "The edit did not go through.";
-
-            if (commit.Status is CommitStatus.PageChangedSinceCheck or CommitStatus.Failed)
-                MessageBox.Show(this, commit.Error, "Nothing was written", MessageBoxButton.OK, MessageBoxImage.Warning);
+            // The formatting pass has already run against the page as it now stands; offering it is the next page,
+            // never an automatic second write.
+            view.SetFormatting(commit.Formatting, commit.FormattingNotes);
+            StatusText.Text = outcome;
+            GoTo(view, ReviewStep.Formatting);
         }
         catch (WikiUnavailableException ex)
         {
-            ReportWikiUnavailable(ex, "The edit was not saved");
+            ReportWikiUnavailable(ex, creating ? "The page was not created" : "The edit was not saved");
         }
         finally
         {
@@ -567,7 +742,7 @@ public partial class MainWindow : Window
         StatusText.Text = $"'{view.ItemName}' skipped.";
     }
 
-    private async void OnCommitFormattingClick(object sender, RoutedEventArgs e)
+    private async void OnAcceptFormattingClick(object sender, RoutedEventArgs e)
     {
         if (ResultsList.SelectedItem is not ResultViewModel { Formatting: { } proposal } view || _services is null)
             return;
@@ -582,14 +757,20 @@ public partial class MainWindow : Window
             view.FormattingOutcome = commit.Status switch
             {
                 CommitStatus.Committed => $"Formatting saved as revision {commit.RevisionId}.",
-                CommitStatus.NoChange => "The wiki found the text identical.",
+                CommitStatus.NoChange => "The wiki found the formatting identical.",
                 _ => null,
             };
 
-            StatusText.Text = view.FormattingOutcome ?? commit.Error ?? "The formatting edit did not go through.";
+            if (view.FormattingOutcome is null)
+            {
+                StatusText.Text = commit.Error ?? "The formatting edit did not go through.";
+                await Dialog.TellAsync("Nothing was written", commit.Error ?? "The wiki did not accept the edit.",
+                    DialogTone.Warning);
+                return;
+            }
 
-            if (commit.Status is CommitStatus.PageChangedSinceCheck or CommitStatus.Failed)
-                MessageBox.Show(this, commit.Error, "Nothing was written", MessageBoxButton.OK, MessageBoxImage.Warning);
+            StatusText.Text = view.FormattingOutcome;
+            GoTo(view, ReviewStep.Done);
         }
         catch (WikiUnavailableException ex)
         {
@@ -599,6 +780,21 @@ public partial class MainWindow : Window
         {
             view.IsBusy = false;
         }
+    }
+
+    /// <summary>Skip on the Formatting page, and its Next when there was nothing to lay out.</summary>
+    private void OnSkipFormattingClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel view) return;
+        GoTo(view, ReviewStep.Done);
+    }
+
+    /// <summary>Done closes the item, like its ✕ in the list: nothing on the wiki or in the ledger changes.</summary>
+    private void OnDoneClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel view) return;
+        _results.Remove(view);
+        if (_results.Count > 0 && ResultsList.SelectedItem is null) ResultsList.SelectedIndex = 0;
     }
 
     private async void OnMarkCheckedClick(object sender, RoutedEventArgs e)
@@ -617,7 +813,186 @@ public partial class MainWindow : Window
         // user has just said is right, so the formatter is not being asked to understand data nobody has vouched for.
         // No request — the page was fetched by the check and nothing has changed it since.
         if (view.Result.Page is { } page)
-            view.Formatting = _services.Pipeline.PrepareFormatting(page).Proposal;
+        {
+            (FormattingProposal? proposal, IReadOnlyList<string> notes) = _services.Pipeline.PrepareFormatting(page);
+            view.SetFormatting(proposal, notes);
+        }
+
+        view.SkippedSubmit = true;
+        GoTo(view, ReviewStep.Formatting);
+    }
+
+    // ============================ the embedded browser ============================
+
+    /// <summary>The wiki's own address, which the preview's site-relative links resolve against.</summary>
+    private static readonly Uri WikiSite = new(AppServices.Endpoint.GetLeftPart(UriPartial.Authority) + "/");
+
+    private Task<Microsoft.Web.WebView2.Core.CoreWebView2Environment>? _browserEnvironment;
+
+    /// <summary>The navigation each browser is about to make on purpose; anything else is a click on a link.</summary>
+    private readonly Dictionary<Microsoft.Web.WebView2.Wpf.WebView2, bool> _expectingNavigation = [];
+
+    private readonly HashSet<Microsoft.Web.WebView2.Wpf.WebView2> _loaded = [];
+
+    /// <summary>
+    /// Readies a browser the first time it is needed, so the app does not start one at launch.
+    ///
+    /// **Scripts are off.** The pages shown are the wiki's own, and its scripts include the "not verified" toast, which
+    /// edits the wiki's verification list when someone types into it — from this browser that would be an anonymous
+    /// edit nobody meant to make. Nothing inside the review may write to the wiki except the buttons that say so, and
+    /// the item box, the effect links and the categories all render without scripts. A link opens in the user's own
+    /// browser rather than navigating this one away from the review.
+    /// </summary>
+    private async Task<bool> EnsureBrowserAsync(Microsoft.Web.WebView2.Wpf.WebView2 browser, System.Windows.Controls.TextBlock status)
+    {
+        if (browser.CoreWebView2 is not null) return true;
+
+        try
+        {
+            _browserEnvironment ??= Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
+                userDataFolder: System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "EQLWikiAssistant", "WebView2"));
+            await browser.EnsureCoreWebView2Async(await _browserEnvironment);
+        }
+        catch (Exception ex) when (ex is Microsoft.Web.WebView2.Core.WebView2RuntimeNotFoundException
+                                       or System.Runtime.InteropServices.COMException
+                                       or InvalidOperationException)
+        {
+            App.Record(ex);
+            status.Text = "The page cannot be shown here: the Microsoft Edge WebView2 runtime is not available. " +
+                          $"({ex.Message})";
+            return false;
+        }
+
+        Microsoft.Web.WebView2.Core.CoreWebView2 core = browser.CoreWebView2!;
+        core.Settings.IsScriptEnabled = false;
+        core.Settings.AreDevToolsEnabled = false;
+        core.Settings.IsStatusBarEnabled = false;
+        core.Settings.AreHostObjectsAllowed = false;
+        core.Settings.IsWebMessageEnabled = false;
+        core.Settings.IsGeneralAutofillEnabled = false;
+        core.Settings.IsPasswordAutosaveEnabled = false;
+
+        core.NavigationStarting += (_, e) =>
+        {
+            if (_expectingNavigation.GetValueOrDefault(browser) || e.IsRedirected)
+            {
+                _expectingNavigation[browser] = false;
+                return;
+            }
+
+            e.Cancel = true;
+            OpenExternally(e.Uri);
+        };
+        core.NewWindowRequested += (_, e) =>
+        {
+            e.Handled = true;
+            OpenExternally(e.Uri);
+        };
+        browser.NavigationCompleted += (_, e) =>
+        {
+            if (e.IsSuccess)
+            {
+                _loaded.Add(browser);
+                status.Text = "";
+            }
+            else
+            {
+                status.Text = $"The page did not load ({e.WebErrorStatus}).";
+            }
+
+            UpdateBrowserVisibility();
+        };
+
+        return true;
+    }
+
+    private static void OpenExternally(string uri)
+    {
+        if (Uri.TryCreate(uri, UriKind.Absolute, out Uri? target) &&
+            (target.Scheme == Uri.UriSchemeHttps || target.Scheme == Uri.UriSchemeHttp))
+            Process.Start(new ProcessStartInfo(target.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    /// <summary>
+    /// Shows each browser only when its page is on screen, it has finished loading, and nothing is meant to be in front
+    /// of it. **A browser is a native window that WPF cannot draw over**, so a dialog or a sliding page would otherwise
+    /// appear behind it.
+    /// </summary>
+    private void UpdateBrowserVisibility()
+    {
+        bool clear = !_sliding && !Dialog.IsOpen && DetailArea.Visibility == Visibility.Visible;
+        PreviewBrowser.Visibility = clear && _shownPage == PreviewPage && _loaded.Contains(PreviewBrowser)
+            ? Visibility.Visible : Visibility.Hidden;
+        DoneBrowser.Visibility = clear && _shownPage == DonePage && _loaded.Contains(DoneBrowser)
+            ? Visibility.Visible : Visibility.Hidden;
+    }
+
+    private void Navigate(Microsoft.Web.WebView2.Wpf.WebView2 browser, Action<Microsoft.Web.WebView2.Core.CoreWebView2> go)
+    {
+        _loaded.Remove(browser);
+        UpdateBrowserVisibility();
+        _expectingNavigation[browser] = true;
+        go(browser.CoreWebView2);
+    }
+
+    /// <summary>
+    /// Renders the text on screen through the wiki and shows it.
+    ///
+    /// **Sent to the wiki only now, because the user asked to see it** (user, 2026-10-07), and only once per version
+    /// of the text: going back and forward without changing anything shows the rendering already made.
+    /// </summary>
+    private async Task ShowPreviewAsync(ResultViewModel view)
+    {
+        if (_services is null || !await EnsureBrowserAsync(PreviewBrowser, PreviewStatus)) return;
+
+        string text = view.Wikitext;
+        if (view.PreviewDocument is null || view.PreviewedText != text)
+        {
+            PreviewStatus.Text = "Asking the wiki to render the page…";
+            _loaded.Remove(PreviewBrowser);
+            UpdateBrowserVisibility();
+
+            AppServices services = _services;
+            try
+            {
+                RenderedPage rendered = await Task.Run(() => services.Pipeline.PreviewAsync(view.Result, text));
+                view.PreviewDocument = rendered.ToDocument(WikiSite);
+                view.PreviewedText = text;
+            }
+            catch (WikiUnavailableException ex)
+            {
+                PreviewStatus.Text = "The wiki could not be reached, so there is no preview.";
+                ReportWikiUnavailable(ex, "The preview was not rendered");
+                return;
+            }
+            catch (MediaWikiException ex)
+            {
+                PreviewStatus.Text = $"The wiki could not render a preview ({ex.Code}): {ex.Message}";
+                return;
+            }
+        }
+
+        if (ResultsList.SelectedItem != view || view.Step != ReviewStep.Preview) return;
+        PreviewStatus.Text = "Loading…";
+        Navigate(PreviewBrowser, core => core.NavigateToString(view.PreviewDocument!));
+    }
+
+    /// <summary>The page as readers now see it — an ordinary page view, the natural sequel to a save.</summary>
+    private async Task ShowLivePageAsync(ResultViewModel view)
+    {
+        if (view.PageUrl is not { } url)
+        {
+            DoneStatus.Text = "There is no page to show.";
+            return;
+        }
+
+        if (!await EnsureBrowserAsync(DoneBrowser, DoneStatus)) return;
+        if (ResultsList.SelectedItem != view || view.Step != ReviewStep.Done) return;
+
+        DoneStatus.Text = "Loading the page…";
+        Navigate(DoneBrowser, core => core.Navigate(url));
     }
 
     /// <summary>
@@ -700,14 +1075,19 @@ public partial class MainWindow : Window
 
     /// <summary>The UI font, the wiki login and the mapping. Modal, and disabled during a capture — see
     /// <see cref="SettingsWindow"/>.</summary>
-    private void OnSettingsClick(object sender, RoutedEventArgs e)
+    private void OnSettingsClick(object sender, RoutedEventArgs e) => OpenSettings(SettingsPage.Font);
+
+    /// <summary>The hotkey hint opens Settings at the page that changes it.</summary>
+    private void OnHotKeyLinkClick(object sender, RoutedEventArgs e) => OpenSettings(SettingsPage.HotKey);
+
+    private void OpenSettings(SettingsPage page)
     {
         if (_services is null) return;
 
         _dialogOpen = true;
         try
         {
-            new SettingsWindow(_services) { Owner = this }.ShowDialog();
+            new SettingsWindow(_services, page) { Owner = this }.ShowDialog();
         }
         finally
         {
@@ -730,13 +1110,11 @@ public partial class MainWindow : Window
     private void ReportWikiUnavailable(WikiUnavailableException ex, string consequence)
     {
         StatusText.Text = $"{consequence} — {ex.Message}";
-        MessageBox.Show(
-            this,
+        _ = Dialog.TellAsync(
+            "The wiki is unavailable",
             $"{ex.Message}\n\n{consequence}. Nothing was written to the wiki, and nothing was recorded locally, so " +
             "try again once the wiki is reachable.",
-            "The wiki is unavailable",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
+            DialogTone.Error);
     }
 
     private void UpdateLedgerText()

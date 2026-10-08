@@ -128,13 +128,10 @@ public partial class LedgerWindow : Window
 
         // Confirmed because it is not undoable from here — the row's fingerprint and the revision it saw are gone.
         // Nothing on the wiki changes, though, so this is a small confirmation rather than the commit one.
-        if (MessageBox.Show(
-                this,
-                $"Forget '{row.ItemName}'?\n\nNothing on the wiki changes. The next capture of this item will " +
-                "check it again from scratch.",
-                "Forget this item",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Question) != MessageBoxResult.OK)
+        if (!await Dialog.AskAsync(
+                $"Forget '{row.ItemName}'?",
+                "Nothing on the wiki changes. The next capture of this item will check it again from scratch.",
+                "Forget"))
             return;
 
         _ledger.Remove(row.Entry.ItemName, row.Entry.EntityKind);

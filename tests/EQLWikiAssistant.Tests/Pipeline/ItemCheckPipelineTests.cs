@@ -872,6 +872,48 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
+    /// **A preview sends the text to the wiki, so only the user's Preview step may cause one** (user, 2026-10-07):
+    /// checking a frame — every lookup, comparison and proposal — renders nothing. The preview itself renders what is
+    /// on screen, under the page's own title, and writes nothing and fetches nothing.
+    /// </summary>
+    [Fact]
+    public async Task OnlyAPreviewRendersAndItWritesNothing()
+    {
+        OcrLine[] lines = [.. EarringLines];
+        lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
+
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+        Assert.Equal(ItemCheckStatus.EditProposed, result.Status);
+        Assert.Equal(0, wiki.Renders);
+
+        int fetches = wiki.Fetches, rows = ledger.Count;
+        string amended = result.Edit!.NewWikitext.Replace("AC: 6<br>", "AC: 7<br>");
+        await pipeline.PreviewAsync(result, amended);
+
+        Assert.Equal(1, wiki.Renders);
+        Assert.Equal(("Earring of Bashing", amended), wiki.LastRendered);
+        Assert.Equal(fetches, wiki.Fetches);
+        Assert.Equal(0, wiki.Edits);
+        Assert.Equal(rows, ledger.Count);
+    }
+
+    /// <summary>A page about to be created is previewed under the title it will be created at, since there is no
+    /// page yet to take one from.</summary>
+    [Fact]
+    public async Task APageToBeCreatedIsPreviewedUnderItsNewTitle()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines));
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+        Assert.True(result.CanCreate);
+
+        await pipeline.PreviewAsync(result, result.Creation!.Wikitext);
+
+        Assert.Equal("Earring of Bashing", wiki.LastRendered?.Title);
+        Assert.Equal(0, wiki.Creations);
+    }
+
+    /// <summary>
     /// The guard that matters more than `basetimestamp` does. MediaWiki merges what it can, and this tool's edits
     /// are wholesale parameter replacements — exactly the shape that merges cleanly while discarding somebody's
     /// work. So a page that changed between the check and the commit is refused outright.
@@ -1575,6 +1617,26 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
+    /// **Re-checking a page this tool just wrote keeps the row's outcome** — the review's "Edit again" does exactly
+    /// that after every save. Recording the agreeing page as Matched would erase Created, the row most worth finding
+    /// again. Fails if the AlreadyCorrect path records Matched unconditionally.
+    /// </summary>
+    [Fact]
+    public async Task ReCheckingAPageJustCreatedKeepsItRecordedAsCreated()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines));
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+        string typed = result.Creation!.Wikitext.Replace("|lucy_img_ID    =", "|lucy_img_ID    = 1234");
+        await pipeline.CreateAsync(result, typed, result.Creation.Summary);
+        Assert.Equal(CheckOutcome.Created, ledger.Find("Earring of Bashing")!.Outcome);
+
+        ItemCheckResult again = await pipeline.ReanalyzeAsync(result);
+
+        Assert.Equal(ItemCheckStatus.AlreadyCorrect, again.Status);
+        Assert.Equal(CheckOutcome.Created, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    /// <summary>
     /// **The consequence of allowing a creation with no icon ID** (user, 2026-10-01: warn, do not block). The page
     /// is written, but the row is `Flagged` rather than `Created`, so the item comes back on the next capture until
     /// somebody supplies the artwork. Without this, the warn-don't-block choice would lose the icon permanently —
@@ -1745,6 +1807,19 @@ public class ItemCheckPipelineTests
 
             Pages[title] = new WikiPage(title, wikitext, 1, DateTimeOffset.UnixEpoch);
             return Task.FromResult(new EditResult(title, 1, false));
+        }
+
+        /// <summary>Counted, because "a check never sends anything to be rendered" is the property worth pinning —
+        /// a preview sends the text to the wiki and may only happen when the user asks for one.</summary>
+        public int Renders { get; private set; }
+        public (string Title, string Wikitext)? LastRendered { get; private set; }
+
+        public Task<RenderedPage> RenderAsync(
+            string title, string wikitext, CancellationToken cancellationToken = default)
+        {
+            Renders++;
+            LastRendered = (title, wikitext);
+            return Task.FromResult(new RenderedPage(title, "<html><head></head><body>", "<p>rendered</p>", ""));
         }
 
         public Task<UploadResult> UploadFileAsync(

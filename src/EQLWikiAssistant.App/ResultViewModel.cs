@@ -126,6 +126,59 @@ public sealed record FindingViewModel(
         Blocks: false);
 }
 
+/// <summary>The pages of the step-by-step review, in order (user, 2026-10-07).</summary>
+public enum ReviewStep
+{
+    Differences,
+    Preview,
+    Submit,
+    Formatting,
+    Done,
+}
+
+public enum StepState
+{
+    Finished,
+    Current,
+    Upcoming,
+    Skipped,
+}
+
+/// <summary>One stop on the review's timeline.</summary>
+public sealed record StepViewModel(ReviewStep Step, int Number, string Label, StepState State, bool CanJump)
+{
+    public Brush Foreground => State switch
+    {
+        StepState.Current => Palette.Text,
+        StepState.Finished => Palette.Done,
+        StepState.Skipped => Palette.Dim,
+        _ => Palette.Muted,
+    };
+
+    /// <summary>The circle's fill: the accent for where the user is, the done colour for what is behind them.</summary>
+    public Brush Marker => State switch
+    {
+        StepState.Current => Palette.Accent,
+        StepState.Finished => Palette.Done,
+        _ => Palette.Raised,
+    };
+
+    /// <summary>Dark on the two filled markers, muted on the empty ones.</summary>
+    public Brush MarkerForeground => State is StepState.Current or StepState.Finished ? Palette.Surface : Palette.Muted;
+
+    public string MarkerText => State switch
+    {
+        StepState.Finished => "✓",
+        StepState.Skipped => "–",
+        _ => Number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+    };
+
+    /// <summary>The connector after this stop; the last has none.</summary>
+    public bool HasConnector => Step != ReviewStep.Done;
+
+    public string? Tip => CanJump ? $"Back to {Label}" : State == StepState.Skipped ? "Not needed for this item" : null;
+}
+
 /// <summary>
 /// One captured window, as the review screen sees it.
 ///
@@ -145,6 +198,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private string _formattedWikitext = "";
     private string? _captureFile;
     private bool _settled;
+    private ReviewStep _step;
+    private bool _skippedSubmit;
+    private bool _written;
+    private string? _submitNotice;
 
     public ResultViewModel(ItemCheckResult result) => Load(result);
 
@@ -172,11 +229,16 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         _settled = false;
         _formatting = null;
         _formattingOutcome = null;
-
-        Replace(Diff, result.Edit is null
-            ? []
-            : WikitextDiff.Compute(result.Edit.OriginalWikitext, result.Edit.NewWikitext)
-                .Select(l => new DiffLineViewModel(l)));
+        // Every reload starts the review over: a re-capture, a lore capture joining, or "Edit again" after a save all
+        // mean there is a fresh comparison to read first.
+        _step = ReviewStep.Differences;
+        _skippedSubmit = false;
+        _written = false;
+        _submitNotice = null;
+        PreviewedText = null;
+        PreviewDocument = null;
+        FormattingNotes.Clear();
+        Diff.Clear();
         Replace(Findings, (result.Analysis?.Findings
                 .Where(f => f.IsChange || f.Blocks)
                 .Select(FindingViewModel.For) ?? [])
@@ -188,6 +250,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         // formatting proposal already worked out — the check had the page in hand, so it cost nothing. For one the
         // tool wants to edit this stays null until the user settles the data question.
         Formatting = result.Formatting;
+
+        RebuildSteps();
 
         // Everything on this object is derived from Result, so the simplest correct notification is "all of it".
         OnPropertyChanged(null);
@@ -474,6 +538,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         {
             Set(ref _settled, value);
             OnPropertyChanged(nameof(IsDone));
+            OnPropertyChanged(nameof(CanGoNext));
             OnPropertyChanged(nameof(StatusText));
             OnPropertyChanged(nameof(StatusBrush));
             // A page just created becomes clickable at this moment and not before — see KnownPageTitle.
@@ -564,7 +629,22 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public bool HasLedgerNote => LedgerNote.Length > 0;
 
+    /// <summary>The final diff on the Submit page, against the page as fetched — or, for a new page, the whole text.
+    /// Built on entering that page, from whatever the editor then holds.</summary>
     public bool HasDiff => Diff.Count > 0;
+
+    /// <summary>Whether the first page shows the raw wikitext editor: anything with a page to edit, including one
+    /// the tool found correct, since a hand-written correction is a real edit.</summary>
+    public bool HasEditor => Result.Edit is not null && !IsCreation;
+
+    /// <summary>Rebuilds <see cref="Diff"/> from the text on screen. What Save writes is what is in the editor, so
+    /// the diff shown beside it has to be of that, not of the tool's proposal.</summary>
+    public void RefreshSubmitDiff()
+    {
+        string before = IsCreation ? "" : Result.Edit?.OriginalWikitext ?? "";
+        Replace(Diff, WikitextDiff.Compute(before, _wikitext).Select(l => new DiffLineViewModel(l)));
+        OnPropertyChanged(nameof(HasDiff));
+    }
     public bool HasFindings => Findings.Count > 0;
     public bool HasWarnings => Warnings.Count > 0;
 
@@ -671,6 +751,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             // Typing a correction into a page the tool judged correct is what makes saving possible at all.
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanCreatePage));
+            OnPropertyChanged(nameof(CanSave));
+            OnPropertyChanged(nameof(HasChangesToSubmit));
+            OnPropertyChanged(nameof(CanGoNext));
         }
     }
 
@@ -682,6 +765,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             Set(ref _summary, value);
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanCreatePage));
+            OnPropertyChanged(nameof(CanSave));
         }
     }
 
@@ -693,6 +777,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         set
         {
             Set(ref _outcome, value);
+            OnPropertyChanged(nameof(CanSave));
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanCreatePage));
             OnPropertyChanged(nameof(CanSkip));
@@ -730,6 +815,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         set
         {
             Set(ref _isBusy, value);
+            OnPropertyChanged(nameof(CanSave));
+            OnPropertyChanged(nameof(CanGoNext));
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanCreatePage));
             OnPropertyChanged(nameof(CanSkip));
@@ -794,6 +881,144 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public bool CanSkip =>
         !HasOutcome && !IsBusy &&
         Result.Status is ItemCheckStatus.EditProposed or ItemCheckStatus.NotOnWiki or ItemCheckStatus.NotAnItemPage;
+
+    // ============================ the step-by-step review ============================
+
+    /// <summary>Whether this item gets the step-by-step review at all: something to edit or create, or a page that
+    /// already agrees and may still want its formatting. Everything else is a report with nothing to step through.
+    /// </summary>
+    public bool HasReview =>
+        IsCreation || Result.Status is ItemCheckStatus.EditProposed or ItemCheckStatus.AlreadyCorrect;
+
+    /// <summary>The page of the review this item is on. Each item keeps its own, so switching between them in the list
+    /// returns to where the user left each one.</summary>
+    public ReviewStep Step
+    {
+        get => _step;
+        set
+        {
+            if (_step == value) return;
+            _step = value;
+            OnPropertyChanged(nameof(Step));
+            RebuildSteps();
+        }
+    }
+
+    /// <summary>True when Preview and Submit were passed over — the user said the wiki is right, or there was nothing
+    /// to save — so the timeline shows them as not needed rather than as done.</summary>
+    public bool SkippedSubmit
+    {
+        get => _skippedSubmit;
+        set
+        {
+            _skippedSubmit = value;
+            RebuildSteps();
+        }
+    }
+
+    /// <summary>True once the data edit or the creation has been saved. The pages before it can no longer be gone back
+    /// to, since they describe a page that is not there any more; "Make another edit" starts afresh instead.</summary>
+    public bool Written
+    {
+        get => _written;
+        set
+        {
+            _written = value;
+            RebuildSteps();
+        }
+    }
+
+    public ObservableCollection<StepViewModel> Steps { get; } = [];
+
+    private void RebuildSteps()
+    {
+        // Back is allowed only until something is settled: after a save, or "the wiki is right", the earlier pages
+        // describe a decision already made.
+        bool settledAlready = _skippedSubmit || _written || _step >= ReviewStep.Formatting;
+        var steps = new List<StepViewModel>();
+        foreach (ReviewStep step in Enum.GetValues<ReviewStep>())
+        {
+            StepState state =
+                step == _step ? StepState.Current
+                : _skippedSubmit && step is ReviewStep.Preview or ReviewStep.Submit ? StepState.Skipped
+                : step < _step ? StepState.Finished
+                : StepState.Upcoming;
+
+            bool canJump = step < _step && !settledAlready && state == StepState.Finished;
+            steps.Add(new StepViewModel(step, (int)step + 1, LabelFor(step), state, canJump));
+        }
+
+        Replace(Steps, steps);
+    }
+
+    private string LabelFor(ReviewStep step) => step switch
+    {
+        ReviewStep.Differences => IsCreation ? "New page" : "Differences",
+        ReviewStep.Preview => "Preview",
+        ReviewStep.Submit => "Submit",
+        ReviewStep.Formatting => "Formatting",
+        _ => "Done",
+    };
+
+    /// <summary>Whether the text on screen would change anything: it differs from the page, or it is a new page with
+    /// anything in it. What decides whether there is anything to preview and save.</summary>
+    public bool HasChangesToSubmit => IsCreation
+        ? !string.IsNullOrWhiteSpace(_wikitext)
+        : Result.Page is not null && Result.Edit is not null &&
+          !string.Equals(_wikitext, Result.Edit.OriginalWikitext, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether the first page's Next goes anywhere: on to Preview when there is something to save, or straight to
+    /// Formatting for a page that already agrees and was settled by the check itself.
+    ///
+    /// A page that agrees but still wants a human is not settled, so it has no Next — "the wiki is right" is how it
+    /// moves on, and that is a decision the user has to make rather than one Next makes for them.
+    /// </summary>
+    public bool CanGoNext => !IsBusy && (HasChangesToSubmit || (IsDone && Result.Page is not null));
+
+    /// <summary>Whether the Submit page's button writes anything: the edit or the creation, with a summary.</summary>
+    public bool CanSave => IsCreation ? CanCreatePage : CanAct;
+
+    public string SaveButtonText => IsCreation ? "Create the page" : "Save to the wiki";
+
+    public string SubmitHeading => IsCreation ? "Create the page" : "Save the edit to";
+
+    /// <summary>The title the save goes to — large on the Submit page, since for a creation it is the one thing the
+    /// user is the only one able to judge.</summary>
+    public string SubmitTitle => IsCreation ? Result.Creation?.Title ?? PageTitle : PageTitle;
+
+    /// <summary>A warning shown on the Submit page, worked out from the text on screen when the page is entered — for a
+    /// creation with no <c>lucy_img_ID</c>.</summary>
+    public string? SubmitNotice
+    {
+        get => _submitNotice;
+        set
+        {
+            Set(ref _submitNotice, value);
+            OnPropertyChanged(nameof(HasSubmitNotice));
+        }
+    }
+
+    public bool HasSubmitNotice => !string.IsNullOrEmpty(_submitNotice);
+
+    /// <summary>What the formatting pass had to say besides a layout — fields it kept without a place for them, or
+    /// why it left the page alone. Shown on the Formatting page.</summary>
+    public ObservableCollection<string> FormattingNotes { get; } = [];
+
+    public bool HasFormattingNotes => FormattingNotes.Count > 0;
+
+    public void SetFormatting(FormattingProposal? proposal, IEnumerable<string> notes)
+    {
+        Formatting = proposal;
+        Replace(FormattingNotes, notes.Distinct());
+        OnPropertyChanged(nameof(HasFormattingNotes));
+    }
+
+    /// <summary>The text last rendered for Preview and the document it produced. Kept so going back and forward
+    /// without changing anything does not send the text to the wiki again.</summary>
+    public string? PreviewedText { get; set; }
+
+    public string? PreviewDocument { get; set; }
 
     /// <summary>
     /// The two compliance findings that read as differences rather than as open questions (user, 2026-09-29): the

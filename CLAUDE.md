@@ -1585,16 +1585,61 @@ a global hotkey is worth having.
   the close buttons out of view; the window's minimum width is 700, the narrowest at which a stacked screenshot still
   shows at full size. Verified by rendering at 1500, 1050 and 700px.
 - **Solid buttons are for actions; navigation is a link or an icon** (user, 2026-10-07). Anything that writes to the
-  wiki stays a clear button. History is a link and Settings a cog in the header's right corner; in History, the item
-  name is the page link and Forget is an ✕.
+  wiki stays a clear button. History is a link and Settings a cog in the header's right corner; the hotkey hint beside Capture is a link
+  to Settings > Capture hotkey; in History, the item name is the page link and Forget is an ✕.
 - **Re-check is per item, and only where the ledger let a capture skip the wiki** (user, 2026-10-07), replacing the
   global "Re-check anyway" checkbox. It runs `ReanalyzeAsync`, so the ledger ends up where a fresh check would leave
   it. **That made the `AlreadyChecked` result carry its captured icon**, which it had not: the re-check fingerprints
   whatever icon the result holds, and a row fingerprinted without one never matches the next capture — the
   2026-09-29 ledger bug, reached by a new route. `ReCheckingAnAlreadyCheckedItemKeepsItSettled` fails without it.
   The review screen still hides the icon section for such a result, since nothing was compared.
-- Saving is confirmed explicitly: it writes to a public wiki under the user's own account, and an ordinary editor
-  there cannot delete a revision.
+- **The edit pane is a step-by-step review** (user, 2026-10-07): a timeline over five pages, sliding between them,
+  with the screenshot pane beside it never moving. Each item keeps its own page, so switching items in the list returns
+  to where each was left. An item with nothing to step through (occluded, ineligible, already checked, a Lore-only
+  capture) shows the first page alone, with no timeline.
+  1. **Differences**: warnings, icon, lore, the findings and the raw wikitext editor, open. Next goes to Preview when
+     the text on screen differs from the page (or is a new page), and straight to Formatting for a page that already
+     agrees and was settled by the check. "The wiki is right" settles it here and also goes on to Formatting, Preview
+     and Submit shown as not needed; "Skip for now" is a link and stays put.
+  2. **Preview**: the wiki's own rendering of the text on screen — see the next bullet.
+  3. **Submit**: the title it goes to (large, for a creation), the final diff of the text on screen against the page,
+     the summary, and Save or Create. **This page is the confirmation** (user, 2026-10-07): there is no "are you sure?"
+     after it. The missing-`lucy_img_ID` warning a creation used to put in its confirmation sits here instead, asked of
+     the text on screen as before.
+  4. **Formatting**: the formatting diff with Accept (a wiki write, so a solid button), Skip, or Make another edit; the
+     raw editor is there but **collapsed**, to discourage formatting by hand. Nothing to lay out and nothing to say shows
+     "Formatting looks good" for a moment and moves on by itself; the formatter's notes (a field kept without a place, a
+     page it declined) are shown here instead of in the warning strip.
+  5. **Done**: the live page, with Done (closes the item) and Edit again.
+  - **Back stops at the save.** Once the data edit is written, or the user has said the wiki is right, the earlier
+    pages describe a decision already made, so the timeline will not go back to them; "Edit again" and "Make another
+    edit" re-check the page as it now stands and start from the first page instead.
+  - **Re-checking a page the tool just wrote keeps its row's outcome.** "Edit again" re-checks the page it has just
+    saved, and recording the agreeing page as `Matched` would have erased `Created` — the row most worth finding again.
+    The AlreadyCorrect path keeps an existing `Edited` or `Created`; `ReCheckingAPageJustCreatedKeepsItRecordedAsCreated`
+    fails without it.
+- **Preview is `action=parse`, sent only when the user reaches that page** (`ItemCheckPipeline.PreviewAsync`, the clarified
+  constraint at the top of this file). Rendered once per version of the text: going back and forward without changing
+  anything reuses the rendering. A check never renders — `OnlyAPreviewRendersAndItWritesNothing` pins that with a
+  counting fake.
+  - **`action=parse` leaves out the skin's stylesheet**: its `headhtml` links only `site.styles`, so the item box came out
+    as plain serif text, dark on dark. A real page view links `skins.EQLImmersive.core` and friends separately. The
+    client reads those links once per session from a view of `Special:BlankPage` (`RenderedPage.SkinStylesheets`, which
+    takes only the wiki's own `load.php` addresses), and the document wraps the content in a real page's containers,
+    since the skin's styles are written against them. Rendered, it is indistinguishable from the live page.
+  - **The embedded browser (WebView2) runs with scripts off.** The wiki's scripts include the "not verified" toast, which
+    edits the verification list when someone types into it, and from this browser that would be an anonymous edit
+    nobody meant to make. Nothing inside the review may write to the wiki except the buttons that say so; the item box,
+    the links and the categories all render without scripts (verified on both pages). A clicked link opens in the
+    user's own browser instead of navigating the review away.
+  - **The browser is a native window WPF cannot draw over**, so it is hidden while a dialog is up or a page is sliding,
+    and shown once its page has loaded. Its data lives in `%LOCALAPPDATA%\EQLWikiAssistant\WebView2`; it is created
+    the first time a page needs it, not at launch.
+- **Dialogs are drawn in the window, not by Windows** (`OverlayDialog`, user, 2026-10-07): a dimmed backdrop over the
+  window's content, in the palette, one at a time, awaited by the caller. Every window carries one; the only Windows
+  message box left is the crash handler's, which has to work when the UI itself is broken. The global hotkey is ignored
+  while one is open, as it is while Settings or History is.
+- Icon uploads are still confirmed, as the one write that is not on the Submit page and the one only an admin can undo.
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — `RapidOcrEngine` loads three
   ONNX models in its constructor, the `MediaWikiClient` must keep one cookie container for its whole session, and
   the ledger and icon cache only mean anything shared. Measured: the window is responsive in ~485ms.
@@ -1786,7 +1831,9 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
   now resize and do not reorder.
 - **The title bar is the one part WPF does not own**, so `DarkTitleBar` sets `DWMWA_USE_IMMERSIVE_DARK_MODE` on
   `SourceInitialized` — before that there is no HWND. Failure is ignored: a light caption is cosmetic, refusing to
-  open a window over it would not be. **A `MessageBox` stays light regardless**, since it is drawn by the OS.
+  open a window over it would not be. **A `MessageBox` stays light regardless**, since it is drawn by the OS — which
+  is one reason the app's dialogs are now drawn in the window instead (see `OverlayDialog`); only the crash handler's
+  remains.
 - **Verified by rendering, which is the only way any of this is visible.** The main window through the real
   executable driven by UI Automation; the ledger window and a gallery of the replaced templates through
   `RenderTargetBitmap` in a throwaway harness, because the review screen's detail panel cannot be reached without a

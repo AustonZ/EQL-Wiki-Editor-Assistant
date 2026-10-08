@@ -14,6 +14,8 @@
          hard way twice, most recently by tools/OcrSpike failing at runtime with a missing-model-file error. See
          CLAUDE.md, which flagged this project as needing the same treatment. -->
     <PackageReference Include="RapidOcrNet" Version="4.2.0" />
+    <!-- The review's Preview and Done pages: the wiki's own rendering, in the Edge runtime Windows 11 ships. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
   </ItemGroup>
 
   <PropertyGroup>
