@@ -235,6 +235,28 @@ public sealed class ItemCheckPipeline
         ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
         var warnings = new List<string>(item.Warnings);
 
+        if (item.TitleContentNameMismatch)
+            warnings.Add(
+                "The name in the title bar does not match the one in the window body, which usually means the " +
+                "capture was obscured. Treat this item's data as unreliable.");
+
+        // **Before the Lore branch, not after it** (bug found by the user, 2026-10-07, on `Arydryidriyorn +5`). The
+        // Lore tab shows the level in its title like the Description tab does, and a levelled item's Lore capture
+        // used to be accepted — asking the user for a Description capture the pipeline would then refuse. A Lore
+        // window has no exaltation rows, so for it only the level can block.
+        ItemEligibility eligibility = ItemEligibility.Check(item);
+        if (!eligibility.IsEligible)
+            return new ItemCheckResult
+            {
+                // No ledger row — see ItemEligibility.ShouldWriteLedgerEntry and this type's comment.
+                Status = ItemCheckStatus.Ineligible,
+                ItemName = item.Name,
+                Item = item,
+                WindowImage = crop,
+                Eligibility = eligibility,
+                Warnings = warnings,
+            };
+
         // A Lore capture is a different view of the same item — prose, no stats. It contributes its text and nothing
         // else; the Description capture is what gets analyzed.
         if (window.ActiveTab == ItemWindowTab.Lore)
@@ -253,24 +275,6 @@ public sealed class ItemCheckPipeline
                 Warnings = warnings,
             };
         }
-
-        if (item.TitleContentNameMismatch)
-            warnings.Add(
-                "The name in the title bar does not match the one in the window body, which usually means the " +
-                "capture was obscured. Treat this item's data as unreliable.");
-
-        ItemEligibility eligibility = ItemEligibility.Check(item);
-        if (!eligibility.IsEligible)
-            return new ItemCheckResult
-            {
-                // No ledger row — see ItemEligibility.ShouldWriteLedgerEntry and this type's comment.
-                Status = ItemCheckStatus.Ineligible,
-                ItemName = item.Name,
-                Item = item,
-                WindowImage = crop,
-                Eligibility = eligibility,
-                Warnings = warnings,
-            };
 
         // Read from the frame, not the crop: ItemIconReader works in frame coordinates. It has to happen before the
         // ledger is consulted, because the icon is part of the fingerprint the ledger is keyed on.

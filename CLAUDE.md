@@ -922,6 +922,11 @@ checked properly. `ShouldWriteLedgerEntry` says so on the result rather than lea
   would read an ornamentation named like the item itself as "native". Its explanation also avoids claiming a name
   mismatch, which would be misleading for a slot that is foreign by nature.
 - Every blocker is reported, not just the first, so the user sees the whole picture in one pass.
+- **It runs before the Lore branch, so a Lore-tab capture is judged too** (bug found by the user, 2026-10-07, on
+  `Arydryidriyorn +5`). The Lore tab's title carries the level, but the pipeline used to record a Lore capture's prose
+  before asking whether the item was eligible — so a levelled item was accepted and the list asked for a Description
+  capture the pipeline would then refuse. A Lore window has no exaltation rows, so only the level can block it there;
+  its lore is not kept either. (Its missing icon was not a bug: the Lore tab does not draw the icon at all.)
 
 **Checked-items ledger (`Wiki.Ledger.CheckedItemsLedger`, pipeline step 5).** A local store keyed by item name +
 entity kind, recording each check's outcome, the captured data's fingerprint, the wiki revision seen or written and

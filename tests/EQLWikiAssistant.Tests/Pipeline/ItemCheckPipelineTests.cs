@@ -1148,6 +1148,33 @@ public class ItemCheckPipelineTests
         Assert.Equal("A trophy of the first bashing.", description.Lore);
     }
 
+    /// <summary>
+    /// A levelled item is refused from its Lore tab too (bug found by the user, 2026-10-07, on `Arydryidriyorn +5`).
+    /// The Lore branch returned before eligibility was checked, so the capture was accepted and the list asked for
+    /// the Description tab — of an item that capture would then refuse. Its lore is not kept either: an ineligible
+    /// window leaves nothing behind, in the ledger or anywhere else.
+    /// </summary>
+    [Fact]
+    public async Task ALoreCaptureOfALevelledItemIsIneligibleAndKeepsNothing()
+    {
+        var wiki = new FakeWiki();
+        wiki.Pages["Earring of Bashing"] =
+            new WikiPage("Earring of Bashing", EarringPage(), 100, DateTimeOffset.UnixEpoch);
+
+        OcrLine[] levelledLore =
+            [.. LoreTabLines.Select(l => new OcrLine(l.Text.Replace("Earring of Bashing", "Earring of Bashing +3"), l.BoundingBox, l.Words))];
+        var locator = new FakeLocator(Window(levelledLore, hasLoreTab: true, tab: ItemWindowTab.Lore));
+        var ledger = new CheckedItemsLedger();
+        var pipeline = new ItemCheckPipeline(wiki, locator, ledger);
+
+        ItemCheckResult lore = (await pipeline.CheckAsync(BlankFrame()))[0];
+        Assert.Equal(ItemCheckStatus.Ineligible, lore.Status);
+        Assert.Equal(0, ledger.Count);
+
+        locator.Window = Window(EarringLines, hasLoreTab: true);
+        ItemCheckResult description = (await pipeline.CheckAsync(BlankFrame()))[0];
+        Assert.True(description.NeedsLoreCapture);
+    }
 
     // --- fakes ------------------------------------------------------------------------------------------
 
