@@ -1,4 +1,4 @@
-﻿using EQLWikiAssistant.Core.Icons;
+using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Items;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Wiki.Analysis;
