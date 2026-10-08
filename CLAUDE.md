@@ -124,6 +124,12 @@ wrong value and fails the same way (`E_NOINTERFACE` → `InvalidCastException`, 
 issue); and `Direct3D11CaptureFramePool.Create(...)` silently never raises `FrameArrived` without a `DispatcherQueue`
 pumped on the calling thread — use `CreateFreeThreaded(...)` instead (fine on this app's Windows 11 target).
 
+**The mouse pointer is kept out of captures** (`GraphicsCaptureSession.IsCursorCaptureEnabled = false`, user,
+2026-10-07). A pointer resting on an item window's text reads as missing letters, and plausibly: `Tarnished Ancient
+Tiara` came back as "Tarnishe ncient Tiara", which the tool then offered to create as a new page. The flag removes only
+the pointer Windows composites; a game drawing its own pointer into its frames would be unaffected, and the fallback
+for that is parking the pointer in a screen corner for the capture and putting it back.
+
 **Formatting is a separate edit, and the prettifier that makes it is v1 scope** (user, 2026-09-25, promoted from a
 parked future feature). *"A single 'automatically reformatted' edit with no actual data changes is much easier to
 work with when reviewing diff history."*

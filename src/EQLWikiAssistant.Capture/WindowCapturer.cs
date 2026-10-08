@@ -72,6 +72,12 @@ public sealed class WindowCapturer : IDisposable
         framePool.FrameArrived += OnFrameArrived;
         using GraphicsCaptureSession session = framePool.CreateCaptureSession(item);
 
+        // **No mouse pointer in the frame** (user, 2026-10-07). A pointer resting on an item window's text reads as
+        // missing letters — `Tarnished Ancient Tiara` came back as "Tarnishe ncient Tiara", a plausible new item the
+        // tool offered to create. This only removes the pointer Windows draws; a game that drew its own into its frames
+        // would still show one. Available from Windows 10 2004, which the target framework already requires.
+        session.IsCursorCaptureEnabled = false;
+
         using var registration = cancellationToken.Register(() => frameTcs.TrySetCanceled());
 
         session.StartCapture();
