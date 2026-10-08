@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Documents;
@@ -373,7 +373,7 @@ public partial class MainWindow : Window
         BusyPanel.Visibility = Visibility.Visible;
         try
         {
-            ItemCheckResult updated = await Task.Run(() => services.Pipeline.ReanalyzeAsync(view.Result));
+            ItemCheckResult updated = await Task.Run(() => services.Pipeline.ReanalyzeAsync(view.Result, refreshVerification: true));
             CapturedImage? lore = view.LoreImage;
             view.Load(updated);
             view.LoreImage = lore;
@@ -417,6 +417,12 @@ public partial class MainWindow : Window
     {
         WindowImage.Source = view?.Result.WindowImage is { } image ? Bitmaps.From(image) : null;
         LoreImage.Source = view?.LoreImage is { } lore ? Bitmaps.From(lore) : null;
+        ShotLabel.Text = WindowImage.Source is not null && LoreImage.Source is not null
+            ? "Captured screenshots"
+            : "Captured screenshot";
+        ShotLabel.Visibility = WindowImage.Source is null && LoreImage.Source is null
+            ? Visibility.Collapsed
+            : Visibility.Visible;
 
         // The wiki's icon is a 40x40 file and the game draws its own at roughly 1.1x, so both are shown at 4x —
         // large enough to compare by eye, which is the whole reason they are here.
@@ -510,7 +516,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void ShowStep(ResultViewModel view, bool animate)
     {
-        ReviewStep step = view.HasReview ? view.Step : ReviewStep.Differences;
+        ReviewStep step = view.HasReview ? view.Step : ReviewStep.Edit;
         FrameworkElement incoming = PageFor(step);
         FrameworkElement? outgoing = _shownPage;
         bool forward = step >= _shownStep;
@@ -659,7 +665,7 @@ public partial class MainWindow : Window
 
     private void OnBackClick(object sender, RoutedEventArgs e)
     {
-        if (ResultsList.SelectedItem is not ResultViewModel { Step: > ReviewStep.Differences } view) return;
+        if (ResultsList.SelectedItem is not ResultViewModel { Step: > ReviewStep.Edit } view) return;
         GoTo(view, view.Step - 1);
     }
 
@@ -738,8 +744,10 @@ public partial class MainWindow : Window
         UpdateLedgerText();
 
         // Deliberately not phrased as "done": Skipped never counts as checked, so the item comes back next capture.
-        view.Outcome = "Skipped — it will come back on the next capture.";
-        StatusText.Text = $"'{view.ItemName}' skipped.";
+        StatusText.Text = $"'{view.ItemName}' skipped. It will come back on the next capture.";
+
+        // Skipping closes the item (user, 2026-10-07): there is nothing left to do with it in this session.
+        CloseItem(view);
     }
 
     private async void OnAcceptFormattingClick(object sender, RoutedEventArgs e)
@@ -786,6 +794,8 @@ public partial class MainWindow : Window
     private void OnSkipFormattingClick(object sender, RoutedEventArgs e)
     {
         if (ResultsList.SelectedItem is not ResultViewModel view) return;
+        // Next past a page with nothing to lay out has finished formatting; Skip past a proposal has not.
+        view.SkippedFormatting = view.Formatting is not null;
         GoTo(view, ReviewStep.Done);
     }
 
@@ -793,8 +803,51 @@ public partial class MainWindow : Window
     private void OnDoneClick(object sender, RoutedEventArgs e)
     {
         if (ResultsList.SelectedItem is not ResultViewModel view) return;
+        CloseItem(view);
+    }
+
+    private void CloseItem(ResultViewModel view)
+    {
         _results.Remove(view);
         if (_results.Count > 0 && ResultsList.SelectedItem is null) ResultsList.SelectedIndex = 0;
+    }
+
+    /// <summary>
+    /// Expanding the wikitext source scrolls it into view (user, 2026-10-07): it opens at the bottom of the page, so
+    /// otherwise expanding it can look like nothing happened. Waits for the layout, since the editor has no height
+    /// until it has been measured.
+    /// </summary>
+    private void OnSourceExpanded(object sender, RoutedEventArgs e)
+    {
+        // Only when the user opened it: switching to an item that has it open sets it too.
+        if (sender is not FrameworkElement expander || !(expander.IsMouseOver || expander.IsKeyboardFocusWithin)) return;
+        _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => expander.BringIntoView());
+    }
+
+    /// <summary>
+    /// The "Not verified for EQL" badge, explained (user, 2026-10-07), with the page offered so the user can verify it
+    /// there. The tool itself never verifies a page: verification vouches for the whole page, and the tool reads only
+    /// the item window.
+    /// </summary>
+    private async void OnNotVerifiedClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel view) return;
+
+        bool open = await Dialog.AskAsync(
+            "Not verified for EQL",
+            "The wiki keeps a list of pages that an editor has checked against EverQuest Legends — the whole page, " +
+            "including where the item drops, who sells it and the quests it is in, not only what the item window " +
+            "shows. Until a page is on that list, the wiki shows a notice at the top of it.\n\n" +
+            "This tool only reads the item window, so it never marks a page verified itself. If you have checked the " +
+            "page, type \"Verified\" into the notice on the wiki.",
+            view.HasPage ? "Open the wiki" : "OK",
+            view.HasPage ? "Close" : null,
+            DialogTone.Info);
+
+        if (!open || view.PageUrl is not { } url) return;
+        // Whatever the user does there, the next capture should see it rather than a list read minutes ago.
+        _services?.Pipeline.ExpectVerificationChange();
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 
     private async void OnMarkCheckedClick(object sender, RoutedEventArgs e)

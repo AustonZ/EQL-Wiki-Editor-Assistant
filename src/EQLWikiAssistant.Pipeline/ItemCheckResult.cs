@@ -1,4 +1,4 @@
-using EQLWikiAssistant.Core.Icons;
+﻿using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Items;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Wiki.Analysis;
@@ -157,6 +157,14 @@ public sealed record ItemCheckResult
     /// <summary>True when the window offers a Lore tab whose text has not been captured yet — the prompt for the
     /// two-capture flow.</summary>
     public bool NeedsLoreCapture { get; init; }
+
+    /// <summary>
+    /// The window offers a Lore tab whose text has not been captured, on a result that does not ask for it — one the
+    /// ledger let skip the wiki, where there is no comparison for the lore to join. Kept so that comparing it after
+    /// all ("Refresh wiki data") asks for the Lore tab as a fresh check would (bug found by the user, 2026-10-08, on
+    /// `Tarnished Ancient Tiara`).
+    /// </summary>
+    public bool LoreNotCaptured { get; init; }
 
     /// <summary>Lore recorded from an earlier Lore-tab capture of this item, if any.</summary>
     public string? Lore { get; init; }

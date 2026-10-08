@@ -999,6 +999,12 @@ measured.
 - Cached at `AppPaths.VerifiedPagesFile` with the list's revision id, refreshed at most every 5 minutes (matching the
   wiki's own `wgEQLEraStatusClientTtlSeconds`). The cache is what lets the **ledger-skip path** answer with no wiki
   request at all — and an already-checked item is the one most likely to still be waiting on verification.
+  - **The five minutes are for captures, not for a refresh the user asked for** (bug found by the user, 2026-10-07).
+    They verified a page on the wiki, pressed "Refresh wiki data", and the badge stayed: `ReanalyzeAsync` never read
+    the list at all, and a capture would not have either while the copy in hand was under five minutes old. "Refresh
+    wiki data" and "Edit again" now pass `refreshVerification`, which re-reads it whatever its age; the automatic
+    re-analysis when a Lore capture joins does not. Opening the page from the badge's dialog marks the list stale
+    (`ItemCheckPipeline.ExpectVerificationChange`), so the next capture re-reads it too.
 - **Verification is per-title and sticky, not per-revision.** The list holds bare titles, so editing a verified page
   does *not* un-verify it: a page corrected by this tool stays marked verified although the correction postdates the
   verification. That is the wiki's design, not something to work around, but it is why "already verified" is not
@@ -1568,6 +1574,8 @@ a global hotkey is worth having.
   - **Not verified is a red badge beside the item's name, not a bar** (user, 2026-10-07): it is about the whole page,
     not something to act on in this edit. The pipeline still raises it as `ItemCheckPipeline.NotVerifiedNotice`, and
     `ItemCheckResult.NotVerifiedForEql` reads it off the warnings so the two can never disagree; the strip skips it.
+    **Clicking it explains it** (user, 2026-10-07): what verification vouches for, that the tool never claims it, and
+    how to do it on the wiki, with a button that opens the page.
   - **"Wiki page not verified for EQL" is the whole message** (user, 2026-09-29), down from a sentence explaining what
     verification covers and how to do it. Both are in this file and neither is news to the reader; the page title went
     too, since the panel is headed by the item and links to its page.
@@ -1584,6 +1592,12 @@ a global hotkey is worth having.
   list defaults to 210px (from 300) and trims a long name or status rather than scrolling sideways, which had pushed
   the close buttons out of view; the window's minimum width is 700, the narrowest at which a stacked screenshot still
   shows at full size. Verified by rendering at 1500, 1050 and 700px.
+  - **The page link reads "Open wiki page", on a line of its own with "Refresh wiki data"** (user, 2026-10-07). It used
+    to be the page's title, which nearly always repeats the name above it — but not always: the wiki follows a redirect
+    (`Kiola nut` lands on `Kiola Nut`), and the ledger can record a hand-chosen title (`Cell Key #5` at `Cell Key No.
+    5`). Those show the title beside the link (`ResultViewModel.PageTitleIfDifferent`). The ledger's "edited <date>"
+    stays beside the status, where it no longer reads as the link's date.
+  - **"Captured screenshot(s)" heads the images** (user, 2026-10-07), since they could otherwise be taken for wiki data.
 - **Solid buttons are for actions; navigation is a link or an icon** (user, 2026-10-07). Anything that writes to the
   wiki stays a clear button. History is a link and Settings a cog in the header's right corner; the hotkey hint beside Capture is a link
   to Settings > Capture hotkey; in History, the item name is the page link and Forget is an ✕.
@@ -1597,10 +1611,29 @@ a global hotkey is worth having.
   with the screenshot pane beside it never moving. Each item keeps its own page, so switching items in the list returns
   to where each was left. An item with nothing to step through (occluded, ineligible, already checked, a Lore-only
   capture) shows the first page alone, with no timeline.
-  1. **Differences**: warnings, icon, lore, the findings and the raw wikitext editor, open. Next goes to Preview when
+  1. **Edit** (named for what happens there, a new page included; it was "Differences"): warnings, icon, lore, the
+     findings, the tool's proposed edit as a diff, and "Edit wikitext source" collapsed beneath it (user, 2026-10-07;
+     expanding it scrolls it into view). The proposed diff is fixed at the check (`ProposedDiff`), unlike Submit's,
+     which is built from whatever the editor holds. The source's open state is per item (`SourceExpanded`, user,
+     2026-10-08): closed whenever the item loads afresh — a capture, "Edit again" — and kept otherwise, so Back from
+     Preview finds it as it was left. Next goes to Preview when
      the text on screen differs from the page (or is a new page), and straight to Formatting for a page that already
      agrees and was settled by the check. "The wiki is right" settles it here and also goes on to Formatting, Preview
-     and Submit shown as not needed; "Skip for now" is a link and stays put.
+     and Submit shown as not needed; "Skip for now" is a link and closes the item.
+     - **A settled item reads "Pending formatting" until it reaches Done** (user, 2026-10-07): "Done" after "the wiki
+       is right" or a save claimed a review that still had a step to go.
+     - **Lore and every cell of the findings table are selectable text** (user, 2026-10-07): a read-only box drawn as a
+       label, whose first click selects the whole value (`Behaviors.SelectAllOnFirstClick`). The table's rows are never
+       selected (`Behaviors.NoRowSelection`), which did nothing useful and competed with selecting text. A DataGrid
+       cannot switch selection off, so the selection is undone once the grid has finished with the click — undone
+       during its own handling, a second click selected the row anyway (user, 2026-10-08) — and a selected cell draws
+       no highlight in case one slips through.
+     - **Every diff is selectable, across lines** (`DiffView`, user, 2026-10-08): one read-only document rather than a
+       text block per line. The line numbers and +/- marker sit in a gutter outside the text, and a copy is rebuilt
+       from each line's own text, so what is copied is wikitext that can be pasted straight into a page — no
+       numbers, no markers, no "... N unchanged lines ...". The Edit, Submit and Formatting pages share it.
+     - **The capture prompts have no button** (user, 2026-10-07): "Switch to it in game, then capture again." The
+       button was clipped, and capturing again is the hotkey or Capture now like any capture.
   2. **Preview**: the wiki's own rendering of the text on screen — see the next bullet.
   3. **Submit**: the title it goes to (large, for a creation), the final diff of the text on screen against the page,
      the summary, and Save or Create. **This page is the confirmation** (user, 2026-10-07): there is no "are you sure?"
@@ -1610,7 +1643,11 @@ a global hotkey is worth having.
      raw editor is there but **collapsed**, to discourage formatting by hand. Nothing to lay out and nothing to say shows
      "Formatting looks good" for a moment and moves on by itself; the formatter's notes (a field kept without a place, a
      page it declined) are shown here instead of in the warning strip.
-  5. **Done**: the live page, with Done (closes the item) and Edit again.
+  5. **Done**: the live page, with Done (closes the item) and Edit again. Its own marker shows a green check, since
+     arriving there means everything is finished.
+  - **A skipped step has its own marker** (user, 2026-10-07): a hollow dashed ring around a skip-forward glyph, its
+    label struck through — not the checkmark of a finished step. Preview and Submit are skipped by "the wiki is right"
+    or a page with nothing to save; Formatting by its Skip. Formatting that found nothing to do is finished, not skipped.
   - **Back stops at the save.** Once the data edit is written, or the user has said the wiki is right, the earlier
     pages describe a decision already made, so the timeline will not go back to them; "Edit again" and "Make another
     edit" re-check the page as it now stands and start from the first page instead.
@@ -1889,6 +1926,12 @@ unsettled rows are the state that accumulates silently and nothing else surfaces
 A Lore-tab window contributes its prose and nothing else (`LoreRecorded`); a Description capture of an item whose
 lore has not been seen reports `NeedsLoreCapture` and is `Flagged` rather than `Matched`; the two are joined by item
 name across frames, and the pipeline attaches the lore to the parsed item so the analyzer sees one complete capture.
+- **An already-checked result keeps the fact that its lore was not captured** (`ItemCheckResult.LoreNotCaptured`;
+  bug found by the user, 2026-10-08, on `Tarnished Ancient Tiara`). The item had been settled by hand without its
+  lore, so a Description capture was let skip the wiki; "Refresh wiki data" then proposed changes without asking for
+  the Lore tab, because the ledger-skip result had dropped the window's Lore tab and the refresh is rebuilt from that
+  result. The already-checked screen itself still does not ask, since the user settled that item; only comparing it
+  after all does. `RefreshingAnAlreadyCheckedItemAsksForItsMissingLore` fails without it.
 - **Lore is added when the page has none and never overwritten when it has some** (user, 2026-09-28, confirming the
   proposed rule and asking for the warning below). This is deliberately narrower than the rule every other field
   follows, for two reasons that point the same way. **Prose is where a reading error costs most and shows least** —

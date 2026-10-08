@@ -21,6 +21,21 @@
             <Setter Property="FontSize" Value="12" />
         </Style>
 
+        <!-- Text the user may want to copy, drawn like a label: read-only, no box, no border, wrapping (user,
+             2026-10-07). The first click selects it all. The wheel is passed on, since a text box's own scroller would
+             otherwise swallow it and stop the page scrolling under the cursor. -->
+        <Style x:Key="SelectableItemData" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="local:Behaviors.SelectAllOnFirstClick" Value="True" />
+            <EventSetter Event="PreviewMouseWheel" Handler="OnPassScrollToParent" />
+        </Style>
+
         <!-- The screenshot pane, sized so a window is always shown at its native size, scrollbar or not (user,
              2026-10-07): the 16px left margin, the widest default-size item window (408px, measured), 8px between it
              and the scrollbar, and the theme's 12px scrollbar. At 430 a Description and a Lore capture together made the
@@ -187,9 +202,11 @@
                                          FontWeight="Bold" TextWrapping="Wrap" VerticalAlignment="Center"
                                          Background="Transparent" BorderThickness="0" Padding="0"
                                          Margin="-2,0,12,0" />
+                                <!-- Clickable (user, 2026-10-07): it explains what it means and offers the page, where
+                                     verifying it is done. -->
                                 <Border Background="{StaticResource AttentionBrush}" CornerRadius="3" Padding="8,2"
-                                        VerticalAlignment="Center"
-                                        ToolTip="This page is not on the wiki's Verified for EQLegends list"
+                                        VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="OnNotVerifiedClick"
+                                        ToolTip="What does this mean?"
                                         Visibility="{Binding Result.NotVerifiedForEql, Converter={StaticResource BoolToVis}}">
                                     <TextBlock Text="Not verified for EQL" FontWeight="Bold" FontSize="13"
                                                Foreground="{StaticResource SurfaceBrush}" />
@@ -198,26 +215,34 @@
 
                             <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
                                 <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontWeight="SemiBold" />
-                                <TextBlock Text="  —  " Foreground="{StaticResource TextDimBrush}"
-                                           Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}" />
-                                <TextBlock Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}">
-                                    <Hyperlink Click="OnOpenPageClick">
-                                        <TextBlock Text="{Binding PageTitle}" />
-                                    </Hyperlink>
-                                </TextBlock>
                                 <TextBlock Text="{Binding LedgerNote}" Foreground="{StaticResource TextDimBrush}" Margin="8,0,0,0"
                                            Visibility="{Binding HasLedgerNote, Converter={StaticResource BoolToVis}}" />
                             </WrapPanel>
-                            <!-- Only where the ledger let this capture skip the wiki, replacing the global checkbox
-                                 (user, 2026-10-07). A link, since it only reads the wiki; on its own line, because the
-                                 status row above already wraps on a long page title. The icon is part of the link. -->
-                            <TextBlock Margin="0,4,0,0"
-                                       Visibility="{Binding CanReCheck, Converter={StaticResource BoolToVis}}">
-                                <Hyperlink Click="OnReCheckClick"
-                                           ToolTip="Compare it against the wiki now, even though nothing has changed since it was checked"><Run
-                                    Text="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BaselineAlignment="Center" /><Run
-                                    Text=" Refresh wiki data" /></Hyperlink>
-                            </TextBlock>
+
+                            <!-- The page link reads "Open wiki page" rather than the title (user, 2026-10-07), since the
+                                 title is the item's name above it nearly always. Not always: a redirect lands on another
+                                 title, so that one is shown beside the link. Re-check shares the line, only where the
+                                 ledger let this capture skip the wiki (replacing the global checkbox). Both are links,
+                                 since neither writes anything. -->
+                            <WrapPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Margin="0,0,16,0" Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}">
+                                    <Hyperlink Click="OnOpenPageClick" ToolTip="{Binding PageUrl}"><Run
+                                        Text="&#xE8A7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BaselineAlignment="Center" /><Run
+                                        Text=" Open wiki page" /></Hyperlink><Run
+                                        Text="{Binding PageTitleIfDifferent, Mode=OneWay}" Foreground="{StaticResource TextDimBrush}" />
+                                </TextBlock>
+                                <TextBlock Visibility="{Binding CanReCheck, Converter={StaticResource BoolToVis}}">
+                                    <Hyperlink Click="OnReCheckClick"
+                                               ToolTip="Compare it against the wiki now, even though nothing has changed since it was checked"><Run
+                                        Text="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BaselineAlignment="Center" /><Run
+                                        Text=" Refresh wiki data" /></Hyperlink>
+                                </TextBlock>
+                            </WrapPanel>
+
+                            <!-- Says where the pictures came from, since they could otherwise be taken for the wiki's own
+                                 (user, 2026-10-07). Plural once the Lore capture joins the Description one. -->
+                            <TextBlock x:Name="ShotLabel" Text="Captured screenshot" Style="{StaticResource SectionHeading}"
+                                       Margin="0,14,0,4" />
 
                             <!-- **Always at full size** (user, 2026-10-07): the screenshot is the reference the user reads
                                  the right-hand side against, and a shrunken one loses exactly that. A window wider than
@@ -226,7 +251,7 @@
                                  stay put and keep wrapping to the pane's width. The wheel goes to the page, since this
                                  scroller only ever scrolls sideways. -->
                             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                                          PreviewMouseWheel="OnPassScrollToParent" Margin="0,12,0,0">
+                                          PreviewMouseWheel="OnPassScrollToParent" Margin="0,4,0,0">
                                 <StackPanel>
                                     <Image x:Name="WindowImage" Stretch="None" UseLayoutRounding="True"
                                            HorizontalAlignment="Left" VerticalAlignment="Top" />
@@ -241,7 +266,7 @@
                 </ScrollViewer>
 
             <!-- **The edit pane is a step-by-step review** (user, 2026-10-07): a timeline over five pages, one shown at a
-                 time and sliding between them — Differences, Preview, Submit, Formatting, Done. The screenshot pane
+                 time and sliding between them — Edit, Preview, Submit, Formatting, Done. The screenshot pane
                  beside it never moves. An item with nothing to step through (occluded, ineligible, already checked, ...)
                  shows the first page alone, with no timeline. -->
             <DockPanel Grid.Column="1" x:Name="EditPane">
@@ -263,13 +288,39 @@
                                             Cursor="Hand" ToolTip="{Binding Tip}">
                                         <StackPanel Orientation="Horizontal">
                                             <Grid Width="20" Height="20" VerticalAlignment="Center">
-                                                <Ellipse Fill="{Binding Marker}" />
+                                                <Ellipse Fill="{Binding Marker}">
+                                                    <Ellipse.Style>
+                                                        <Style TargetType="Ellipse">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsSkipped}" Value="True">
+                                                                    <Setter Property="Stroke" Value="{StaticResource TextMutedBrush}" />
+                                                                    <Setter Property="StrokeThickness" Value="1.5" />
+                                                                    <Setter Property="StrokeDashArray" Value="2 1.6" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Ellipse.Style>
+                                                </Ellipse>
                                                 <TextBlock Text="{Binding MarkerText}" FontSize="11" FontWeight="SemiBold"
                                                            Foreground="{Binding MarkerForeground}"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <TextBlock Text="&#xE893;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                           FontSize="9" Foreground="{StaticResource TextMutedBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Visibility="{Binding IsSkipped, Converter={StaticResource BoolToVis}}" />
                                             </Grid>
                                             <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}"
-                                                       FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                       FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSkipped}" Value="True">
+                                                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                         </StackPanel>
                                     </Button>
                                     <Rectangle Width="22" Height="1" Margin="4,0" VerticalAlignment="Center"
@@ -284,7 +335,7 @@
                 <!-- The pages overlap here, one visible at a time; changing page slides one out and the next in. -->
                 <Grid x:Name="PageHost" ClipToBounds="True">
 
-            <!-- 1. Differences. -->
+            <!-- 1. Edit. -->
             <!-- No padding on the scroller itself: it sat inside the scrolling area, so clipped content stopped short
                  of the border above and below (user, 2026-10-07). The panel's own margin scrolls with it instead. -->
             <ScrollViewer x:Name="DetailScroller" VerticalScrollBarVisibility="Auto">
@@ -436,12 +487,8 @@
                     <Border Visibility="{Binding WantsDescriptionCapture, Converter={StaticResource BoolToVis}}"
                             Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1" CornerRadius="3"
                             Padding="10,7" Margin="0,12,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
-                                       Text="This item's Description tab has not been captured yet. Switch to it in game, then:" />
-                            <Button Content="Capture the Description tab" Click="OnCaptureClick" Padding="12,4"
-                                    Margin="10,0,0,0" VerticalAlignment="Center" />
-                        </StackPanel>
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
+                                   Text="This item's Description tab has not been captured yet. Switch to it in game, then capture again." />
                     </Border>
 
                     <!-- One lore region, always in the same place: the prompt to capture the Lore tab, the lore once
@@ -450,17 +497,13 @@
                     <StackPanel Visibility="{Binding HasLoreSection, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="Lore" Style="{StaticResource SectionHeading}" />
 
-                        <!-- Waiting for the second capture. The button just captures again, so the user switches
-                             tab in game and clicks here — or presses the same hotkey. -->
+                        <!-- Waiting for the second capture. No button of its own (user, 2026-10-07): capturing again
+                             is the hotkey or Capture now, as for any capture, and the button was being clipped. -->
                         <Border Visibility="{Binding WantsLoreCapture, Converter={StaticResource BoolToVis}}"
                                 Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1" CornerRadius="3"
                                 Padding="10,7">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
-                                           Text="This item has a Lore tab that has not been captured yet. Switch to it in game, then:" />
-                                <Button Content="Capture the Lore tab" Click="OnCaptureClick" Padding="12,4"
-                                        Margin="10,0,0,0" VerticalAlignment="Center" />
-                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
+                                       Text="This item has a Lore tab that has not been captured yet. Switch to it in game, then capture again." />
                         </Border>
 
                         <!-- Captured, and the page has none to compare against — it will be added by the edit. -->
@@ -469,7 +512,7 @@
                             <StackPanel>
                                 <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"
                                            Margin="0,0,0,4" />
-                                <TextBlock Text="{Binding CapturedLore}" TextWrapping="Wrap" Style="{StaticResource ItemData}" />
+                                <TextBox Text="{Binding CapturedLore, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -489,7 +532,7 @@
                                 <StackPanel>
                                     <TextBlock Text="On the wiki (kept)" FontWeight="SemiBold" Foreground="{StaticResource DoneBrush}"
                                                Margin="0,0,0,4" />
-                                    <TextBlock Text="{Binding LoreOnWiki}" TextWrapping="Wrap" Style="{StaticResource ItemData}" />
+                                    <TextBox Text="{Binding LoreOnWiki, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="1" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
@@ -497,7 +540,7 @@
                                 <StackPanel>
                                     <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"
                                                Margin="0,0,0,4" />
-                                    <TextBlock Text="{Binding LoreInGame}" TextWrapping="Wrap" Style="{StaticResource ItemData}" />
+                                    <TextBox Text="{Binding LoreInGame, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -507,55 +550,94 @@
                                Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}" />
                     <!-- PreviewMouseWheel: a DataGrid has its own ScrollViewer, which swallows the wheel even when
                          it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
+                    <!-- Every cell is selectable text (user, 2026-10-07): the first click selects the whole value, later
+                         ones pick out part of it. Rows are never selected, which did nothing useful. The text takes the
+                         row's colour, since a text box sets its own foreground rather than inheriting one. -->
                     <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
                               CanUserReorderColumns="False" CanUserResizeColumns="True"
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
                               BorderBrush="{StaticResource BorderBrushKey}" HorizontalScrollBarVisibility="Disabled"
                               ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                              PreviewMouseWheel="OnPassScrollToPage"
+                              PreviewMouseWheel="OnPassScrollToPage" local:Behaviors.NoRowSelection="True"
                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
+                        <DataGrid.Resources>
+                            <Style x:Key="FindingCell" TargetType="TextBox" BasedOn="{StaticResource SelectableItemData}">
+                                <Setter Property="Margin" Value="2,3" />
+                                <Setter Property="Foreground" Value="{Binding Foreground}" />
+                            </Style>
+                            <Style x:Key="FindingProse" TargetType="TextBox" BasedOn="{StaticResource FindingCell}">
+                                <Setter Property="FontFamily" Value="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                <Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+                            </Style>
+                        </DataGrid.Resources>
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Field" Binding="{Binding Field}" Width="1.2*" />
-                            <!-- Template columns so the compared values wrap. As text columns they truncated, which
-                                 hid the very thing the row exists to show — an effect line or a lore paragraph is
-                                 far wider than a cell. -->
+                            <DataGridTemplateColumn Header="Field" Width="1.2*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding Field, Mode=OneWay}" Style="{StaticResource FindingProse}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <!-- The compared values wrap: an effect line or a lore paragraph is far wider than a cell, and
+                                 truncating it hid the very thing the row exists to show. -->
                             <DataGridTemplateColumn Header="In game" Width="1.6*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Captured}" TextWrapping="Wrap" Margin="2,3" Style="{StaticResource ItemData}" />
+                                        <TextBox Text="{Binding Captured, Mode=OneWay}" Style="{StaticResource FindingCell}" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
                             <DataGridTemplateColumn Header="On the wiki" Width="1.6*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding OnWiki}" TextWrapping="Wrap" Margin="2,3" Style="{StaticResource ItemData}" />
+                                        <TextBox Text="{Binding OnWiki, Mode=OneWay}" Style="{StaticResource FindingCell}" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Verdict" Binding="{Binding Verdict}" Width="Auto" />
-                            <!-- A template column so the note wraps. As a text column it truncated mid-sentence,
-                                 which loses the part explaining *why* the tool concluded what it did. -->
+                            <DataGridTemplateColumn Header="Verdict" Width="Auto">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding Verdict, Mode=OneWay}" Style="{StaticResource FindingProse}"
+                                                 TextWrapping="NoWrap" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <!-- The note wraps; truncated mid-sentence it lost the part explaining *why*. -->
                             <DataGridTemplateColumn Header="Note" Width="2.2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Margin="2,3" />
+                                        <TextBox Text="{Binding Explanation, Mode=OneWay}" Style="{StaticResource FindingProse}" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
-                        <DataGrid.RowStyle>
-                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                                <Setter Property="Foreground" Value="{Binding Foreground}" />
+                        <!-- A row that gets selected regardless (a second click does it) shows nothing: the
+                             highlight sat behind the text's own selection and made it hard to read (user, 2026-10-08). -->
+                        <DataGrid.CellStyle>
+                            <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                                <Setter Property="Focusable" Value="False" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="Transparent" />
+                                    </Trigger>
+                                </Style.Triggers>
                             </Style>
-                        </DataGrid.RowStyle>
+                        </DataGrid.CellStyle>
                     </DataGrid>
 
 
-                    <!-- **The editor is open at the bottom of the first page** (user, 2026-10-07): the findings say what the
-                         tool would change, and this is where the user changes it further. What is in it is what Preview
-                         renders and Submit saves. -->
-                    <Expander Header="Raw wikitext" Margin="0,14,0,0" IsExpanded="True"
+                    <!-- **The tool's own proposal as a diff, and the source collapsed beneath it** (user, 2026-10-07). The
+                         diff is the edit the tool worked out, fixed when the item was checked; Submit shows the final
+                         one, from whatever the editor then holds. The source is there to change it further, and what is
+                         in it is what Preview renders and Submit saves. Expanding it brings it into view. -->
+                    <StackPanel Visibility="{Binding HasProposedDiff, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Proposed edit" Style="{StaticResource SectionHeading}" />
+                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3">
+                            <local:DiffView Lines="{Binding ProposedDiff}" />
+                        </Border>
+                    </StackPanel>
+                    <Expander x:Name="SourceExpander" Header="Edit wikitext source" Margin="0,14,0,0"
+                              Expanded="OnSourceExpanded" IsExpanded="{Binding SourceExpanded}"
                               Visibility="{Binding HasEditor, Converter={StaticResource BoolToVis}}">
                         <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
                                  FontFamily="Consolas" FontSize="12" Height="320" VerticalScrollBarVisibility="Auto"
@@ -641,23 +723,7 @@
 
                     <TextBlock Text="What will be written" Style="{StaticResource SectionHeading}" />
                     <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3">
-                        <ItemsControl ItemsSource="{Binding Diff}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Background="{Binding Background}">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{Binding LineNumbers}" FontFamily="Consolas"
-                                                   FontSize="11" Foreground="{StaticResource TextDimBrush}" Margin="4,0,8,0" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas"
-                                                   FontSize="12" Foreground="{Binding Foreground}"
-                                                   TextWrapping="Wrap" Margin="0,0,4,0" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <local:DiffView Lines="{Binding Diff}" />
                     </Border>
 
                     <TextBlock Text="Edit summary" Style="{StaticResource SectionHeading}" />
@@ -712,23 +778,7 @@
                         </Border>
 
                         <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3" Margin="0,8,0,0">
-                            <ItemsControl ItemsSource="{Binding FormattingDiff}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Background="{Binding Background}">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{Binding LineNumbers}" FontFamily="Consolas"
-                                                       FontSize="11" Foreground="{StaticResource TextDimBrush}" Margin="4,0,8,0" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas"
-                                                       FontSize="12" Foreground="{Binding Foreground}"
-                                                       TextWrapping="Wrap" Margin="0,0,4,0" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <local:DiffView Lines="{Binding FormattingDiff}" />
                         </Border>
 
                         <!-- **Collapsed by default** (user, 2026-10-07), to discourage formatting by hand: the formatter is

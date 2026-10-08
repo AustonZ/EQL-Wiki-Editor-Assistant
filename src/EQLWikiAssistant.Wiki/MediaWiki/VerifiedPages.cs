@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace EQLWikiAssistant.Wiki.MediaWiki;
 
@@ -86,9 +86,23 @@ public sealed class VerifiedPages
     /// that the wiki is gone (user, 2026-09-29). An error *about this page* is a different matter and is swallowed:
     /// whether somebody has ticked a box on a web page is not a reason to fail an item.
     /// </summary>
-    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsync(false, cancellationToken);
+
+    /// <summary>Makes the next <see cref="RefreshAsync(CancellationToken)"/> re-read the list whatever its age — for
+    /// when the user has gone to the wiki to verify a page. The copy in hand still answers until then.</summary>
+    public void MarkStale() => _loadedAt = DateTimeOffset.MinValue;
+
+    /// <summary>
+    /// Re-reads the list, now when <paramref name="evenIfRecent"/> is set — for a refresh the user asked for.
+    ///
+    /// **The age limit is for captures, not for a deliberate refresh** (bug found by the user, 2026-10-07). They marked
+    /// a page verified on the wiki and pressed "Refresh wiki data", and the badge stayed: the list read a minute earlier
+    /// was still inside its five minutes, so nothing re-read it. A capture repeated every few seconds is what the limit
+    /// spares the wiki from; a refresh is one request the user expects to see the result of.
+    /// </summary>
+    public async Task RefreshAsync(bool evenIfRecent, CancellationToken cancellationToken = default)
     {
-        if (_titles is not null && _time.GetUtcNow() - _loadedAt < RefreshAfter) return;
+        if (!evenIfRecent && _titles is not null && _time.GetUtcNow() - _loadedAt < RefreshAfter) return;
 
         try
         {

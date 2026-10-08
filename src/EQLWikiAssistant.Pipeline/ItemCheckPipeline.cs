@@ -1,4 +1,4 @@
-using EQLWikiAssistant.Core.Icons;
+﻿using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Items;
 using EQLWikiAssistant.Core.Locate;
 using EQLWikiAssistant.Core.Ocr;
@@ -191,6 +191,12 @@ public sealed class ItemCheckPipeline
         warnings.Add(NotVerifiedNotice);
     }
 
+    /// <summary>
+    /// The user has gone to the wiki, perhaps to verify a page, so the next capture re-reads the verified list rather
+    /// than trusting one read minutes ago (user, 2026-10-07).
+    /// </summary>
+    public void ExpectVerificationChange() => _verified?.MarkStale();
+
     /// <summary>The verification notice. Public so the review screen can show it as a badge beside the item's name
     /// (user, 2026-10-07) rather than as one more bar in the strip — see <see cref="ItemCheckResult.NotVerifiedForEql"/>.</summary>
     public const string NotVerifiedNotice = "Wiki page not verified for EQL";
@@ -323,6 +329,7 @@ public sealed class ItemCheckPipeline
                 LedgerVerdict = verdict,
                 LedgerRow = _ledger.Find(item.Name),
                 Lore = lore,
+                LoreNotCaptured = needsLore,
                 Warnings = warnings,
             };
         }
@@ -903,13 +910,20 @@ public sealed class ItemCheckPipeline
     /// The parsed item and its icon have not changed, so nothing is re-read from pixels; only the comparison against
     /// the page is redone, now with a complete capture. Without this the user would have to capture the Description
     /// tab a second time for the lore to reach the edit.
+    ///
+    /// <paramref name="refreshVerification"/> is for a re-analysis the user asked for ("Refresh wiki data", "Edit
+    /// again"): it re-reads the verified-pages list too, whatever its age, since marking the page verified on the wiki
+    /// is one of the things the user may have just done (bug found by the user, 2026-10-07).
     /// </summary>
     public async Task<ItemCheckResult> ReanalyzeAsync(
-        ItemCheckResult previous, CancellationToken cancellationToken = default)
+        ItemCheckResult previous, CancellationToken cancellationToken = default, bool refreshVerification = false)
     {
         ArgumentNullException.ThrowIfNull(previous);
         if (previous.Item is not { } item)
             throw new InvalidOperationException("This result has no parsed item, so there is nothing to re-analyze.");
+
+        if (refreshVerification && _verified is not null)
+            await _verified.RefreshAsync(evenIfRecent: true, cancellationToken).ConfigureAwait(false);
 
         string? lore = PendingLoreFor(item.Name);
         string fingerprint = ItemFingerprint.Compute(item, previous.CapturedIcon, lore);
@@ -925,7 +939,7 @@ public sealed class ItemCheckPipeline
                     // The icon has not been re-read, so whatever was said about it still holds.
                     previous.IconNote,
                     lore,
-                    needsLore: lore is null && previous.NeedsLoreCapture,
+                    needsLore: lore is null && (previous.NeedsLoreCapture || previous.LoreNotCaptured),
                     fingerprint,
                     [.. item.Warnings],
                     cancellationToken)

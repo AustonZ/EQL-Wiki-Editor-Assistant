@@ -1,4 +1,4 @@
-using EQLWikiAssistant.Core.Locate;
+﻿using EQLWikiAssistant.Core.Locate;
 using EQLWikiAssistant.Core.Icons;
 using EQLWikiAssistant.Core.Ocr;
 using EQLWikiAssistant.Pipeline;
@@ -325,6 +325,31 @@ public class ItemCheckPipelineTests
         Assert.Equal(after, wiki.Fetches);
     }
 
+    /// <summary>
+    /// **Refreshing an already-checked item asks for its Lore tab like a fresh check would** (bug found by the user,
+    /// 2026-10-08, on `Tarnished Ancient Tiara`). The item had been settled by hand without its lore; a Description
+    /// capture was then let skip the wiki, and "Refresh wiki data" proposed changes without asking for the Lore tab,
+    /// because the already-checked result had dropped the window's Lore tab and the refresh is built from it.
+    /// </summary>
+    [Fact]
+    public async Task RefreshingAnAlreadyCheckedItemAsksForItsMissingLore()
+    {
+        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines, hasLoreTab: true), UntidyPage());
+
+        IReadOnlyList<ItemCheckResult> first = await pipeline.CheckAsync(FrameWithIcon());
+        Assert.True(first[0].NeedsLoreCapture);
+        pipeline.RecordCheckedByHand(first[0]);
+
+        IReadOnlyList<ItemCheckResult> again = await pipeline.CheckAsync(FrameWithIcon());
+        Assert.Equal(ItemCheckStatus.AlreadyChecked, again[0].Status);
+        // The already-checked screen itself does not ask: the user settled the item, lore and all.
+        Assert.False(again[0].NeedsLoreCapture);
+
+        ItemCheckResult refreshed = await pipeline.ReanalyzeAsync(again[0], refreshVerification: true);
+
+        Assert.True(refreshed.NeedsLoreCapture);
+    }
+
     /// <summary>The same round trip through a commit, which shared the same broken fingerprint.</summary>
     [Fact]
     public async Task AnItemCommittedIsNotCheckedAgain()
@@ -479,6 +504,38 @@ public class ItemCheckPipelineTests
         Assert.Contains(results[0].Warnings, w => w.Contains("not verified for EQL", StringComparison.Ordinal));
         Assert.False(results[0].NeedsAttention);
         Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    /// <summary>
+    /// **A refresh the user asked for re-reads the list, however recently it was read** (bug found by the user,
+    /// 2026-10-07): they marked the page verified on the wiki, pressed "Refresh wiki data", and the badge stayed, because
+    /// the list was inside its five-minute age limit. The automatic re-analysis — a lore capture joining — is the
+    /// control: it still uses the copy in hand.
+    /// </summary>
+    [Fact]
+    public async Task ARefreshTheUserAskedForSeesAPageVerifiedSinceTheCheck()
+    {
+        var wiki = new FakeWiki();
+        wiki.Pages["Earring of Bashing"] =
+            new WikiPage("Earring of Bashing", EarringPage(), 100, DateTimeOffset.UnixEpoch);
+        wiki.Pages[VerifiedPages.ListPageTitle] =
+            new WikiPage(VerifiedPages.ListPageTitle, "Some_Other_Page", 1, DateTimeOffset.UnixEpoch);
+        var verified = new VerifiedPages(wiki, Path.Combine(Path.GetTempPath(), $"verified-{Guid.NewGuid():N}.json"));
+        var pipeline = new ItemCheckPipeline(
+            wiki, new FakeLocator(Window(EarringLines)), new CheckedItemsLedger(), verified: verified);
+
+        IReadOnlyList<ItemCheckResult> first = await pipeline.CheckAsync(BlankFrame());
+        Assert.True(first[0].NotVerifiedForEql);
+
+        // The user verifies the page on the wiki a moment later.
+        wiki.Pages[VerifiedPages.ListPageTitle] = new WikiPage(
+            VerifiedPages.ListPageTitle, "Some_Other_Page\nEarring_of_Bashing", 2, DateTimeOffset.UnixEpoch);
+
+        ItemCheckResult automatic = await pipeline.ReanalyzeAsync(first[0]);
+        Assert.True(automatic.NotVerifiedForEql);
+
+        ItemCheckResult refreshed = await pipeline.ReanalyzeAsync(first[0], refreshVerification: true);
+        Assert.False(refreshed.NotVerifiedForEql);
     }
 
     /// <summary>The other branch says nothing at all. An alert on every page — either "not yet verified" or "already

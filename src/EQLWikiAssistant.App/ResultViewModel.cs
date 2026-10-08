@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -129,7 +129,7 @@ public sealed record FindingViewModel(
 /// <summary>The pages of the step-by-step review, in order (user, 2026-10-07).</summary>
 public enum ReviewStep
 {
-    Differences,
+    Edit,
     Preview,
     Submit,
     Formatting,
@@ -151,32 +151,40 @@ public sealed record StepViewModel(ReviewStep Step, int Number, string Label, St
     {
         StepState.Current => Palette.Text,
         StepState.Finished => Palette.Done,
-        StepState.Skipped => Palette.Dim,
         _ => Palette.Muted,
     };
 
-    /// <summary>The circle's fill: the accent for where the user is, the done colour for what is behind them.</summary>
+    /// <summary>The circle's fill: the accent for where the user is, the done colour for what is behind them. A skipped
+    /// step is hollow — passed over, with nothing in it.</summary>
     public Brush Marker => State switch
     {
         StepState.Current => Palette.Accent,
         StepState.Finished => Palette.Done,
+        StepState.Skipped => Brushes.Transparent,
         _ => Palette.Raised,
     };
 
     /// <summary>Dark on the two filled markers, muted on the empty ones.</summary>
     public Brush MarkerForeground => State is StepState.Current or StepState.Finished ? Palette.Surface : Palette.Muted;
 
+    /// <summary>
+    /// A skipped step is a hollow, dashed ring around a skip-forward glyph, with its label struck through (user,
+    /// 2026-10-07, who asked for something other than the checkmark it had shared with a finished step). The dashes and
+    /// the strike say "not done" and the glyph says "on purpose", so it reads as neither finished nor forgotten.
+    /// </summary>
+    public bool IsSkipped => State == StepState.Skipped;
+
     public string MarkerText => State switch
     {
         StepState.Finished => "✓",
-        StepState.Skipped => "–",
+        StepState.Skipped => "",
         _ => Number.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
 
     /// <summary>The connector after this stop; the last has none.</summary>
     public bool HasConnector => Step != ReviewStep.Done;
 
-    public string? Tip => CanJump ? $"Back to {Label}" : State == StepState.Skipped ? "Not needed for this item" : null;
+    public string? Tip => CanJump ? $"Back to {Label}" : State == StepState.Skipped ? "Skipped" : null;
 }
 
 /// <summary>
@@ -200,6 +208,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private bool _settled;
     private ReviewStep _step;
     private bool _skippedSubmit;
+    private bool _skippedFormatting;
+    private bool _sourceExpanded;
     private bool _written;
     private string? _submitNotice;
 
@@ -231,14 +241,19 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         _formattingOutcome = null;
         // Every reload starts the review over: a re-capture, a lore capture joining, or "Edit again" after a save all
         // mean there is a fresh comparison to read first.
-        _step = ReviewStep.Differences;
+        _step = ReviewStep.Edit;
         _skippedSubmit = false;
+        _skippedFormatting = false;
+        _sourceExpanded = false;
         _written = false;
         _submitNotice = null;
         PreviewedText = null;
         PreviewDocument = null;
         FormattingNotes.Clear();
         Diff.Clear();
+        Replace(ProposedDiff, result.Edit is { HasChanges: true } toolEdit && !IsCreation
+            ? WikitextDiff.Compute(toolEdit.OriginalWikitext, toolEdit.NewWikitext).Select(l => new DiffLineViewModel(l))
+            : []);
         Replace(Findings, (result.Analysis?.Findings
                 .Where(f => f.IsChange || f.Blocks)
                 .Select(FindingViewModel.For) ?? [])
@@ -266,6 +281,26 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public ItemCheckResult Result { get; private set; }
 
     public ObservableCollection<DiffLineViewModel> Diff { get; } = [];
+
+    /// <summary>
+    /// The edit the tool worked out, as a diff on the Edit page (user, 2026-10-07). Fixed when the item was checked,
+    /// unlike <see cref="Diff"/>, which Submit builds from whatever the editor then holds — this one says what the tool
+    /// proposes, and that one what will be written. Empty for a creation, which shows its whole text instead.
+    /// </summary>
+    public ObservableCollection<DiffLineViewModel> ProposedDiff { get; } = [];
+
+    public bool HasProposedDiff => ProposedDiff.Count > 0;
+
+    /// <summary>
+    /// Whether "Edit wikitext source" is open, per item (user, 2026-10-08). The one Expander serves every item, so it
+    /// used to carry its state from one to the next. It is closed whenever the item loads afresh — a capture, "Edit
+    /// again" — and kept otherwise, so Back from Preview finds it as it was left.
+    /// </summary>
+    public bool SourceExpanded
+    {
+        get => _sourceExpanded;
+        set => Set(ref _sourceExpanded, value);
+    }
     public ObservableCollection<FindingViewModel> Findings { get; } = [];
     public ObservableCollection<string> Warnings { get; } = [];
 
@@ -425,7 +460,11 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         _wikitext = wikitext;
 
         if (Result.Edit is { } edit)
+        {
             Replace(Diff, WikitextDiff.Compute(edit.OriginalWikitext, wikitext).Select(l => new DiffLineViewModel(l)));
+            // Setting the icon is the tool's proposal too, so the proposed edit shows it.
+            Replace(ProposedDiff, WikitextDiff.Compute(edit.OriginalWikitext, wikitext).Select(l => new DiffLineViewModel(l)));
+        }
 
         if (IsCreation)
         {
@@ -544,6 +583,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             // A page just created becomes clickable at this moment and not before — see KnownPageTitle.
             OnPropertyChanged(nameof(PageTitle));
             OnPropertyChanged(nameof(HasPage));
+            OnPropertyChanged(nameof(PageTitleIfDifferent));
+            OnPropertyChanged(nameof(PageUrl));
         }
     }
 
@@ -552,6 +593,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         // Green either way (see StatusBrush), but worded for what actually happened (user, 2026-10-07): "Done" is
         // kept for an item the user settled by acting on it. A page that already matched had nothing done to it, and
         // an item the ledger let skip the wiki was not compared at all this time.
+        // Settled, but formatting is still to come (user, 2026-10-07): "Done" belongs to the end of the review.
+        _ when _settled && _step < ReviewStep.Done => "Pending formatting",
         _ when _settled => "Done",
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: false } => "No differences",
         { Status: ItemCheckStatus.AlreadyChecked } => "Already checked",
@@ -584,6 +627,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public Brush StatusBrush => Result switch
     {
+        _ when _settled && _step < ReviewStep.Done => Palette.Warning,
         _ when IsDone => Palette.Done,
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Palette.Attention,
         { NeedsLoreCapture: true } or { Status: ItemCheckStatus.LoreRecorded } => Palette.Attention,
@@ -616,6 +660,15 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public string PageTitle => KnownPageTitle ?? Result.Lookup?.RequestedTitle ?? "";
 
     public bool HasPage => KnownPageTitle is not null;
+
+    /// <summary>
+    /// The page's title beside the "Open wiki page" link, only when it is not the item's own name — which happens when
+    /// the wiki redirected the name to another page, or the ledger recorded a hand-chosen title (<c>Cell Key #5</c> at
+    /// <c>Cell Key No. 5</c>). Otherwise the name above already says it.
+    /// </summary>
+    public string PageTitleIfDifferent => KnownPageTitle is { } title && !string.Equals(title, Result.ItemName, StringComparison.Ordinal)
+        ? $"  ({title})"
+        : "";
 
     public string? PageUrl => KnownPageTitle is { } title
         ? $"https://eqlwiki.com/{Uri.EscapeDataString(title.Replace(' ', '_'))}"
@@ -900,6 +953,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             if (_step == value) return;
             _step = value;
             OnPropertyChanged(nameof(Step));
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(StatusBrush));
             RebuildSteps();
         }
     }
@@ -912,6 +967,18 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         set
         {
             _skippedSubmit = value;
+            RebuildSteps();
+        }
+    }
+
+    /// <summary>True when the user pressed Skip on the Formatting page, so the timeline shows it as skipped rather than
+    /// done. Formatting that found nothing to do is done, not skipped.</summary>
+    public bool SkippedFormatting
+    {
+        get => _skippedFormatting;
+        set
+        {
+            _skippedFormatting = value;
             RebuildSteps();
         }
     }
@@ -938,9 +1005,12 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         var steps = new List<StepViewModel>();
         foreach (ReviewStep step in Enum.GetValues<ReviewStep>())
         {
+            // Done is reached only once everything is finished, so it reads as finished itself (user, 2026-10-07).
             StepState state =
-                step == _step ? StepState.Current
+                step == _step && step == ReviewStep.Done ? StepState.Finished
+                : step == _step ? StepState.Current
                 : _skippedSubmit && step is ReviewStep.Preview or ReviewStep.Submit ? StepState.Skipped
+                : _skippedFormatting && step == ReviewStep.Formatting ? StepState.Skipped
                 : step < _step ? StepState.Finished
                 : StepState.Upcoming;
 
@@ -953,7 +1023,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     private string LabelFor(ReviewStep step) => step switch
     {
-        ReviewStep.Differences => IsCreation ? "New page" : "Differences",
+        ReviewStep.Edit => "Edit",
         ReviewStep.Preview => "Preview",
         ReviewStep.Submit => "Submit",
         ReviewStep.Formatting => "Formatting",
