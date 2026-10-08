@@ -1696,6 +1696,16 @@ a global hotkey is worth having.
   whether an edit is surgical, but it collapsed duplicate lines (real statsblocks repeat `<br>`) and paired a changed
   line with an unrelated one. Long unchanged runs fold away, because an item page can carry a `dropsfrom` table with
   nothing to do with the edit and a reviewer scrolling past it is a reviewer who stops reading.
+- **A capture leaves an item the user is still working on selected** (user, 2026-10-08). The last window in the
+  frame used to take the selection, so capturing a Lore tab with several item windows open meant hunting for the item
+  it was for. Only an item that is not done is kept; with nothing in progress, the new capture is shown as before.
+- **A re-capture leaves work in progress alone unless the item changed** (`ResultViewModel.KeepsWorkAgainst`, user,
+  2026-10-08). The same Lore-tab capture re-captures every other window on screen, and reloading one threw away
+  whatever was half done — edited text, a typed summary, a review partway through its steps. "Changed" is the ledger's
+  own fingerprint (the item's data, icon and lore), so a capture that really changed the item still replaces it; one
+  that could not be read at all (covered, the wrong font) cannot show a change, so it keeps the work too. An item
+  nobody has touched reloads as before. Checked through `MainWindow`'s own merge in a harness, since the tests cannot
+  reach the WPF app.
 - **Each captured frame can be kept on disk** (`App.CaptureArchive`, user 2026-09-29), named after the items in it, so
   a bug can be reported by naming an item rather than by keeping it in the game. The list entry's tooltip carries the
   path.
@@ -1896,6 +1906,11 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
 **The ledger view (`App.LedgerWindow`, 2026-09-29).** What has been checked, and — the reason it exists — what is
 still waiting for a human. Built ahead of milestone 6 by the user's agreement, because over a long session the
 unsettled rows are the state that accumulates silently and nothing else surfaces them.
+- **Rows are one line, centred, with no lines between them and no selection** (user, 2026-10-08): the row under the
+  pointer is highlighted instead (`HoverBrush`), and the revision is in the ordinary font. The page-title line under a
+  name is collapsed when there is none — empty, it still took a line's height, which made every row two lines tall
+  and pushed the name above centre. The exact time a row was checked is a tooltip on its "Checked" cell only; on the
+  whole row it popped up over everything else.
 - **Shown to the user as "History"** (renamed from "Checked items", user 2026-10-07). The status bar's "N need
   attention" opens it already filtered to those rows (`LedgerWindow`'s `filter` argument).
 - **It judges nothing.** "Would the next capture skip this?" is answered by calling `CheckedItemsLedger.Consult` with

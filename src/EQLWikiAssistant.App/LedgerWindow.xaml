@@ -10,6 +10,36 @@
         Style="{StaticResource DarkWindow}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <!-- A plain text column's cell, padded like the template columns'. -->
+        <Style x:Key="PlainCell" TargetType="TextBlock">
+            <Setter Property="Margin" Value="6,3" />
+        </Style>
+
+        <!-- Every cell centres its content, and never shows as selected. -->
+        <Style x:Key="HistoryCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- The exact time a row was checked is a tooltip on its "Checked" cell only (user, 2026-10-08): on the whole
+             row it popped up over the name, the outcome and everything else, where it had nothing to do with them. -->
+        <Style x:Key="CheckedCell" TargetType="DataGridCell" BasedOn="{StaticResource HistoryCell}">
+            <Setter Property="ToolTip" Value="{Binding CheckedExactly}" />
+        </Style>
     </Window.Resources>
     <!-- A grid only so the in-app dialog can sit over everything. -->
     <Grid>
@@ -49,15 +79,26 @@
         </Border>
 
         <Grid>
+            <!-- No lines between rows; the row under the pointer is highlighted instead, and none is ever selected,
+                 which did nothing useful (user, 2026-10-08). Every cell centres its content, so a row reads as one
+                 line whatever its height. -->
             <DataGrid x:Name="RowsGrid" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
-                      GridLinesVisibility="Horizontal" BorderThickness="0" CanUserSortColumns="True"
+                      GridLinesVisibility="None" BorderThickness="0" CanUserSortColumns="True"
                       CanUserReorderColumns="False" CanUserResizeColumns="True"
-                      SelectionMode="Single" HorizontalScrollBarVisibility="Disabled">
+                      SelectionMode="Single" HorizontalScrollBarVisibility="Disabled"
+                      local:Behaviors.NoRowSelection="True">
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                        <Setter Property="ToolTip" Value="{Binding CheckedExactly}" />
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+                            </Trigger>
+                        </Style.Triggers>
                     </Style>
                 </DataGrid.RowStyle>
+                <DataGrid.CellStyle>
+                    <StaticResource ResourceKey="HistoryCell" />
+                </DataGrid.CellStyle>
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="Item" Width="1.4*" SortMemberPath="ItemName">
                         <DataGridTemplateColumn.CellTemplate>
@@ -78,7 +119,8 @@
                                     <!-- Only when it differs from the in-game name, which is the case worth
                                          seeing: the page a human had to name by hand. -->
                                     <TextBlock Text="{Binding PageTitle}" FontFamily="Consolas" FontSize="11"
-                                               Foreground="{StaticResource TextDimBrush}" TextWrapping="Wrap" />
+                                               Foreground="{StaticResource TextDimBrush}" TextWrapping="Wrap"
+                                               Visibility="{Binding HasPageTitle, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
@@ -93,7 +135,8 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Header="Checked" Binding="{Binding Checked}" Width="Auto" />
+                    <DataGridTextColumn Header="Checked" Binding="{Binding Checked}" Width="Auto"
+                                        ElementStyle="{StaticResource PlainCell}" CellStyle="{StaticResource CheckedCell}" />
 
                     <!-- What the next capture will do with this row, asked of the ledger itself rather than
                          inferred here. It is what explains a re-check the user did not expect. -->
@@ -107,7 +150,7 @@
                     </DataGridTemplateColumn>
 
                     <DataGridTextColumn Header="Revision" Binding="{Binding Revision}" Width="Auto"
-                                        FontFamily="Consolas" FontSize="11" />
+                                        ElementStyle="{StaticResource PlainCell}" />
 
                     <DataGridTemplateColumn Header="" Width="Auto">
                         <!-- The full height of the row, so the cross sits centred and is easy to hit — the same fix as
@@ -115,6 +158,7 @@
                              the top, so this column gets a cell that stretches it instead. -->
                         <DataGridTemplateColumn.CellStyle>
                             <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                                <Setter Property="Focusable" Value="False" />
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="DataGridCell">
@@ -124,6 +168,11 @@
                                         </ControlTemplate>
                                     </Setter.Value>
                                 </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="Transparent" />
+                                    </Trigger>
+                                </Style.Triggers>
                             </Style>
                         </DataGridTemplateColumn.CellStyle>
                         <DataGridTemplateColumn.CellTemplate>

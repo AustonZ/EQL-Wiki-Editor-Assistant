@@ -26,6 +26,10 @@ public sealed record LedgerRowViewModel(LedgerEntry Entry, LedgerVerdict Verdict
             ? title
             : "";
 
+    /// <summary>Collapses the line when there is no title to show: an empty one still took a line's height, which made
+    /// every row two lines tall and pushed the name above the row's centre (user, 2026-10-08).</summary>
+    public bool HasPageTitle => PageTitle.Length > 0;
+
     public string Outcome => Entry.Outcome switch
     {
         CheckOutcome.Matched => "Matched",

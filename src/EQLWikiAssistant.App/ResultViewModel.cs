@@ -210,6 +210,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private bool _skippedSubmit;
     private bool _skippedFormatting;
     private bool _sourceExpanded;
+    private string _loadedWikitext = "";
+    private string _loadedSummary = "";
     private bool _written;
     private string? _submitNotice;
 
@@ -235,6 +237,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         // inherit, because "created from the in-game item window" is the whole truth about that revision.
         _summary = result.Creation?.Summary
             ?? (result.Edit is { HasChanges: true } proposed ? proposed.Summary : "");
+        _loadedWikitext = _wikitext;
+        _loadedSummary = _summary;
         _outcome = null;
         _settled = false;
         _formatting = null;
@@ -290,6 +294,37 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public ObservableCollection<DiffLineViewModel> ProposedDiff { get; } = [];
 
     public bool HasProposedDiff => ProposedDiff.Count > 0;
+
+    /// <summary>
+    /// Whether the user has done anything to this item since it was loaded: moved on from the first page, settled it,
+    /// or changed the text or the summary.
+    /// </summary>
+    public bool HasWorkInProgress =>
+        _step != ReviewStep.Edit || _settled ||
+        !string.Equals(_wikitext, _loadedWikitext, StringComparison.Ordinal) ||
+        !string.Equals(_summary, _loadedSummary, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether a new capture of this item should be left out rather than replace what is on screen (user, 2026-10-08):
+    /// the user is partway through it and the capture says nothing new. Capturing a Lore tab with several item windows
+    /// open captures all the others again too, and reloading them threw away whatever was half done.
+    ///
+    /// "Nothing new" is the same fingerprint the ledger uses — the item's data, its icon and its lore — so a capture
+    /// that really did change the item still replaces it. A capture that could not be read at all (covered, the wrong
+    /// font) cannot say the item changed, so it does not get to throw the work away either.
+    /// </summary>
+    public bool KeepsWorkAgainst(ItemCheckResult capture)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        if (!HasWorkInProgress) return false;
+        if (capture.Item is null || capture.Status is ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont) return true;
+        if (Result.Item is null) return false;
+
+        return string.Equals(
+            ItemFingerprint.Compute(Result.Item, Result.CapturedIcon, Result.Lore),
+            ItemFingerprint.Compute(capture.Item, capture.CapturedIcon, capture.Lore),
+            StringComparison.Ordinal);
+    }
 
     /// <summary>
     /// Whether "Edit wikitext source" is open, per item (user, 2026-10-08). The one Expander serves every item, so it

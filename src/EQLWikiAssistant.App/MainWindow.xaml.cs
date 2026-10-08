@@ -170,10 +170,22 @@ public partial class MainWindow : Window
 
             // Results accumulate across captures rather than replacing each other (user, 2026-09-28), so an item
             // just updated stays on screen to refer back to while working on the next one. Closing one is explicit.
-            foreach (ItemCheckResult result in results)
+            //
+            // **An item the user is still working on stays selected** (user, 2026-10-08). Otherwise the last window in
+            // the frame took the selection — and capturing a Lore tab with several item windows open meant hunting for
+            // the item it was for. With nothing in progress, the new capture is shown as before.
+            _keepSelected = ResultsList.SelectedItem is ResultViewModel { IsDone: false } current ? current : null;
+            try
             {
-                await MergeAsync(result);
-                if (archived is not null && Find(result) is { } view) view.CaptureFile = archived;
+                foreach (ItemCheckResult result in results)
+                {
+                    await MergeAsync(result);
+                    if (archived is not null && Find(result) is { } view) view.CaptureFile = archived;
+                }
+            }
+            finally
+            {
+                _keepSelected = null;
             }
 
             // The ledger is written after a batch rather than per row — it is saved whole, and a check can settle a
@@ -263,10 +275,12 @@ public partial class MainWindow : Window
             ItemCheckResult updated = await _services.Pipeline.ReanalyzeAsync(existing.Result);
             existing.Load(updated);
             existing.LoreImage = result.WindowImage;
-            ResultsList.SelectedItem = existing;
-            ShowSelected();
+            Select(existing);
             return;
         }
+
+        // Partway through, and nothing about the item has changed: the work on screen stays (see KeepsWorkAgainst).
+        if (existing is not null && existing.KeepsWorkAgainst(result)) return;
 
         if (existing is not null)
         {
@@ -277,13 +291,23 @@ public partial class MainWindow : Window
                 : existing.LoreImage;
             existing.Load(result);
             existing.LoreImage = lore;
-            ResultsList.SelectedItem = existing;
-            ShowSelected();
+            Select(existing);
             return;
         }
 
         var view = new ResultViewModel(result);
         _results.Add(view);
+        Select(view);
+    }
+
+    /// <summary>The item a capture is folding in, kept selected rather than moved off — see the capture loop.</summary>
+    private ResultViewModel? _keepSelected;
+
+    /// <summary>Shows an item a capture has just added or changed, unless the user is in the middle of another — in
+    /// which case that one stays, refreshed if it was this.</summary>
+    private void Select(ResultViewModel view)
+    {
+        if (_keepSelected is { } kept && kept != view && _results.Contains(kept)) return;
         ResultsList.SelectedItem = view;
         ShowSelected();
     }
