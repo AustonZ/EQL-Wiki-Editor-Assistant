@@ -216,8 +216,12 @@ public sealed class WikiMapping
     /// they keep their legacy flags forever and nobody is told. Measured at 5 of 1,183 cached pages (`NO TRADE` on
     /// 5, `LORE EQUIPPED` on 1). The user said no bump was needed for the item they reported, having removed it
     /// from their ledger by hand — this is for the ones they have not checked.
+    /// **9** (2026-10-08): the attribute line follows the blueprint's new order, which is the game's (user, 2026-10-08).
+    /// Formatting only — the data pass compares fields wherever they sit — so the bump is 4's reasoning again: a
+    /// settled row skips the wiki and its page would never be offered the reorder. At most 97 of 744 cached item pages
+    /// carry an attribute pair whose order flips.
     /// </summary>
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 9;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -558,7 +562,9 @@ public sealed class WikiMapping
                 ["Skill", "Atk Delay"],
                 ["DMG", "DMG Bonus", "AC", "BACKSTAB", "Magic DMG", "Poison DMG"],
                 ["Skill Mod"],
-                ["STR", "DEX", "STA", "CHA", "WIS", "INT", "AGI", "HP", "MANA", "END"],
+                // The game's own order, which the blueprint adopted on 2026-10-06 (oldid 181237); it used to read
+                // STR DEX STA CHA WIS INT AGI. Every attribute sequence in the captured corpus fits this one.
+                ["STR", "STA", "INT", "WIS", "AGI", "DEX", "CHA", "HP", "MANA", "END"],
                 ["SV Fire", "SV Disease", "SV Cold", "SV Magic", "SV Poison", "SV Void"],
                 ["Attack", "HP Regen", "Mana Regen", "Haste", "Clairvoyance", "Spell Dmg", "Heal Amount", "END Regen"],
                 // The blueprint's `Recommended level of ? Required level of ?` line was removed from it on

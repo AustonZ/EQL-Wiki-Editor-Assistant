@@ -582,6 +582,23 @@ decisions made here on measurement are now documented upstream, so they no longe
   `[[Zone_Name]]`). v1 preserves all of these byte for byte and generates none of them. The underscores are
   cosmetic regardless — in a wikilink `_` and a space are the same character to MediaWiki.
 
+**The blueprint's 2026-10-06 revision (oldid 181237), reconciled 2026-10-08.** Four edits by the blueprint's author since 179818,
+changing three lines. Note it is the *blueprint* on `Help:Contents` that moves; `Template:Itempage` itself has not
+changed since 2026-09-02.
+- **The attributes are in the game's own order now**: `STR STA INT WIS AGI DEX CHA`, from `STR DEX STA CHA WIS INT
+  AGI`. Adopted (user, 2026-10-08). Every attribute sequence in the captured corpus fits it and most contradicted the
+  old one — `TheAttributeLineIsInTheGamesOwnOrder` checks the corpus, and fails with the old order on `Dark Cloak of
+  the Sky`. HP, Mana and End are not part of that check: the window draws them in its other column, so in reading
+  order HP can precede STR, and their place on the wiki's line is the blueprint's own. Formatting only, so the
+  census is byte-identical (0 refused, 0 unsettled); at most 97 of 744 cached item pages have a pair that flips.
+  `CurrentVersion` 9.
+- **`merchant_value = ?p ?g ?s ?c`** documents the compact form the tool already writes. No change.
+- **The effect line is ambiguous and deliberately not acted on** (user, 2026-10-08, who is asking its author). It now
+  reads `(Combat / Clicky / Can Equip / Must Equip, Casting Time: ?, Cooldown: ??? Seconds)`, under the summary "Added
+  new clicky type of Can Equip". The tool writes `(Clicky, Can Equip, Casting Time: 5.0, Cooldown: 180 seconds)`. Open:
+  whether `Can Equip`/`Must Equip` replace `Clicky` rather than follow it, and whether `Seconds` is meant capitalised
+  (the game and the one real page with a cooldown both write `seconds`). Either would be a `CurrentVersion` bump.
+
 **The item window's trailing region.** Below the effects the game mixes real fields with developer help text,
 because there was nowhere else to put either. **Handled by rules on what a line *says*, never on where it sits.**
 - **Two earlier claims here were wrong and are corrected** (user, 2026-09-28, reversing their own first account

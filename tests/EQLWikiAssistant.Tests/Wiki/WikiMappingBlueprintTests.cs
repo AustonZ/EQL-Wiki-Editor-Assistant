@@ -10,7 +10,9 @@ namespace EQLWikiAssistant.Tests.Wiki;
 /// **Checked against the blueprint's 2026-09-30 revision** (oldid 179818), which is the one that made the sign
 /// convention explicit. Before it the blueprint wrote `STR: ?` and this set rested on a frequency census; now it
 /// writes `STR: +?` and the two agree. If the blueprint changes again, these are the assertions to re-read it
-/// against.
+/// against. **Re-read against oldid 181237 (2026-10-06)**: it reordered the attributes to the game's own order (taken,
+/// and pinned below), wrote `merchant_value` as `?p ?g ?s ?c` (what the tool already writes), and reworded the effect
+/// line — left as it is until the user has asked its author what the new wording means.
 /// </summary>
 public class WikiMappingBlueprintTests
 {
@@ -180,5 +182,44 @@ public class WikiMappingBlueprintTests
         Assert.All(
             WikiMapping.Default.Stats.Values.Where(s => s.GameLabel != "Skill Mod"),
             s => Assert.Equal(StatValueFormat.AsCaptured, s.Format));
+    }
+
+    /// <summary>
+    /// **The attribute line is in the game's own order**, which the blueprint adopted on 2026-10-06 (oldid 181237;
+    /// user, 2026-10-08, to follow it). It used to read `STR DEX STA CHA WIS INT AGI`. The corpus half is the evidence
+    /// rather than the blueprint: every window that shows two or more attributes must list them in this order, so a
+    /// future blueprint edit that drifted from the game would fail here instead of reordering pages wrongly.
+    /// </summary>
+    [Fact]
+    public void TheAttributeLineIsInTheGamesOwnOrder()
+    {
+        IReadOnlyList<string> line = WikiMapping.Default.StatsBlockLineOrder.Single(l => l.Contains("STR"));
+        Assert.Equal(["STR", "STA", "INT", "WIS", "AGI", "DEX", "CHA", "HP", "MANA", "END"], line);
+
+        if (!File.Exists(TestSupport.RepoPaths.ExpectedItemsFile)) return;
+
+        // The seven attributes only. HP, Mana and End sit in the window's other column, so in reading order HP can
+        // come before STR (`Dark Cloak of the Sky`); where they go on the wiki's line is the blueprint's own choice.
+        string[] attributes = ["STR", "STA", "INT", "WIS", "AGI", "DEX", "CHA"];
+        int compared = 0;
+        foreach (TestSupport.Accuracy.ExpectedWindow window in TestSupport.Accuracy.ExpectedCorpus
+                     .Load(TestSupport.RepoPaths.ExpectedItemsFile).Samples.SelectMany(s => s.Windows))
+        {
+            int[] positions =
+            [
+                .. window.Stats
+                    .Select(s => WikiMapping.Default.FindStat(s.Label)?.WikiLabel)
+                    .Where(label => label is not null && attributes.Contains(label))
+                    .Select(label => line.ToList().IndexOf(label!)),
+            ];
+            if (positions.Length < 2) continue;
+
+            compared++;
+            Assert.True(positions.SequenceEqual(positions.Order()),
+                $"{window.Name}: the game lists {string.Join(" ", positions.Select(p => line[p]))}");
+        }
+
+        // Or the corpus half proved nothing.
+        Assert.True(compared >= 20, $"only {compared} windows show two or more attributes");
     }
 }
