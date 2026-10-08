@@ -99,7 +99,6 @@ public static class WindowBoundsFinder
     // and is now simply never looked at.
     private const int TitleBarWalkLimit = 20;
 
-    private const int MaxScanDistance = 700;
     private const int ProbeCount = 11;
     private const int AgreementTolerancePx = 6;
 
@@ -122,11 +121,12 @@ public static class WindowBoundsFinder
     // frame. The outline sits a few px inside the outer frame, so this only has to clear the tracing tolerance.
     private const int TitleBarProbeInset = 12;
 
-    // Sanity ceilings, generous over the largest real window measured (~550x655). These catch the case where an
-    // occluder is adjacent along an *entire* side, so every probe agrees on the same wrong, oversized answer and
-    // consensus has no disagreement to notice.
-    private const int MaxPlausibleWidth = 600;
-    private const int MaxPlausibleHeight = 700;
+    // **No size ceiling, and no limit on how far an edge scan travels short of the frame** (bug found by the user,
+    // 2026-10-07: a window resized to 1074px wide was reported "partly covered"). Item windows can be resized, and
+    // the 600x700 ceiling and 700px scan that used to sit here refused any that were. The ceiling was a backstop for
+    // an occluder flush along a window's entire side, where every probe agrees on the same oversized answer — but
+    // measured, it never fired: all 119 windows in the corpus trace to byte-identical rectangles with and without it.
+    // IsRectangleClosed and Parse's title-vs-content name check remain the defences for that case.
 
     /// <summary>Returns the window's pixel bounds, or null if its outline can't be traced consistently (treat as
     /// occluded — don't parse it).</summary>
@@ -172,7 +172,6 @@ public static class WindowBoundsFinder
 
         int width = right - left, height = bottom - top;
         if (width < 50 || height < 50) return null;
-        if (width > MaxPlausibleWidth || height > MaxPlausibleHeight) return null;
         if (!IsRectangleClosed(image, left, right, bottom, interiorY)) return null;
 
         return new Rect(left, top, width + 1, height + 1);
@@ -228,7 +227,7 @@ public static class WindowBoundsFinder
         {
             int x = xRangeStart + (xRangeEnd - xRangeStart) * i / Math.Max(1, ProbeCount - 1);
             if (x < 0 || x >= image.Width || !IsInterior(image, x, fromY)) continue;
-            if (ScanForOutline(image, x, fromY + dy, dx: 0, dy, MaxScanDistance, requireFrameBeyond: true) is { } v) found.Add(v);
+            if (ScanForOutline(image, x, fromY + dy, dx: 0, dy, Math.Max(image.Width, image.Height), requireFrameBeyond: true) is { } v) found.Add(v);
         }
         return TryGetConsensus(found, MinOutlineAgreementFraction, out consensus);
     }
@@ -242,7 +241,7 @@ public static class WindowBoundsFinder
         {
             int y = yRangeStart + (yRangeEnd - yRangeStart) * i / Math.Max(1, ProbeCount - 1);
             if (y < 0 || y >= image.Height || !IsInterior(image, fromX, y)) continue;
-            if (ScanForOutline(image, fromX + dx, y, dx, dy: 0, MaxScanDistance, requireFrameBeyond: true) is { } v) found.Add(v);
+            if (ScanForOutline(image, fromX + dx, y, dx, dy: 0, Math.Max(image.Width, image.Height), requireFrameBeyond: true) is { } v) found.Add(v);
         }
         return TryGetConsensus(found, MinOutlineAgreementFraction, out consensus);
     }

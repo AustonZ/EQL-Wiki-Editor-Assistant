@@ -1995,8 +1995,13 @@ already found and fixed.
   outline must be present at the corners, not just where probes crossed it. A covered edge's consensus lands on
   the *occluding* window's outline, and this window's own bottom outline doesn't reach that corner. Without this,
   a partly-covered window came back confidently 587px wide, silently merged with its neighbour.
-- The absolute size ceilings (600x700) are retained and still catch an occluder adjacent along an *entire* side,
-  where every probe agrees on the same wrong answer.
+- **There is no size ceiling and no edge-scan limit short of the frame** (bug found by the user, 2026-10-07). Item
+  windows can be resized, and a 1074px-wide one was refused as "partly covered" by the 600x700 ceiling that used to
+  sit here — a backstop for an occluder flush along an *entire* side, where every probe agrees on the same oversized
+  answer. Measured before removing it: **all 119 corpus windows trace to byte-identical rectangles with and without
+  the ceiling, and with the 700px scan limit lifted too**, so it never fired on anything real. Rectangle closure and
+  Parse's title-vs-content name check remain the defences for that case. A resized window parses exactly like a
+  default one, because the game's layouts do not reflow into the extra width; `16-resized-wide-window.png` pins it.
 - Validated against the full real-sample corpus (46 screenshots, 109 located windows, 1 correctly occluded;
   `tools/LocateSpike --save` draws a debug overlay, green/red by `PossiblyOccluded`; golden tests in
   `Tests/Locate/`). Traced widths are consistently 388-404px — the window's true content width — where the
@@ -2298,8 +2303,8 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
-- Baseline (2026-10-05): **51 samples — 48 in Arial, 3 in EQL Wiki Assistant — 119 windows located (1 correctly
-  occluded), 2417 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
+- Baseline (2026-10-07): **52 samples — 48 in Arial, 4 in EQL Wiki Assistant — 120 windows located (1 correctly
+  occluded), 2442 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
   extra. Parser warnings are 2, not 0**: both are
   `Convert to Guise of the Deceiver`, which is the trailing-region rule working exactly as designed (see "The item
   window's trailing region" — an unknown line reaching the user is the right outcome). The corpus test gates
@@ -2311,8 +2316,8 @@ invisible that way by definition.
   configuration, so the comparison stays reproducible.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
     newly bootstrapped sample guards against regressions immediately; the flag only records whether a human has
-    checked it against the screenshot, and the summary counts it (`51 samples scored (51 verified)`). **All 51 are
-    verified** (2026-10-05). A status line in this file is a snapshot: check it against the repository before
+    checked it against the screenshot, and the summary counts it (`52 samples scored (52 verified)`). **All 52 are
+    verified** (2026-10-07). A status line in this file is a snapshot: check it against the repository before
     telling the user something is still outstanding.
   - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure** — a sample that is
     located and parsed but compared against nothing. `AccuracySpike --bootstrap --only <substring>` adds one entry
