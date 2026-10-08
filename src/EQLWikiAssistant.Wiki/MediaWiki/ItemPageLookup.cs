@@ -119,7 +119,7 @@ public static class ItemPageLookup
                 LookupOutcome.FoundMisnamedCandidate, itemName, page, null,
                 $"No page exists at '{itemName}', but '{page.Title}' does — the same name with a different quote " +
                 "character. That is very likely this item under a misspelt name. This item is being treated as new; " +
-                "check the existing page before creating another one, and consider making the old title a redirect.");
+                "check the existing page before creating another one, and if it is this item, move it to the right title.");
         }
 
         return new ItemPageLookupResult(LookupOutcome.NotFound, itemName, null, null, null);

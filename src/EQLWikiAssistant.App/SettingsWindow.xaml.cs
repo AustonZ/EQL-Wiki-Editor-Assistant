@@ -115,8 +115,8 @@ public partial class SettingsWindow : Window
     private void DescribeFont(UiFont font) => FontDescription.Text = font switch
     {
         UiFont.EqlWikiAssistant =>
-            "Your own modification of Arial: the capital I has serifs and the r is a pixel wider. Every bare stroke " +
-            "is a lowercase l, so nothing is guessed.",
+            "A modified Arial with a serifed capital I and an r one pixel wider. Every bare stroke is a lowercase l, " +
+            "so nothing is guessed.",
         _ =>
             "The game's default. Its capital I and lowercase l are the same pixels, so the tool guesses from the word: " +
             "a stroke that starts a word is read as I. That is right for item names and wrong in lore, where \"lost\" " +

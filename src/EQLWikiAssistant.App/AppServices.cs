@@ -371,8 +371,7 @@ public sealed class AppServices : IDisposable
     {
         BotCredentials? credentials = Credentials.Read();
         if (credentials is null)
-            return "No bot password is stored. Create one at https://eqlwiki.com/Special:BotPasswords with the " +
-                   "\"Edit existing pages\" right, then enter it under Settings > Wiki account.";
+            return "No bot password is stored. Enter one under Settings > Wiki account.";
 
         try
         {

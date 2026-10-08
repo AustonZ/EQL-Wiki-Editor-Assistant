@@ -149,9 +149,8 @@ public static class ItemPageAnalyzer
                 ? new FieldFinding(LoreField, FieldVerdict.Matches, lore, onWiki)
                 : new FieldFinding(
                     LoreField, FieldVerdict.NeedsReview, lore, onWiki,
-                    "The page's lore differs from the captured text. The tool does not overwrite lore: it is prose, " +
-                    "where a misread word would be invisible in review, and the page's copy may carry wikilinks or " +
-                    "formatting the item window cannot show. Compare them and edit by hand if the page is wrong."));
+                    "The page's lore differs from the game's. Lore is never overwritten: edit the page by hand if it is " +
+                    "wrong."));
             return;
         }
 
@@ -250,7 +249,7 @@ public static class ItemPageAnalyzer
                 match == TitleMatch.DisambiguatedTitle
                     ? $"The page is titled '{pageTitle}' but its itemname is '{page.ItemName}'. That breaks the " +
                       "item box, which links to a page named after itemname. It looks like one in-game item split " +
-                      "across several pages, which the template cannot currently express — a human has to decide."
+                      "across several pages, which the template cannot currently express."
                     : $"The page is titled '{pageTitle}' but its itemname is '{page.ItemName}'. That breaks the " +
                       "item box, which links to a page named after itemname."));
 
@@ -332,11 +331,8 @@ public static class ItemPageAnalyzer
         {
             findings.Add(new FieldFinding(
                 FlagProseField, FieldVerdict.NeedsReview, null, string.Join(", ", prose),
-                "The flags line carries text that is not a flag. EQL no longer shows it, but it may still mean " +
-                "something the UI stopped exposing — in original EverQuest 'This is a hearty meal!' meant the food " +
-                "lasted longer. Move it into notes by hand if you want to keep it; this tool will not move or " +
-                "discard it for you. Until it is gone the flags line is left exactly as it is, because the line is " +
-                "rewritten whole and that would delete this text."));
+                "Not a flag, and EQL no longer shows it. Move it into notes by hand to keep it; until then the flags " +
+                "line is left as it is, because rewriting it would delete this text."));
             return;
         }
 
@@ -524,7 +520,7 @@ public static class ItemPageAnalyzer
             findings[i] = finding with
             {
                 Verdict = FieldVerdict.Differs,
-                Explanation = "Only the sign differs, which would normally be left to the prettifier — but this " +
+                Explanation = "Only the sign differs, which would normally be left to the reformatting step — but this " +
                               "edit is already writing another signed stat on the page, so leaving this one " +
                               "unsigned would make the result inconsistent.",
             };
@@ -610,8 +606,7 @@ public static class ItemPageAnalyzer
                     LinkNote(target, effect.Name) ??
                     (EffectLine.HasTooltipLink(existing.Value)
                         ? null
-                        : "The existing link is the legacy [[Name]] form, which gets no tooltip. Rewriting it to " +
-                          "the itemeff span form is a functional fix, not a style change.")));
+                        : "The existing link is the legacy [[Name]] form, which gets no tooltip.")));
             }
         }
 

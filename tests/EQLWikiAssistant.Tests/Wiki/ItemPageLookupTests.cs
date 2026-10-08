@@ -48,7 +48,7 @@ public class ItemPageLookupTests
         Assert.Equal(LookupOutcome.FoundMisnamedCandidate, result.Outcome);
         Assert.Equal("Kavruul's Mystic Pouch", result.Page!.Title);
         Assert.Contains("different quote character", result.Warning);
-        Assert.Contains("redirect", result.Warning);
+        Assert.Contains("move it", result.Warning);
     }
 
     [Fact]

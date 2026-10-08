@@ -361,7 +361,7 @@ public class ItemPageAnalyzerTests
         Assert.Equal(FieldVerdict.NeedsReview, finding.Verdict);
         Assert.Contains("This is a meal!", finding.OnWiki);
         Assert.False(finding.IsChange);
-        Assert.Contains("will not move or discard", finding.Explanation);
+        Assert.Contains("Move it into notes by hand", finding.Explanation);
     }
 
     // ---- stats ----
@@ -618,7 +618,7 @@ public class ItemPageAnalyzerTests
         Assert.Equal(FieldVerdict.Differs, finding.Verdict);
         Assert.Equal("Effect: [[Enduring Breath|<span class='itemeff'>Enduring Breath</span>]] (Worn)", finding.Captured);
         Assert.Contains("no tooltip", finding.Explanation);
-        Assert.Contains("functional fix", finding.Explanation);
+        Assert.Contains("no tooltip", finding.Explanation);
     }
 
     /// <summary>

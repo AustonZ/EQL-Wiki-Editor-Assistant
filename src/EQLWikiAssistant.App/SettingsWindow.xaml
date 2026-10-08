@@ -104,7 +104,7 @@
 
                     <TextBlock Text="If the setting is wrong" Style="{StaticResource SectionHeading}" />
                     <TextBlock Style="{StaticResource Prose}"
-                               Text="A window drawn in the other font is refused and shown as Wrong font rather than read, so a mismatch is never silent. Nothing is recorded for a refused window: switch the setting or the game's font, and capture again." />
+                               Text="A window drawn in the wrong font is refused and shown as Wrong font rather than read, so a mismatch is never silent. Nothing is recorded for a refused window: switch the setting or the game's font, and capture again." />
                 </StackPanel>
             </ScrollViewer>
 

@@ -56,7 +56,7 @@ public partial class App : Application
     }
 
     /// <summary>Appends one entry. Never throws: a failure to record a failure must not become the failure.</summary>
-    private static void Record(Exception ex)
+    internal static void Record(Exception ex)
     {
         try
         {

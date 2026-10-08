@@ -222,10 +222,9 @@ public sealed class ItemCheckPipeline
                 WindowImage = crop,
                 Warnings =
                 [
-                    $"This window is drawn in-game using the '{UiFonts.DisplayName(drawn)}' font, but the tool is set " +
-                    $"to read the '{UiFonts.DisplayName(configured)}' font, so nothing was read from it. Switch the " +
-                    $"tool to '{UiFonts.DisplayName(drawn)}' under Settings > UI font, or switch the game's font to " +
-                    $"'{UiFonts.DisplayName(configured)}', then capture again.",
+                    $"Drawn in {UiFonts.DisplayName(drawn)}, but the tool is set to {UiFonts.DisplayName(configured)}. " +
+                    $"Switch the tool to {UiFonts.DisplayName(drawn)} under Settings > UI font, or switch the game's " +
+                    $"font to {UiFonts.DisplayName(configured)}, then capture again.",
                 ],
             };
 
@@ -238,7 +237,7 @@ public sealed class ItemCheckPipeline
         {
             if (!string.IsNullOrWhiteSpace(item.Lore))
                 lock (_pendingLore) _pendingLore[item.Name] = item.Lore!;
-            else warnings.Add("The Lore tab was captured but no lore text could be read from it.");
+            else warnings.Add("Failed to parse lore tab.");
 
             return new ItemCheckResult
             {
@@ -494,8 +493,7 @@ public sealed class ItemCheckPipeline
 
         if (needsLore)
             warnings.Add(
-                "This item has a Lore tab that has not been captured. Switch to it and capture again so the lore " +
-                "can be checked too.");
+                "This item has a Lore tab that has not been captured. Switch to it and capture again.");
 
         AddVerificationNotice(wikiPage.Title, warnings);
 

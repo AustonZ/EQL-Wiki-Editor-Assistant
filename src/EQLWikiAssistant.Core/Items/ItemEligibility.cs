@@ -60,7 +60,7 @@ public sealed record ItemEligibility(IReadOnlyList<IneligibilityDetail> Blockers
             // an ornamentation would be actively misleading.
             string explanation = slot.Kind == ExaltationKind.Ornamentation
                 ? $"The Ornamentation slot holds '{slot.Name}'. Ornamentation is always applied by a player, never " +
-                  "native to the item, so this capture may not reflect the item as it ships."
+                  "native to the item, so this capture may not contain the unaltered item details (particularly No Trade vs. Attunable)."
                 : $"The {slot.Kind} Exaltation slot holds '{slot.Name}', which is not this item's own exaltation, " +
                   "so the window's data includes another item's contribution.";
 

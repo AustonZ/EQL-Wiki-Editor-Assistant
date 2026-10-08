@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:EQLWikiAssistant.App"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
-        Title="EQLWiki Editor Assistant" Height="900" Width="1300" MinWidth="650" MinHeight="400"
+        Title="EQL Wiki Editor Assistant" Height="900" Width="1300" MinWidth="650" MinHeight="400"
         Style="{StaticResource DarkWindow}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -41,13 +41,13 @@
                 <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMutedBrush}" />
                 <CheckBox x:Name="ReCheckBox" Content="Re-check anyway" VerticalAlignment="Center" Margin="16,0,0,0"
                           Checked="OnReCheckChanged" Unchecked="OnReCheckChanged"
-                          ToolTip="Ask the wiki even for items the ledger has already settled" />
+                          ToolTip="Check items against the wiki even if they were checked before and have not changed" />
                 <Button x:Name="LedgerButton" Click="OnLedgerClick" Padding="12,4" Margin="16,0,0,0"
                         Content="History…"
                         ToolTip="Everything checked so far, and what still needs attention" />
                 <Button x:Name="SettingsButton" Click="OnSettingsClick" Padding="12,4" Margin="8,0,0,0"
                         Content="Settings…"
-                        ToolTip="The game's UI font, the wiki login, and the wiki mapping" />
+                        ToolTip="UI font, hotkey, saved captures, icon cache, wiki account and mapping" />
 
                 <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a
                      status line were too quiet to read as "working" (user, 2026-09-28). -->
@@ -108,8 +108,6 @@
                                          needs attention, so done is what has to be obvious (user, 2026-09-29). -->
                                     <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
                                                FontSize="11" FontWeight="SemiBold" />
-                                    <TextBlock Text="  •  lore" FontSize="11" Foreground="{StaticResource TextDimBrush}"
-                                               Visibility="{Binding HasCapturedLore, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>
                             </StackPanel>
                             <!-- The list accumulates across captures, so finishing with an item has to be an
@@ -133,7 +131,7 @@
                  the entire empty scaffold, lore panel and buttons included. -->
             <TextBlock Grid.Column="2" x:Name="EmptyState" TextWrapping="Wrap" MaxWidth="420" Foreground="{StaticResource TextDimBrush}"
                        HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
-                       Text="Open an item window in game and press Ctrl+Shift+E.&#10;&#10;Every item window in the capture is checked against the wiki and listed on the left." />
+                       Text="Open an item window in game and press Ctrl+Shift+E, or press Capture now.&#10;&#10;Every item window in the capture is checked against the wiki and listed on the left." />
 
             <!-- No padding on the scroller itself: it sat inside the scrolling area, so clipped content stopped short
                  of the border above and below (user, 2026-10-07). The panel's own margin scrolls with it instead. -->
@@ -187,7 +185,7 @@
                                        TextWrapping="Wrap" Margin="0,0,0,6" MaxWidth="380" HorizontalAlignment="Left"
                                        Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}" />
                             <TextBlock Text="{Binding IconColumnHint}" TextWrapping="Wrap"
-                                       Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
+                                       Foreground="{Binding IconColumnHintBrush}" Margin="0,0,0,6"
                                        MaxWidth="380" HorizontalAlignment="Left"
                                        Visibility="{Binding HasIconColumnHint, Converter={StaticResource BoolToVis}}" />
                             <!-- Wraps rather than clips: three tiles need ~560px, more than the content column has at the minimum
@@ -253,7 +251,8 @@
                             <StackPanel Margin="0,8,0,0" MaxWidth="380" HorizontalAlignment="Left"
                                         Visibility="{Binding CanActOnIcon, Converter={StaticResource BoolToVis}}">
                                 <TextBlock Text="{Binding IconActionPrompt}" TextWrapping="Wrap"
-                                           Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4" />
+                                           Foreground="{StaticResource AttentionBrush}" Margin="0,0,0,4"
+                                           Visibility="{Binding HasIconActionPrompt, Converter={StaticResource BoolToVis}}" />
                                 <!-- The label is a TextBlock rather than string Content because **a Button eats an
                                      underscore**: WPF reads it as an access-key prefix, so binding the file name
                                      directly rendered "Upload Item3327.png" for a file actually called
@@ -285,7 +284,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBlock Text="What differs" Style="{StaticResource SectionHeading}"
+                    <TextBlock Text="Proposed changes" Style="{StaticResource SectionHeading}"
                                Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}" />
                     <!-- PreviewMouseWheel: a DataGrid has its own ScrollViewer, which swallows the wheel even when
                          it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
@@ -331,6 +330,19 @@
                             </Style>
                         </DataGrid.RowStyle>
                     </DataGrid>
+
+                    <!-- The reverse of the Lore tab prompt below (user, 2026-10-07): the Lore tab was captured first,
+                         so the item's data is still to come. -->
+                    <Border Visibility="{Binding WantsDescriptionCapture, Converter={StaticResource BoolToVis}}"
+                            Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1" CornerRadius="3"
+                            Padding="10,7" Margin="0,12,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
+                                       Text="This item's Description tab has not been captured yet. Switch to it in game, then:" />
+                            <Button Content="Capture the Description tab" Click="OnCaptureClick" Padding="12,4"
+                                    Margin="10,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
 
                     <!-- One lore region, always in the same place: the prompt to capture the Lore tab, the lore once
                          captured, and the comparison against the page all live here rather than the lore capture
@@ -414,7 +426,7 @@
                         </ItemsControl>
                     </Border>
 
-                    <Expander Header="Edit the wikitext before saving" Margin="0,10,0,0"
+                    <Expander Header="Edit raw wikitext" Margin="0,10,0,0"
                               Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
                         <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
                                  FontFamily="Consolas" FontSize="12" Height="260" VerticalScrollBarVisibility="Auto"
@@ -442,7 +454,7 @@
                                 Visibility="{Binding IsCreation, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="The page to create" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
-                                   Text="Generated from the blueprint and laid out already, so this should need no second formatting edit. Everything the capture cannot know — where the item drops, who sells it, which quests use it — is left blank for you." />
+                                   Text="Generated from the blueprint. Drops, vendors and quests are left blank for you to fill in." />
                         <TextBox Text="{Binding Wikitext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
                                  FontFamily="Consolas" FontSize="12" Height="320" VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Auto" />
@@ -466,7 +478,7 @@
                         <Button Content="The wiki is right — mark as checked" Click="OnMarkCheckedClick" Padding="14,5" />
                         <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                                    MaxWidth="520"
-                                   Text="Records this item as matched without changing the page — for a value the page states better than the game does, or anything flagged above that you have judged yourself. It stops coming back unless the item itself changes." />
+                                   Text="Records the item as checked without changing the page. It comes back only if the item changes." />
                     </StackPanel>
 
                     <TextBlock Text="{Binding Outcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
@@ -485,7 +497,7 @@
                                 <!-- Worded for both cases: after a data edit, and on a page whose data already
                                      agreed, where there is no edit above to keep readable (user, 2026-09-29). -->
                                 <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeInfoBodyBrush}" Margin="0,3,0,0"
-                                           Text="Laid out to the Item Page Blueprint. It changes nothing about what the page says, and stays its own commit so that a reflow never hides a data change in the page's history." />
+                                           Text="Layout only: nothing the page says changes. Saved as its own edit." />
                             </StackPanel>
                         </Border>
 
@@ -512,7 +524,7 @@
                         <!-- Editable for the same reason the data edit is: the formatter positions a field it has
                              no rule for as best it can, and the user may want it somewhere else (user,
                              2026-09-28). What is in this box is what gets saved. -->
-                        <Expander Header="Edit the formatted wikitext before saving" Margin="0,10,0,0">
+                        <Expander Header="Edit raw wikitext" Margin="0,10,0,0">
                             <TextBox Text="{Binding FormattedWikitext, UpdateSourceTrigger=PropertyChanged}"
                                      AcceptsReturn="True" FontFamily="Consolas" FontSize="12" Height="260"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"

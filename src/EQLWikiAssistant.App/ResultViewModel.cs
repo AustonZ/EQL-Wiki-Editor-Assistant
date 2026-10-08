@@ -66,12 +66,46 @@ public sealed record FindingViewModel(
     public Brush Foreground => Blocks ? Palette.Attention : Palette.Text;
 
     public static FindingViewModel For(FieldFinding finding) => new(
-        finding.Field,
+        DisplayField(finding.Field),
         finding.Captured ?? "—",
         finding.OnWiki ?? "—",
-        finding.Verdict.ToString(),
+        DisplayVerdict(finding.Verdict, finding.Captured, finding.OnWiki),
         finding.Explanation ?? "",
         finding.Blocks);
+
+    /// <summary>
+    /// The analyzer's field names, as a reader would write them (user, 2026-10-07). They are keys in the
+    /// <c>Wiki</c> layer and the tests pin them, so they are translated here rather than renamed there. A stat keeps
+    /// its wiki label (<c>AC</c>, <c>SV Fire</c>), which is already what the reader sees on the page.
+    /// </summary>
+    public static string DisplayField(string field) => field switch
+    {
+        ItemPageAnalyzer.ItemNameField => "Item name",
+        ItemPageAnalyzer.PageTitleField => "Page title",
+        ItemPageAnalyzer.MerchantValueField => "Merchant value",
+        ItemPageAnalyzer.LoreField => "Lore",
+        ItemPageAnalyzer.CategoryField => "Category",
+        ItemPageAnalyzer.FlagsField => "Flags",
+        ItemPageAnalyzer.FlagProseField => "Flags (text)",
+        ItemPageAnalyzer.OrphanEffectField => "Effect",
+        "focus_effect" => "Focus effect",
+        _ => field,
+    };
+
+    /// <summary>
+    /// What the edit does to the row, since the table lists proposed changes (user, 2026-10-07): the enum names
+    /// (<c>MissingOnWiki</c>, <c>NeedsReview</c>) said what the comparison found, not what happens next.
+    /// </summary>
+    public static string DisplayVerdict(FieldVerdict verdict, string? captured, string? onWiki) => verdict switch
+    {
+        FieldVerdict.Matches => "Matches",
+        FieldVerdict.MissingOnWiki => "Add",
+        FieldVerdict.Differs when captured is null && onWiki is not null => "Remove",
+        FieldVerdict.Differs => "Change",
+        FieldVerdict.Unverifiable => "Kept",
+        FieldVerdict.NeedsReview => "Your call",
+        _ => verdict.ToString(),
+    };
 
     /// <summary>A compliance finding the tool fixes, shown as the two-sided comparison it is. The verdict names
     /// which side is empty, matching the vocabulary the field rows already use, and the finding's own prose becomes
@@ -86,7 +120,8 @@ public sealed record FindingViewModel(
         field,
         finding.Wanted ?? emptyCaptured,
         finding.OnPage ?? "—",
-        finding.OnPage is null ? nameof(FieldVerdict.MissingOnWiki) : nameof(FieldVerdict.Differs),
+        DisplayVerdict(
+            finding.OnPage is null ? FieldVerdict.MissingOnWiki : FieldVerdict.Differs, finding.Wanted, finding.OnPage),
         finding.Detail,
         Blocks: false);
 }
@@ -213,26 +248,19 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// read an icon id off the game, so the user looked the icon up by hand. With a confident match that instruction
     /// is stale — the id is already in the box, and the job is now to confirm it rather than to find it.
     /// </summary>
+    /// <remarks>Only a creation gets one (user, 2026-10-07): on an existing page the verdict line and the button
+    /// already say everything a hint would.</remarks>
     public string IconColumnHint => (IsCreation, Result.IconSuggestion) switch
     {
-        (true, { IsConfident: true } s) =>
-            $"The icon library matched this artwork to {s.IconId}, which is already filled in below. Check the two " +
-            "images agree before saving.",
-        (true, { IsConfident: false }) =>
-            "The icon library could not decide between two similar icons, so lucy_img_ID was left blank. Its closest " +
-            "guess is shown on the right.",
-        (true, _) => "Read the item's lucy_img_ID off this artwork.",
-
-        // On an existing page the question is not "what is this icon" but "is the page pointing at the right one",
-        // so the hint names what the button would do rather than what was already written.
-        (false, { CanApplyToPage: true } s) =>
-            $"The icon library matched the in-game artwork to {s.IconId}. Check it against the capture — nothing " +
-            "changes until you use the button below.",
-        (false, { IsConfident: false } s) =>
-            $"The icon library could not decide which icon this is; its closest guess is {s.IconId}. Deciding is " +
-            "yours — the id is left as the page has it.",
+        (true, { IsConfident: true }) => "lucy_img_ID automatically set below",
+        (true, _) => "lucy_img_ID not automatically set",
         _ => "",
     };
+
+    /// <summary>Red when the id was left blank: with the warning-strip bar gone, this line is the one place the gap is
+    /// said, so it has to read as one.</summary>
+    public Brush IconColumnHintBrush =>
+        Result.IconSuggestion is { IsConfident: true } ? Palette.Muted : Palette.Attention;
 
     /// <summary>Whether the hint says anything. It is blank on an ordinary page whose icon agrees.</summary>
     public bool HasIconColumnHint => !string.IsNullOrEmpty(IconColumnHint);
@@ -243,8 +271,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// </summary>
     public string MatchedIconCaption => Result.IconSuggestion switch
     {
-        { IsConfident: true } s => $"Matched: {s.IconId}",
-        { } s => $"Closest: {s.IconId} (unsure)",
+        { IsConfident: true } s => $"Matched (ID: {s.IconId})",
+        { } s => $"Best Guess (ID: {s.IconId})",
         _ => "",
     };
 
@@ -270,23 +298,17 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// back, so it is named rather than implied.</summary>
     public string IconActionPrompt => (IsCreation, Result.IconSuggestion) switch
     {
-        (_, null) => "",
-        (true, { } s) =>
-            $"The wiki has no {s.WikiFileName}, so this item's box would render without artwork until it is uploaded.",
-        (false, { NeedsUpload: true } s) =>
-            $"The wiki has no {s.WikiFileName}. This uploads it and then points the page at {s.IconId}; the page " +
-            "itself is not saved until you press Save.",
-        (false, { } s) =>
-            $"{s.WikiFileName} is already on the wiki. This sets lucy_img_ID to {s.IconId} in the proposed edit; " +
-            "nothing is saved until you press Save.",
+        (_, { NeedsUpload: true } s) => $"Icon #{s.IconId} is missing on the wiki.",
+        _ => "",
     };
 
-    public string IconActionButtonText => (IsCreation, Result.IconSuggestion) switch
+    public bool HasIconActionPrompt => !string.IsNullOrEmpty(IconActionPrompt);
+
+    public string IconActionButtonText => Result.IconSuggestion switch
     {
-        (_, null) => "Upload the icon",
-        (true, { } s) => $"Upload {s.WikiFileName} to the wiki",
-        (false, { NeedsUpload: true } s) => $"Upload {s.WikiFileName} and use icon {s.IconId}",
-        (false, { } s) => $"Use icon {s.IconId}",
+        null => "",
+        { NeedsUpload: true } s => $"Upload and use icon #{s.IconId}",
+        { } s => $"Use icon #{s.IconId}",
     };
 
     private bool _iconActioned;
@@ -338,7 +360,11 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         if (Result.Edit is { } edit)
             Replace(Diff, WikitextDiff.Compute(edit.OriginalWikitext, wikitext).Select(l => new DiffLineViewModel(l)));
 
-        if (_summary.Length == 0)
+        if (IsCreation)
+        {
+            // Nothing to add: a creation's summary already covers every field on the page.
+        }
+        else if (_summary.Length == 0)
             _summary = $"Set lucy_img_ID to {iconId} from the in-game icon";
         else if (!_summary.Contains("lucy_img_ID", StringComparison.OrdinalIgnoreCase) &&
                  !_summary.Contains("icon", StringComparison.OrdinalIgnoreCase))
@@ -347,9 +373,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         Replace(Warnings, BuildWarnings());
 
         _iconUploadFailed = false;
+        string next = IsCreation ? "" : " — review the diff, then Save";
         _iconUploadOutcome = _iconUploadOutcome is { } uploaded
-            ? $"{uploaded} lucy_img_ID set to {iconId} — review the diff, then Save."
-            : $"lucy_img_ID set to {iconId} — review the diff, then Save.";
+            ? $"{uploaded} lucy_img_ID set to {iconId}{next}."
+            : $"lucy_img_ID set to {iconId}{next}.";
 
         // Everything the box, the diff, the summary and the button all read from has moved.
         OnPropertyChanged(null);
@@ -375,8 +402,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     {
         { Matches: true } => "Appears to be correct.",
         { Matches: false } when Result.IconSuggestion is { CanApplyToPage: true } =>
-            $"May be incorrect. The in-game icon looks like {Result.IconSuggestion.IconId}: compare the third tile.",
-        { Matches: false } => "May be incorrect. Compare the two and decide which is wrong.",
+            $"May be incorrect on the wiki. The in-game icon looks like icon #{Result.IconSuggestion.IconId}.",
+        { Matches: false } => "May be incorrect on the wiki. Failed to automatically determine icon ID.",
         _ => Result.IconNote ?? "Not compared.",
     };
 
@@ -405,6 +432,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// <summary>True while this item is waiting for its Lore tab to be captured — what the lore section's prompt
     /// hangs off.</summary>
     public bool WantsLoreCapture => Result.NeedsLoreCapture;
+
+    /// <summary>True when only the Lore tab has been captured, so the item's data is still to come — the reverse of
+    /// <see cref="WantsLoreCapture"/> (user, 2026-10-07).</summary>
+    public bool WantsDescriptionCapture => Result.Status == ItemCheckStatus.LoreRecorded;
 
     /// <summary>Whether the lore section has anything at all to show.</summary>
     public bool HasLoreSection => WantsLoreCapture || HasCapturedLore;
@@ -450,12 +481,21 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public string StatusText => Result switch
     {
-        _ when IsDone => "Done",
+        // Green either way (see StatusBrush), but worded for what actually happened (user, 2026-10-07): "Done" is
+        // kept for an item the user settled by acting on it. A page that already matched had nothing done to it, and
+        // an item the ledger let skip the wiki was not compared at all this time.
+        _ when _settled => "Done",
+        { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: false } => "No differences",
+        { Status: ItemCheckStatus.AlreadyChecked } => "Already checked",
 
         // "Already correct" is a false statement about a page the tool declined to finish, and it sat directly above
         // a warning strip saying "Not done" (user, 2026-09-29). The ledger records Flagged in this case; the label
         // has to agree with it.
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => "Needs attention",
+
+        // The next thing to do with an item missing one of its two tabs is to capture it, whatever else is true, so
+        // the label says that and the list doubles as a to-do (user, 2026-10-07).
+        { NeedsLoreCapture: true } => "Lore tab capture needed",
         _ => StatusTextFor(Result.Status),
     };
 
@@ -465,9 +505,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         ItemCheckStatus.WrongFont => "Wrong font",
         ItemCheckStatus.Ineligible => "Not eligible",
         ItemCheckStatus.AlreadyChecked => "Already checked",
-        ItemCheckStatus.LoreRecorded => "Lore recorded",
+        ItemCheckStatus.LoreRecorded => "Description tab capture needed",
         ItemCheckStatus.NotOnWiki => "Not on the wiki",
-        ItemCheckStatus.NotAnItemPage => "Not an item page",
+        ItemCheckStatus.NotAnItemPage => "Wiki page is not an item page",
         ItemCheckStatus.AlreadyCorrect => "Already correct",
         ItemCheckStatus.EditProposed => "Edit proposed",
         ItemCheckStatus.Failed => "Failed",
@@ -478,6 +518,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     {
         _ when IsDone => Palette.Done,
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Palette.Attention,
+        { NeedsLoreCapture: true } or { Status: ItemCheckStatus.LoreRecorded } => Palette.Attention,
         { Status: ItemCheckStatus.EditProposed } => Palette.Warning,
         { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont } => Palette.Attention,
         _ => Palette.Neutral,
@@ -791,26 +832,16 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         // table. The table truncates, and these are precisely the items nobody has judged yet — the tool has said
         // so explicitly, so they are the last thing that should be skimmable.
         foreach (FieldFinding blocker in result.Analysis?.Blockers ?? [])
-            yield return $"{blocker.Field}: {blocker.Explanation ?? "needs a human before anything is written."}";
+            yield return $"{FindingViewModel.DisplayField(blocker.Field)}: {blocker.Explanation ?? "needs a human before anything is written."}";
 
         foreach (IneligibilityDetail blocker in result.Eligibility?.Blockers ?? [])
             yield return blocker.Explanation;
 
         if (result.Error is { } error) yield return error;
 
-        // The bar stays — a wrong icon is exactly the kind of thing nobody has judged yet — but it must not
-        // contradict the button sitting above it in the Icon panel, which it did until the panel grew one
-        // (rendered, 2026-10-02). Where the library has an answer the bar sends the user to it instead of telling
-        // them the tool will never do anything.
-        if (result.Icon is { Matches: false } icon && !_iconActioned)
-            yield return
-                $"The page's icon (lucy_img_ID {icon.IconId}) may be incorrect. " +
-                (result.IconSuggestion is { CanApplyToPage: true } fix
-                    ? $"The in-game icon looks like {fix.IconId}: compare them, and use the button in the Icon " +
-                      "panel if you agree."
-                    : "Compare the two by eye.");
-
-        if (result.IconNote is { } note) yield return note;
+        // Nothing about the icon: a mismatch, a comparison that could not run and a missing lucy_img_ID are all said
+        // in red in the Icon panel, beside the images and the button that acts on them (user, 2026-10-07). A second
+        // copy up here was one more bar to read past.
 
         foreach (ComplianceFinding compliance in result.Analysis?.Compliance ?? [])
         {
@@ -826,34 +857,15 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
         if (result.Creation is { } creation)
         {
-            // Worded for what it costs rather than quoted from the compliance rule, because this is the one gap
-            // every creation starts with and the user has to decide about it every time: no capture can read an
-            // icon ID off the game, so it is typed or it is missing.
-            // One bar for the icon gap, whatever the reason. When the library had a near-miss it names the candidate,
-            // because "it is probably this one, check it" is a different job from "type one in" — but it is still the
-            // same gap, and two bars about one gap is how this strip got too long to read before.
-            if (!creation.HasIconId)
-                yield return result.IconSuggestion is { IsConfident: false } unsure
-                    ? $"No lucy_img_ID — the closest icon is {unsure.IconId}, but another is nearly as close, so the " +
-                      "tool did not fill it in. Compare the artwork shown above and type the ID below, or create the " +
-                      "page now and add it later (the item will keep coming back until you do)."
-                    : "No lucy_img_ID — the item box will render without artwork. The icon from the window is shown " +
-                      "above; fill the ID in below, or create the page now and add it later (the item will keep " +
-                      "coming back until you do).";
-
             foreach (string gap in creation.Gaps)
             {
-                if (gap.Contains("lucy_img_ID", StringComparison.Ordinal)) continue; // said better, just above
+                if (gap.Contains("lucy_img_ID", StringComparison.Ordinal)) continue; // the Icon panel says it
                 yield return gap;
             }
 
             foreach (string refusal in creation.FormattingRefusals)
                 yield return "The formatting pass declined to lay this page out: " + refusal;
         }
-
-        if (result.Edit is { NeedsReformatting: true })
-            yield return
-                "This edit adds a line it did not position, so the page will want the formatting pass afterwards.";
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

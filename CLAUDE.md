@@ -469,12 +469,15 @@ the proposed edit — and that assumption is wrong for a small, real set of item
 
 **Finding an item's page (`Wiki.MediaWiki.ItemPageLookup`).** More than one API call, because of two measured
 hazards.
-- **A quote-character mismatch must be offered as a candidate, not reported as a new item** (user, 2026-09-25). The
-  user cannot rename a page; their remedy is to create a correctly-named one and redirect the old, so a missed
-  candidate becomes a duplicate nobody can delete. On a miss the lookup retries the name's quote variants and, if
-  one exists, returns `FoundMisnamedCandidate` — the item still counts as new (`TreatAsNew`), because acting on the
-  wrong page is worse than treating a real item as unlisted, but the user is told what was found and prompted to
-  consider a redirect.
+- **A quote-character mismatch must be offered as a candidate, not reported as a new item** (user, 2026-09-25). A
+  missed candidate becomes a duplicate page, and only an admin can delete one. On a miss the lookup retries the
+  name's quote variants and, if one exists, returns `FoundMisnamedCandidate` — the item still counts as new
+  (`TreatAsNew`), because acting on the wrong page is worse than treating a real item as unlisted, but the user is
+  told what was found and prompted to move it to the right title.
+  - **Correction (user, 2026-10-07): any editor can move (rename) a page**; the action is just hard to find. This used
+    to say the user could not, and that their only remedy was to create a correctly-named page and redirect the old one
+    by hand, losing its history. A move keeps the history and leaves the redirect behind on its own, so the warning now
+    suggests that instead.
   - **The variant ordering is what makes the request cap safe.** Four quote characters over two positions is
     sixteen combinations, more than the cap, so an arbitrary order could discard a plausible apostrophe/grave swap
     in favour of a curly-quote form nobody has observed. Variants are ordered by how many curly quotes they use, so
@@ -1425,8 +1428,9 @@ them, and before this the tool's only offer on one was **Skip**.
   rather than behind an Expander — on a creation it is not a detail to drill into, it is the whole thing being
   reviewed, so it must not be collapsible. The icon *comparison* goes too (there is no page to compare with), but
   the captured icon stays, because it is how the user reads off the `lucy_img_ID` they are about to type.
-- **The confirmation names the title**, because that is the part that is permanent: a page created at the wrong name
-  stays, and the user is the only one who can judge it.
+- **The confirmation names the title**, because the user is the only one who can judge it. It is no longer described
+  as permanent (user, 2026-10-07): any editor can move a page and an admin can delete one, so the dialog's
+  "nobody can delete a page" sentence was wrong and is gone.
 - `tools/WikiSpike -- preview <screenshot>` now prints the whole page it would create for a new item, which is where
   the generated text has to be judged — and it found two real bugs the moment it ran against a real capture:
   - **The gap list described the skeleton rather than the result.** The data pass defers every required parameter
@@ -1492,7 +1496,7 @@ testable) and that it includes the two steps preview skipped, the ledger and the
   page the user has decided is *correct* (most often lore the wiki states better than the game does) re-fetches on
   every capture forever, and the only other escape would be making the tool overwrite the very thing the user just
   approved. It records `Matched` against that capture's fingerprint, so the item settles until it actually changes.
-  The review screen offers it as "Looks right — mark as checked" whenever something is flagged.
+  The review screen offers it as "The wiki is right — mark as checked".
 - **`CommitAsync` re-fetches and refuses a page that moved on**, which matters more than `basetimestamp` does here.
   MediaWiki merges what it can, and this tool's edits are wholesale parameter replacements — exactly the shape that
   merges cleanly while still discarding somebody's work. Keep sending the parameter; this is what actually catches
@@ -1552,6 +1556,10 @@ a global hotkey is worth having.
       captured prose the analyzer has already reported. `ItemPageAnalysis.IsAlreadyCoveredByAFieldFinding` owns that,
       in `Wiki` rather than the app, because it is a question about the analysis and because nothing in the WPF
       project can be tested — the same constraint that put `LedgerQuery` there.
+  - **Nothing about the icon goes in the strip** (user, 2026-10-07). A mismatch, a comparison that could not run and
+    a creation's missing `lucy_img_ID` are each said in red in the Icon panel, beside the images and the button that
+    acts on them, so a bar repeating it was one more thing to read past. The same goes for "this edit adds a line it
+    did not position": the formatting step always follows, so it told the user nothing they would not see anyway.
   - **"Wiki page not verified for EQL" is the whole message** (user, 2026-09-29), down from a sentence explaining what
     verification covers and how to do it. Both are in this file and neither is news to the reader; the page title went
     too, since the panel is headed by the item and links to its page.

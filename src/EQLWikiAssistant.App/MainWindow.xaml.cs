@@ -47,7 +47,7 @@ public partial class MainWindow : Window
         LedgerButton.IsEnabled = false;
         AttentionLink.IsEnabled = false;
         SettingsButton.IsEnabled = false;
-        StatusText.Text = "Loading the OCR models…";
+        StatusText.Text = "Starting…";
         _ = StartUpAsync();
     }
 
@@ -75,12 +75,13 @@ public partial class MainWindow : Window
 
         HotKeyLabel.Text = _services.HotKeyProblem is null
             ? $"Hotkey: {_services.Settings.HotKey}"
-            : "Hotkey unavailable";
+            : $"Hotkey {_services.Settings.HotKey} unavailable";
         HotKeyLabel.ToolTip = _services.HotKeyProblem is { } problem
             ? $"{problem} Choose another under Settings > Capture hotkey."
             : null;
         EmptyState.Text = _services.HotKeyProblem is null
-            ? $"Open an item window in game and press {_services.Settings.HotKey}.\n\nEvery item window in the " +
+            ? $"Open an item window in game and press {_services.Settings.HotKey}, or press Capture now.\n\n" +
+              "Every item window in the " +
               "capture is checked against the wiki and listed on the left."
             : "Open an item window in game and press Capture now.\n\nEvery item window in the capture is checked " +
               "against the wiki and listed on the left.";
@@ -104,8 +105,13 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             // Most likely the RapidOCR models did not make it next to the executable — the documented packaging
-            // trap. Saying so beats a startup crash with a stack trace.
-            StatusText.Text = $"Could not start: {ex.Message}";
+            // trap. Fatal (user, 2026-10-07): nothing in the window works without the services, so it says why in a
+            // dialog and exits rather than sitting there in a state that only looks usable.
+            App.Record(ex);
+            MessageBox.Show(
+                this, $"Could not start: {ex.Message}\n\nThe details are in:\n{App.ErrorLogFile}", Title,
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            Application.Current.Shutdown();
         }
     }
 
@@ -143,7 +149,7 @@ public partial class MainWindow : Window
                 await Task.Run(() => services.CaptureGameWindowAsync());
             if (frame is null)
             {
-                StatusText.Text = problem;
+                ReportCaptureProblem(problem ?? "The game window could not be captured.");
                 return;
             }
 
@@ -181,12 +187,10 @@ public partial class MainWindow : Window
             // The "none found" case names the window it read. That is the one message where the user needs to know
             // *what* was searched — a capture of the wrong window looks exactly like a capture with no item windows
             // open, which is how a browser being captured instead of the game went undiagnosed (user, 2026-09-29).
-            StatusText.Text = results.Count switch
-            {
-                0 => $"No item window was found in {captured}.",
-                1 => "1 item window checked.",
-                _ => $"{results.Count} item windows checked.",
-            };
+            if (results.Count == 0)
+                ReportCaptureProblem($"No item window was found in {captured}.");
+            else
+                StatusText.Text = results.Count == 1 ? "1 item window checked." : $"{results.Count} item windows checked.";
         }
         catch (WikiUnavailableException ex)
         {
@@ -196,7 +200,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Capture failed: {ex.Message}";
+            App.Record(ex);
+            ReportCaptureProblem($"Capture failed: {ex.Message}");
         }
         finally
         {
@@ -207,6 +212,14 @@ public partial class MainWindow : Window
             SettingsButton.IsEnabled = true;
             BusyPanel.Visibility = Visibility.Collapsed;
         }
+    }
+
+    /// <summary>A capture that produced nothing to review: said in the status line and in a dialog, because the
+    /// hotkey is pressed from inside the game and a status line alone is easy to miss (user, 2026-10-07).</summary>
+    private void ReportCaptureProblem(string message)
+    {
+        StatusText.Text = message;
+        MessageBox.Show(this, message, "Nothing to check", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     /// <summary>The busy label and the status line say the same thing while work is under way.</summary>
@@ -262,7 +275,9 @@ public partial class MainWindow : Window
         {
             // Re-capturing an item the user already has open updates it rather than adding a duplicate; a lore
             // capture taken earlier stays attached, since it is still the same item.
-            CapturedImage? lore = existing.LoreImage;
+            CapturedImage? lore = existing.Result.Status == ItemCheckStatus.LoreRecorded
+                ? existing.Result.WindowImage
+                : existing.LoreImage;
             existing.Load(result);
             existing.LoreImage = lore;
             ResultsList.SelectedItem = existing;
@@ -352,12 +367,12 @@ public partial class MainWindow : Window
                 if (!uploaded.Uploaded) return;
             }
 
-            // On a creation the id is already in the generated text — the file was the only thing missing. On an
-            // existing page the id *is* the fix, and this is the press that writes it: see ItemPageEditor.WithIconId
-            // for why it goes through the ordinary parameter edit rather than being spliced in here.
-            if (!view.IsCreation)
-                view.ApplyIconId(
-                    ItemPageEditor.WithIconId(view.Wikitext, suggestion.IconId, _services.Mapping), suggestion.IconId);
+            // The id is written either way (user, 2026-10-07: never upload a file the page does not then use). On a
+            // creation it is normally in the generated text already, so this changes nothing unless the user had
+            // typed another; on an existing page the id *is* the fix. See ItemPageEditor.WithIconId for why it goes
+            // through the ordinary parameter edit rather than being spliced in here.
+            view.ApplyIconId(
+                ItemPageEditor.WithIconId(view.Wikitext, suggestion.IconId, _services.Mapping), suggestion.IconId);
         }
         catch (WikiUnavailableException ex)
         {
@@ -372,10 +387,9 @@ public partial class MainWindow : Window
     /// <summary>
     /// Creates the page for an item the wiki has never heard of.
     ///
-    /// **Confirmed more pointedly than an edit is**, because creating is the one write this tool does that nobody
-    /// here can undo: an ordinary editor on this wiki cannot delete a page, so a page created at the wrong title
-    /// stays. The title is in the prompt for that reason — it is the part that is permanent, and the part the user
-    /// is the only one able to judge.
+    /// **The title is in the prompt** because it is the part the user is the only one able to judge. It is not
+    /// permanent, which an earlier version of this prompt claimed: any editor can move a page, and an admin can delete
+    /// one (user, 2026-10-07).
     /// </summary>
     private async void OnCreateClick(object sender, RoutedEventArgs e)
     {
@@ -393,8 +407,7 @@ public partial class MainWindow : Window
 
         if (MessageBox.Show(
                 this,
-                $"Create the page '{creation.Title}'?\n\nNobody on this wiki can delete a page, so the title is " +
-                $"permanent once this is saved.{warning}",
+                $"Create the page '{creation.Title}'?{warning}",
                 "Create a wiki page",
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Warning) != MessageBoxResult.OK)

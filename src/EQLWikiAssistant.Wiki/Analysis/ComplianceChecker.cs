@@ -105,8 +105,7 @@ public static class ComplianceChecker
         if (page.HasLoreMissingPlaceholder)
             findings.Add(new ComplianceFinding(
                 LorePlaceholderRule,
-                "The page still carries {{Item Lore Missing}}. It will be removed — by the time this tool edits, " +
-                "either the lore has been captured or the item has none.",
+                "Remove placeholder text",
                 ToolWillFix: true,
                 Wanted: null,
                 OnPage: "{{Item Lore Missing}}"));
@@ -118,7 +117,7 @@ public static class ComplianceChecker
             findings.Add(new ComplianceFinding(
                 OnlyIncludeRule,
                 "The {{Itempage}} call is not wrapped in <onlyinclude>, so the item box cannot be transcluded " +
-                "elsewhere. Adding the wrapper means deciding what it should enclose, which is a human's call.",
+                "elsewhere. Adding the wrapper means deciding what it should enclose, which is your call.",
                 ToolWillFix: false));
 
         // The most common defect by far — 232 of 744 pages have no banner and 176 more carry a legacy one — and,
