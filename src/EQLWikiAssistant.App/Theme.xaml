@@ -411,6 +411,22 @@
         <Setter Property="RowHeaderWidth" Value="0" />
     </Style>
 
+    <!-- An invisible grip on each header edge. **Without these a column cannot be resized at all**, whatever
+         CanUserResizeColumns says: the DataGrid resizes through the template's two named Thumbs, and the template
+         below replaced the default one without them (user, 2026-10-07: the columns would reorder but not resize). -->
+    <Style x:Key="ColumnHeaderGripper" TargetType="Thumb">
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Cursor" Value="SizeWE" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border Background="{TemplateBinding Background}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="DataGridColumnHeader">
         <Setter Property="Background" Value="{StaticResource ChromeBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
@@ -420,12 +436,18 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="DataGridColumnHeader">
-                    <Border Background="{TemplateBinding Background}" BorderBrush="{StaticResource BorderBrushKey}"
-                            BorderThickness="0,0,1,1" SnapsToDevicePixels="True">
-                        <ContentPresenter Margin="{TemplateBinding Padding}"
-                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                          VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{StaticResource BorderBrushKey}"
+                                BorderThickness="0,0,1,1" SnapsToDevicePixels="True">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <Thumb x:Name="PART_LeftHeaderGripper" HorizontalAlignment="Left"
+                               Style="{StaticResource ColumnHeaderGripper}" />
+                        <Thumb x:Name="PART_RightHeaderGripper" HorizontalAlignment="Right"
+                               Style="{StaticResource ColumnHeaderGripper}" />
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

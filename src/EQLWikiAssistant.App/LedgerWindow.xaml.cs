@@ -118,7 +118,7 @@ public partial class LedgerWindow : Window
 
     private void OnOpenPageClick(object sender, RoutedEventArgs e)
     {
-        if ((sender as Button)?.DataContext is not LedgerRowViewModel { PageUrl: { } url }) return;
+        if ((sender as FrameworkContentElement)?.DataContext is not LedgerRowViewModel { PageUrl: { } url }) return;
         Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 

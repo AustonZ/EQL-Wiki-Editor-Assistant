@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:EQLWikiAssistant.App"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
-        Title="EQL Wiki Editor Assistant" Height="900" Width="1300" MinWidth="650" MinHeight="400"
+        Title="EQL Wiki Editor Assistant" Height="900" Width="1300" MinWidth="700" MinHeight="400"
         Style="{StaticResource DarkWindow}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -19,6 +19,13 @@
             <Setter Property="FontFamily" Value="Consolas" />
             <Setter Property="FontSize" Value="12" />
         </Style>
+
+        <!-- The screenshot pane, sized so a window is always shown at its native size, scrollbar or not (user,
+             2026-10-07): the 16px left margin, the widest default-size item window (408px, measured), 8px between it
+             and the scrollbar, and the theme's 12px scrollbar. At 430 a Description and a Lore capture together made the
+             scrollbar appear and the window shrank a few pixels to fit beside it, which reads as blur.
+             A window the player has resized wider scrolls sideways rather than shrinking. -->
+        <sys:Double x:Key="ShotPaneWidth">450</sys:Double>
 
         <!-- One size for every icon tile: a 40x40 wiki file at 4x. -->
         <sys:Double x:Key="IconTileSize">160</sys:Double>
@@ -34,20 +41,24 @@
         <!-- A plain header rather than a ToolBar: WPF's ToolBar restyles a CheckBox into a flat toggle with no box,
              which makes a setting look like a button, and adds an overflow chevron that never has anything in it. -->
         <Border DockPanel.Dock="Top" Background="{StaticResource ChromeBrush}" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,0,0,1" Padding="10,7">
-            <StackPanel Orientation="Horizontal">
+            <!-- **Solid buttons are for actions; everything else is a link or an icon** (user, 2026-10-07). Capture is
+                 the one action here. History and Settings only open a window, so they read as navigation. The global
+                 "Re-check anyway" box is gone: an item the ledger let skip the wiki offers its own Re-check link. -->
+            <DockPanel LastChildFill="False">
+                <Button x:Name="SettingsButton" DockPanel.Dock="Right" Click="OnSettingsClick"
+                        Style="{StaticResource QuietButton}" Foreground="{StaticResource TextMutedBrush}"
+                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Content="&#xE713;"
+                        Width="30" Height="30" Padding="0" VerticalAlignment="Center"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center" ToolTip="Settings" />
+                <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,14,0">
+                    <Hyperlink x:Name="LedgerLink" Click="OnLedgerClick"
+                               ToolTip="Everything checked so far, and what still needs attention">History</Hyperlink>
+                </TextBlock>
+
                 <Button x:Name="CaptureButton" Click="OnCaptureClick" Padding="12,4" FontWeight="SemiBold"
                         Content="Capture now" ToolTip="Capture the game window and check every item window in it" />
                 <!-- Beside the button it is the shortcut for (user, 2026-10-07). -->
                 <TextBlock x:Name="HotKeyLabel" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMutedBrush}" />
-                <CheckBox x:Name="ReCheckBox" Content="Re-check anyway" VerticalAlignment="Center" Margin="16,0,0,0"
-                          Checked="OnReCheckChanged" Unchecked="OnReCheckChanged"
-                          ToolTip="Check items against the wiki even if they were checked before and have not changed" />
-                <Button x:Name="LedgerButton" Click="OnLedgerClick" Padding="12,4" Margin="16,0,0,0"
-                        Content="History…"
-                        ToolTip="Everything checked so far, and what still needs attention" />
-                <Button x:Name="SettingsButton" Click="OnSettingsClick" Padding="12,4" Margin="8,0,0,0"
-                        Content="Settings…"
-                        ToolTip="UI font, hotkey, saved captures, icon cache, wiki account and mapping" />
 
                 <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a
                      status line were too quiet to read as "working" (user, 2026-09-28). -->
@@ -56,7 +67,7 @@
                     <TextBlock x:Name="BusyLabel" VerticalAlignment="Center" Margin="10,0,0,0"
                                Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
         </Border>
 
         <StatusBar DockPanel.Dock="Bottom">
@@ -75,7 +86,7 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="200" />
+                <ColumnDefinition Width="210" MinWidth="160" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
@@ -91,30 +102,38 @@
                     <Hyperlink Click="OnCloseAllClick" ToolTip="Close every item">Close all</Hyperlink>
                 </TextBlock>
             </Border>
+            <!-- No horizontal scrolling: a long name or status is trimmed instead, so the close button always stays
+                 in view at the column's narrower width (user, 2026-10-07). -->
             <ListBox x:Name="ResultsList" SelectionChanged="OnResultSelected"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      HorizontalContentAlignment="Stretch" BorderThickness="0,0,1,0" BorderBrush="{StaticResource BorderBrushKey}">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid Margin="2,0" ToolTip="{Binding CaptureTip}">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Margin="0,5">
+                            <!-- The item's own icon, so the list can be scanned by picture (user, 2026-10-07). The
+                                 slot keeps its width when there is none — a Lore-only capture — so names line up. -->
+                            <Image Grid.Column="0" Source="{Binding TabIcon}" Width="28" Height="28" Margin="0,0,8,0"
+                                   Stretch="Uniform" VerticalAlignment="Center"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                            <StackPanel Grid.Column="1" Margin="0,5">
                                 <TextBlock Text="{Binding ItemName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <StackPanel Orientation="Horizontal">
-                                    <!-- A settled item reads "Done" in green here rather than keeping its orange
-                                         status with a grey marker beside it: the list is scanned to find what still
-                                         needs attention, so done is what has to be obvious (user, 2026-09-29). -->
-                                    <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
-                                               FontSize="11" FontWeight="SemiBold" />
-                                </StackPanel>
+                                <!-- A settled item reads green here rather than keeping its orange status with a
+                                     grey marker beside it: the list is scanned to find what still needs attention, so
+                                     done is what has to be obvious (user, 2026-09-29). -->
+                                <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
+                                           FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding StatusText}" />
                             </StackPanel>
                             <!-- The list accumulates across captures, so finishing with an item has to be an
                                  explicit act rather than something the next capture does for you. -->
                             <!-- The full height of the row, so the cross sits centred and is easy to hit (user,
                                  2026-10-07). The row's vertical margin lives on the text for the same reason. -->
-                            <Button Grid.Column="1" Content="✕" Click="OnCloseResultClick" Padding="8,0"
+                            <Button Grid.Column="2" Content="✕" Click="OnCloseResultClick" Padding="8,0"
                                     Style="{StaticResource QuietButton}"
                                     VerticalAlignment="Stretch" ToolTip="Close this item" />
                         </Grid>
@@ -133,26 +152,94 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
                        Text="Open an item window in game and press Ctrl+Shift+E, or press Capture now.&#10;&#10;Every item window in the capture is checked against the wiki and listed on the left." />
 
+            <!-- **The screenshot has its own pane, left of the edit pane** (user, 2026-10-07): fixed width, no border on
+                 the side it shares, and it never scrolls away with the edit, so the window being reviewed stays in
+                 view and the warnings no longer sit underneath it. When the area is too narrow for both side by side,
+                 the screenshot moves to the top of the edit pane instead — see OnDetailAreaSizeChanged. -->
+            <Grid Grid.Column="2" x:Name="DetailArea" Visibility="Collapsed" SizeChanged="OnDetailAreaSizeChanged"
+                  DataContext="{Binding SelectedItem, ElementName=ResultsList}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <ScrollViewer Grid.Column="0" x:Name="ShotPane" Width="{StaticResource ShotPaneWidth}"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="ShotPaneHost" Margin="16,10,8,16">
+                        <!-- Moved between this pane and the top of the edit pane as the width changes. -->
+                        <StackPanel x:Name="ShotStack">
+                            <!-- The item's name, status and page link head the screenshot rather than the edit (user,
+                                 2026-10-07), so they stay in view with it. The status row wraps, the pane being
+                                 narrower than the edit pane it came from. -->
+                            <!-- The verification badge beside the name rather than a bar in the warning strip (user,
+                                 2026-10-07): it is about the page as a whole, not something to act on in this edit. -->
+                            <WrapPanel>
+                                <!-- Selectable, for copying the name (user, 2026-10-07), and otherwise a label: read-only,
+                                     no box, no border. The -2 cancels the text box's own inner inset so the name still
+                                     lines up with the status below it. -->
+                                <TextBox Text="{Binding ItemName, Mode=OneWay}" IsReadOnly="True" FontSize="21"
+                                         FontWeight="Bold" TextWrapping="Wrap" VerticalAlignment="Center"
+                                         Background="Transparent" BorderThickness="0" Padding="0"
+                                         Margin="-2,0,12,0" />
+                                <Border Background="{StaticResource AttentionBrush}" CornerRadius="3" Padding="8,2"
+                                        VerticalAlignment="Center"
+                                        ToolTip="This page is not on the wiki's Verified for EQLegends list"
+                                        Visibility="{Binding Result.NotVerifiedForEql, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="Not verified for EQL" FontWeight="Bold" FontSize="13"
+                                               Foreground="{StaticResource SurfaceBrush}" />
+                                </Border>
+                            </WrapPanel>
+
+                            <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontWeight="SemiBold" />
+                                <TextBlock Text="  —  " Foreground="{StaticResource TextDimBrush}"
+                                           Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}" />
+                                <TextBlock Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}">
+                                    <Hyperlink Click="OnOpenPageClick">
+                                        <TextBlock Text="{Binding PageTitle}" />
+                                    </Hyperlink>
+                                </TextBlock>
+                                <TextBlock Text="{Binding LedgerNote}" Foreground="{StaticResource TextDimBrush}" Margin="8,0,0,0"
+                                           Visibility="{Binding HasLedgerNote, Converter={StaticResource BoolToVis}}" />
+                            </WrapPanel>
+                            <!-- Only where the ledger let this capture skip the wiki, replacing the global checkbox
+                                 (user, 2026-10-07). A link, since it only reads the wiki; on its own line, because the
+                                 status row above already wraps on a long page title. The icon is part of the link. -->
+                            <TextBlock Margin="0,4,0,0"
+                                       Visibility="{Binding CanReCheck, Converter={StaticResource BoolToVis}}">
+                                <Hyperlink Click="OnReCheckClick"
+                                           ToolTip="Compare it against the wiki now, even though nothing has changed since it was checked"><Run
+                                    Text="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BaselineAlignment="Center" /><Run
+                                    Text=" Refresh wiki data" /></Hyperlink>
+                            </TextBlock>
+
+                            <!-- **Always at full size** (user, 2026-10-07): the screenshot is the reference the user reads
+                                 the right-hand side against, and a shrunken one loses exactly that. A window wider than
+                                 the space — one the player resized, which the game's layouts give no reason to do —
+                                 scrolls sideways here instead. Only the screenshots scroll: the name and status above
+                                 stay put and keep wrapping to the pane's width. The wheel goes to the page, since this
+                                 scroller only ever scrolls sideways. -->
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                          PreviewMouseWheel="OnPassScrollToParent" Margin="0,12,0,0">
+                                <StackPanel>
+                                    <Image x:Name="WindowImage" Stretch="None" UseLayoutRounding="True"
+                                           HorizontalAlignment="Left" VerticalAlignment="Top" />
+                                    <!-- The Lore capture sits below the Description one rather than replacing it, so
+                                         both halves of a two-capture item stay visible together. -->
+                                    <Image x:Name="LoreImage" Stretch="None" UseLayoutRounding="True"
+                                           HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
             <!-- No padding on the scroller itself: it sat inside the scrolling area, so clipped content stopped short
                  of the border above and below (user, 2026-10-07). The panel's own margin scrolls with it instead. -->
-            <ScrollViewer Grid.Column="2" x:Name="DetailScroller" VerticalScrollBarVisibility="Auto"
-                          Visibility="Collapsed">
-                <StackPanel x:Name="DetailPanel" DataContext="{Binding SelectedItem, ElementName=ResultsList}"
-                            Margin="16,10,16,16">
-                    <TextBlock Text="{Binding ItemName}" FontSize="21" FontWeight="Bold" TextWrapping="Wrap" />
-
-                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                        <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontWeight="SemiBold" />
-                        <TextBlock Text="  —  " Foreground="{StaticResource TextDimBrush}"
-                                   Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}" />
-                        <TextBlock Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}">
-                            <Hyperlink Click="OnOpenPageClick">
-                                <TextBlock Text="{Binding PageTitle}" />
-                            </Hyperlink>
-                        </TextBlock>
-                        <TextBlock Text="{Binding LedgerNote}" Foreground="{StaticResource TextDimBrush}" Margin="8,0,0,0"
-                                   Visibility="{Binding HasLedgerNote, Converter={StaticResource BoolToVis}}" />
-                    </StackPanel>
+            <ScrollViewer Grid.Column="1" x:Name="DetailScroller" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="DetailPanel" Margin="16,10,16,16">
+                    <!-- The name, status and screenshot land here when the area is too narrow for their own pane. -->
+                    <StackPanel x:Name="InlineShotHost" Margin="0,0,0,4" Visibility="Collapsed" />
 
                     <!-- **The capture comes first, above everything else** (user, 2026-10-01): the game is the
                          source, so the panel reads from the source downward towards the finished wikitext. The
@@ -160,12 +247,7 @@
                          spare width beside a ~400px window crop, and vertical space is what this panel runs out
                          of. A WrapPanel is what makes that safe: on a narrow window the icons drop below the
                          screenshot instead of being clipped. -->
-                    <TextBlock Text="What was captured" Style="{StaticResource SectionHeading}" />
                     <WrapPanel Orientation="Horizontal">
-                        <Image x:Name="WindowImage" Stretch="None" VerticalAlignment="Top" Margin="0,2,0,0" />
-                        <!-- The Lore capture sits beside the Description one rather than replacing it, so both
-                             halves of a two-capture item stay visible together. -->
-                        <Image x:Name="LoreImage" Stretch="None" VerticalAlignment="Top" Margin="12,2,0,0" />
 
                         <!-- Both icons, whatever the verdict. The comparison is perceptual and has limits — it
                              declines near-black sprites and occasionally flags a good one — and every one of those
@@ -178,9 +260,9 @@
                              about two thirds of the second tile (user, 2026-10-01). The icons set the column's
                              width; only the prose below is bounded, and at the same 380 so the column reads
                              straight. -->
-                        <StackPanel Margin="20,2,0,0"
+                        <StackPanel Margin="0,2,0,0"
                                     Visibility="{Binding HasIcons, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="Icon" Style="{StaticResource SectionHeading}" Margin="0,0,0,4" />
+                            <TextBlock Text="Icon" Style="{StaticResource SectionHeading}" Margin="0,10,0,4" />
                             <TextBlock Text="{Binding IconVerdict}" Foreground="{Binding IconVerdictBrush}"
                                        TextWrapping="Wrap" Margin="0,0,0,6" MaxWidth="380" HorizontalAlignment="Left"
                                        Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}" />
@@ -206,8 +288,16 @@
                                                Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
                                                RenderOptions.BitmapScalingMode="HighQuality" />
                                     </Border>
-                                    <TextBlock Text="not captured" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
-                                               Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}" />
+                                    <!-- An absent icon has to look absent, and now also says so where the icon would be
+                                         (user, 2026-10-07). -->
+                                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                            Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}">
+                                        <Grid Margin="4" Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}">
+                                            <TextBlock Text="No icon found in the capture" TextWrapping="Wrap" TextAlignment="Center"
+                                                       VerticalAlignment="Center" Padding="10,0"
+                                                       Foreground="{StaticResource AttentionBrush}" />
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
                                 <StackPanel Margin="0,0,20,8"
                                             Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}">
@@ -218,8 +308,14 @@
                                                Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
                                                RenderOptions.BitmapScalingMode="NearestNeighbor" />
                                     </Border>
-                                    <TextBlock Text="none on the page" FontSize="11" Foreground="{StaticResource TextDimBrush}" FontStyle="Italic"
-                                               Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}" />
+                                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                            Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}">
+                                        <Grid Margin="4" Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}">
+                                            <TextBlock Text="No icon on the wiki" TextWrapping="Wrap" TextAlignment="Center"
+                                                       VerticalAlignment="Center" Padding="10,0"
+                                                       Foreground="{StaticResource AttentionBrush}" />
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
 
                                 <!-- The icon the library matched, beside the captured one. **This tile is the whole
@@ -283,53 +379,6 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-
-                    <TextBlock Text="Proposed changes" Style="{StaticResource SectionHeading}"
-                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}" />
-                    <!-- PreviewMouseWheel: a DataGrid has its own ScrollViewer, which swallows the wheel even when
-                         it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
-                    <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
-                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
-                              BorderBrush="{StaticResource BorderBrushKey}" HorizontalScrollBarVisibility="Disabled"
-                              ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                              PreviewMouseWheel="OnPassScrollToPage"
-                              Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Field" Binding="{Binding Field}" Width="1.2*" />
-                            <!-- Template columns so the compared values wrap. As text columns they truncated, which
-                                 hid the very thing the row exists to show — an effect line or a lore paragraph is
-                                 far wider than a cell. -->
-                            <DataGridTemplateColumn Header="In game" Width="1.6*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Captured}" TextWrapping="Wrap" Margin="2,3" Style="{StaticResource ItemData}" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="On the wiki" Width="1.6*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding OnWiki}" TextWrapping="Wrap" Margin="2,3" Style="{StaticResource ItemData}" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Verdict" Binding="{Binding Verdict}" Width="Auto" />
-                            <!-- A template column so the note wraps. As a text column it truncated mid-sentence,
-                                 which loses the part explaining *why* the tool concluded what it did. -->
-                            <DataGridTemplateColumn Header="Note" Width="2.2*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Margin="2,3" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                        <DataGrid.RowStyle>
-                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                                <Setter Property="Foreground" Value="{Binding Foreground}" />
-                            </Style>
-                        </DataGrid.RowStyle>
-                    </DataGrid>
 
                     <!-- The reverse of the Lore tab prompt below (user, 2026-10-07): the Lore tab was captured first,
                          so the item's data is still to come. -->
@@ -403,6 +452,55 @@
                         </Grid>
                     </StackPanel>
 
+                    <TextBlock Text="Proposed changes" Style="{StaticResource SectionHeading}"
+                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}" />
+                    <!-- PreviewMouseWheel: a DataGrid has its own ScrollViewer, which swallows the wheel even when
+                         it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
+                    <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserReorderColumns="False" CanUserResizeColumns="True"
+                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
+                              BorderBrush="{StaticResource BorderBrushKey}" HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                              PreviewMouseWheel="OnPassScrollToPage"
+                              Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Field" Binding="{Binding Field}" Width="1.2*" />
+                            <!-- Template columns so the compared values wrap. As text columns they truncated, which
+                                 hid the very thing the row exists to show — an effect line or a lore paragraph is
+                                 far wider than a cell. -->
+                            <DataGridTemplateColumn Header="In game" Width="1.6*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Captured}" TextWrapping="Wrap" Margin="2,3" Style="{StaticResource ItemData}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="On the wiki" Width="1.6*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding OnWiki}" TextWrapping="Wrap" Margin="2,3" Style="{StaticResource ItemData}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Verdict" Binding="{Binding Verdict}" Width="Auto" />
+                            <!-- A template column so the note wraps. As a text column it truncated mid-sentence,
+                                 which loses the part explaining *why* the tool concluded what it did. -->
+                            <DataGridTemplateColumn Header="Note" Width="2.2*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Margin="2,3" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                <Setter Property="Foreground" Value="{Binding Foreground}" />
+                            </Style>
+                        </DataGrid.RowStyle>
+                    </DataGrid>
+
+
                     <TextBlock Text="The edit" Style="{StaticResource SectionHeading}"
                                Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}" />
                     <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
@@ -473,13 +571,16 @@
 
                     <!-- The only way a flagged item becomes done. Without it, an item whose page the user has
                          decided is correct stays flagged and re-fetches on every capture forever. -->
-                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
-                                Visibility="{Binding CanMarkChecked, Converter={StaticResource BoolToVis}}">
-                        <Button Content="The wiki is right — mark as checked" Click="OnMarkCheckedClick" Padding="14,5" />
+                    <!-- A DockPanel rather than a horizontal StackPanel, which gives its children unlimited width
+                         so the note never wrapped and ran off the edge once the edit pane got narrower. -->
+                    <DockPanel Margin="0,12,0,0"
+                               Visibility="{Binding CanMarkChecked, Converter={StaticResource BoolToVis}}">
+                        <Button DockPanel.Dock="Left" Content="The wiki is right — mark as checked" Click="OnMarkCheckedClick"
+                                Padding="14,5" VerticalAlignment="Center" />
                         <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                                   MaxWidth="520"
+                                   MaxWidth="520" HorizontalAlignment="Left"
                                    Text="Records the item as checked without changing the page. It comes back only if the item changes." />
-                    </StackPanel>
+                    </DockPanel>
 
                     <TextBlock Text="{Binding Outcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
                                Margin="0,12,0,0" TextWrapping="Wrap"
@@ -542,6 +643,7 @@
 
                 </StackPanel>
             </ScrollViewer>
+            </Grid>
         </Grid>
     </DockPanel>
 </Window>

@@ -344,6 +344,35 @@ public class ItemCheckPipelineTests
         Assert.Equal(after, wiki.Fetches);
     }
 
+    /// <summary>
+    /// The same round trip through the review screen's per-item Re-check (2026-10-07), which re-analyzes a result the
+    /// ledger let skip the wiki. That result used to carry no captured icon, so the re-check fingerprinted the item
+    /// without one and the row it wrote could never match the next capture.
+    /// </summary>
+    [Fact]
+    public async Task ReCheckingAnAlreadyCheckedItemKeepsItSettled()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines), EarringPage());
+
+        await pipeline.CheckAsync(FrameWithIcon());
+        IReadOnlyList<ItemCheckResult> skipped = await pipeline.CheckAsync(FrameWithIcon());
+        Assert.Equal(ItemCheckStatus.AlreadyChecked, skipped[0].Status);
+        Assert.NotNull(skipped[0].CapturedIcon);
+
+        int before = wiki.Fetches;
+        ItemCheckResult rechecked = await pipeline.ReanalyzeAsync(skipped[0]);
+        Assert.Equal(ItemCheckStatus.AlreadyCorrect, rechecked.Status);
+        Assert.True(wiki.Fetches > before);   // it really did ask the wiki
+
+        int after = wiki.Fetches;
+        IReadOnlyList<ItemCheckResult> again = await pipeline.CheckAsync(FrameWithIcon());
+
+        Assert.Equal(ItemCheckStatus.AlreadyChecked, again[0].Status);
+        Assert.Equal(after, wiki.Fetches);
+        Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
     // --- formatting offered without a data edit ---------------------------------------------------------
 
     /// <summary>
@@ -1118,6 +1147,7 @@ public class ItemCheckPipelineTests
         Assert.False(description.NeedsLoreCapture);
         Assert.Equal("A trophy of the first bashing.", description.Lore);
     }
+
 
     // --- fakes ------------------------------------------------------------------------------------------
 

@@ -1560,9 +1560,34 @@ a global hotkey is worth having.
     a creation's missing `lucy_img_ID` are each said in red in the Icon panel, beside the images and the button that
     acts on them, so a bar repeating it was one more thing to read past. The same goes for "this edit adds a line it
     did not position": the formatting step always follows, so it told the user nothing they would not see anyway.
+  - **Not verified is a red badge beside the item's name, not a bar** (user, 2026-10-07): it is about the whole page,
+    not something to act on in this edit. The pipeline still raises it as `ItemCheckPipeline.NotVerifiedNotice`, and
+    `ItemCheckResult.NotVerifiedForEql` reads it off the warnings so the two can never disagree; the strip skips it.
   - **"Wiki page not verified for EQL" is the whole message** (user, 2026-09-29), down from a sentence explaining what
     verification covers and how to do it. Both are in this file and neither is news to the reader; the page title went
     too, since the panel is headed by the item and links to its page.
+- **The screenshot has its own pane, left of the edit pane** (user, 2026-10-07): fixed width (`ShotPaneWidth`: the
+  margin, the widest default-size window at 408px, 8px of padding and the 12px scrollbar — sized for the scrollbar
+  because a Description and a Lore capture together bring it up, and at 430 that shrank the window a few pixels, which
+  read as blur; verified by measuring a 408px image drawn at 408.0 with the scrollbar showing), no border on the side it shares, scrolling on its own so the window under review never
+  scrolls away. Below `NarrowestEditPane` of room beside it, the screenshot moves to the top of the edit pane and
+  scrolls with it (`OnDetailAreaSizeChanged` re-parents one `ShotStack`), and it is **always drawn at full size**
+  (user, 2026-10-07): it is the reference the user reads the edit against, and a shrunken one loses exactly that. A
+  window wider than the space — one the player resized, which nobody has reason to do — scrolls sideways in a
+  scroller of its own around the screenshots only, so the name and status above keep wrapping to the pane. **The item's name, verification badge, status and page link
+  head that pane, not the edit pane** (user, 2026-10-07), so they move with the screenshot in either layout. The item
+  list defaults to 210px (from 300) and trims a long name or status rather than scrolling sideways, which had pushed
+  the close buttons out of view; the window's minimum width is 700, the narrowest at which a stacked screenshot still
+  shows at full size. Verified by rendering at 1500, 1050 and 700px.
+- **Solid buttons are for actions; navigation is a link or an icon** (user, 2026-10-07). Anything that writes to the
+  wiki stays a clear button. History is a link and Settings a cog in the header's right corner; in History, the item
+  name is the page link and Forget is an ✕.
+- **Re-check is per item, and only where the ledger let a capture skip the wiki** (user, 2026-10-07), replacing the
+  global "Re-check anyway" checkbox. It runs `ReanalyzeAsync`, so the ledger ends up where a fresh check would leave
+  it. **That made the `AlreadyChecked` result carry its captured icon**, which it had not: the re-check fingerprints
+  whatever icon the result holds, and a row fingerprinted without one never matches the next capture — the
+  2026-09-29 ledger bug, reached by a new route. `ReCheckingAnAlreadyCheckedItemKeepsItSettled` fails without it.
+  The review screen still hides the icon section for such a result, since nothing was compared.
 - Saving is confirmed explicitly: it writes to a public wiki under the user's own account, and an ordinary editor
   there cannot delete a revision.
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — `RapidOcrEngine` loads three
@@ -1750,6 +1775,10 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
   could live — and a second copy of a palette is the kind that drifts, with half the app still on `SeaGreen` after
   the other half moved. A missing key throws rather than defaulting: a silently grey status column is exactly the
   kind of wrong this tool avoids elsewhere.
+- **A replaced `DataGridColumnHeader` template must carry the two resize grips** (`PART_LeftHeaderGripper`,
+  `PART_RightHeaderGripper`), or no column can be resized whatever `CanUserResizeColumns` says — which is how both
+  grids came to reorder their columns but not resize them (user, 2026-10-07). They are invisible `Thumb`s; both grids
+  now resize and do not reorder.
 - **The title bar is the one part WPF does not own**, so `DarkTitleBar` sets `DWMWA_USE_IMMERSIVE_DARK_MODE` on
   `SourceInitialized` — before that there is no HWND. Failure is ignored: a light caption is cosmetic, refusing to
   open a window over it would not be. **A `MessageBox` stays light regardless**, since it is drawn by the OS.
@@ -1797,7 +1826,7 @@ unsettled rows are the state that accumulates silently and nothing else surfaces
 - **Modal, deliberately.** The ledger is shared state a capture writes to, so a view left open beside one would show
   rows already wrong, and a "Forget" pressed against one would act on a row the pipeline had just replaced. The
   capture path disables the button for the same reason from the other side.
-- "Forget" is the permanent form of "re-check anyway" (`CheckedItemsLedger.Remove`): the next capture treats the item
+- "Forget" (the row's ✕) is the permanent form of a re-check (`CheckedItemsLedger.Remove`): the next capture treats the item
   as new. Confirmed, but lightly — nothing on the wiki changes.
 - **No export.** The plan listed one; the ledger is already readable JSON in the user's own app-data, so the window
   links to the file instead. An export would be a second copy of data that is not hidden.

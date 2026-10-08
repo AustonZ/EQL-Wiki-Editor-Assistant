@@ -167,6 +167,10 @@ public sealed record ItemCheckResult
 
     public string? Error { get; init; }
 
+    /// <summary>The wiki's Verified for EQLegends list is known not to include this page. Read off the warning rather
+    /// than kept as a second flag, so the two can never disagree.</summary>
+    public bool NotVerifiedForEql => Warnings.Contains(ItemCheckPipeline.NotVerifiedNotice);
+
     /// <summary>Whether a commit is possible: there is an edit, and nothing is asking for a human first.</summary>
     public bool CanCommit =>
         Status == ItemCheckStatus.EditProposed &&

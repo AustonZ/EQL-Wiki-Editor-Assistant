@@ -221,8 +221,11 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public bool HasLoreImage => _loreImage is not null;
 
     /// <summary>Whether there is anything to show in the icon section — at least one of the images.</summary>
+    /// <remarks>Not for an item the ledger let skip the wiki: nothing was compared, so the section could only say
+    /// "not compared" beside an empty wiki tile. It carries the icon for its list entry and a re-check.</remarks>
     public bool HasIcons =>
-        Result.CapturedIconImage is not null || Result.WikiIconImage is not null || MatchedIconImage is not null;
+        Result.Status != ItemCheckStatus.AlreadyChecked &&
+        (Result.CapturedIconImage is not null || Result.WikiIconImage is not null || MatchedIconImage is not null);
 
     /// <summary>The artwork the icon library matched, for a new item. This is what the user confirms against the
     /// captured icon — see <c>IconLibrary.ConfidentMargin</c> for why the eye is the backstop and not the number.
@@ -733,9 +736,19 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanMarkChecked));
             OnPropertyChanged(nameof(CanCommitFormatting));
             OnPropertyChanged(nameof(CanActOnIcon));
+            OnPropertyChanged(nameof(CanReCheck));
             OnPropertyChanged(nameof(IsNotBusy));
         }
     }
+
+    /// <summary>Whether to offer Re-check: only where the ledger let this capture skip the wiki, which is the one
+    /// result that was never compared (user, 2026-10-07). Every other result already reflects the wiki as it stood.</summary>
+    public bool CanReCheck =>
+        !IsBusy && Result is { Status: ItemCheckStatus.AlreadyChecked, Item: not null, WindowImage: not null };
+
+    /// <summary>The captured icon, small, for the item list.</summary>
+    public System.Windows.Media.ImageSource? TabIcon =>
+        Result.CapturedIconImage is { } icon ? Bitmaps.From(icon) : null;
 
     /// <summary>
     /// Whether "Save to the wiki" does anything.
@@ -825,6 +838,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             // The lore section says this, with a button to act on it. Repeating it up here was noise once lore got
             // a region of its own (user, 2026-09-28).
             if (result.NeedsLoreCapture && warning.Contains("Lore tab", StringComparison.Ordinal)) continue;
+
+            // Shown as a badge beside the item's name instead (user, 2026-10-07).
+            if (warning == ItemCheckPipeline.NotVerifiedNotice) continue;
             yield return warning;
         }
 

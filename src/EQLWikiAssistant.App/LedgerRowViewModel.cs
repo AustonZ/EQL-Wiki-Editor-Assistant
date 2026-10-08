@@ -73,6 +73,10 @@ public sealed record LedgerRowViewModel(LedgerEntry Entry, LedgerVerdict Verdict
             ? $"https://eqlwiki.com/{Uri.EscapeDataString(title.Replace(' ', '_'))}"
             : null;
 
+    public bool HasPageUrl => PageUrl is not null;
+
+    public bool HasNoPageUrl => PageUrl is null;
+
     private static string Describe(DateTimeOffset when)
     {
         TimeSpan ago = DateTimeOffset.Now - when;

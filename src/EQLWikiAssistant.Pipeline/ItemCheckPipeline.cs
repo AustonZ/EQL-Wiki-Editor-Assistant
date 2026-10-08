@@ -188,8 +188,12 @@ public sealed class ItemCheckPipeline
         // long form explained what verification covers and how to do it; the user knows both, and the sentence was
         // competing with the warnings that actually need judging. The page title is dropped too — the panel is headed
         // by the item and links to its page, so there is no ambiguity about which page this is about.
-        warnings.Add("Wiki page not verified for EQL");
+        warnings.Add(NotVerifiedNotice);
     }
+
+    /// <summary>The verification notice. Public so the review screen can show it as a badge beside the item's name
+    /// (user, 2026-10-07) rather than as one more bar in the strip — see <see cref="ItemCheckResult.NotVerifiedForEql"/>.</summary>
+    public const string NotVerifiedNotice = "Wiki page not verified for EQL";
 
     private async Task<ItemCheckResult> CheckWindowAsync(
         CapturedImage frame, LocatedWindow window, CancellationToken cancellationToken)
@@ -299,12 +303,19 @@ public sealed class ItemCheckPipeline
             // item settled weeks ago is exactly the one whose verification is most likely still outstanding.
             AddVerificationNotice(_ledger.Find(item.Name)?.WikiPageTitle ?? item.Name, warnings);
 
+            // The icon travels with it although nothing here compares it. Re-checking this result from the review
+            // screen goes through ReanalyzeAsync, which fingerprints whatever icon the result carries — and a row
+            // fingerprinted without the icon never matches the next capture, so the item would come back forever
+            // (the 2026-09-29 bug, reached by a new route).
             return new ItemCheckResult
             {
                 Status = ItemCheckStatus.AlreadyChecked,
                 ItemName = item.Name,
                 Item = item,
                 WindowImage = crop,
+                CapturedIcon = capturedIcon,
+                CapturedIconImage = iconCrop,
+                IconNote = iconUnreadableNote,
                 LedgerVerdict = verdict,
                 LedgerRow = _ledger.Find(item.Name),
                 Lore = lore,

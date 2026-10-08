@@ -44,7 +44,7 @@ public partial class MainWindow : Window
         // Built off the UI thread: RapidOcrEngine loads three ONNX models in its constructor, which is seconds of a
         // frozen window if it happens here. The capture button stays disabled until it is ready.
         CaptureButton.IsEnabled = false;
-        LedgerButton.IsEnabled = false;
+        LedgerLink.IsEnabled = false;
         AttentionLink.IsEnabled = false;
         SettingsButton.IsEnabled = false;
         StatusText.Text = "Starting…";
@@ -92,11 +92,10 @@ public partial class MainWindow : Window
         try
         {
             _services = await Task.Run(() => new AppServices());
-            _services.Pipeline.ReCheckAnyway = ReCheckBox.IsChecked == true;
             _services.HotKeyPressed += OnHotKeyPressed;
             UpdateHotKeyLabel();
             CaptureButton.IsEnabled = true;
-            LedgerButton.IsEnabled = true;
+            LedgerLink.IsEnabled = true;
             AttentionLink.IsEnabled = true;
             SettingsButton.IsEnabled = true;
             UpdateLedgerText();
@@ -117,10 +116,6 @@ public partial class MainWindow : Window
 
     private void OnCaptureClick(object sender, RoutedEventArgs e) => _ = CaptureAsync();
 
-    private void OnReCheckChanged(object sender, RoutedEventArgs e)
-    {
-        if (_services is not null) _services.Pipeline.ReCheckAnyway = ReCheckBox.IsChecked == true;
-    }
 
     private async Task CaptureAsync()
     {
@@ -129,7 +124,7 @@ public partial class MainWindow : Window
         CaptureButton.IsEnabled = false;
         // The ledger too: a capture writes rows, so a ledger view opened mid-capture would show some of them stale.
         // The window being modal stops a capture starting while it is open; this is the same guard the other way.
-        LedgerButton.IsEnabled = false;
+        LedgerLink.IsEnabled = false;
         AttentionLink.IsEnabled = false;
         // Settings too: the capture in progress reads with the configured font, so switching it mid-capture would
         // read part of a frame in each.
@@ -207,7 +202,7 @@ public partial class MainWindow : Window
         {
             _capturing = false;
             CaptureButton.IsEnabled = true;
-            LedgerButton.IsEnabled = true;
+            LedgerLink.IsEnabled = true;
             AttentionLink.IsEnabled = true;
             SettingsButton.IsEnabled = true;
             BusyPanel.Visibility = Visibility.Collapsed;
@@ -309,24 +304,78 @@ public partial class MainWindow : Window
 
     private void OnResultSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => ShowSelected();
 
+    /// <summary>
+    /// The narrowest the edit pane may get with the screenshot pane beside it. Below this the screenshot moves to the
+    /// top of the edit pane, where it scrolls with the rest (user, 2026-10-07: "above when especially narrow").
+    /// </summary>
+    private const double NarrowestEditPane = 420;
+
+    /// <summary>Puts the screenshot beside the edit pane, or above it when there is not room for both.</summary>
+    private void OnDetailAreaSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        bool beside = e.NewSize.Width >= (double)FindResource("ShotPaneWidth") + NarrowestEditPane;
+        System.Windows.Controls.Panel target = beside ? ShotPaneHost : InlineShotHost;
+        if (ShotStack.Parent == target) return;
+
+        ((System.Windows.Controls.Panel)ShotStack.Parent).Children.Remove(ShotStack);
+        target.Children.Add(ShotStack);
+        ShotPane.Visibility = beside ? Visibility.Visible : Visibility.Collapsed;
+        InlineShotHost.Visibility = beside ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Compares an item the ledger let skip the wiki, now, without waiting for its data to change — the per-item form
+    /// of the old "Re-check anyway" box (user, 2026-10-07). It goes through the same re-analysis a lore capture uses,
+    /// which asks the wiki and records the outcome, so the ledger ends up exactly where a fresh check would leave it.
+    /// </summary>
+    private async void OnReCheckClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel { CanReCheck: true } view || _services is null) return;
+
+        AppServices services = _services;
+        view.IsBusy = true;
+        ShowBusy($"Checking {view.ItemName} against the wiki…");
+        BusyPanel.Visibility = Visibility.Visible;
+        try
+        {
+            ItemCheckResult updated = await Task.Run(() => services.Pipeline.ReanalyzeAsync(view.Result));
+            CapturedImage? lore = view.LoreImage;
+            view.Load(updated);
+            view.LoreImage = lore;
+            await services.SaveLedgerAsync();
+            UpdateLedgerText();
+            ShowSelected();
+            StatusText.Text = $"'{view.ItemName}' re-checked.";
+        }
+        catch (WikiUnavailableException ex)
+        {
+            ReportWikiUnavailable(ex, "Nothing was checked");
+        }
+        finally
+        {
+            view.IsBusy = false;
+            if (!_capturing) BusyPanel.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private void ShowSelected()
     {
         // Collapsed rather than left to the bindings: with no selection there is no DataContext for them to resolve
         // against, so each `Visibility` falls back to Visible and the whole empty scaffold renders.
         bool selected = ResultsList.SelectedItem is not null;
-        DetailScroller.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
+        DetailArea.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
         EmptyState.Visibility = selected ? Visibility.Collapsed : Visibility.Visible;
 
         var view = ResultsList.SelectedItem as ResultViewModel;
-        WindowImage.Source = view?.Result.WindowImage is { } image ? ToBitmap(image) : null;
-        LoreImage.Source = view?.LoreImage is { } lore ? ToBitmap(lore) : null;
+        WindowImage.Source = view?.Result.WindowImage is { } image ? Bitmaps.From(image) : null;
+        LoreImage.Source = view?.LoreImage is { } lore ? Bitmaps.From(lore) : null;
 
         // The wiki's icon is a 40x40 file and the game draws its own at roughly 1.1x, so both are shown at 4x —
         // large enough to compare by eye, which is the whole reason they are here.
-        CapturedIconImage.Source = view?.Result.CapturedIconImage is { } shot ? ToBitmap(shot, 4) : null;
-        WikiIconImage.Source = view?.Result.WikiIconImage is { } wiki ? ToBitmap(wiki, 4) : null;
+        CapturedIconImage.Source = view?.Result.CapturedIconImage is { } shot ? Bitmaps.From(shot, 4) : null;
+        WikiIconImage.Source = view?.Result.WikiIconImage is { } wiki ? Bitmaps.From(wiki, 4) : null;
         // The library's match, at the same 4x, so comparing it against the captured strip beside it is a glance.
-        MatchedIconImage.Source = view?.MatchedIconImage is { } matched ? ToBitmap(matched, 4) : null;
+        MatchedIconImage.Source = view?.MatchedIconImage is { } matched ? Bitmaps.From(matched, 4) : null;
     }
 
     /// <summary>
@@ -591,6 +640,28 @@ public partial class MainWindow : Window
         });
     }
 
+    /// <summary>
+    /// Sends the wheel from a sideways-only scroller to the one that scrolls vertically around it. The screenshot's
+    /// own scroller sits in the screenshot pane or in the edit pane depending on the width, so the target is found by
+    /// walking up rather than named.
+    /// </summary>
+    private void OnPassScrollToParent(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if (sender is not DependencyObject source) return;
+
+        DependencyObject? parent = System.Windows.Media.VisualTreeHelper.GetParent(source);
+        while (parent is not null and not System.Windows.Controls.ScrollViewer)
+            parent = System.Windows.Media.VisualTreeHelper.GetParent(parent);
+        if (parent is not System.Windows.Controls.ScrollViewer outer) return;
+
+        e.Handled = true;
+        outer.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+        {
+            RoutedEvent = System.Windows.Input.Mouse.MouseWheelEvent,
+            Source = source,
+        });
+    }
+
     private void OnOpenPageClick(object sender, RoutedEventArgs e)
     {
         if ((sender as Hyperlink)?.DataContext is not ResultViewModel { PageUrl: { } url }) return;
@@ -674,23 +745,6 @@ public partial class MainWindow : Window
         LedgerTotalRun.Text = summary is null ? "" : $"{summary.Total} checked";
         LedgerSeparatorRun.Text = summary is { NeedsAttention: > 0 } ? " · " : "";
         AttentionRun.Text = summary is { NeedsAttention: > 0 } ? $"{summary.NeedsAttention} need attention" : "";
-    }
-
-    /// <summary>The capture is tightly packed top-down BGRA32, which is exactly <c>Bgra32</c>'s layout, so this is a
-    /// copy rather than a conversion.</summary>
-    private static BitmapSource ToBitmap(CapturedImage image, int magnify = 1)
-    {
-        BitmapSource bitmap = BitmapSource.Create(
-            image.Width, image.Height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null,
-            image.Pixels, image.Width * 4);
-
-        if (magnify <= 1) return bitmap;
-
-        // Nearest-neighbour, so a magnified icon shows the artwork rather than a blurred guess at it — the user is
-        // being asked to compare two sprites, and interpolation would invent detail in both.
-        var scaled = new TransformedBitmap(bitmap, new System.Windows.Media.ScaleTransform(magnify, magnify));
-        scaled.Freeze();
-        return scaled;
     }
 
     protected override void OnClosed(EventArgs e)
