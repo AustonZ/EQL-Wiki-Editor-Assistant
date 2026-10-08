@@ -258,9 +258,37 @@ public static class WindowBoundsFinder
             if (IsOutlinePixel(image, nx, ny)
                 && VerifyLineRun(image, nx, ny, dx, dy)
                 && (!requireFrameBeyond || HasFrameBeyond(image, nx, ny, dx, dy)))
-                return dx != 0 ? nx : ny;
+                return requireFrameBeyond ? OutermostOutline(image, nx, ny, dx, dy) : dx != 0 ? nx : ny;
         }
         return null;
+    }
+
+    /// <summary>
+    /// The last outline before the frame, starting from one already confirmed.
+    ///
+    /// **The Lore tab draws two outlines 3px apart** (bug found by the user, 2026-10-07, on `Tarnished Ancient Tiara`):
+    /// the tab's own, which is the content outline every Description window has, and inside it one around the lore's
+    /// text area. Measured on the real capture, left to right: frame at 1547-1548, interior, the tab outline at 1552,
+    /// interior, the text area's at 1555; at the bottom 658 and 652. Both have the frame within
+    /// <see cref="FrameSearchDistance"/>, so stopping at the first cropped every Lore capture 3px short on the left and
+    /// right and 6px at the bottom — narrower than the Description capture stacked above it. A Description window has
+    /// nothing between its outline and the frame, so this changes nothing there.
+    /// </summary>
+    private static int OutermostOutline(CapturedImage image, int x, int y, int dx, int dy)
+    {
+        int best = dx != 0 ? x : y;
+        for (int step = 1; step <= LineClusterGapPx; step++)
+        {
+            int nx = x + dx * step, ny = y + dy * step;
+            if (nx < 0 || nx >= image.Width || ny < 0 || ny >= image.Height) break;
+            if (IsFrameBlack(image, nx, ny)) break;
+
+            if (IsOutlinePixel(image, nx, ny) && VerifyLineRun(image, nx, ny, dx, dy) &&
+                HasFrameBeyond(image, nx, ny, dx, dy))
+                best = dx != 0 ? nx : ny;
+        }
+
+        return best;
     }
 
     /// <summary>True if the window's outer frame (a short run of near-black, darker than the interior) lies

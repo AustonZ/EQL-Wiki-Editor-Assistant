@@ -90,6 +90,29 @@ public class WindowTopEdgeTests
     }
 
     /// <summary>
+    /// **The Lore tab draws a second outline inside the first**, around its text area (bug found by the user,
+    /// 2026-10-07, on `Tarnished Ancient Tiara`). Measured: 3px in from the tab's outline at the sides and 6px up from
+    /// it at the bottom, with interior between. The inner one has the frame within reach beyond it too, so stopping at
+    /// the first outline cropped every Lore capture narrower than the Description capture of the same window. The
+    /// window's edge is the outermost outline before the frame. Not strictly a top-edge case, but this frame builder
+    /// is the only one in the suite that runs on a fresh clone.
+    /// </summary>
+    [Fact]
+    public void TheLoreTabsTextAreaOutlineIsNotMistakenForTheWindowsEdge()
+    {
+        Frame f = AWindow();
+        f.Fill(WindowLeft + 3, ContentTop + 3, WindowRight - 3, ContentBottom - 6, Outline);
+        f.Fill(WindowLeft + 4, ContentTop + 4, WindowRight - 4, ContentBottom - 7, Interior);
+
+        Rect? bounds = Find(f);
+
+        Assert.NotNull(bounds);
+        Assert.Equal(WindowLeft, bounds.Value.X);
+        Assert.Equal(WindowRight - WindowLeft + 1, bounds.Value.Width);
+        Assert.Equal(ContentBottom, bounds.Value.Y + bounds.Value.Height - 1);
+    }
+
+    /// <summary>
     /// **The bug that prompted the rewrite** (user, 2026-10-01, on `Armor Ornamentation Token`). Unrelated dark
     /// chrome sits a little above the window with open game world between the two. The old scan walked up through
     /// the black, treated the intervening world as the title's own anti-aliased glyph rows — it was within the

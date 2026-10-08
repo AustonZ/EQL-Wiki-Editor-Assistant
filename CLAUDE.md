@@ -2009,6 +2009,15 @@ already found and fixed.
   content area's top outline look like the window's bottom. The step-in point also has to land on an actual
   interior row, not a fixed offset: a real Lore capture starts its first line of text 4px below the outline, so
   a fixed clearance lands inside a glyph and every interior test downstream fails.
+- **The Lore tab has a second outline inside the first, and the edge is the outermost one before the frame** (bug
+  found by the user, 2026-10-07, on `Tarnished Ancient Tiara`). Its text area is boxed by its own grey line, 3px in
+  from the tab's outline at the sides and 6px up at the bottom (measured: frame 1547-1548, interior, tab outline 1552,
+  interior, text area 1555). Both have the frame within `FrameSearchDistance` beyond them, so taking the first outline
+  cropped every Lore capture 6px narrower and 6px shorter than the Description capture of the same window — plain to
+  see once the two were stacked in the screenshot pane. `OutermostOutline` keeps stepping out to the frame. Measured
+  across all 120 corpus windows: exactly the two Lore captures moved (`02b` now traces to `02a`'s rectangle exactly),
+  every other rectangle is byte-identical, and the accuracy corpus is unchanged. `WindowTopEdgeTests` pins it
+  synthetically, so it runs on a fresh clone, and it fails against the old rule.
 - **The top edge is probed across the anchor ±100 first, and across the window's own traced width only if that
   finds nothing** (bug found by the user, 2026-09-30, on `Shield of the Stalwart Seas`). The player's HP bar is a
   black HUD panel, and it sat flush on top of that window's title bar with no gap at all: the two black regions were
