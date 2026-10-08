@@ -776,8 +776,16 @@
                     <TextBlock Text="{Binding FormattingOutcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
                                TextWrapping="Wrap"
                                Visibility="{Binding HasFormattingOutcome, Converter={StaticResource BoolToVis}}" />
-                    <TextBlock Text="The page as it now reads on the wiki." Foreground="{StaticResource TextMutedBrush}"
-                               Margin="0,4,0,0" />
+                    <!-- Repeats the page link under the item's name, here where the page is (user, 2026-10-07: "even
+                         I forgot about it"). A link, since it only opens a page. -->
+                    <DockPanel Margin="0,4,0,0">
+                        <TextBlock DockPanel.Dock="Right" Margin="12,0,0,0">
+                            <Hyperlink Click="OnOpenPageClick" ToolTip="{Binding PageUrl}"><Run
+                                Text="&#xE8A7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BaselineAlignment="Center" /><Run
+                                Text=" Open in browser" /></Hyperlink>
+                        </TextBlock>
+                        <TextBlock Text="The page as it now reads on the wiki." Foreground="{StaticResource TextMutedBrush}" />
+                    </DockPanel>
                 </StackPanel>
                 <Grid>
                     <TextBlock x:Name="DoneStatus" Margin="16,8" TextWrapping="Wrap"
