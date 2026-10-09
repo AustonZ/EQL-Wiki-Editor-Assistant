@@ -6,7 +6,7 @@ namespace EQLWikiAssistant.Tests.Glyphs;
 
 /// <summary>
 /// Reading the game in either of the two UI fonts the tool knows (user, 2026-10-05): Windows' Arial, and the user's
-/// own modification of it, "EQL Wiki Assistant", which gives the capital I serifs and the r a wider cell.
+/// own modification of it, "EQL Wiki Editor Assistant", which gives the capital I serifs and the r a wider cell.
 ///
 /// The two render pixel-identically except for those two characters, so the bundled atlas holds both with the
 /// font-specific shapes tagged. These tests pin what that buys and what it must not cost: the corpus of Arial
@@ -26,7 +26,7 @@ public class UiFontTests
         string Describe(AtlasEntry e) => $"{string.Concat(e.Labels)}@{e.Font}";
 
         Assert.Equal(
-            ["I@EqlWikiAssistant", "r@Arial", "r@EqlWikiAssistant"],
+            ["I@EqlWikiEditorAssistant", "r@Arial", "r@EqlWikiEditorAssistant"],
             Atlas.Entries.Where(e => e.Font is not null).Select(Describe).Order(StringComparer.Ordinal));
     }
 
@@ -45,8 +45,8 @@ public class UiFontTests
     [Fact]
     public void TheNewShapesHaveTheirOwnLearnedCells()
     {
-        Assert.Equal(5, Entry("I", UiFont.EqlWikiAssistant).Advance);
-        Assert.Equal(5, Entry("r", UiFont.EqlWikiAssistant).Advance);
+        Assert.Equal(5, Entry("I", UiFont.EqlWikiEditorAssistant).Advance);
+        Assert.Equal(5, Entry("r", UiFont.EqlWikiEditorAssistant).Advance);
         Assert.Equal(4, Entry("r", UiFont.Arial).Advance);
     }
 
@@ -55,7 +55,7 @@ public class UiFontTests
     [Fact]
     public void FontSpecificEntriesHaveDistinctKeys()
     {
-        Assert.NotEqual(Entry("r", UiFont.Arial).Key, Entry("r", UiFont.EqlWikiAssistant).Key);
+        Assert.NotEqual(Entry("r", UiFont.Arial).Key, Entry("r", UiFont.EqlWikiEditorAssistant).Key);
         Assert.Equal("o", Entry("o", UiFont.Arial).Key);   // a shared entry's key is just its label, as before
     }
 
@@ -86,14 +86,14 @@ public class UiFontTests
         var arial = new GlyphAtlas([new AtlasEntry(["l", "I"], 0, Bar, 3), new AtlasEntry(["r"], 0, Hook, 4)]);
         var custom = new GlyphAtlas([new AtlasEntry(["l"], 0, Bar), new AtlasEntry(["I"], 0, Serif), new AtlasEntry(["r"], 0, Wide)]);
 
-        GlyphAtlas merged = GlyphAtlas.MergeFont(arial, UiFont.Arial, custom, UiFont.EqlWikiAssistant);
+        GlyphAtlas merged = GlyphAtlas.MergeFont(arial, UiFont.Arial, custom, UiFont.EqlWikiEditorAssistant);
 
         AtlasEntry bar = merged.Entries.Single(e => e.Bitmap.Equals(Bar));
         Assert.Equal(["l", "I"], bar.Labels);       // keeps its labels...
         Assert.Equal(3, bar.Advance);               // ...and the advance learned for it
         Assert.Null(bar.Font);
         Assert.Equal(UiFont.Arial, merged.Entries.Single(e => e.Bitmap.Equals(Hook)).Font);
-        Assert.Equal(UiFont.EqlWikiAssistant, merged.Entries.Single(e => e.Bitmap.Equals(Serif)).Font);
+        Assert.Equal(UiFont.EqlWikiEditorAssistant, merged.Entries.Single(e => e.Bitmap.Equals(Serif)).Font);
         Assert.Equal(0, merged.Entries.Single(e => e.Bitmap.Equals(Wide)).Advance);   // not learned yet
     }
 
@@ -106,19 +106,19 @@ public class UiFontTests
         var mislabelled = new GlyphAtlas([new AtlasEntry(["1"], 0, Bar)]);
 
         Assert.Throws<ArgumentException>(() =>
-            GlyphAtlas.MergeFont(arial, UiFont.Arial, mislabelled, UiFont.EqlWikiAssistant));
+            GlyphAtlas.MergeFont(arial, UiFont.Arial, mislabelled, UiFont.EqlWikiEditorAssistant));
     }
 
     // ---- what the bare bar means ----
 
-    /// <summary>In EQL Wiki Assistant the bar is always an l: that font's I has serifs, so there is nothing to
+    /// <summary>In EQL Wiki Editor Assistant the bar is always an l: that font's I has serifs, so there is nothing to
     /// decide — including the lore word Arial gets wrong.</summary>
     [Theory]
     [InlineData("\u0001ost items", "lost items")]
     [InlineData("B\u0001adestopper", "Bladestopper")]
     [InlineData("\u0001\u0001ama", "llama")]
-    public void InEqlWikiAssistantTheBarIsAlwaysAnL(string text, string expected) =>
-        Assert.Equal(expected, GlyphReader.ResolveBar(text, UiFont.EqlWikiAssistant));
+    public void InEqlWikiEditorAssistantTheBarIsAlwaysAnL(string text, string expected) =>
+        Assert.Equal(expected, GlyphReader.ResolveBar(text, UiFont.EqlWikiEditorAssistant));
 
     /// <summary>In Arial nothing changes: the word decides, exactly as before. "Iost" is the known limitation the
     /// user chose to keep rather than have the tool guess harder — pinned so nobody "fixes" it by accident.</summary>
@@ -134,14 +134,14 @@ public class UiFontTests
     /// <summary>The whole point of the font: every character is its own shape, so a line full of I's and l's
     /// reads exactly, and says which font drew it.</summary>
     [Fact]
-    public void EqlWikiAssistantTextReadsExactly()
+    public void EqlWikiEditorAssistantTextReadsExactly()
     {
-        CapturedImage image = Paint(UiFont.EqlWikiAssistant, "Iron", "lost");
+        CapturedImage image = Paint(UiFont.EqlWikiEditorAssistant, "Iron", "lost");
 
-        OcrLine line = Assert.Single(Read(image, UiFont.EqlWikiAssistant));
+        OcrLine line = Assert.Single(Read(image, UiFont.EqlWikiEditorAssistant));
 
         Assert.Equal("Iron lost", line.Text);
-        Assert.Equal(UiFont.EqlWikiAssistant, line.DrawnIn);
+        Assert.Equal(UiFont.EqlWikiEditorAssistant, line.DrawnIn);
     }
 
     /// <summary>Arial reads as it always has, limitation included.</summary>
@@ -157,7 +157,7 @@ public class UiFontTests
     }
 
     /// <summary>
-    /// The hazard the font evidence exists for. Arial text read with the reader set to EQL Wiki Assistant turns
+    /// The hazard the font evidence exists for. Arial text read with the reader set to EQL Wiki Editor Assistant turns
     /// every capital I into an l — and it does read, plausibly, as "lron". Nothing in the text says it is wrong.
     /// What does is the line's own r, which is Arial's: that is how the pipeline knows to refuse the window.
     /// </summary>
@@ -166,7 +166,7 @@ public class UiFontTests
     {
         CapturedImage image = Paint(UiFont.Arial, "Iron", "lost");
 
-        OcrLine line = Assert.Single(Read(image, UiFont.EqlWikiAssistant));
+        OcrLine line = Assert.Single(Read(image, UiFont.EqlWikiEditorAssistant));
 
         Assert.Equal("lron lost", line.Text);
         Assert.Equal(UiFont.Arial, line.DrawnIn);
@@ -177,9 +177,9 @@ public class UiFontTests
     [Fact]
     public void ALineOfSharedShapesClaimsNoFont()
     {
-        CapturedImage image = Paint(UiFont.EqlWikiAssistant, "Hoop");
+        CapturedImage image = Paint(UiFont.EqlWikiEditorAssistant, "Hoop");
 
-        Assert.Null(Assert.Single(Read(image, UiFont.EqlWikiAssistant)).DrawnIn);
+        Assert.Null(Assert.Single(Read(image, UiFont.EqlWikiEditorAssistant)).DrawnIn);
     }
 
     // ---- the window's verdict ----
@@ -192,7 +192,7 @@ public class UiFontTests
         Assert.Equal(UiFont.Arial, ItemWindowLocator.DrawnIn([Line(null), Line(UiFont.Arial), Line(UiFont.Arial)]));
         Assert.Null(ItemWindowLocator.DrawnIn([Line(null), Line(null)]));
         // Lines that disagree mean a misread, not a window in two fonts, so the window claims nothing.
-        Assert.Null(ItemWindowLocator.DrawnIn([Line(UiFont.Arial), Line(UiFont.EqlWikiAssistant)]));
+        Assert.Null(ItemWindowLocator.DrawnIn([Line(UiFont.Arial), Line(UiFont.EqlWikiEditorAssistant)]));
     }
 
     // ---- helpers ----

@@ -22,7 +22,7 @@ public class AppSettingsTests : IDisposable
     /// <summary>Both directions, so a round trip that only ever wrote the default could not pass.</summary>
     [Theory]
     [InlineData(UiFont.Arial)]
-    [InlineData(UiFont.EqlWikiAssistant)]
+    [InlineData(UiFont.EqlWikiEditorAssistant)]
     public async Task TheFontRoundTrips(UiFont font)
     {
         await new AppSettings { Font = font }.SaveAsync(_path);
@@ -87,7 +87,7 @@ public class AppSettingsTests : IDisposable
 
         File.WriteAllText(_path, """
             {
-              "font": "EqlWikiAssistant",
+              "font": "EqlWikiEditorAssistant",
               "hotKey": {
                 "modifiers": "Control",
                 "virtualKey": 82,

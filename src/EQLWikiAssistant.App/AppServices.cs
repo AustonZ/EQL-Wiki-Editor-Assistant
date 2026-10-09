@@ -103,7 +103,9 @@ public sealed class AppServices : IDisposable
         IOcrEngine ocr = new RoutingOcrEngine(fullFrame: _rapidOcr, windowCrop: _windowReader);
 
         Wiki = MediaWikiClient.Create(Endpoint);
-        Ledger = CheckedItemsLedger.Load(AppPaths.LedgerFile);
+        // Every edit and upload says which app and version made it — see MediaWikiClient.SummaryTag.
+        Wiki.SummaryTag = $"{AppInfo.SummaryName} {AppInfo.Version}";
+        Ledger =CheckedItemsLedger.Load(AppPaths.LedgerFile);
 
         // The built-in mapping, always. There is no mapping file in v1: the format that existed was lossy, and the
         // settings window shows this mapping read-only (user, 2026-10-05). See WikiMapping.

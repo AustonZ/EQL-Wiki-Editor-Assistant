@@ -69,6 +69,9 @@
         <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0" Padding="10,8">
             <DockPanel>
                 <Button x:Name="CloseButton" DockPanel.Dock="Right" Content="Close" IsCancel="True" Padding="16,4" MinWidth="80" />
+                <!-- The version a tester quotes in a bug report; the tooltip adds the commit it was built from. -->
+                <TextBlock x:Name="VersionText" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,16,0"
+                           Foreground="{StaticResource TextDimBrush}" />
                 <TextBlock VerticalAlignment="Center" Foreground="{StaticResource TextDimBrush}" TextTrimming="CharacterEllipsis">
                     <Hyperlink Click="OnOpenSettingsFolderClick">
                         <TextBlock x:Name="SettingsPathText" />

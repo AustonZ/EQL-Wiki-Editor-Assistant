@@ -219,7 +219,7 @@ public sealed class ItemCheckPipeline
 
         // A window drawn in another UI font than the reader was set to is refused the same way, and for the same
         // reason: what was read from it cannot be trusted. The font decides what the bare bar means, so an Arial
-        // capture read as EQL Wiki Assistant turns every capital I into an l — "Iron" becomes "lron", a page that
+        // capture read as EQL Wiki Editor Assistant turns every capital I into an l — "Iron" becomes "lron", a page that
         // does not exist, which the tool would then offer to create.
         //
         // Both remedies are offered, the tool's first (user, 2026-10-07): it is one click in Settings, while the game's

@@ -8,9 +8,9 @@ namespace EQLWikiAssistant.Core.Ocr;
 /// the 89 shapes Arial produces are byte-identical in both — so one atlas serves both and each font contributes
 /// only what is unique to it (see <c>AtlasEntry.Font</c>):
 /// <list type="bullet">
-/// <item><b>I</b>: in Arial a bare 2x9 bar, the very same pixels as lowercase <b>l</b>. EQL Wiki Assistant gives it
+/// <item><b>I</b>: in Arial a bare 2x9 bar, the very same pixels as lowercase <b>l</b>. EQL Wiki Editor Assistant gives it
 /// serifs, so there the bar is only ever an l.</item>
-/// <item><b>r</b>: EQL Wiki Assistant's is one pixel wider with its arm a quarter-pixel longer, so that "rn" stops
+/// <item><b>r</b>: EQL Wiki Editor Assistant's is one pixel wider with its arm a quarter-pixel longer, so that "rn" stops
 /// reading as "m". Its tip pixel differs from Arial's, which also makes the two r's distinct shapes.</item>
 /// </list>
 /// </summary>
@@ -22,30 +22,34 @@ public enum UiFont
 
     /// <summary>The user's personal modification of Arial (<c>fonts/</c>, gitignored): a serifed I and a wider r.
     /// Nothing is guessed: every character it can draw has a shape of its own.</summary>
-    EqlWikiAssistant,
+    EqlWikiEditorAssistant,
 }
 
 public static class UiFonts
 {
     /// <summary>
-    /// The font the tool assumes the game is drawing in when the user has not chosen one in the settings window
-    /// (user, 2026-10-05: "default to our special font").
+    /// The font the Assistant assumes the game is drawing in when the user has not chosen one in the settings window.
+    ///
+    /// **Arial, the game's own default** (user, 2026-10-08, for the first release). It was EQL Wiki Editor Assistant (user,
+    /// 2026-10-05), which is the user's own font and is never distributed — so a tester on stock Arial would have had
+    /// every capture refused as the wrong font until they found the setting. The user's own settings name their font
+    /// explicitly, so this changes nothing for them.
     ///
     /// <b>An explicit choice rather than detection, by the user's decision.</b> A capture that contradicts it is
     /// still caught — the two r shapes differ, so the reader records which font a line was drawn in and the
     /// pipeline refuses a window that disagrees with this setting (see <c>ItemCheckStatus.WrongFont</c>). Without
-    /// that, an Arial capture read as EQL Wiki Assistant would turn every capital I into an l, silently.
+    /// that, an Arial capture read as EQL Wiki Editor Assistant would turn every capital I into an l, silently.
     ///
     /// Reading the setting from the game is a future feature: the per-character UI ini
     /// (<c>UI_&lt;character&gt;_&lt;server&gt;_&lt;loadout&gt;.ini</c>) carries it as <c>[Fonts] Font.us.0=Arial</c>,
     /// but the player can switch loadout on the fly, so which file applies is itself a question.
     /// </summary>
-    public const UiFont AppDefault = UiFont.EqlWikiAssistant;
+    public const UiFont AppDefault = UiFont.Arial;
 
     /// <summary>The font's name as the game's font option shows it.</summary>
     public static string DisplayName(UiFont font) => font switch
     {
-        UiFont.EqlWikiAssistant => "EQL Wiki Assistant",
+        UiFont.EqlWikiEditorAssistant => "EQL Wiki Editor Assistant",
         _ => font.ToString(),
     };
 

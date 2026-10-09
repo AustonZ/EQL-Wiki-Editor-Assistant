@@ -63,13 +63,13 @@ robocopy (Join-Path $repo 'game_assets\item_icons') (Join-Path $Destination 'gam
     /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "Copying the icon library failed (robocopy exit code $LASTEXITCODE)." }
 
-$shortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'EQL Wiki Assistant.lnk'
+$shortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'EQL Wiki Editor Assistant.lnk'
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $exe
 $shortcut.WorkingDirectory = $Destination
 $shortcut.Description = 'Checks EverQuest Legends item windows against eqlwiki.com'
 $shortcut.Save()
 
-Write-Host "Installed $revision. Start it from the Start menu (EQL Wiki Assistant) or run:" -ForegroundColor Green
+Write-Host "Installed $revision. Start it from the Start menu (EQL Wiki Editor Assistant) or run:" -ForegroundColor Green
 Write-Host "  $exe"
 exit 0

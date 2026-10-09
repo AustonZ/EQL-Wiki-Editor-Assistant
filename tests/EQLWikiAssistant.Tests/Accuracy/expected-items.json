@@ -7179,7 +7179,7 @@
     {
       "file": "15a-eql-wiki-assistant-font.png",
       "verified": true,
-      "font": "EqlWikiAssistant",
+      "font": "EqlWikiEditorAssistant",
       "windows": [
         {
           "occluded": false,
@@ -7428,7 +7428,7 @@
     {
       "file": "15b-r-and-rn-words.png",
       "verified": true,
-      "font": "EqlWikiAssistant",
+      "font": "EqlWikiEditorAssistant",
       "windows": [
         {
           "occluded": false,
@@ -7809,7 +7809,7 @@
     {
       "file": "15c-lowercase-l-lore.png",
       "verified": true,
-      "font": "EqlWikiAssistant",
+      "font": "EqlWikiEditorAssistant",
       "windows": [
         {
           "occluded": false,
@@ -7831,7 +7831,7 @@
     {
       "file": "16-resized-wide-window.png",
       "verified": true,
-      "font": "EqlWikiAssistant",
+      "font": "EqlWikiEditorAssistant",
       "windows": [
         {
           "occluded": false,

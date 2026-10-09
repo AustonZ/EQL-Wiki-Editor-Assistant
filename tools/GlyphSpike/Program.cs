@@ -333,7 +333,7 @@ static int ReadRegion(CapturedImage image, Rect region, string[] args)
         : GlyphAtlas.Bundled;
 
     int fontIndex = Array.IndexOf(args, "--font");
-    UiFont font = fontIndex >= 0 && fontIndex + 1 < args.Length ? UiFonts.Parse(args[fontIndex + 1]) : UiFonts.AppDefault;
+    UiFont font = fontIndex >= 0 && fontIndex + 1 < args.Length ? UiFonts.Parse(args[fontIndex + 1]) : SampleFonts.UnlistedScreenshot;
 
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     IReadOnlyList<OcrLine> lines = GlyphReader.Read(image, region, atlas, font);

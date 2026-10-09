@@ -32,7 +32,7 @@ public partial class SettingsWindow : Window
     private readonly AppServices _services;
 
     /// <summary>The fonts in the order offered: the one the user plays in first.</summary>
-    private static readonly UiFont[] Fonts = [UiFont.EqlWikiAssistant, UiFont.Arial];
+    private static readonly UiFont[] Fonts = [UiFont.EqlWikiEditorAssistant, UiFont.Arial];
 
     /// <summary>True while the controls are being filled in, so selecting the saved font does not save it again.</summary>
     private bool _loading = true;
@@ -49,6 +49,8 @@ public partial class SettingsWindow : Window
         _services = services;
 
         SettingsPathText.Text = AppPaths.SettingsFile;
+        VersionText.Text = $"{AppInfo.Name} {AppInfo.Version}";
+        VersionText.ToolTip = AppInfo.BuildVersion;
 
         FontBox.ItemsSource = Fonts.Select(UiFonts.DisplayName);
         FontBox.SelectedIndex = Array.IndexOf(Fonts, services.Settings.Font);
@@ -114,7 +116,7 @@ public partial class SettingsWindow : Window
 
     private void DescribeFont(UiFont font) => FontDescription.Text = font switch
     {
-        UiFont.EqlWikiAssistant =>
+        UiFont.EqlWikiEditorAssistant =>
             "A modified Arial with a serifed capital I and an r one pixel wider. Every bare stroke is a lowercase l, " +
             "so nothing is guessed.",
         _ =>

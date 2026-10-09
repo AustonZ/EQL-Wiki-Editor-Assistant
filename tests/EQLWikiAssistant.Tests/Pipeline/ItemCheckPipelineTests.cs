@@ -708,7 +708,7 @@ public class ItemCheckPipelineTests
     /// A window the game drew in a different font from the one the reader was set to is refused, like an occluded
     /// one: nothing read from it is used, no ledger row, no wiki traffic.
     ///
-    /// The case this exists for: the tool set to EQL Wiki Assistant while the game draws Arial. The reader then
+    /// The case this exists for: the tool set to EQL Wiki Editor Assistant while the game draws Arial. The reader then
     /// takes every bare bar as an l, so a capital I is lost — "Iron" reads "lron", a page that does not exist, and
     /// the tool would offer to create it. The window's own pixels say which font it is, so the contradiction is
     /// caught here rather than published.
@@ -718,7 +718,7 @@ public class ItemCheckPipelineTests
     {
         (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
             Build(Window(EarringLines, drawnIn: UiFont.Arial), EarringPage());
-        pipeline.ConfiguredFont = UiFont.EqlWikiAssistant;
+        pipeline.ConfiguredFont = UiFont.EqlWikiEditorAssistant;
 
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
@@ -727,9 +727,9 @@ public class ItemCheckPipelineTests
 
         // Both remedies, each naming the font that fixes it — and the tool's first, since it is one click in
         // Settings while the game's font is set per character and loadout (user, 2026-10-07).
-        Assert.StartsWith("Drawn in Arial, but the tool is set to EQL Wiki Assistant.", warning);
+        Assert.StartsWith("Drawn in Arial, but the tool is set to EQL Wiki Editor Assistant.", warning);
         int tool = warning.IndexOf("Switch the tool to Arial under Settings > UI font", StringComparison.Ordinal);
-        int game = warning.IndexOf("switch the game's font to EQL Wiki Assistant", StringComparison.Ordinal);
+        int game = warning.IndexOf("switch the game's font to EQL Wiki Editor Assistant", StringComparison.Ordinal);
         Assert.True(tool >= 0, warning);
         Assert.True(game > tool, warning);
         Assert.Equal(0, ledger.Count);
@@ -741,8 +741,8 @@ public class ItemCheckPipelineTests
     public async Task AWindowDrawnInTheConfiguredFontIsChecked()
     {
         (ItemCheckPipeline pipeline, FakeWiki wiki, _) =
-            Build(Window(EarringLines, drawnIn: UiFont.EqlWikiAssistant), EarringPage());
-        pipeline.ConfiguredFont = UiFont.EqlWikiAssistant;
+            Build(Window(EarringLines, drawnIn: UiFont.EqlWikiEditorAssistant), EarringPage());
+        pipeline.ConfiguredFont = UiFont.EqlWikiEditorAssistant;
 
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
@@ -756,7 +756,7 @@ public class ItemCheckPipelineTests
     public async Task AWindowWithNoFontEvidenceIsChecked()
     {
         (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines, drawnIn: null), EarringPage());
-        pipeline.ConfiguredFont = UiFont.EqlWikiAssistant;
+        pipeline.ConfiguredFont = UiFont.EqlWikiEditorAssistant;
 
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
@@ -770,7 +770,7 @@ public class ItemCheckPipelineTests
     {
         (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) =
             Build(Window(EarringLines, drawnIn: UiFont.Arial), EarringPage());
-        pipeline.ConfiguredFont = UiFont.EqlWikiAssistant;
+        pipeline.ConfiguredFont = UiFont.EqlWikiEditorAssistant;
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
         // An empty item name would also stop a row being written, so give the result one: the status alone has to

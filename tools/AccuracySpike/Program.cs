@@ -18,7 +18,7 @@ using EQLWikiAssistant.TestSupport.Accuracy;
 //   AccuracySpike --json <path>        write the summary counts as JSON
 //   AccuracySpike --expected <path>    score against a ground-truth file other than the tracked one
 //                                      (e.g. a candidate still under review)
-//   AccuracySpike --font <name>        read the selected samples in this UI font (Arial, EqlWikiAssistant) rather
+//   AccuracySpike --font <name>        read the selected samples in this UI font (Arial, EqlWikiEditorAssistant) rather
 //                                      than the one their ground truth names; needed to bootstrap a new sample
 //                                      captured in a font other than the app default
 //

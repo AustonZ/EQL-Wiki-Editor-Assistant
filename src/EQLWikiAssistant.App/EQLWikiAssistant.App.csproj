@@ -24,7 +24,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <ApplicationDisplayName>EQL Wiki Editor Assistant</ApplicationDisplayName>
+    <!-- The one home of the name and version: AppInfo reads both, and the wiki edit summaries carry them. Semantic
+         Versioning as adapted for this app — see AppInfo. -->
+    <Product>EQL Wiki Editor Assistant</Product>
+    <Version>1.0.0-alpha.1</Version>
+    <ApplicationDisplayName>$(Product)</ApplicationDisplayName>
     <!-- The wiki's logo with a pencil. Windows without an Icon of their own take this one, taskbar included. -->
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>

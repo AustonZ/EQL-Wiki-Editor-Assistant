@@ -290,6 +290,31 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         _csrfToken = null; // the anonymous CSRF token is not valid for the logged-in session
     }
 
+    /// <summary>
+    /// Appended, in brackets, to every edit summary and upload comment this client sends — the app's name and version,
+    /// e.g. <c>Editor Assistant 1.0.0-alpha.1</c> (user, 2026-10-08). With more than one person using the
+    /// Assistant, it is what lets anyone find every edit a given release made — the way to clean up after a release
+    /// that shipped a bad rule — and tells other editors where an edit came from. Null sends summaries as given.
+    /// </summary>
+    public string? SummaryTag { get; set; }
+
+    /// <summary>MediaWiki cuts a summary at 500 characters; the tag is the part that must survive, so the summary is
+    /// what gets shortened.</summary>
+    private const int SummaryCharacterLimit = 500;
+
+    private string Tagged(string summary)
+    {
+        if (string.IsNullOrWhiteSpace(SummaryTag)) return summary;
+
+        string tag = $"({SummaryTag.Trim()})";
+        string text = summary.TrimEnd();
+        if (text.Length == 0) return tag;
+
+        int room = SummaryCharacterLimit - tag.Length - 1;
+        if (text.Length > room) text = text[..Math.Max(0, room - 1)].TrimEnd() + "…";
+        return $"{text} {tag}";
+    }
+
     public Task<EditResult> EditAsync(
         string title,
         string newWikitext,
@@ -345,7 +370,7 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
             ["action"] = "edit",
             ["title"] = title,
             ["text"] = wikitext,
-            ["summary"] = summary,
+            ["summary"] = Tagged(summary),
             ["token"] = _csrfToken,
             // assert=user turns a silently-expired session into a loud failure rather than an anonymous edit.
             ["assert"] = "user",
@@ -410,7 +435,7 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
                 { new StringContent("json"), "format" },
                 { new StringContent("2"), "formatversion" },   // see AddFormat for why
                 { new StringContent(fileName), "filename" },
-                { new StringContent(comment), "comment" },
+                { new StringContent(Tagged(comment)), "comment" },
                 { new StringContent(description), "text" },
                 { new StringContent(_csrfToken!), "token" },
                 { new StringContent("user"), "assert" },

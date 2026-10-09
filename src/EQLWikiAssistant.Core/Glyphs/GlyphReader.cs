@@ -429,18 +429,18 @@ public static class GlyphReader
     /// <summary>
     /// What the bare vertical bar means in the configured font.
     ///
-    /// In <see cref="UiFont.EqlWikiAssistant"/> it is <b>always 'l'</b>: that font gives the capital I serifs, so a
+    /// In <see cref="UiFont.EqlWikiEditorAssistant"/> it is <b>always 'l'</b>: that font gives the capital I serifs, so a
     /// bar is never an I, and there is nothing to decide. In <see cref="UiFont.Arial"/> the two really are the same
     /// pixels and <see cref="ResolveAmbiguous"/> decides from the word — the guess a human makes too, and a known
     /// limitation (it reads the lore word "lost" as "Iost"), deliberately left exactly as it was rather than
     /// improved on (user, 2026-10-05).
     ///
     /// The font is the caller's statement, not a detection. If the game is really drawing the other font, an
-    /// Arial capture read as EQL Wiki Assistant turns every capital I into an l — which is why each line also
+    /// Arial capture read as EQL Wiki Editor Assistant turns every capital I into an l — which is why each line also
     /// records the font it was drawn in, and the pipeline refuses a window that contradicts the setting.
     /// </summary>
     public static string ResolveBar(string text, UiFont font) =>
-        font == UiFont.EqlWikiAssistant ? text.Replace(AmbiguousMarker, 'l') : ResolveAmbiguous(text);
+        font == UiFont.EqlWikiEditorAssistant ? text.Replace(AmbiguousMarker, 'l') : ResolveAmbiguous(text);
 
     /// <summary>Placeholder for the one shape the font renders identically for two characters, before context
     /// decides which it is. Deliberately a character that cannot occur in game text, so a bug that leaves one

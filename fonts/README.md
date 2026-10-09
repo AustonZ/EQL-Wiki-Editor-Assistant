@@ -2,15 +2,15 @@
 
 Everything in this folder except this README is gitignored, and must stay that way.
 
-**EQL Wiki Assistant** is a personal modification of Windows' own Arial, made so the in-game item window is easier
+**EQL Wiki Editor Assistant** is a personal modification of Windows' own Arial, made so the in-game item window is easier
 for a human to read and exactly readable by the tool. Arial's licence forbids modifying it at all, let alone
 distributing it; the user chose to make this copy for their own machine. So the font files never enter git, never
 get attached to an issue, and never get shared. This folder is the one place they live.
 
 ## What is here
 
-- `EQLWikiAssistant-Regular.ttf`, `EQLWikiAssistant-Bold.ttf` — the font in use (version 2.3). Install both, then
-  select "EQL Wiki Assistant" in the game's font option.
+- `EQLWikiEditorAssistant-Regular.ttf`, `EQLWikiEditorAssistant-Bold.ttf` — the font in use (version 2.3). Install
+  both, then select "EQL Wiki Editor Assistant" in the game's font option.
 - `archive/` — every earlier version, kept for comparison:
   - `v1-liberation` — Liberation Sans 1.05 with a serifed I and Arial's per-size line heights. Rejected: the user
     preferred Arial's look. Note it uses the **same family name** as the current font, so never install both.
@@ -19,6 +19,9 @@ get attached to an issue, and never get shared. This folder is the one place the
   - `v2.2` — adds 1px of space after `r`, to stop `rn` reading as `m`. Too airy before round letters.
   - `v2.4`, `v2.5` — 2.2 with the `r` arm reaching ½ and ¾ of a pixel into that space. Too close to fusing `rn`.
     The chosen 2.3 reaches ¼.
+  - `v2.3-old-name` — 2.3 as first built, under the family name "EQL Wiki Assistant". Renamed on 2026-10-08 to match
+    the app; the rebuild differs only in its name records (every other table byte-identical, `head` aside from its
+    checksum and timestamp). Uninstall it once the renamed font is in use.
 - `build/` — the scripts that made them. `build2.py` builds the Arial-based fonts from the system's own Arial
   (`C:\Windows\Fonts\arial.ttf`, `arialbd.ttf`), so no Arial data is stored in them; `build.py` built v1.
 
@@ -38,7 +41,7 @@ Measured through GDI, DirectWrite, GDI+ and FreeType when each version was built
 
 ```powershell
 cd fonts/build
-python build2.py "$(Get-Content spec2.json -Raw)" '{"family":"EQL Wiki Assistant","ps":"EQLWikiAssistant","version":"2.3","out":"final","widen":{"r":171},"stretch":{"r":43}}'
+python build2.py "$(Get-Content spec2.json -Raw)" '{"family":"EQL Wiki Editor Assistant","ps":"EQLWikiEditorAssistant","version":"2.3","out":"final","widen":{"r":171},"stretch":{"r":43}}'
 ```
 
 Needs `pip install --user fonttools freetype-py`. `spec2.json` holds the measured hinting choices (which of Arial's

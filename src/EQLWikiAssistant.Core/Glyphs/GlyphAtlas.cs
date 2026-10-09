@@ -8,7 +8,7 @@ namespace EQLWikiAssistant.Core.Glyphs;
 /// 2x9 vertical bar with no serif or crossbar to separate them.
 ///
 /// <see cref="Font"/> is null for a shape every known <see cref="UiFont"/> draws — 87 of Arial's 89 — and names the
-/// font for a shape only that font draws (Arial's r; EQL Wiki Assistant's r and serifed I). The reader matches every
+/// font for a shape only that font draws (Arial's r; EQL Wiki Editor Assistant's r and serifed I). The reader matches every
 /// entry whatever font it is configured for, so a capture in the other font still reads, and the tag is what lets
 /// it say which font it actually saw.</summary>
 public sealed record AtlasEntry(
@@ -18,7 +18,7 @@ public sealed record AtlasEntry(
 
     /// <summary>What identifies this entry beyond its shape, for anything keyed by entry rather than by pixels —
     /// learned advances above all. The labels alone are not enough once two fonts each draw their own 'r': keyed
-    /// by "r", Arial's 4px cell and EQL Wiki Assistant's 5px one would collapse into whichever was smaller, and every
+    /// by "r", Arial's 4px cell and EQL Wiki Editor Assistant's 5px one would collapse into whichever was smaller, and every
     /// wide r would then be followed by a phantom space.</summary>
     public string Key => Font is null ? string.Concat(Labels) : $"{string.Concat(Labels)}@{Font}";
 
@@ -144,7 +144,7 @@ public sealed class GlyphAtlas
     ///
     /// <b>A shared shape must not gain a label it did not have</b>, or this would silently assert that two
     /// characters look alike in a font where they were never seen to: the new sheet may only spell a subset of
-    /// what the existing entry already says (EQL Wiki Assistant's bar is "l" where Arial's is "l" or "I"), and
+    /// what the existing entry already says (EQL Wiki Editor Assistant's bar is "l" where Arial's is "l" or "I"), and
     /// anything else is refused as a mislabelled sheet. Entries already tagged with another font are kept as they
     /// are, so fonts can be merged in one at a time.
     /// </summary>

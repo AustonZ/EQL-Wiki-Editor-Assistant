@@ -269,6 +269,52 @@ public class MediaWikiClientTests
         Assert.Contains("summary=why", edit);
     }
 
+    /// <summary>
+    /// **Every write carries the app's name and version** (user, 2026-10-08), so the edits a release made can be found
+    /// again — the way to clean up after one that shipped a bad rule. An edit and an upload are separate request
+    /// shapes, so both are checked.
+    /// </summary>
+    [Fact]
+    public async Task EveryWriteIsTaggedWithTheAppAndItsVersion()
+    {
+        var handler = new StubHandler(
+            Json("""{"query":{"tokens":{"logintoken":"t"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"CSRF"}}}"""),
+            Json("""{"edit":{"result":"Success","newrevid":4300}}"""),
+            Json("""{"upload":{"result":"Success","imageinfo":{"url":"https://eqlwiki.com/images/Item_1.png"}}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint) { SummaryTag = "Assistant 1.0.0-alpha.1" };
+        await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"));
+
+        await client.EditAsync("Sandbox", "new text", "added merchant value", DateTimeOffset.UtcNow);
+        await client.UploadFileAsync("Item_1.png", [1, 2, 3], "An item icon.", "Uploading an item icon");
+
+        Assert.Contains("summary=added+merchant+value+%28Assistant+1.0.0-alpha.1%29", handler.Requests[3]);
+        Assert.Contains("Uploading an item icon (Assistant 1.0.0-alpha.1)", handler.Requests[4]);
+    }
+
+    /// <summary>MediaWiki cuts a summary at 500 characters, and the tag is the part that has to survive, so a long
+    /// summary is shortened instead.</summary>
+    [Fact]
+    public async Task ALongSummaryIsShortenedSoTheTagSurvives()
+    {
+        var handler = new StubHandler(
+            Json("""{"query":{"tokens":{"logintoken":"t"}}}"""),
+            Json("""{"login":{"result":"Success"}}"""),
+            Json("""{"query":{"tokens":{"csrftoken":"CSRF"}}}"""),
+            Json("""{"edit":{"result":"Success","newrevid":4300}}"""));
+        using var client = new MediaWikiClient(new HttpClient(handler), Endpoint) { SummaryTag = "Assistant 1.0.0-alpha.1" };
+        await client.LoginAsync(new BotCredentials("Editor@assistant", "secret"));
+
+        await client.EditAsync("Sandbox", "new text", new string('x', 600), DateTimeOffset.UtcNow);
+
+        string summary = Uri.UnescapeDataString(
+            handler.Requests[3].Split('&').Single(p => p.StartsWith("summary=", StringComparison.Ordinal))["summary=".Length..]
+                .Replace('+', ' '));
+        Assert.True(summary.Length <= 500, $"{summary.Length} characters");
+        Assert.EndsWith("(Assistant 1.0.0-alpha.1)", summary, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task EditAsync_DistinguishesANoChangeSave()
     {
