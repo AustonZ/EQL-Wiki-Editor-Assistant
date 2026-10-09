@@ -11,8 +11,9 @@ namespace EQLWikiEditorAssistant.Core.Icons;
 /// `lucy_img_ID` written into a new page, and a wrong icon uploaded beside it, from a cache nobody thought about.
 ///
 /// So the index records what it was built from and is discarded when that no longer matches. The stamp is the file
-/// count plus the newest write time, which catches an addition, a removal and a replacement — everything short of an
-/// edit that preserves both, which is not a thing an asset re-export does.
+/// count plus a hash of every file's name and size, which catches an addition, a removal, a rename and a redrawn icon
+/// — everything short of a redraw that keeps the exact byte size — and ignores the dates an installer rewrites; see
+/// <see cref="StampOf"/>.
 /// </summary>
 public static class IconLibraryStore
 {
@@ -91,17 +92,25 @@ public static class IconLibraryStore
         return (library, true);
     }
 
-    /// <summary>What the index was built from: how many icon files there were and the newest write time among them.
+    /// <summary>
+    /// What the index was built from: how many icon files there were, and a hash of every file's name and size.
+    ///
+    /// **Not the write times, which is what it used to be** (user, 2026-10-09). The installer sets every icon's date to
+    /// the moment it installs, so a date-based stamp rebuilt the index — several seconds at start-up — after every
+    /// install and every update, and the developer's build and the installed copy, which share this index, kept
+    /// invalidating each other. Names and sizes are what an install leaves alone and what a re-export changes: an added,
+    /// removed or renamed icon changes the names, and a redrawn one its size. Only a redrawn icon of exactly the same
+    /// byte size would slip past, which a PNG almost never is; hashing the contents would close that too, at about a
+    /// second on every start.
     /// </summary>
     private static string StampOf(string folder)
     {
-        string[] files = Directory.GetFiles(folder, "*.png");
-        long newest = 0;
-        foreach (string file in files)
-        {
-            long ticks = File.GetLastWriteTimeUtc(file).Ticks;
-            if (ticks > newest) newest = ticks;
-        }
-        return $"{files.Length}:{newest}";
+        FileInfo[] files = [.. new DirectoryInfo(folder).EnumerateFiles("*.png")
+            .OrderBy(f => f.Name, StringComparer.Ordinal)];
+        using var hash = System.Security.Cryptography.IncrementalHash.CreateHash(
+            System.Security.Cryptography.HashAlgorithmName.SHA256);
+        foreach (FileInfo file in files)
+            hash.AppendData(System.Text.Encoding.UTF8.GetBytes($"{file.Name}\n{file.Length}\n"));
+        return $"{files.Length}:{Convert.ToHexString(hash.GetHashAndReset())}";
     }
 }

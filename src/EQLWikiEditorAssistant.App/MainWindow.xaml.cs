@@ -51,7 +51,10 @@ public partial class MainWindow : Window
         LedgerLink.IsEnabled = false;
         AttentionLink.IsEnabled = false;
         SettingsButton.IsEnabled = false;
-        StatusText.Text = "Starting…";
+        // The capture's own progress bar, because a status line alone read as a hang on a first start (user,
+        // 2026-10-09): the icon index alone takes several seconds to build.
+        ShowBusy("Starting…");
+        BusyPanel.Visibility = Visibility.Visible;
         _ = StartUpAsync();
     }
 
@@ -96,7 +99,10 @@ public partial class MainWindow : Window
     {
         try
         {
-            _services = await Task.Run(() => new AppServices());
+            // A report still queued once start-up has finished is dropped, or it would overwrite "Ready".
+            var progress = new Progress<string>(text => { if (_services is null) ShowBusy(text); });
+            _services = await Task.Run(() => new AppServices(progress));
+            BusyPanel.Visibility = Visibility.Collapsed;
             _services.HotKeyPressed += OnHotKeyPressed;
             UpdateHotKeyLabel();
             CaptureButton.IsEnabled = true;

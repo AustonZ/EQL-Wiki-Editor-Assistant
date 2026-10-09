@@ -125,6 +125,46 @@ public class IconLibraryStoreTests : IDisposable
         Assert.Equal(1, library!.Count);
     }
 
+    /// <summary>A redrawn icon changes the file's size, and that rebuilds the index — the replacement the old
+    /// date-based stamp caught, still caught without the dates.</summary>
+    [Fact]
+    public async Task ReplacingAnIconRebuildsTheIndex()
+    {
+        WriteIcon("1", 1);
+        WriteIcon("2", 2);
+        var decoder = new FakeDecoder();
+        await IconLibraryStore.LoadOrBuildAsync(Folder, IndexFile, decoder, null, force: false);
+
+        File.WriteAllBytes(Path.Combine(Folder, "2.png"), [9, 0]);
+
+        (_, bool rebuilt) = await IconLibraryStore.LoadOrBuildAsync(Folder, IndexFile, decoder, null, force: false);
+
+        Assert.True(rebuilt);
+    }
+
+    /// <summary>
+    /// **The installer rewrites every icon's date and nothing else**, so a date alone must not rebuild the index
+    /// (user, 2026-10-09). With the old date-based stamp this rebuilt — several seconds at start-up after every install
+    /// and update, and after every switch between the developer's build and the installed copy, which share the index.
+    /// </summary>
+    [Fact]
+    public async Task NewDatesAloneDoNotRebuildTheIndex()
+    {
+        WriteIcon("1", 1);
+        WriteIcon("2", 2);
+        var decoder = new FakeDecoder();
+        await IconLibraryStore.LoadOrBuildAsync(Folder, IndexFile, decoder, null, force: false);
+        int afterBuild = decoder.Decodes;
+
+        foreach (string file in Directory.GetFiles(Folder))
+            File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddHours(1));
+
+        (_, bool rebuilt) = await IconLibraryStore.LoadOrBuildAsync(Folder, IndexFile, decoder, null, force: false);
+
+        Assert.False(rebuilt);
+        Assert.Equal(afterBuild, decoder.Decodes);
+    }
+
     /// <summary>A damaged index costs eight seconds, not the feature — the same call the ledger makes when its JSON
     /// will not parse.</summary>
     [Fact]

@@ -1375,10 +1375,19 @@ usually read: match the captured sprite against the library, and the matching fi
     here and into the upload dialog), so a wrong overwrite destroys the original and needs somebody else to undo.
 - **The index is cached and rebuilds itself when the folder changes, which is a correctness rule rather than a
   speed one.** Fingerprinting 11,592 PNGs takes ~8 seconds, so the result is cached in app-data with a stamp of what
-  it was built from (file count plus newest write time). A stale index would be the worst bug this feature could
-  have: the user adds newly extracted icons — which has **already happened once in this repo's history** — the index
-  does not know them, and every capture of one of those items is matched against the closest *older* icon and offered
-  confidently. Pinned by tests that fail when the stamp check is removed.
+  it was built from (file count plus a hash of every file's name and size). A stale index would be the worst bug this
+  feature could have: the user adds newly extracted icons — which has **already happened once in this repo's
+  history** — the index does not know them, and every capture of one of those items is matched against the closest
+  *older* icon and offered confidently. Pinned by tests that fail when the stamp check is removed.
+  - **The stamp ignores file dates** (user, 2026-10-09). It used the newest write time until the installer showed
+    that Velopack sets every icon's date to the moment it installs: the index rebuilt — several seconds of "Starting…"
+    — after every install and every update, and the developer's build and the installed copy, which share the index,
+    invalidated each other on every switch. Names and sizes are what an install leaves alone and a re-export changes.
+    The one change it misses is a redrawn icon of exactly the same byte size; hashing contents would catch that too,
+    for about a second on every start, which was judged not worth it. `NewDatesAloneDoNotRebuildTheIndex` pins it.
+  - **Start-up shows the build** (user, 2026-10-09): `AppServices` reports each slow step, and the window shows it in
+    the capture's own progress bar — "Loading the text reader…", then "Indexing the game's icons, N%…" — because
+    "Starting…" in the status bar alone read as a hang.
   - **Not committed beside the icons**, deliberately: a committed index is a second record of which icons exist, and
     the moment the two disagree the tool starts matching against an out-of-date library. The folder is the only
     answer to "what icons are there".

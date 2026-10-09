@@ -92,7 +92,10 @@ public sealed class AppServices : IDisposable
     /// null when it is. Capturing still works from the button either way.</summary>
     public string? HotKeyProblem { get; private set; }
 
-    public AppServices()
+    /// <param name="progress">Told each slow step as it starts, so the window can say what it is waiting for: the OCR
+    /// models, and the icon index, which is built with a running count the first time (user, 2026-10-09: "Starting…"
+    /// alone looked like a hang).</param>
+    public AppServices(IProgress<string>? progress = null)
     {
         AppPaths.EnsureExists();
 
@@ -101,6 +104,7 @@ public sealed class AppServices : IDisposable
         // The UI font is one value given to both the reader and the pipeline's wrong-font guard, so they cannot
         // disagree — here, and afterwards only through UseFontAsync, which sets both.
         Settings = AppSettings.Load(AppPaths.SettingsFile);
+        progress?.Report("Loading the text reader…");
         _rapidOcr = new RapidOcrEngine();
         _windowReader = new GlyphOcrEngine(Settings.Font);
         IOcrEngine ocr = new RoutingOcrEngine(fullFrame: _rapidOcr, windowCrop: _windowReader);
@@ -130,8 +134,17 @@ public sealed class AppServices : IDisposable
         if (iconFolder is not null)
         {
             IconFiles = new IconLibraryFolder(iconFolder);
+            progress?.Report("Loading the game's icons…");
+            // Building reports every icon; the window hears about each whole percent, which is plenty to see it move.
+            int shown = -1;
             IconLibrary = IconLibraryStore
-                .LoadOrBuildAsync(iconFolder, AppPaths.IconIndexFile, decoder).GetAwaiter().GetResult();
+                .LoadOrBuildAsync(iconFolder, AppPaths.IconIndexFile, decoder, (done, total) =>
+                {
+                    int percent = done * 100 / Math.Max(total, 1);
+                    if (percent == shown) return;
+                    shown = percent;
+                    progress?.Report($"Indexing the game's icons, {percent}%…");
+                }).GetAwaiter().GetResult();
         }
 
         Pipeline = new ItemCheckPipeline(
