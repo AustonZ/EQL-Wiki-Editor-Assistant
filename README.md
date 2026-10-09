@@ -17,6 +17,8 @@ an item the wiki has no page for, it proposes the whole page.
   the wiki, and does so anonymously. Each edit it makes is marked in the page history with the app's name and version,
   e.g. `(Editor Assistant 1.0.0-alpha.1)`.
 - **Your wiki password is a bot password**, kept in Windows Credential Manager, never in a file.
+- **The only other request it makes is to GitHub**, once each time it starts, asking whether a newer release exists, so
+  it can say so if one does. It sends nothing about you, and it downloads an update only when you click *Update*.
 
 ## Requirements
 
@@ -28,9 +30,11 @@ an item the wiki has no page for, it proposes the whole page.
 
 ## Getting started
 
-1. **Install it** from the [Releases](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/releases) page. The installer is
-   not code-signed yet, so Windows SmartScreen may warn about an unknown publisher; choose *More info*, then *Run
-   anyway*.
+1. **Install it**: download `EQLWikiEditorAssistant-win-Setup.exe` from the newest release on the
+   [Releases](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/releases) page and run it. It installs for your Windows
+   account only, needs no administrator rights and no separate .NET install, and adds a Start menu and a desktop
+   shortcut. The installer is not code-signed yet, so Windows SmartScreen may warn about an unknown publisher; choose
+   *More info*, then *Run anyway*.
 2. **Create a bot password** on the wiki at [Special:BotPasswords](https://eqlwiki.com/Special:BotPasswords), granting
    - *Edit existing pages* (required),
    - *Create, edit, and move pages* (to create pages for new items),
@@ -68,6 +72,14 @@ Everything the Assistant keeps is in `%APPDATA%\EQLWikiEditorAssistant`: setting
 icons, and `errors.log`. **Settings > Saved captures** is off by default; when on, it keeps every screenshot it takes in
 a `debug-captures` folder there. Those are full screenshots of your game, so they can show your character's name,
 other players and chat.
+
+**Updating**: when a newer version is out, the top of the window says so. Click *Update*: the Assistant downloads it,
+closes, and opens again on the new version. Items you were still reviewing are closed, so finish or save them first. Your
+data is kept. Running a newer release's `Setup.exe` over the installed one works too: it offers to update.
+
+**Uninstalling**: Windows Settings > Apps > Installed apps > EQL Wiki Editor Assistant. It asks whether to delete your
+data as well — settings, history, cached icons, saved screenshots and your wiki login. The answer is No unless you choose
+Yes, and the question gives up after 30 seconds and keeps everything.
 
 ## Reporting a problem
 

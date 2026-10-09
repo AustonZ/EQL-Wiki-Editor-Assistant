@@ -33,6 +33,7 @@ public partial class OverlayDialog : UserControl
     private TaskCompletionSource<bool>? _answer;
     private bool _hasCancel;
     private IInputElement? _focusBefore;
+    private CancellationTokenSource? _cancelWork;
 
     public OverlayDialog() => InitializeComponent();
 
@@ -55,45 +56,95 @@ public partial class OverlayDialog : UserControl
         await _oneAtATime.WaitAsync();
         try
         {
-            TitleText.Text = title;
-            TitleText.Foreground = tone switch
-            {
-                DialogTone.Error => Palette.Attention,
-                DialogTone.Warning => Palette.Warning,
-                _ => Palette.Text,
-            };
-            MessageText.Text = message;
-            MessageText.Visibility = string.IsNullOrEmpty(message) ? Visibility.Collapsed : Visibility.Visible;
-
-            ConfirmButton.Content = confirm;
-            ConfirmButton.Style = writesToWiki
-                ? (Style)FindResource("WikiWriteButton")
-                : (Style)FindResource(typeof(Button));
-            _hasCancel = cancel is not null;
-            CancelButton.Content = cancel ?? "";
-            CancelButton.Visibility = _hasCancel ? Visibility.Visible : Visibility.Collapsed;
-
-            _answer = new TaskCompletionSource<bool>();
-            _focusBefore = Keyboard.FocusedElement;
-            Visibility = Visibility.Visible;
-            Opened?.Invoke(this, EventArgs.Empty);
-
-            // Cancel takes the focus when there is one, so an Enter pressed by habit does not confirm a question that
-            // was meant to be read. Deferred until the card is laid out, or the focus request is lost.
-            _ = Dispatcher.BeginInvoke(() => Keyboard.Focus(_hasCancel ? CancelButton : ConfirmButton),
-                System.Windows.Threading.DispatcherPriority.Input);
-
-            return await _answer.Task;
+            Show(title, message, tone, confirm, cancel, writesToWiki);
+            return await _answer!.Task;
         }
         finally
         {
-            _answer = null;
-            Visibility = Visibility.Collapsed;
-            Closed?.Invoke(this, EventArgs.Empty);
-            if (_focusBefore is { } before) Keyboard.Focus(before);
-            _focusBefore = null;
-            _oneAtATime.Release();
+            Hide();
         }
+    }
+
+    /// <summary>
+    /// Shows <paramref name="title"/> while <paramref name="work"/> runs, with the message as the work reports it and one
+    /// button that cancels it — for a wait the user must not act through, such as downloading an update that ends in a
+    /// restart. Escape cancels too. Answers false when the user cancelled, whatever the work then threw; any other
+    /// failure is passed on.
+    /// </summary>
+    public async Task<bool> RunAsync(
+        string title, string cancel, Func<IProgress<string>, CancellationToken, Task> work)
+    {
+        await _oneAtATime.WaitAsync();
+        using var cancellation = new CancellationTokenSource();
+        _cancelWork = cancellation;
+        bool running = true;
+        try
+        {
+            Show(title, "", DialogTone.Info, confirm: null, cancel, writesToWiki: false);
+            // Progress<T> posts back to the thread that made it, which is this one, so the work may report from any.
+            // A report still queued when the work ends is dropped, or it would overwrite the next dialog's message.
+            await work(new Progress<string>(text =>
+            {
+                if (!running) return;
+                MessageText.Text = text;
+                MessageText.Visibility = Visibility.Visible;
+            }), cancellation.Token);
+            return true;
+        }
+        catch (Exception) when (cancellation.IsCancellationRequested)
+        {
+            return false;
+        }
+        finally
+        {
+            running = false;
+            _cancelWork = null;
+            Hide();
+        }
+    }
+
+    private void Show(
+        string title, string message, DialogTone tone, string? confirm, string? cancel, bool writesToWiki)
+    {
+        TitleText.Text = title;
+        TitleText.Foreground = tone switch
+        {
+            DialogTone.Error => Palette.Attention,
+            DialogTone.Warning => Palette.Warning,
+            _ => Palette.Text,
+        };
+        MessageText.Text = message;
+        MessageText.Visibility = string.IsNullOrEmpty(message) ? Visibility.Collapsed : Visibility.Visible;
+
+        ConfirmButton.Content = confirm ?? "";
+        ConfirmButton.Visibility = confirm is null ? Visibility.Collapsed : Visibility.Visible;
+        ConfirmButton.Style = writesToWiki
+            ? (Style)FindResource("WikiWriteButton")
+            : (Style)FindResource(typeof(Button));
+        _hasCancel = cancel is not null;
+        CancelButton.Content = cancel ?? "";
+        CancelButton.Visibility = _hasCancel ? Visibility.Visible : Visibility.Collapsed;
+        CancelButton.Margin = new Thickness(0, 0, confirm is null ? 0 : 8, 0);
+
+        _answer = new TaskCompletionSource<bool>();
+        _focusBefore = Keyboard.FocusedElement;
+        Visibility = Visibility.Visible;
+        Opened?.Invoke(this, EventArgs.Empty);
+
+        // Cancel takes the focus when there is one, so an Enter pressed by habit does not confirm a question that
+        // was meant to be read. Deferred until the card is laid out, or the focus request is lost.
+        _ = Dispatcher.BeginInvoke(() => Keyboard.Focus(_hasCancel ? CancelButton : ConfirmButton),
+            System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    private void Hide()
+    {
+        _answer = null;
+        Visibility = Visibility.Collapsed;
+        Closed?.Invoke(this, EventArgs.Empty);
+        if (_focusBefore is { } before) Keyboard.Focus(before);
+        _focusBefore = null;
+        _oneAtATime.Release();
     }
 
     /// <summary>Tells the user something, with a single button to acknowledge it.</summary>
@@ -102,7 +153,11 @@ public partial class OverlayDialog : UserControl
 
     private void OnConfirmClick(object sender, RoutedEventArgs e) => _answer?.TrySetResult(true);
 
-    private void OnCancelClick(object sender, RoutedEventArgs e) => _answer?.TrySetResult(false);
+    private void OnCancelClick(object sender, RoutedEventArgs e)
+    {
+        _cancelWork?.Cancel();
+        _answer?.TrySetResult(false);
+    }
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
@@ -112,8 +167,14 @@ public partial class OverlayDialog : UserControl
         if (e.Key == Key.Escape)
         {
             // With no cancel button, Escape just dismisses — the only answer there is.
+            _cancelWork?.Cancel();
             _answer.TrySetResult(!_hasCancel);
             e.Handled = true;
+        }
+        else if (_cancelWork is not null)
+        {
+            // Work in progress has nothing to confirm, and Enter must not cancel it by landing on the only button.
+            e.Handled = e.Key == Key.Enter;
         }
         else if (e.Key == Key.Enter)
         {

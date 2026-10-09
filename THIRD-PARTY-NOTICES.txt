@@ -2,11 +2,28 @@ EQL Wiki Editor Assistant — third-party notices
 
 The EQL Wiki Editor Assistant is MIT licensed (see LICENSE). It is built on
 the components below, each under its own licence, whose full texts follow
-this list. Two of them ship long notices files of their own, which are
+this list. Three of them ship long notices files of their own, which are
 included beside this one in the licenses folder.
 
 The item icons in game_assets/item_icons are not covered by any of these
 licences, nor by the Assistant's own: see game_assets/README.md.
+
+
+Runtime
+-------
+
+.NET runtime and Windows Desktop (WPF)              MIT License
+  https://github.com/dotnet/runtime, https://github.com/dotnet/wpf
+  Copyright (c) .NET Foundation and Contributors.
+  Included in the installed app, which needs no separate .NET install.
+  Their licences and the runtime's own third-party notices:
+  licenses/dotnet-runtime-LICENSE.txt,
+  licenses/dotnet-windowsdesktop-LICENSE.txt,
+  licenses/dotnet-runtime-THIRD-PARTY-NOTICES.txt
+
+Velopack 1.2.161 (installer and updater)            MIT License
+  https://github.com/velopack/velopack
+  Copyright (c) Velopack Ltd. All rights reserved.
 
 
 Text recognition

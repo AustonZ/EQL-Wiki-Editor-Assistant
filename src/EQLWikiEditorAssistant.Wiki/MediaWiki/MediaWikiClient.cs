@@ -26,7 +26,8 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
     /// tell releases apart.</summary>
     public const string UserAgent = "EQLWikiEditorAssistant (" + ProjectUrl + ")";
 
-    private const string ProjectUrl = "https://github.com/AustonZ/EQL-Wiki-Editor-Assistant";
+    /// <summary>The project's home, which the app's updater also reads its releases from.</summary>
+    public const string ProjectUrl = "https://github.com/AustonZ/EQL-Wiki-Editor-Assistant";
 
     /// <summary>The User-Agent naming a release, e.g. <c>EQLWikiEditorAssistant/1.0.0-alpha.1 (https://...)</c>.</summary>
     public static string UserAgentFor(string version) => $"EQLWikiEditorAssistant/{version} ({ProjectUrl})";

@@ -32,7 +32,7 @@ public sealed class AppServices : IDisposable
     public static readonly Uri Endpoint = new("https://eqlwiki.com/api.php");
 
     /// <summary>What the wiki sees this app as: its name, its version and where to find it.</summary>
-    private static readonly string UserAgent = MediaWikiClient.UserAgentFor(AppInfo.Version);
+    internal static readonly string UserAgent = MediaWikiClient.UserAgentFor(AppInfo.Version);
 
     /// <summary>
     /// The game's process name, without <c>.exe</c> — **how the window to capture is identified**.

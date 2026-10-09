@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using EQLWikiEditorAssistant.Pipeline;
+using Velopack;
 
 namespace EQLWikiEditorAssistant.App;
 
@@ -22,6 +23,31 @@ public partial class App : Application
     /// <summary>Beside the ledger and the settings, in the user's own app-data — never beside the executable, and
     /// never containing a screenshot. Only the exception's own text reaches it.</summary>
     public static string ErrorLogFile => Path.Combine(AppPaths.Root, "errors.log");
+
+    /// <summary>The version an update just installed, when this start is Velopack restarting the app after it; else
+    /// null.</summary>
+    public static string? UpdatedTo { get; private set; }
+
+    /// <summary>
+    /// The entry point, written out so the installer's hook runs before anything else (Velopack, 2026-10-08). When
+    /// Setup or Windows' uninstaller starts the app with one of Velopack's own arguments, <c>Run</c> handles it and
+    /// exits; otherwise it returns at once and the app starts as normal — including when run from a build folder,
+    /// where it does nothing at all. That is why App.xaml is a Page rather than the generated entry point.
+    ///
+    /// Two hooks: uninstalling offers to delete the user's data (<see cref="UninstallCleanup"/>), and a start that
+    /// Velopack made after installing an update records the version, so the window can say it worked.
+    /// </summary>
+    [STAThread]
+    private static void Main()
+    {
+        VelopackApp.Build()
+            .OnBeforeUninstallFastCallback(_ => UninstallCleanup.OfferToRemoveData())
+            .OnRestarted(version => UpdatedTo = version.ToString())
+            .Run();
+        var app = new App();
+        app.InitializeComponent();
+        app.Run();
+    }
 
     protected override void OnStartup(StartupEventArgs e)
     {

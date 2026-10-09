@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\EQLWikiEditorAssistant.Core\EQLWikiEditorAssistant.Core.csproj" />
@@ -16,6 +16,8 @@
     <PackageReference Include="RapidOcrNet" Version="4.2.0" />
     <!-- The review's Preview and Done pages: the wiki's own rendering, in the Edge runtime Windows 11 ships. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <!-- The installer and its uninstall/update hooks. App.Main hands control to it first; see there. -->
+    <PackageReference Include="Velopack" Version="1.2.161" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -31,6 +33,25 @@
     <ApplicationDisplayName>$(Product)</ApplicationDisplayName>
     <!-- The wiki's logo with a pencil. Windows without an Icon of their own take this one, taskbar included. -->
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- App.Main rather than a generated one, so the installer's hook runs first. -->
+    <StartupObject>EQLWikiEditorAssistant.App.App</StartupObject>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
+
+  <!-- Shipped beside the executable: the licence, the notices for everything the app is built on, and the two
+       components' own notices files that THIRD-PARTY-NOTICES.txt points to. Pinned to the package versions on purpose:
+       when a package moves, the copy fails the build instead of shipping a stale notice. -->
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(NuGetPackageRoot)microsoft.ml.onnxruntime\1.29.0\ThirdPartyNotices.txt"
+          Link="licenses\onnxruntime-ThirdPartyNotices.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(NuGetPackageRoot)skiasharp.nativeassets.win32\3.119.1\THIRD-PARTY-NOTICES.txt"
+          Link="licenses\skiasharp-THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>

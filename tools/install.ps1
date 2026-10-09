@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-Builds the app in Release and installs it where it can run on its own, outside the repository.
+Builds the app in Release and installs it where it can run on its own, outside the repository — the developer's
+quick install. Testers get the real installer, built by tools/release.ps1.
 
 .DESCRIPTION
 Publishes to a staging folder, mirrors that into the install folder, copies the game's icon library beside it and
@@ -63,13 +64,15 @@ robocopy (Join-Path $repo 'game_assets\item_icons') (Join-Path $Destination 'gam
     /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "Copying the icon library failed (robocopy exit code $LASTEXITCODE)." }
 
-$shortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'EQL Wiki Editor Assistant.lnk'
+# "(dev build)", because the released installer's own shortcut is "EQL Wiki Editor Assistant" and the two would
+# overwrite each other.
+$shortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'EQL Wiki Editor Assistant (dev build).lnk'
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $exe
 $shortcut.WorkingDirectory = $Destination
 $shortcut.Description = 'Checks EverQuest Legends item windows against eqlwiki.com'
 $shortcut.Save()
 
-Write-Host "Installed $revision. Start it from the Start menu (EQL Wiki Editor Assistant) or run:" -ForegroundColor Green
+Write-Host "Installed $revision. Start it from the Start menu (EQL Wiki Editor Assistant (dev build)) or run:" -ForegroundColor Green
 Write-Host "  $exe"
 exit 0

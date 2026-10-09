@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Net.Http;
+using Velopack;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media.Imaging;
@@ -102,7 +104,10 @@ public partial class MainWindow : Window
             AttentionLink.IsEnabled = true;
             SettingsButton.IsEnabled = true;
             UpdateLedgerText();
-            StatusText.Text = "Ready. Press the hotkey with an item window open in game.";
+            StatusText.Text = App.UpdatedTo is { } updated
+                ? $"Updated to version {updated}. Ready. Press the hotkey with an item window open in game."
+                : "Ready. Press the hotkey with an item window open in game.";
+            _ = ShowUpdateIfAnyAsync();
         }
         catch (Exception ex)
         {
@@ -113,6 +118,102 @@ public partial class MainWindow : Window
             await Dialog.TellAsync(
                 "Could not start", $"{ex.Message}\n\nThe details are in:\n{App.ErrorLogFile}", DialogTone.Error);
             Application.Current.Shutdown();
+        }
+    }
+
+    /// <summary>
+    /// Says in the header when a newer release is out, once per start, after everything else is ready. An installed
+    /// copy asks Velopack, which can then install it (<see cref="AppUpdater"/>, user, 2026-10-09); any other build asks
+    /// GitHub directly and can only link to the release (<see cref="ReleaseCheck"/>). Either way a failure is silence.
+    /// </summary>
+    private async Task ShowUpdateIfAnyAsync()
+    {
+        _updater = await Task.Run(AppUpdater.ForThisCopy);
+        if (_updater is { } updater)
+        {
+            UpdateInfo? update = await Task.Run(updater.FindNewerAsync);
+            if (update is null) return;
+
+            _update = update;
+            ShowUpdate(update.TargetFullRelease.Version.ToString(), AppUpdater.PageFor(update));
+            return;
+        }
+
+        UpdatePanel.Inlines.Remove(InstallUpdateSpan);
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        http.DefaultRequestHeaders.UserAgent.ParseAdd(AppServices.UserAgent);
+        if (await ReleaseCheck.FindNewerAsync(http, AppInfo.Version) is { } newer)
+            ShowUpdate(newer.Version, newer.Page);
+    }
+
+    private AppUpdater? _updater;
+    private UpdateInfo? _update;
+    private Uri? _releasePage;
+
+    private void ShowUpdate(string version, Uri page)
+    {
+        _releasePage = page;
+        UpdateRun.Text = $"Version {version} is available";
+        UpdatePanel.Visibility = Visibility.Visible;
+    }
+
+    private void OnReleasePageClick(object sender, RoutedEventArgs e)
+    {
+        if (_releasePage is { } page)
+            Process.Start(new ProcessStartInfo(page.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    /// <summary>
+    /// Updates in place: one confirmation, then the download behind a dialog that can cancel it, then Velopack closes the
+    /// app, swaps in the new version and starts it. **The confirmation is the only question**, so it has to say what is
+    /// lost: the items on the left live only in memory, and a restart closes them.
+    /// </summary>
+    private async void OnInstallUpdateClick(object sender, RoutedEventArgs e)
+    {
+        if (_updater is not { } updater || _update is not { } update) return;
+        string version = update.TargetFullRelease.Version.ToString();
+
+        // A save in flight would be cut off by the restart, and a capture's result would be lost unseen.
+        if (_capturing || _results.Any(r => r.IsBusy))
+        {
+            await Dialog.TellAsync("Not just yet", "Wait for the capture or save in progress to finish, then update.");
+            return;
+        }
+
+        string message = $"The Assistant downloads version {version}, closes, and opens again on it. Your history, " +
+                         "settings and wiki login are kept.";
+        int open = _results.Count(r => !r.IsDone);
+        if (open > 0)
+            message += $"\n\n{(open == 1 ? "1 item" : $"{open} items")} still under review will be closed, along with " +
+                       "any edit not yet saved. Capture them again afterwards.";
+        if (!await Dialog.AskAsync($"Update to version {version}?", message, "Update now", "Not now", DialogTone.Info))
+            return;
+
+        try
+        {
+            bool downloaded = await Dialog.RunAsync($"Updating to version {version}", "Cancel", (progress, cancel) =>
+            {
+                progress.Report("Downloading…");
+                return Task.Run(() => updater.DownloadAsync(
+                    update, percent => progress.Report($"Downloading… {percent}%"), cancel), cancel);
+            });
+            if (!downloaded)
+            {
+                StatusText.Text = "Update cancelled.";
+                return;
+            }
+
+            StatusText.Text = $"Restarting on version {version}…";
+            updater.ApplyAndRestart(update);
+        }
+        catch (Exception ex)
+        {
+            App.Record(ex);
+            await Dialog.TellAsync(
+                "The update did not install",
+                $"{ex.Message}\n\nNothing was changed. Try again later, or download the installer from the release's " +
+                "page (What's new).",
+                DialogTone.Error);
         }
     }
 

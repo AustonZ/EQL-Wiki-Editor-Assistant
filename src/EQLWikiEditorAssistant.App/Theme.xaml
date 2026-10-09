@@ -57,6 +57,10 @@
     <SolidColorBrush x:Key="WarningBrush" Color="#E0A340" />
     <SolidColorBrush x:Key="NeutralBrush" Color="#9FA0A4" />
     <SolidColorBrush x:Key="RecheckBrush" Color="#D4A05A" />
+    <!-- Good news that wants noticing but is not a link — the header's "Version X is available". Blue is kept for
+         what can be clicked (user, 2026-10-09), and this is yellower than the warning amber so it does not read as one.
+         Contrast 9.9 against #1E1E1E. -->
+    <SolidColorBrush x:Key="NewsBrush" Color="#E8C547" />
 
     <!-- The two notice bars. Each keeps the hue it had — amber for "a human should look", blue for "there is also
          this" — at a lightness that belongs on a dark surface. -->

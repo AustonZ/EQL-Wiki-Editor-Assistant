@@ -2586,6 +2586,51 @@ separate from the wiki mapping config (that's user-editable MediaWiki vocabulary
 vocabulary) and testable on plain strings without an image/OCR round-trip. Start small (really just
 `Ornamentation`/`Worn` today) and grow only as real evidence demands.
 
+**Releases (`tools/release.ps1`, Velopack, 2026-10-08).** Testers install from a `Setup.exe` that Velopack builds; the
+developer's own quick install stays `tools/install.ps1`. Versioning rules are in `AppInfo` and the plan.
+- **What a tester gets**: a self-contained win-x64 build (no .NET install), the icon library beside it, installed per
+  user with no administrator prompt to `%LOCALAPPDATA%\EQLWikiEditorAssistant`, with Start menu and desktop shortcuts.
+  `--framework webview2` makes Setup install the WebView2 runtime if Windows lacks it. The app's state stays in
+  `%APPDATA%\EQLWikiEditorAssistant`, so reinstalling never touches a tester's history, settings or login.
+- **`App.Main` exists for Velopack**, which must run before anything else so Setup and the uninstaller can call the app
+  with their hook arguments; that is why `App.xaml` is a Page rather than the generated entry point. `vpk pack` checks
+  the call is there. From a build folder it does nothing.
+- **`vpk` is pinned as a repo-local tool** (`dotnet-tools.json`) and must match the `Velopack` package's version.
+- **Every licence ships beside the executable.** The project file copies `LICENSE`, `THIRD-PARTY-NOTICES.txt` and ONNX
+  Runtime's and Skia's own notices, pinned to those packages' versions so a package bump fails the build instead of
+  shipping a stale notice. The .NET runtime's and WPF's are added by the script from the versions the published build
+  records in its `runtimeconfig.json`, since those follow the SDK and exist only for a self-contained build.
+- **A draft release is exactly one pushed commit**: `-Draft` refuses a dirty tree or an unpushed commit, pins the tag
+  to that commit, and uploads through `gh`, because `vpk upload` takes the GitHub token only on its command line.
+  Raising `<Version>` in the app's project file is the whole of "making a new version"; the script refuses a tag
+  GitHub already has.
+- **An installed copy updates itself on a click** (`App.AppUpdater`, user, 2026-10-09, brought forward from the 1.0.0
+  backlog because an updater only helps from the release *after* the one that ships it). Once per start Velopack checks
+  GitHub; the header then reads "Version X is available — Update · What's new". Update asks once — saying that the items
+  under review will close, since they live only in memory — refuses while a capture or a save is running, downloads
+  behind `OverlayDialog.RunAsync` (cancellable), and Velopack restarts the app on the new version, which says "Updated
+  to version X". Nothing is downloaded without that click.
+  - **Velopack decides what is newer for an installed copy**, so only a release it can actually install is offered.
+    `GithubSource` gets `prerelease` set exactly when this copy is one, matching ReleaseCheck's rule.
+  - **Only a Velopack copy can do it** (Setup's, or the portable zip's — both carry `Update.exe`). A build folder or
+    `install.ps1`'s copy gets null from `AppUpdater.ForThisCopy` and keeps ReleaseCheck's link to the release page.
+  - **`EQLWIKI_UPDATE_FEED=<folder>` points the check at local release files** instead of GitHub, which is how an update
+    is tested end to end before anything is published: install an older build's Setup, put a newer build's
+    `artifacts\releases` in a folder, and start the installed copy with the variable set.
+  - **Every release must therefore upload Velopack's `.nupkg` and `releases.win.json`**, which `-Draft` does. A release
+    missing them is simply not offered as an update; ReleaseCheck would still have announced it.
+- **ReleaseCheck is what other builds use** (`Pipeline.ReleaseCheck`): once per start, one anonymous GET of the
+  repository's releases list on GitHub, and a link in the header when a newer one exists. The *list*, because GitHub's
+  `/releases/latest` skips pre-releases and every alpha is one; a pre-release is offered only to someone already running
+  one; the link must be a `github.com` https page, since it opens a browser; and any failure is silence. Precedence is
+  Semantic Versioning's, implemented in `SemanticVersion` — `alpha.10` after `alpha.2`, build metadata ignored.
+- **Uninstalling asks whether to delete the user's data too** (`App.UninstallCleanup`, user, 2026-10-09), from
+  Velopack's before-uninstall hook: `%APPDATA%\EQLWikiEditorAssistant` and the Credential Manager login. **No is the
+  default** — Enter, Escape and closing all keep it — because the history is real work and a reinstall wants it back.
+  Velopack ends the hook after 30 seconds and uninstalls anyway, so an unanswered question keeps the data too. A plain
+  Windows message box, topmost: no window of the app exists then. The install folder, which holds the review browser's
+  WebView2 cache, is removed by Velopack regardless. `install.ps1`'s copy shares the data folder, so Yes clears it too.
+
 ## Wiki reference (eqlwiki.com)
 
 - MediaWiki 1.45.3, `api.php` at the site root (no script path). `login`/`clientlogin` API modules are available;
@@ -2655,10 +2700,14 @@ dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test c
 dotnet run --project src/EQLWikiEditorAssistant.App
 
 # Or install a Release build to %LOCALAPPDATA%\Programs\EQLWikiEditorAssistant, with the icon library beside it and a Start
-# menu shortcut, so the app you use never locks the build you are working on. Run again to update; it refuses while
-# the installed copy is running. Both copies share the same %APPDATA% state. The build carries the commit it came
-# from in its product version (1.0.0+<commit>, with -modified for uncommitted changes).
+# menu shortcut ("(dev build)"), so the app you use never locks the build you are working on. Run again to update; it
+# refuses while the installed copy is running. Both copies share the same %APPDATA% state. The build carries the commit
+# it came from in its product version (1.0.0-alpha.1+<commit>, with -modified for uncommitted changes).
 powershell -ExecutionPolicy Bypass -File tools/install.ps1
+
+# Build the testers' installer into artifacts\releases (see "Releases" above). -Draft also creates the draft GitHub
+# release for v<Version>, from a clean, pushed commit; read it over and publish it on GitHub.
+powershell -ExecutionPolicy Bypass -File tools/release.ps1 [-Draft]
 
 # OCR tuning against a real sample screenshot (feed it native resolution — upscaling hurts this engine):
 dotnet run --project tools/OcrSpike -- "samples/some screenshot.png" --crop x,y,w,h --save out.png

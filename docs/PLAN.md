@@ -283,7 +283,12 @@ The last work before calling v1 done. Grouped and ordered by agreement:
 ### 1.0.0-alpha.1 — for the first tester, a fellow wiki editor
 **Order agreed** (user, 2026-10-08): (1) Arial default, version shown, edit-summary tag — **DONE 2026-10-08**; (2) tester
 README, licence, RapidOCR notice, icon marking — **DONE 2026-10-08** (see "Licensing as built" below); (3) history and screenshot audit, results to the user before anything is
-public; (4) the installer and the update notice; (5) the user makes the repo public; (6) tag and publish
+public — **DONE 2026-10-08**; (4) the installer and the update notice — **built 2026-10-08** (`tools/release.ps1`,
+`Pipeline.ReleaseCheck`; see CLAUDE.md, "Releases"); install, repair and uninstall tested by the user 2026-10-09, after
+which the updater and the uninstall question were added (below) and tested by the user 2026-10-09 between two local
+builds — in-app update, a newer Setup over an older install, a downgrade warning, and both uninstall answers;
+(5) the user makes the repo public;
+(6) tag and publish
 `v1.0.0-alpha.1`.
 
 Same resolution and UI scale as the user, default Arial font, so the Assistant should work for them as it stands once the
@@ -339,6 +344,12 @@ font default changes.
   the Microsoft Store's terms for individual developers. Otherwise ship unsigned and say so in the README.
 - **An "update available" notice** (in the alpha, user, 2026-10-08): on start, ask GitHub's releases API for the latest
   version and show a link if it is newer. One small request to GitHub, nothing sent; the README says so.
+- **Updating in place, brought forward from 1.0.0** (user, 2026-10-09). Shipping it in the first release is what makes it
+  useful at all: an updater only helps from the release after the one that ships it, and an alpha is when fixes come
+  fastest. The notice gains *Update*: one confirmation (which says the open items will close), the download behind a
+  cancellable progress dialog, then Velopack restarts the app on the new version. Never without a click.
+- **Uninstalling asks whether to delete the user's data too** (user, 2026-10-09: "I'm not a fan of programs that leave
+  trash behind"). Default No, since the history is real work and a reinstall wants it back.
 
 - **Name and tag** (user, 2026-10-08): the app is "EQL Wiki Editor Assistant"; wiki edits carry the shorter
   `(Editor Assistant 1.0.0-alpha.1)`, "EQL Wiki" being implied on the wiki. The user's font was renamed in code from
@@ -370,8 +381,8 @@ font default changes.
   (everything is measured relative to the window); UI scale and skin do, since every edge-finding constant and the glyph
   atlas belong to one scale and skin. Likely shape: a one-time calibration on a known window that measures the frame and
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
-- **Auto-update — in the backlog, built only if third-party testing shows interest** (user, 2026-10-08). Velopack makes
-  this mostly a switch once the installer uses it.
+- **Updating without being asked**, in the background on close, if testers want it. Updating on a click is in the alpha
+  (above).
 - Everything above from the alpha, settled.
 
 ### Keeping up with the wiki's conventions (user, 2026-10-08)

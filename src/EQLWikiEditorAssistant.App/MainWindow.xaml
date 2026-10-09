@@ -72,6 +72,14 @@
                     <Hyperlink x:Name="LedgerLink" Click="OnLedgerClick"
                                ToolTip="Everything checked so far, and what still needs attention">History</Hyperlink>
                 </TextBlock>
+                <!-- Shown only when a newer release is out. An installed copy can update itself (AppUpdater); any
+                     other build only links to the release's page, so InstallUpdateSpan is removed there. -->
+                <TextBlock x:Name="UpdatePanel" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,14,0"
+                           Visibility="Collapsed"><Run x:Name="UpdateRun" Foreground="{StaticResource NewsBrush}"
+                    /><Run Text=" — " /><Span x:Name="InstallUpdateSpan"><Hyperlink Click="OnInstallUpdateClick"
+                        ToolTip="Download it, then restart on the new version">Update</Hyperlink><Run Text=" · "
+                    /></Span><Hyperlink Click="OnReleasePageClick"
+                        ToolTip="The release's notes and downloads, on GitHub">What's new</Hyperlink></TextBlock>
 
                 <Button x:Name="CaptureButton" Click="OnCaptureClick" Padding="12,4" FontWeight="SemiBold"
                         Content="Capture now" ToolTip="Capture the game window and check every item window in it" />
