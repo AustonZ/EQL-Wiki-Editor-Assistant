@@ -29,6 +29,15 @@ $packId = 'EQLWikiEditorAssistant'
 $publish = Join-Path $repo 'artifacts\publish'
 $releases = Join-Path $repo 'artifacts\releases'
 
+# Windows PowerShell makes a native command's stderr an error, and under 'Stop' that ends the script even when the
+# stderr is redirected. For a command whose failure is an answer ("no such release") rather than a fault, the exit code
+# is what decides, so it runs under 'Continue' and returns that.
+function Get-ExitCode([scriptblock]$Command) {
+    $ErrorActionPreference = 'Continue'
+    & $Command 2>&1 | Out-Null
+    $LASTEXITCODE
+}
+
 $version = (dotnet msbuild $project -getProperty:Version -nologo).Trim()
 $product = (dotnet msbuild $project -getProperty:Product -nologo).Trim()
 $tag = "v$version"
@@ -40,8 +49,7 @@ if (git -C $repo status --porcelain) {
     Write-Host 'Note: the working tree has uncommitted changes, and they are included in this build.' -ForegroundColor Yellow
 }
 if ($Draft) {
-    gh release view $tag --repo $repoUrl 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { throw "GitHub already has a release tagged $tag. Raise <Version> in the app's project file." }
+    if ((Get-ExitCode { gh release view $tag --repo $repoUrl }) -eq 0) { throw "GitHub already has a release tagged $tag. Raise <Version> in the app's project file." }
     # The tag is created when the draft is published, on this commit, so GitHub must already have it.
     git -C $repo fetch --quiet origin
     if (-not (git -C $repo branch -r --contains HEAD)) { throw 'Push first: the release is tagged on this commit, and GitHub does not have it yet.' }
@@ -84,8 +92,7 @@ if ($LASTEXITCODE -ge 8) { throw "Copying the icon library failed (robocopy exit
 # release, and a private repository refuses an anonymous download; a full package works either way.
 Push-Location $repo
 try {
-    dotnet vpk download github --repoUrl $repoUrl --pre --outputDir $releases 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { Write-Host 'No previous release downloaded, so no delta package (expected for the first).' }
+    if ((Get-ExitCode { dotnet vpk download github --repoUrl $repoUrl --pre --outputDir $releases }) -ne 0) { Write-Host 'No previous release downloaded, so no delta package (expected for the first).' }
 
     Write-Host 'Packaging with Velopack...'
     $pack = @(
