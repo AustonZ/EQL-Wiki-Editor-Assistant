@@ -12,7 +12,7 @@ namespace EQLWikiEditorAssistant.Tests.Accuracy;
 /// drift.
 ///
 /// **Gated behind <c>EQLWIKI_ACCURACY=1</c>** (precedent: <c>EQLWIKI_LOCATE_DIAG</c>). A corpus pass runs the real
-/// pipeline over every screenshot and takes ~3 minutes; in the default <c>dotnet test</c> path that would get
+/// pipeline over every screenshot and takes about a minute; in the default <c>dotnet test</c> path that would get
 /// muted within a week, which is worse than an opt-in gate that people actually run.
 ///
 ///     EQLWIKI_ACCURACY=1 dotnet test --filter FullyQualifiedName~CorpusAccuracyTests
@@ -38,7 +38,7 @@ public class CorpusAccuracyTests
     {
         if (Environment.GetEnvironmentVariable("EQLWIKI_ACCURACY") != "1")
         {
-            _output.WriteLine("Skipping: set EQLWIKI_ACCURACY=1 to run the corpus pass (~3 minutes).");
+            _output.WriteLine("Skipping: set EQLWIKI_ACCURACY=1 to run the corpus pass (about a minute).");
             return;
         }
 
@@ -57,13 +57,12 @@ public class CorpusAccuracyTests
         // The shipping configuration: RapidOCR finds the windows, the glyph atlas reads inside them — each sample in
         // the UI font its ground truth names (absent means Arial).
         ExpectedCorpus expected = ExpectedCorpus.Load(RepoPaths.ExpectedItemsFile);
-        using var rapid = new RapidOcrEngine();
-        var samples = new List<CorpusSample>();
-        foreach (string file in files)
-        {
-            UiFont font = SampleFonts.For(file, [], expected);
-            samples.Add(await CorpusRunner.RunAsync(file, SampleFonts.Engine(rapid, font), font));
-        }
+        IReadOnlyList<CorpusSample> samples = await CorpusRunner.RunAllAsync(files, threads => new RapidOcrEngine(threads),
+            (file, rapid) =>
+            {
+                UiFont font = SampleFonts.For(file, [], expected);
+                return (SampleFonts.Engine(rapid, font), font);
+            });
 
         // A sample whose pixels contradict the font its ground truth names was read by the wrong l/I rule, so its
         // scores would be measuring the mislabel rather than the reader.

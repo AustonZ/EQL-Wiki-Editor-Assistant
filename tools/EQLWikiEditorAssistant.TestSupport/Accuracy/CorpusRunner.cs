@@ -49,6 +49,55 @@ public static class CorpusRunner
         return new CorpusSample(Path.GetFileName(path), windows, items, font);
     }
 
+    /// <summary>
+    /// Runs every sample, <paramref name="workers"/> at a time (user, 2026-10-09: the corpus took four minutes on a
+    /// 32-thread machine, one screenshot after another). Results come back in <paramref name="files"/>' order whatever
+    /// finished first, so a report is identical at any worker count.
+    ///
+    /// **Each worker gets an engine of its own** from <paramref name="createEngine"/>, rather than sharing one, because
+    /// RapidOCR is not written to be called from two threads at once. That costs a set of loaded models per worker,
+    /// which is why the count is a parameter rather than "every core". **The factory is told how many threads its
+    /// engine may use** — the machine's share per worker — because an engine left to size itself takes the whole
+    /// machine, and several of them then fight: measured, 4 and 8 such workers were no faster than one. <paramref name="configure"/> picks the engine and
+    /// font for one sample given its worker's engine, as <see cref="SampleFonts"/> does.
+    /// </summary>
+    public static async Task<IReadOnlyList<CorpusSample>> RunAllAsync(
+        IReadOnlyList<string> files,
+        Func<int, IOcrEngine> createEngine,
+        Func<string, IOcrEngine, (IOcrEngine Engine, UiFont Font)> configure,
+        int workers = 0,
+        CancellationToken cancellationToken = default)
+    {
+        if (workers <= 0) workers = DefaultWorkers;
+        var results = new CorpusSample[files.Count];
+        int next = -1;
+        int threads = Math.Max(1, Environment.ProcessorCount / workers);
+
+        await Task.WhenAll(Enumerable.Range(0, Math.Clamp(workers, 1, Math.Max(files.Count, 1))).Select(_ =>
+            Task.Run(async () =>
+            {
+                IOcrEngine own = createEngine(threads);
+                try
+                {
+                    for (int i = Interlocked.Increment(ref next); i < files.Count; i = Interlocked.Increment(ref next))
+                    {
+                        (IOcrEngine engine, UiFont font) = configure(files[i], own);
+                        results[i] = await RunAsync(files[i], engine, font, cancellationToken);
+                    }
+                }
+                finally
+                {
+                    (own as IDisposable)?.Dispose();
+                }
+            }, cancellationToken)));
+
+        return results;
+    }
+
+    /// <summary>How many samples run at once when the caller does not say. Measured: see CLAUDE.md, "Measuring
+    /// extraction accuracy".</summary>
+    public static int DefaultWorkers => Math.Clamp(Environment.ProcessorCount / 4, 1, 8);
+
     /// <summary>Scores a run against ground truth. Samples on disk with no expected entry are reported as
     /// unscored rather than skipped silently, so a new capture batch is visible immediately.</summary>
     public static AccuracyReport Score(IReadOnlyList<CorpusSample> samples, ExpectedCorpus expected)

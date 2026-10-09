@@ -2504,8 +2504,16 @@ invisible that way by definition.
 - Compare configurations **lexicographically**, not by a weighted score: a weighted total lets a tuner buy five
   recovered digits with one corrupted value, which is exactly the trade this project must never make.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
-  corpus pass is ~3 minutes; in the default `dotnet test` path it would get muted within a week. The pure comparer
+  corpus pass is about a minute; in the default `dotnet test` path it would get muted within a week. The pure comparer
   tests run always and need no samples.
+- **The corpus runs several samples at once** (`CorpusRunner.RunAllAsync`, user, 2026-10-09), each worker with its own
+  RapidOCR engine, since one is not safe to share between threads; results come back in file order, so a report is
+  identical at any worker count — checked at 1, 2, 4, 8 and 16 on all 52 samples. **Each engine is told its share of
+  the cores** (`RapidOcrEngine(threads)`, which RapidOcrNet hands to ONNX Runtime), and that is what made it work: left
+  to size itself, every engine took the whole machine, and 4 or 8 workers were no faster than one (243 s and 246 s
+  against 245 s). With the share, on 32 logical cores: 1 worker 271 s, 2 141 s, 4 81 s, 8 **56 s**, 16 52 s. The
+  default (`CorpusRunner.DefaultWorkers`) is a quarter of the logical cores, at most 8, which takes nearly all of the
+  gain at half the memory of 16; `AccuracySpike --workers <n>` overrides it. The app's single engine is untouched.
 - Baseline (2026-10-07): **52 samples — 48 in Arial, 4 in EQL Wiki Editor Assistant — 120 windows located (1 correctly
   occluded), 2442 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
   extra. Parser warnings are 2, not 0**: both are
@@ -2762,7 +2770,7 @@ dotnet run --project tools/AccuracySpike                 # summary
 dotnet run --project tools/AccuracySpike -- --diff       # plus every differing field
 dotnet run --project tools/AccuracySpike -- --bootstrap  # regenerate ground truth after a new capture batch
 
-# The corpus regression test (~3 min, opt-in so it can't get muted):
+# The corpus regression test (about a minute, opt-in so it can't get muted):
 $env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracyTests"
 
 # Glyph matching: read a region's raw pixel intensities (the --probe of this work; measure before tuning),

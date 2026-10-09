@@ -22,14 +22,18 @@ public sealed class RapidOcrEngine : IOcrEngine, IDisposable
     // where the package copies them.
     private static readonly string ModelDirectory = Path.Combine(AppContext.BaseDirectory, "models", "v5");
 
-    public RapidOcrEngine()
+    /// <param name="threads">The threads each model may use, or 0 for RapidOcrNet's default. The app runs one engine and
+    /// leaves it at the default; the accuracy corpus runs several at once and splits the cores between them, since each
+    /// engine left at the default sizes itself for the whole machine and the engines then fight over it.</param>
+    public RapidOcrEngine(int threads = 0)
     {
         _ocr = new RapidOcr();
-        _ocr.InitModels(
-            Path.Combine(ModelDirectory, "ch_PP-OCRv5_mobile_det.onnx"),
-            Path.Combine(ModelDirectory, "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx"),
-            Path.Combine(ModelDirectory, "latin_PP-OCRv5_rec_mobile_infer.onnx"),
-            Path.Combine(ModelDirectory, "ppocrv5_latin_dict.txt"));
+        string det = Path.Combine(ModelDirectory, "ch_PP-OCRv5_mobile_det.onnx"),
+            cls = Path.Combine(ModelDirectory, "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx"),
+            rec = Path.Combine(ModelDirectory, "latin_PP-OCRv5_rec_mobile_infer.onnx"),
+            keys = Path.Combine(ModelDirectory, "ppocrv5_latin_dict.txt");
+        if (threads > 0) _ocr.InitModels(det, cls, rec, keys, numThread: threads);
+        else _ocr.InitModels(det, cls, rec, keys);
     }
 
     public Task<IReadOnlyList<OcrLine>> RecognizeAsync(
