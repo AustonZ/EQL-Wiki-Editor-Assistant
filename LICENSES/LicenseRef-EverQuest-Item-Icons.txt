@@ -1,0 +1,21 @@
+EverQuest Legends item icons: NOT licensed by this project
+
+The files under game_assets/item_icons/ are item icon artwork extracted from the
+EverQuest Legends game client. They belong to the game's publisher,
+Daybreak Game Company LLC, or its licensors.
+
+They are NOT covered by this project's MIT licence, and this project grants
+no licence to them of any kind. Copying them out of this repository does not
+make them free to use.
+
+Why they are here: the EQL Wiki Editor Assistant identifies an item's icon by
+comparing the in-game artwork against these files, and can upload the matching
+one to the EverQuest Legends Wiki. For many years the publisher has allowed
+EverQuest item icons to appear on fan wikis and item databases, which is the
+use made of them here. That is the publisher's tolerance, not a licence, and
+it covers nothing beyond that use.
+
+Anyone wanting to use these files for any other purpose (another project, a
+dataset, training a model, redistribution) needs the publisher's permission.
+
+If the rights holder asks for them to be removed, they will be.

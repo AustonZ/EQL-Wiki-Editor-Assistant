@@ -1,0 +1,25 @@
+# Machine-readable licensing for this repository (https://reuse.software).
+# Everything is MIT unless an annotation below says otherwise; the full texts are in LICENSES/.
+version = 1
+SPDX-PackageName = "EQL Wiki Editor Assistant"
+SPDX-PackageDownloadLocation = "https://github.com/AustonZ/EQLWiki-EditorAssistant"
+
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2026 EQL Wiki Editor Assistant contributors"
+SPDX-License-Identifier = "MIT"
+
+# The game's item icon artwork. NOT MIT, and not licensed by this project at all: see the licence file and
+# game_assets/README.md.
+[[annotations]]
+path = "game_assets/item_icons/**"
+precedence = "override"
+SPDX-FileCopyrightText = "Daybreak Game Company LLC"
+SPDX-License-Identifier = "LicenseRef-EverQuest-Item-Icons"
+
+# Item pages copied from the EverQuest Legends Wiki as test fixtures. NOT MIT; the wiki names no licence.
+[[annotations]]
+path = "tests/EQLWikiAssistant.Tests/Wiki/Fixtures/*.txt"
+precedence = "override"
+SPDX-FileCopyrightText = "EverQuest Legends Wiki contributors"
+SPDX-License-Identifier = "LicenseRef-EQL-Wiki-Content"

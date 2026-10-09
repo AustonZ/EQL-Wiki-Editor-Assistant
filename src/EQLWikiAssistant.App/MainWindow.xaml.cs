@@ -929,7 +929,7 @@ public partial class MainWindow : Window
             _browserEnvironment ??= Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
                 userDataFolder: System.IO.Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "EQLWikiAssistant", "WebView2"));
+                    "EQLWikiEditorAssistant", "WebView2"));
             await browser.EnsureCoreWebView2Async(await _browserEnvironment);
         }
         catch (Exception ex) when (ex is Microsoft.Web.WebView2.Core.WebView2RuntimeNotFoundException

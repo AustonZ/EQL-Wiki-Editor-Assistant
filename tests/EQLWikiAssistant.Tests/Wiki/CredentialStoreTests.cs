@@ -11,7 +11,7 @@ namespace EQLWikiAssistant.Tests.Wiki;
 /// </summary>
 public class CredentialStoreTests : IDisposable
 {
-    private const string TestTarget = "EQLWikiAssistant:unit-test-do-not-use";
+    private const string TestTarget = "EQLWikiEditorAssistant:unit-test-do-not-use";
 
     private readonly WindowsCredentialStore _store = new(TestTarget);
 

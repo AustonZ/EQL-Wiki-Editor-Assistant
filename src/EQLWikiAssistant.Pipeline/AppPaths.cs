@@ -10,7 +10,7 @@ namespace EQLWikiAssistant.Pipeline;
 public static class AppPaths
 {
     public static string Root { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EQLWikiAssistant");
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EQLWikiEditorAssistant");
 
     /// <summary>The checked-items ledger. JSON — see <c>CheckedItemsLedger</c> for why not SQLite.</summary>
     public static string LedgerFile => Path.Combine(Root, "checked-items.json");

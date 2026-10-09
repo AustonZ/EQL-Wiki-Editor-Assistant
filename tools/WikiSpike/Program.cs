@@ -821,7 +821,7 @@ async Task<int> EditAsync()
         return 1;
     }
 
-    string marker = $"EQLWikiAssistant write-path test {DateTimeOffset.UtcNow:u}";
+    string marker = $"EQLWikiEditorAssistant write-path test {DateTimeOffset.UtcNow:u}";
 
     Console.WriteLine($"Fetched '{page.Title}' revision {page.RevisionId} ({page.Wikitext.Length} bytes).");
     Console.WriteLine();

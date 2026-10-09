@@ -31,6 +31,9 @@ public sealed class AppServices : IDisposable
     /// knowledge belongs, and a second wiki would need its own mapping anyway.</summary>
     public static readonly Uri Endpoint = new("https://eqlwiki.com/api.php");
 
+    /// <summary>What the wiki sees this app as: its name, its version and where to find it.</summary>
+    private static readonly string UserAgent = MediaWikiClient.UserAgentFor(AppInfo.Version);
+
     /// <summary>
     /// The game's process name, without <c>.exe</c> — **how the window to capture is identified**.
     ///
@@ -102,7 +105,7 @@ public sealed class AppServices : IDisposable
         _windowReader = new GlyphOcrEngine(Settings.Font);
         IOcrEngine ocr = new RoutingOcrEngine(fullFrame: _rapidOcr, windowCrop: _windowReader);
 
-        Wiki = MediaWikiClient.Create(Endpoint);
+        Wiki = MediaWikiClient.Create(Endpoint, UserAgent);
         // Every edit and upload says which app and version made it — see MediaWikiClient.SummaryTag.
         Wiki.SummaryTag = $"{AppInfo.SummaryName} {AppInfo.Version}";
         Ledger =CheckedItemsLedger.Load(AppPaths.LedgerFile);
@@ -112,7 +115,7 @@ public sealed class AppServices : IDisposable
         Mapping = WikiMapping.Default;
 
         _http = new HttpClient();
-        _http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
+        _http.DefaultRequestHeaders.Add("User-Agent", UserAgent);
         Icons = new IconCache(AppPaths.IconCacheDirectory, new WikiIconSource(_http, Endpoint));
         Verified = new VerifiedPages(Wiki, AppPaths.VerifiedPagesFile);
 
@@ -302,7 +305,7 @@ public sealed class AppServices : IDisposable
     public static async Task<CredentialCheck> CheckCredentialAsync(
         BotCredentials credentials, CancellationToken cancellationToken = default)
     {
-        using MediaWikiClient client = MediaWikiClient.Create(Endpoint);
+        using MediaWikiClient client = MediaWikiClient.Create(Endpoint, UserAgent);
         try
         {
             await client.LoginAsync(credentials, cancellationToken);

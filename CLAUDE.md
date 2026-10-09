@@ -25,6 +25,12 @@ The full design rationale, wiki research findings, and milestone plan live in
   reasonably expect to send it** (user, 2026-10-07, clarifying the original "only user-approved edits"). The purpose
   is to never publish anything unknowingly and never add load to the wiki for nothing — so a preview rendered by the
   wiki's `action=parse` when the user presses Preview is fine, and one fired automatically on every capture is not.
+- **The repository is MIT, except for two things that are not ours to license** (user, 2026-10-08): the game's item
+  icons in `game_assets/item_icons` (the publisher's artwork, tolerated on fan wikis, licensed to nobody) and the wiki
+  pages copied as test fixtures (the wiki's contributors', under no stated licence). `REUSE.toml` records this and
+  `reuse lint` must keep passing: anything added that is not the project's own work — more wiki text, game data,
+  artwork — gets its own annotation and `LICENSES/` entry rather than falling under MIT by default. Never describe the
+  repository as wholly MIT, and never reuse the icons outside the Assistant's own purpose.
 - **Never commit real screenshots.** They may contain private info (character/player names, chat). They belong in
   `samples/`, which is gitignored except for `samples/README.md`.
 - **Wiki data is untrusted and often malformed.** Item pages are human-edited and partly imported from the old
@@ -1564,7 +1570,7 @@ a global hotkey is worth having.
   debug log (2026-09-29). It earns its place independently of the bug above: the review screen's click handlers are
   `async void`, as event handlers must be, so an exception in one reaches the dispatcher rather than any caller and
   closes the window. It is marked handled — losing the other items on screen, some representing captures that are
-  awkward to retake, is worse than the failure itself — and the stack goes to `%APPDATA%\EQLWikiAssistant\errors.log`,
+  awkward to retake, is worse than the failure itself — and the stack goes to `%APPDATA%\EQLWikiEditorAssistant\errors.log`,
   since a stack is too much for a dialog and too easy to lose once one is dismissed. Recording never throws.
 - **What is on screen is what gets saved.** The proposed wikitext is editable and the commit writes *that*, never
   `Edit.NewWikitext`. A review screen whose approve button saved something else would make the review meaningless.
@@ -1700,7 +1706,7 @@ a global hotkey is worth having.
     the links and the categories all render without scripts (verified on both pages). A clicked link opens in the
     user's own browser instead of navigating the review away.
   - **The browser is a native window WPF cannot draw over**, so it is hidden while a dialog is up or a page is sliding,
-    and shown once its page has loaded. Its data lives in `%LOCALAPPDATA%\EQLWikiAssistant\WebView2`; it is created
+    and shown once its page has loaded. Its data lives in `%LOCALAPPDATA%\EQLWikiEditorAssistant\WebView2`; it is created
     the first time a page needs it, not at launch.
 - **Dialogs are drawn in the window, not by Windows** (`OverlayDialog`, user, 2026-10-07): a dimmed backdrop over the
   window's content, in the palette, one at a time, awaited by the caller. Every window carries one; the only Windows
@@ -1741,7 +1747,7 @@ a global hotkey is worth having.
   path.
   - **Off unless chosen, and never inside the repository.** A frame is a full screenshot and can hold character names,
     other players' names and chat — the reason `samples/` is gitignored and the reason the pipeline otherwise keeps
-    every frame in memory. These go to `%APPDATA%\EQLWikiAssistant\debug-captures`, outside any working copy, so no
+    every frame in memory. These go to `%APPDATA%\EQLWikiEditorAssistant\debug-captures`, outside any working copy, so no
     commit can pick one up by accident, and the newest 50 are kept.
   - **It is a setting (Settings > Saved captures, `AppSettings.KeepCaptures`), not a build flavour** (user,
     2026-10-07). It began as Debug-only, which was the same thing while the tool only ever ran from `dotnet run`; once
@@ -1845,7 +1851,7 @@ reading with the configured font.
   different thing and untouched here; its index rebuilds itself when the folder changes. Verified with a real
   re-download against the live wiki; clearing is covered by tests only, since it would have emptied the user's cache.
 - **The mapping is shown, not edited** (user, 2026-10-05), and showing it **found a latent bug that is now gone**.
-  `AppServices` loaded `%APPDATA%\EQLWikiAssistant\wiki-mapping.json` if one existed, but that file format carried
+  `AppServices` loaded `%APPDATA%\EQLWikiEditorAssistant\wiki-mapping.json` if one existed, but that file format carried
   only stat renames and parameter names: it silently dropped signs, units (`Weight Reduction`'s `%`), the Skill Mod
   format, slot renames, effect kinds, the statsblock line order, the parameter order and the block parameters. No
   such file had ever been written and nothing tested the format, so it was harmless — until the day one appeared,
@@ -2636,10 +2642,10 @@ dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test c
 # Run the app. Ctrl+Shift+E (changeable under Settings > Capture hotkey) captures the game window from wherever you
 # are — you never have to leave the game.
 # Reads are anonymous, so it only needs a credential the first time you save (enter one under Settings > Wiki account).
-# Its state (ledger, settings, icon cache) lives in %APPDATA%\EQLWikiAssistant — see Pipeline.AppPaths.
+# Its state (ledger, settings, icon cache) lives in %APPDATA%\EQLWikiEditorAssistant — see Pipeline.AppPaths.
 dotnet run --project src/EQLWikiAssistant.App
 
-# Or install a Release build to %LOCALAPPDATA%\Programs\EQLWikiAssistant, with the icon library beside it and a Start
+# Or install a Release build to %LOCALAPPDATA%\Programs\EQLWikiEditorAssistant, with the icon library beside it and a Start
 # menu shortcut, so the app you use never locks the build you are working on. Run again to update; it refuses while
 # the installed copy is running. Both copies share the same %APPDATA% state. The build carries the commit it came
 # from in its product version (1.0.0+<commit>, with -modified for uncommitted changes).
@@ -2763,7 +2769,7 @@ Ornamentation slot; unit tests cover both. **A capture in a font other than the 
 bootstrapping**, or its ground truth will be read by the wrong l/I rule.
 
 **A sample can come from the capture archive rather than a fresh capture.** With Settings > Saved captures on, the app
-files every frame under `%APPDATA%\EQLWikiAssistant\debug-captures`, named after the items in it, so an interesting
+files every frame under `%APPDATA%\EQLWikiEditorAssistant\debug-captures`, named after the items in it, so an interesting
 item the user has already looked at is usually sitting there — which is how `14-race-restricted-item.png` was added
 without asking them to go and find the item again. Copy it into `samples/` under the naming convention, then
 `AccuracySpike --bootstrap --only <substring>` merges one entry into the tracked ground truth without touching the

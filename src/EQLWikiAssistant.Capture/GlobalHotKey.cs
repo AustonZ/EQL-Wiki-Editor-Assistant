@@ -24,7 +24,7 @@ public sealed class GlobalHotKey : IDisposable
     private static int _instanceCount;
 
     private readonly string _windowClassName =
-        $"EQLWikiAssistant.GlobalHotKey.MessageWindow.{Interlocked.Increment(ref _instanceCount)}";
+        $"EQLWikiEditorAssistant.GlobalHotKey.MessageWindow.{Interlocked.Increment(ref _instanceCount)}";
 
     private readonly HotKeyModifiers _modifiers;
     private readonly uint _virtualKey;
@@ -47,7 +47,7 @@ public sealed class GlobalHotKey : IDisposable
         _virtualKey = virtualKey;
         _wndProc = WindowProc;
 
-        _thread = new Thread(RunMessageLoop) { IsBackground = true, Name = "EQLWikiAssistant hotkey listener" };
+        _thread = new Thread(RunMessageLoop) { IsBackground = true, Name = "EQLWikiEditorAssistant hotkey listener" };
         _thread.Start();
 
         _started.Wait();

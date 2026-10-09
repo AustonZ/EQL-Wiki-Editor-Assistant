@@ -10,14 +10,14 @@ not replace a running executable and a half-updated install is worse than none.
 Running from an install rather than `dotnet run` is what lets a build and a running copy coexist: building the repo
 no longer has to fight the app you are using for its own output files.
 
-The app's own state (ledger, settings, caches) lives in %APPDATA%\EQLWikiAssistant regardless of where it runs, so
+The app's own state (ledger, settings, caches) lives in %APPDATA%\EQLWikiEditorAssistant regardless of where it runs, so
 the installed copy and a `dotnet run` copy share it.
 
 .PARAMETER Destination
-Where to install. Defaults to %LOCALAPPDATA%\Programs\EQLWikiAssistant, where per-user programs go.
+Where to install. Defaults to %LOCALAPPDATA%\Programs\EQLWikiEditorAssistant, where per-user programs go.
 #>
 param(
-    [string]$Destination = (Join-Path $env:LOCALAPPDATA 'Programs\EQLWikiAssistant')
+    [string]$Destination = (Join-Path $env:LOCALAPPDATA 'Programs\EQLWikiEditorAssistant')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,7 +38,7 @@ if (git -C $repo status --porcelain) {
     Write-Host "Note: the working tree has uncommitted changes, and they are included in this build." -ForegroundColor Yellow
 }
 
-$staging = Join-Path ([IO.Path]::GetTempPath()) ("EQLWikiAssistant-publish-" + [guid]::NewGuid().ToString('N'))
+$staging = Join-Path ([IO.Path]::GetTempPath()) ("EQLWikiEditorAssistant-publish-" + [guid]::NewGuid().ToString('N'))
 try {
     Write-Host "Building $revision in Release..."
     dotnet publish (Join-Path $repo 'src\EQLWikiAssistant.App') -c Release -o $staging --nologo -v q `

@@ -23,7 +23,7 @@ namespace EQLWikiAssistant.Wiki.MediaWiki;
 public sealed class WindowsCredentialStore(string targetName = WindowsCredentialStore.DefaultTargetName) : ICredentialStore
 {
     /// <summary>Namespaced so it is obvious in <c>cmdkey /list</c> which application owns it and what it is for.</summary>
-    public const string DefaultTargetName = "EQLWikiAssistant:eqlwiki.com";
+    public const string DefaultTargetName = "EQLWikiEditorAssistant:eqlwiki.com";
 
     private const int CredTypeGeneric = 1;
     private const int CredPersistLocalMachine = 2;

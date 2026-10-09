@@ -1,0 +1,13 @@
+EverQuest Legends Wiki page text: NOT licensed by this project
+
+The page files under tests/EQLWikiAssistant.Tests/Wiki/Fixtures/ are copies of
+item pages from the EverQuest Legends Wiki (https://eqlwiki.com), written by
+that wiki's contributors. Their copyright belongs to those contributors.
+
+They are NOT covered by this project's MIT licence. The wiki itself names no
+licence for its content: when checked on 2026-10-08, its edit notice said
+contributions are "released under the" licence it then leaves blank.
+
+They are kept as test fixtures because real pages, with all their
+inconsistencies, are what the Assistant has to read and edit correctly.
+They are used for nothing else.

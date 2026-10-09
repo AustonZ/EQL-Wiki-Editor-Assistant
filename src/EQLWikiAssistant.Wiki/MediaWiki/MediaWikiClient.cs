@@ -21,8 +21,15 @@ namespace EQLWikiAssistant.Wiki.MediaWiki;
 public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
 {
     /// <summary>MediaWiki's API etiquette asks for a descriptive User-Agent with a contact route; a generic or
-    /// absent one is grounds for being blocked, and being blocked mid-session is a confusing failure.</summary>
-    public const string UserAgent = "EQLWikiAssistant/1.0 (https://github.com/; EverQuest Legends Wiki editor assistant)";
+    /// absent one is grounds for being blocked, and being blocked mid-session is a confusing failure. This bare form
+    /// is what the dev tools send; the app sends <see cref="UserAgentFor"/> its version, so the wiki's admins can
+    /// tell releases apart.</summary>
+    public const string UserAgent = "EQLWikiEditorAssistant (" + ProjectUrl + ")";
+
+    private const string ProjectUrl = "https://github.com/AustonZ/EQLWiki-EditorAssistant";
+
+    /// <summary>The User-Agent naming a release, e.g. <c>EQLWikiEditorAssistant/1.0.0-alpha.1 (https://...)</c>.</summary>
+    public static string UserAgentFor(string version) => $"EQLWikiEditorAssistant/{version} ({ProjectUrl})";
 
     private readonly HttpClient _http;
     private readonly bool _ownsHttp;
@@ -40,10 +47,11 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
     }
 
     /// <summary>Builds a client with the cookie container and user agent MediaWiki needs.</summary>
-    public static MediaWikiClient Create(Uri endpoint)
+    public static MediaWikiClient Create(Uri endpoint, string userAgent = UserAgent)
     {
         var handler = new HttpClientHandler { CookieContainer = new CookieContainer(), UseCookies = true };
         var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
+        http.DefaultRequestHeaders.Add("User-Agent", userAgent);
         return new MediaWikiClient(http, endpoint, ownsHttpClient: true);
     }
 
