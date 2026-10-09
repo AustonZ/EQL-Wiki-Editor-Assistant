@@ -9,7 +9,8 @@ and quests to be added later.
 
 Hard constraints: no network-traffic interception, no game-memory access; screenshots and OCR stay 100% local (no
 cloud OCR); only wiki text/images are fetched (inbound) and only user-approved edits are sent (outbound). The repo has a
-GitHub remote, so real screenshots (which may contain private info) must never be committed (gitignored `samples/`).
+GitHub remote, so real screenshots (which may contain private info) are committed only once audited (`samples/`
+stays gitignored, and audited frames are added deliberately).
 
 ## Decisions
 - Stack: C# / .NET WPF, Windows-only, runs on the gaming desktop (no laptop needed).
@@ -317,6 +318,14 @@ font default changes.
     looking at, and where something private is visible, a decision: redact it (blanking regions the tests do not read,
     then re-running the corpus to prove nothing moved) or leave that sample out. The "never commit real screenshots"
     rule in CLAUDE.md changes to "only audited ones" once this is done.
+  - **DONE 2026-10-08.** History: no screenshot, font, log or credential was ever committed; the commit author became
+    `AustonZ` with the GitHub noreply address, and the developer's machine path, wiki account and the other editor's
+    name were rewritten out of every revision and message (`git filter-repo`; the final tree was byte-identical
+    before and after). The plan moved into the repository as this file. Screenshots: the user reviewed all 52 and the
+    only redaction was the private chat channel's name in five frames, blacked out losslessly; character names were
+    judged fine. The corpus scored identically afterwards (120 windows, 2442 correct, 0 everywhere). The 52 frames
+    are committed as plain git (~145 MB) rather than LFS. The GitHub repository is recreated empty before the first
+    push, so no copy of the old history survives there.
   - **A README** for testers: what the Assistant does and never does (local screenshots only, no game memory, nothing
     sent to the wiki without pressing a button), creating a bot password and the rights it needs, the Settings it needs
     (font, hotkey), the SmartScreen warning to expect if unsigned, and how to report a problem.

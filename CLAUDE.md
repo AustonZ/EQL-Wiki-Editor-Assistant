@@ -31,8 +31,12 @@ The full design rationale, wiki research findings, and milestone plan live in
   `reuse lint` must keep passing: anything added that is not the project's own work — more wiki text, game data,
   artwork — gets its own annotation and `LICENSES/` entry rather than falling under MIT by default. Never describe the
   repository as wholly MIT, and never reuse the icons outside the Assistant's own purpose.
-- **Never commit real screenshots.** They may contain private info (character/player names, chat). They belong in
-  `samples/`, which is gitignored except for `samples/README.md`.
+- **Only audited screenshots are committed.** A frame can show character names, other players and chat, so
+  `samples/` stays gitignored and a new capture cannot be swept into a commit by accident. The samples the tests use
+  were audited one by one before the repository went public (user, 2026-10-08) and added with `git add -f`, which is
+  how any future sample gets in: look at the whole frame first, black out anything private (the private chat channel
+  was the only thing redacted; character names were judged fine), then re-run `AccuracySpike` to prove the redaction
+  moved nothing. `samples/README.md` has the steps.
 - **Wiki data is untrusted and often malformed.** Item pages are human-edited and partly imported from the old
   Project1999 wiki fork: expect wrong template usage, typos, missing/extra params, inconsistent casing. Wikitext
   parsing must degrade gracefully (flag "couldn't parse this part" rather than throw or silently corrupt), and
@@ -1746,7 +1750,7 @@ a global hotkey is worth having.
   a bug can be reported by naming an item rather than by keeping it in the game. The list entry's tooltip carries the
   path.
   - **Off unless chosen, and never inside the repository.** A frame is a full screenshot and can hold character names,
-    other players' names and chat — the reason `samples/` is gitignored and the reason the pipeline otherwise keeps
+    other players' names and chat — the reason `samples/` admits only audited frames and the reason the pipeline otherwise keeps
     every frame in memory. These go to `%APPDATA%\EQLWikiEditorAssistant\debug-captures`, outside any working copy, so no
     commit can pick one up by accident, and the newest 50 are kept.
   - **It is a setting (Settings > Saved captures, `AppSettings.KeepCaptures`), not a build flavour** (user,
@@ -2092,8 +2096,8 @@ already found and fixed.
     capture reads 192, 115, 77, 38 down one). Skipping them is safe here in a way it was not before, because the
     height bounds and the must-end check now do the work that tolerance alone used to be asked to do.
   - **It is pinned by tests that can actually fail**, which none of the previous three fixes were. The locate
-    goldens all run against `samples/`, which is gitignored, so they skip on a fresh clone — which is how three
-    bugs in a row shipped with no test able to catch them. `WindowTopEdgeTests` synthesizes the arrangement instead
+    goldens all ran against `samples/`, which was gitignored, so they skipped on a fresh clone — which is how three
+    bugs in a row shipped with no test able to catch them (the audited samples are committed since 2026-10-08). `WindowTopEdgeTests` synthesizes the arrangement instead
     (the values are the measured ones; only the layout is made up) and covers the chrome-above case, the flush
     panel, a panel covering the whole width — which must be *refused*, since nothing can know where the window
     starts — and the screen-edge window. Verified as a control: the chrome-above test fails against the old rule.
@@ -2746,7 +2750,8 @@ dotnet run --project tools/WikiSpike -- whoami     # confirm it logs in AND may 
 dotnet run --project tools/WikiSpike -- edit "User:YourName/sandbox"   # 2 revisions, self-reverting, confirms first
 ```
 
-Real screenshots for manual testing/tuning go in `samples/` (gitignored, never commit game screenshots).
+Real screenshots for manual testing/tuning go in `samples/`, which is gitignored: a new one is committed only after
+it has been audited (see the hard constraint and `samples/README.md`).
 
 **The sample set is captured through the tool's own capture path**, not saved screenshots — lossless PNG via
 Windows Graphics Capture, the same code the app uses, so the pixel values `WindowBoundsFinder` depends on are the

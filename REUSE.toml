@@ -17,6 +17,13 @@ precedence = "override"
 SPDX-FileCopyrightText = "Daybreak Game Company LLC"
 SPDX-License-Identifier = "LicenseRef-EverQuest-Item-Icons"
 
+# Screenshots of the game, used as test inputs. NOT MIT: they show the publisher's artwork.
+[[annotations]]
+path = "samples/*.png"
+precedence = "override"
+SPDX-FileCopyrightText = "Daybreak Game Company LLC"
+SPDX-License-Identifier = "LicenseRef-EverQuest-Screenshots"
+
 # Item pages copied from the EverQuest Legends Wiki as test fixtures. NOT MIT; the wiki names no licence.
 [[annotations]]
 path = "tests/EQLWikiEditorAssistant.Tests/Wiki/Fixtures/*.txt"

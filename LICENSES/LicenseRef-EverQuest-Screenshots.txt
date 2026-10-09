@@ -1,0 +1,14 @@
+EverQuest Legends screenshots: NOT licensed by this project
+
+The PNG files under samples/ are screenshots of the EverQuest Legends game
+client, taken by this project's developer. They show the game's artwork and
+interface, which belong to the game's publisher, Daybreak Game Company LLC, or
+its licensors, and other players' characters as anyone in the game sees them.
+
+They are NOT covered by this project's MIT licence, and this project grants no
+licence to them. They are here only as test inputs: the Assistant's tests read
+the item windows in them to check that it locates and reads those windows
+correctly. Do not reuse them for anything else.
+
+If the rights holder, or a player who appears in one, asks for a screenshot to
+be removed, it will be.
