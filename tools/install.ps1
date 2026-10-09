@@ -22,9 +22,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$exe = Join-Path $Destination 'EQLWikiAssistant.App.exe'
+$exe = Join-Path $Destination 'EQLWikiEditorAssistant.App.exe'
 
-$running = Get-Process -Name 'EQLWikiAssistant.App' -ErrorAction SilentlyContinue |
+$running = Get-Process -Name 'EQLWikiEditorAssistant.App' -ErrorAction SilentlyContinue |
     Where-Object { $_.Path -eq $exe }
 if ($running) {
     Write-Host "The installed copy is running (process $($running.Id -join ', ')). Close it and run this again." -ForegroundColor Red
@@ -41,7 +41,7 @@ if (git -C $repo status --porcelain) {
 $staging = Join-Path ([IO.Path]::GetTempPath()) ("EQLWikiEditorAssistant-publish-" + [guid]::NewGuid().ToString('N'))
 try {
     Write-Host "Building $revision in Release..."
-    dotnet publish (Join-Path $repo 'src\EQLWikiAssistant.App') -c Release -o $staging --nologo -v q `
+    dotnet publish (Join-Path $repo 'src\EQLWikiEditorAssistant.App') -c Release -o $staging --nologo -v q `
         "-p:SourceRevisionId=$revision"
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed (exit code $LASTEXITCODE)." }
 

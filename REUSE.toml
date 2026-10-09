@@ -19,7 +19,7 @@ SPDX-License-Identifier = "LicenseRef-EverQuest-Item-Icons"
 
 # Item pages copied from the EverQuest Legends Wiki as test fixtures. NOT MIT; the wiki names no licence.
 [[annotations]]
-path = "tests/EQLWikiAssistant.Tests/Wiki/Fixtures/*.txt"
+path = "tests/EQLWikiEditorAssistant.Tests/Wiki/Fixtures/*.txt"
 precedence = "override"
 SPDX-FileCopyrightText = "EverQuest Legends Wiki contributors"
 SPDX-License-Identifier = "LicenseRef-EQL-Wiki-Content"

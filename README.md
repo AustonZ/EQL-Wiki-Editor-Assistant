@@ -82,7 +82,7 @@ Needs the .NET 10 SDK on Windows.
 ```powershell
 dotnet build
 dotnet test
-dotnet run --project src/EQLWikiAssistant.App
+dotnet run --project src/EQLWikiEditorAssistant.App
 ```
 
 [CLAUDE.md](CLAUDE.md) is the detailed design record: why each rule exists and what it was measured against.

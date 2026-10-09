@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\EQLWikiAssistant.Core\EQLWikiAssistant.Core.csproj" />
-    <ProjectReference Include="..\..\src\EQLWikiAssistant.Capture\EQLWikiAssistant.Capture.csproj" />
-    <ProjectReference Include="..\EQLWikiAssistant.TestSupport\EQLWikiAssistant.TestSupport.csproj" />
+    <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Core\EQLWikiEditorAssistant.Core.csproj" />
+    <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Capture\EQLWikiEditorAssistant.Capture.csproj" />
+    <ProjectReference Include="..\EQLWikiEditorAssistant.TestSupport\EQLWikiEditorAssistant.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>

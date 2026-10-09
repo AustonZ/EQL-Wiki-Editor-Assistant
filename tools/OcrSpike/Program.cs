@@ -1,6 +1,6 @@
-using EQLWikiAssistant.Core.Ocr;
-using EQLWikiAssistant.Ocr;
-using EQLWikiAssistant.TestSupport;
+using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.TestSupport;
 
 // Spike tool: run the real OCR engine against a screenshot (optionally cropped and scaled) and dump what it
 // recognizes, so accuracy can be judged by eye when tuning parse logic against new samples.

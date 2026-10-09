@@ -1,7 +1,7 @@
-using EQLWikiAssistant.Capture;
-using EQLWikiAssistant.Core.Input;
-using EQLWikiAssistant.Core.Ocr;
-using EQLWikiAssistant.TestSupport;
+using EQLWikiEditorAssistant.Capture;
+using EQLWikiEditorAssistant.Core.Input;
+using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.TestSupport;
 
 // Milestone 1 spike tool: validate WindowCapturer (Windows Graphics Capture) and GlobalHotKey against real
 // windows on this machine, since the game itself isn't necessarily running.

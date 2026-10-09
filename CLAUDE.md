@@ -40,7 +40,7 @@ The full design rationale, wiki research findings, and milestone plan live in
 
 ## Solution layout
 
-- `src/EQLWikiAssistant.Core` (`net10.0`, no Windows APIs) — wiki-agnostic domain models (`Item` etc.), shared
+- `src/EQLWikiEditorAssistant.Core` (`net10.0`, no Windows APIs) — wiki-agnostic domain models (`Item` etc.), shared
   pipeline abstractions (`IEntityKind` and friends), the portable ports `IOcrEngine` + `CapturedImage`/`Rect`/
   `OcrLine`/`OcrWord` and `FieldLabelLexicon` (`Core.Ocr`), **`ItemWindowLocator`/`WindowBoundsFinder`**
   (`Core.Locate` — finds each item window's real pixel bounds in a full screenshot by tracing its border, not by
@@ -50,18 +50,18 @@ The full design rationale, wiki research findings, and milestone plan live in
   checks). Anything here must stay portable and free of MediaWiki syntax knowledge — see "Wiki mapping layer"
   below. Interfaces the pipeline depends on live here even though their real implementations are Windows-only,
   since `Core` can't reference the Windows-only projects.
-- `src/EQLWikiAssistant.Capture` (`net10.0-windows10.0.19041.0`) — `GlobalHotKey` (Win32 `RegisterHotKey`, its own
+- `src/EQLWikiEditorAssistant.Capture` (`net10.0-windows10.0.19041.0`) — `GlobalHotKey` (Win32 `RegisterHotKey`, its own
   message-only window/thread, no UI-framework dependency), `WindowFinder` (find a window by title), `WindowCapturer`
   (Windows Graphics Capture of a specific window, via `Vortice.Direct3D11`/`Vortice.DXGI` for the D3D11 device), and
   `WindowsImageDecoder` (the `IImageDecoder` implementation — WinRT `BitmapDecoder` reading from memory, for wiki
   icon PNGs; it lives here because this is the project whose job is turning Windows pixels into a `CapturedImage`).
   **Read the `[GeneratedComInterface]` note below before touching `Interop/`** — it documents a real, confirmed
   runtime failure mode, not a style preference.
-- `src/EQLWikiAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — the general-OCR `IOcrEngine`: **`RapidOcrEngine`
+- `src/EQLWikiEditorAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — the general-OCR `IOcrEngine`: **`RapidOcrEngine`
   wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline). See "OCR engine choice" below — this
   wasn't arbitrary: the OS-provided `Windows.Media.Ocr` was tried first and replaced after real testing showed it
   meaningfully less accurate, then removed outright once it had no remaining use.
-- `src/EQLWikiAssistant.Wiki` (`net10.0`) — **`MediaWikiClient`/`IMediaWikiClient`** (`Wiki.MediaWiki` — bot-password
+- `src/EQLWikiEditorAssistant.Wiki` (`net10.0`) — **`MediaWikiClient`/`IMediaWikiClient`** (`Wiki.MediaWiki` — bot-password
   auth, read-only fetch, conflict-guarded edit), **`ICredentialStore`/`WindowsCredentialStore`** (same namespace —
   Windows Credential Manager), **`WikitextScanner`/`TemplateCall`/`ItemPageDocument`/`StatsBlock`**
   (`Wiki.Wikitext` — locating a template's parameters by exact source span and editing one surgically; see
@@ -71,19 +71,19 @@ The full design rationale, wiki research findings, and milestone plan live in
   `Capture`/`Ocr` projects. It uses `[DllImport]` rather than `[LibraryImport]` because the latter's generator
   emits unsafe code, and enabling `<AllowUnsafeBlocks>` across a domain assembly for four P/Invokes is the worse
   trade — unrelated to the `[GeneratedComInterface]` rule below, which is about CsWinRT COM objects.
-- `src/EQLWikiAssistant.Pipeline` (`net10.0`) — **`ItemCheckPipeline`** and its report types: the whole sequence from
+- `src/EQLWikiEditorAssistant.Pipeline` (`net10.0`) — **`ItemCheckPipeline`** and its report types: the whole sequence from
   a captured frame to a reviewable per-window result, plus `WikitextDiff` (the review screen's line diff) and
   `AppPaths` (where the ledger, mapping and icon cache live). See "The pipeline" below. It is its own assembly
   because it is the only thing that depends on *both* the game side (`Core`) and the wiki side (`Wiki`), and neither
   of those may depend on it.
-- `src/EQLWikiAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: `AppServices` (the composition root),
+- `src/EQLWikiEditorAssistant.App` (`net10.0-windows10.0.19041.0`, WPF) — UI: `AppServices` (the composition root),
   `MainWindow` (capture trigger + review/diff screen), `ResultViewModel`, `LedgerWindow`/`LedgerRowViewModel` (what
   has been checked and what still wants a human), and **`Theme.xaml`/`Palette.cs`/`DarkTitleBar.cs`** (the one
   permanent dark palette — see "The dark palette" below; Theme.xaml is the only file in the app with a hex colour in
   it), and `SettingsWindow` (the UI font, the capture hotkey, kept captures, the icon cache, the wiki login and a
   read-only view of the mapping — see "The settings window" below).
-- `tests/EQLWikiAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
-- `tools/EQLWikiAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
+- `tests/EQLWikiEditorAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
+- `tools/EQLWikiEditorAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
   screenshot file from disk into a `CapturedImage` (the real app only ever captures a live window, never reads a
   file — this exists for tests/tooling), `TestSupport.RepoPaths` for finding `samples/` reliably from a
@@ -105,9 +105,9 @@ The full design rationale, wiki research findings, and milestone plan live in
   comparison.
   Keep using these — don't recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
-  `RapidOcrNet`, not just a transitive one via `EQLWikiAssistant.Ocr` — the package's bundled `.onnx` model files
+  `RapidOcrNet`, not just a transitive one via `EQLWikiEditorAssistant.Ocr` — the package's bundled `.onnx` model files
   only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
-  failed at runtime with a missing-model-file error until given its own direct reference). `EQLWikiAssistant.App`
+  failed at runtime with a missing-model-file error until given its own direct reference). `EQLWikiEditorAssistant.App`
   has the same direct reference, **verified by a real run** (2026-09-28): the models land in its own output and the
   app starts.
 
@@ -118,7 +118,7 @@ use the versioned form.
 ## Key architectural ideas
 
 **`[GeneratedComInterface]`, never `[ComImport]`, for the Windows Graphics Capture interop.**
-`src/EQLWikiAssistant.Capture/Interop/` declares two hand-written COM interfaces
+`src/EQLWikiEditorAssistant.Capture/Interop/` declares two hand-written COM interfaces
 (`IGraphicsCaptureItemInterop`, `IDirect3DDxgiInterfaceAccess`) that aren't exposed by the plain WinRT projection.
 Declaring these with the classic `[ComImport]` attribute **compiles fine but throws `InvalidCastException`
 ("Specified cast is not valid") at runtime** the moment you call through them on an object obtained from a CsWinRT
@@ -399,7 +399,7 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
     returning zero would publish `absolutely nothing` for an item whose price merely could not be read. The `p/g/s/c`
     spelling is a wiki convention and belongs in the mapping layer once that exists (milestone 6); it lives in
     `Core` for now because there is no mapping layer yet and one convention does not justify an abstraction.
-- Fixtures: eleven real pages in `tests/EQLWikiAssistant.Tests/Wiki/Fixtures/`, **tracked in git** — unlike
+- Fixtures: eleven real pages in `tests/EQLWikiEditorAssistant.Tests/Wiki/Fixtures/`, **tracked in git** — unlike
   screenshots these are public wikitext with nothing private in them. That folder's README says what each one is
   there to prove; each exists because it broke a plausible simplifying assumption.
 
@@ -2424,7 +2424,7 @@ both fonts; Arial reading is exactly what it was.
 - **Advances are keyed by entry, not label** (`AtlasEntry.Key`). Two r's keyed by "r" collapsed into the smaller
   cell, and every wide r would have been followed by a phantom space.
 - **The corpus needed no regeneration.** Each ground-truth entry names its font, absent meaning Arial, so the 48
-  Arial samples are untouched and new-font samples are simply added (`15a-eql-wiki-assistant-font.png` onward).
+  Arial samples are untouched and new-font samples are simply added (`15a-eql-wiki-editor-assistant-font.png` onward).
   `15c-lowercase-l-lore.png` is the case the font exists for: Token of Reclamation's lore reads "recover lost items"
   in it, and the same pixels read with the Arial rule (`ParseSpike --font Arial`) still give "Iost".
   `SampleFonts` decides the font every tool reads a screenshot in: `--font`, else the sample's ground truth, else
@@ -2439,7 +2439,7 @@ both fonts; Arial reading is exactly what it was.
 settings or parser rules must be judged by a number, not by eyeballing warning counts — 18 tunable OCR parameters
 against ~100 item windows is unmeasurable by eye, and the failure that matters most (a *silently* wrong value) is
 invisible that way by definition.
-- Ground truth lives in `tests/EQLWikiAssistant.Tests/Accuracy/expected-items.json`, **tracked in git**. It holds
+- Ground truth lives in `tests/EQLWikiEditorAssistant.Tests/Accuracy/expected-items.json`, **tracked in git**. It holds
   only parsed item-window fields — the same public game data this tool publishes to the wiki. The private-info
   risk in `samples/` is everything *outside* a window, so the hard rule (documented in `ExpectedCorpus.cs`) is:
   never whole-frame OCR text, never a line the locator didn't attribute to a window crop, no coordinates, and
@@ -2643,7 +2643,7 @@ dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test c
 # are — you never have to leave the game.
 # Reads are anonymous, so it only needs a credential the first time you save (enter one under Settings > Wiki account).
 # Its state (ledger, settings, icon cache) lives in %APPDATA%\EQLWikiEditorAssistant — see Pipeline.AppPaths.
-dotnet run --project src/EQLWikiAssistant.App
+dotnet run --project src/EQLWikiEditorAssistant.App
 
 # Or install a Release build to %LOCALAPPDATA%\Programs\EQLWikiEditorAssistant, with the icon library beside it and a Start
 # menu shortcut, so the app you use never locks the build you are working on. Run again to update; it refuses while
@@ -2685,14 +2685,14 @@ dotnet run --project tools/GlyphSpike -- read "samples/some screenshot.png" 774,
 # never be reopened in the same place twice. Update SheetRows() in GlyphSpike if the sheet's contents change.
 # Then relearn cell widths from real windows: the sheet spaces every character out, so it cannot show them.
 dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,700,570,250 \
-  --out src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
+  --out src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas
 dotnet run --project tools/GlyphSpike -- advances "samples/any screenshot.png"   # updates the atlas in place
 
 # A second UI font: merge its glyph sheet into the existing atlas instead of replacing it. Shapes both fonts draw
 # stay shared; the rest are tagged with their font. Then rerun `advances` so the new shapes learn their cells.
-dotnet run --project tools/GlyphSpike -- atlas "samples/15a-eql-wiki-assistant-font.png" 1330,860,650,112 \
-  --font EqlWikiEditorAssistant --merge-into src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas \
-  --out src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas
+dotnet run --project tools/GlyphSpike -- atlas "samples/15a-eql-wiki-editor-assistant-font.png" 1330,860,650,112 \
+  --font EqlWikiEditorAssistant --merge-into src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas \
+  --out src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas
 
 # Wiki side. Reads are anonymous, so fetch/roundtrip/grammar need no credential:
 dotnet run --project tools/WikiSpike -- fetch "Earring of Bashing"       # page source + parsed v1 fields

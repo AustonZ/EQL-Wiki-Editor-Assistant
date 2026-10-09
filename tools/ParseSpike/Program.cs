@@ -1,9 +1,9 @@
-using EQLWikiAssistant.Core.Glyphs;
-using EQLWikiAssistant.Core.Items;
-using EQLWikiAssistant.Core.Locate;
-using EQLWikiAssistant.Core.Ocr;
-using EQLWikiAssistant.Ocr;
-using EQLWikiAssistant.TestSupport;
+using EQLWikiEditorAssistant.Core.Glyphs;
+using EQLWikiEditorAssistant.Core.Items;
+using EQLWikiEditorAssistant.Core.Locate;
+using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.TestSupport;
 
 // Milestone 2 spike tool: run the full Locate -> Parse pipeline against a real screenshot and dump each item's
 // parsed fields, for eyeballing against the real window during parser tuning. Mirrors OcrSpike/LocateSpike —

@@ -1,21 +1,21 @@
-using EQLWikiAssistant.Capture;
-using EQLWikiAssistant.TestSupport;
-using EQLWikiAssistant.Pipeline;
-using EQLWikiAssistant.Wiki.MediaWiki;
-using EQLWikiAssistant.Core.Icons;
-using EQLWikiAssistant.Core.Items;
-using EQLWikiAssistant.Core.Locate;
-using EQLWikiAssistant.Core.Ocr;
-using EQLWikiAssistant.Core.Glyphs;
-using EQLWikiAssistant.Ocr;
-using EQLWikiAssistant.TestSupport.Accuracy;
-using EQLWikiAssistant.Wiki.Analysis;
-using EQLWikiAssistant.Wiki.Formatting;
-using EQLWikiAssistant.Wiki.Wikitext;
+using EQLWikiEditorAssistant.Capture;
+using EQLWikiEditorAssistant.TestSupport;
+using EQLWikiEditorAssistant.Pipeline;
+using EQLWikiEditorAssistant.Wiki.MediaWiki;
+using EQLWikiEditorAssistant.Core.Icons;
+using EQLWikiEditorAssistant.Core.Items;
+using EQLWikiEditorAssistant.Core.Locate;
+using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
+using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.TestSupport.Accuracy;
+using EQLWikiEditorAssistant.Wiki.Analysis;
+using EQLWikiEditorAssistant.Wiki.Formatting;
+using EQLWikiEditorAssistant.Wiki.Wikitext;
 
 // The accuracy scorer has its own FieldVerdict (how well extraction did) which is a different question from the
 // analyzer's (how the page compares to the capture). This tool bridges both, so it names the one it means.
-using FieldVerdict = EQLWikiAssistant.Wiki.Analysis.FieldVerdict;
+using FieldVerdict = EQLWikiEditorAssistant.Wiki.Analysis.FieldVerdict;
 
 // Milestone 3 spike tool: exercise the wiki client and the wikitext layer against the real eqlwiki.com, the same
 // way OcrSpike/LocateSpike/ParseSpike exercise the capture side against real screenshots. Keep using this rather

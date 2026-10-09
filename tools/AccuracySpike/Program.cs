@@ -1,13 +1,13 @@
-using EQLWikiAssistant.Core.Ocr;
-using EQLWikiAssistant.Core.Glyphs;
+using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using System.Diagnostics;
-using EQLWikiAssistant.Core.Items;
-using EQLWikiAssistant.Ocr;
-using EQLWikiAssistant.TestSupport;
-using EQLWikiAssistant.TestSupport.Accuracy;
+using EQLWikiEditorAssistant.Core.Items;
+using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.TestSupport;
+using EQLWikiEditorAssistant.TestSupport.Accuracy;
 
 // Scores the real Locate -> Parse pipeline against the ground truth in
-// tests/EQLWikiAssistant.Tests/Accuracy/expected-items.json, so a change to OCR settings or parser rules can be
+// tests/EQLWikiEditorAssistant.Tests/Accuracy/expected-items.json, so a change to OCR settings or parser rules can be
 // judged by a number instead of by eyeballing warning counts.
 //
 // Usage:

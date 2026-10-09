@@ -1,9 +1,9 @@
-using EQLWikiAssistant.Core.Locate;
-using EQLWikiAssistant.Ocr;
-using EQLWikiAssistant.Core.Glyphs;
-using EQLWikiAssistant.Core.Ocr;
-using EQLWikiAssistant.TestSupport.Accuracy;
-using EQLWikiAssistant.TestSupport;
+using EQLWikiEditorAssistant.Core.Locate;
+using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
+using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.TestSupport.Accuracy;
+using EQLWikiEditorAssistant.TestSupport;
 
 // Milestone 2d / stage 2 spike tool: the measuring instrument and atlas builder for the glyph-matching work, in
 // the same spirit as LocateSpike's --probe (which is how the window-chrome colour profile was measured rather
@@ -358,7 +358,7 @@ static async Task<int> Advances(string[] args)
     int atlasIndex = Array.IndexOf(args, "--atlas");
     string atlasPath = atlasIndex >= 0 && atlasIndex + 1 < args.Length
         ? args[atlasIndex + 1]
-        : "src/EQLWikiAssistant.Core/Glyphs/eql-ui-font.atlas";
+        : "src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas";
     GlyphAtlas atlas = GlyphAtlas.Parse(File.ReadAllText(atlasPath));
 
     IReadOnlyList<string> files = CorpusRunner.EnumerateSampleFiles();

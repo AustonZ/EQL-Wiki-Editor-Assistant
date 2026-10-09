@@ -1,8 +1,8 @@
 EverQuest Legends Wiki page text: NOT licensed by this project
 
-The page files under tests/EQLWikiAssistant.Tests/Wiki/Fixtures/ are copies of
-item pages from the EverQuest Legends Wiki (https://eqlwiki.com), written by
-that wiki's contributors. Their copyright belongs to those contributors.
+The page files under tests/EQLWikiEditorAssistant.Tests/Wiki/Fixtures/ are
+copies of item pages from the EverQuest Legends Wiki (https://eqlwiki.com),
+written by that wiki's contributors. Their copyright belongs to those contributors.
 
 They are NOT covered by this project's MIT licence. The wiki itself names no
 licence for its content: when checked on 2026-10-08, its edit notice said

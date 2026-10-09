@@ -1,7 +1,7 @@
-using EQLWikiAssistant.Core.Locate;
-using EQLWikiAssistant.Core.Ocr;
-using EQLWikiAssistant.Ocr;
-using EQLWikiAssistant.TestSupport;
+using EQLWikiEditorAssistant.Core.Locate;
+using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.TestSupport;
 
 // Milestone 2 spike tool: run ItemWindowLocator (whole-screenshot OCR to find Description tabs, pixel border
 // tracing to find each window's real bounds, occluded windows reported with no data) against a real
