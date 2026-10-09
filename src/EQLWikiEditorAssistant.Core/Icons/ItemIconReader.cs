@@ -90,7 +90,7 @@ public static class ItemIconReader
         // is a different thing from failing to see it.
         whyNot = $"the icon is too dark to compare — only {fingerprint.InkWidth}x{fingerprint.InkHeight} of faint " +
                  $"artwork, with a contrast of {fingerprint.Contrast:F3} against the {IconFingerprint.MinimumContrast:F2} " +
-                 "needed. Nothing is wrong with it; the tool cannot tell two near-black icons apart, so it did not try";
+                 "needed. Nothing is wrong with it; two near-black icons cannot be told apart, so no comparison was made";
         fingerprint = new IconFingerprint([], 0, 0);
         return false;
     }

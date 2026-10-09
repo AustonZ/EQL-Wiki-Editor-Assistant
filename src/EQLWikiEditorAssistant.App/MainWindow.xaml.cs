@@ -180,8 +180,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        string message = $"The Assistant downloads version {version}, closes, and opens again on it. Your history, " +
-                         "settings and wiki login are kept.";
+        string message = $"Version {version} is downloaded, then this app closes and opens again on it. Your " +
+                         "history, settings and wiki login are kept.";
         int open = _results.Count(r => !r.IsDone);
         if (open > 0)
             message += $"\n\n{(open == 1 ? "1 item" : $"{open} items")} still under review will be closed, along with " +
@@ -963,7 +963,7 @@ public partial class MainWindow : Window
             "The wiki keeps a list of pages that an editor has checked against EverQuest Legends — the whole page, " +
             "including where the item drops, who sells it and the quests it is in, not only what the item window " +
             "shows. Until a page is on that list, the wiki shows a notice at the top of it.\n\n" +
-            "This tool only reads the item window, so it never marks a page verified itself. If you have checked the " +
+            "This app only reads the item window, so it never marks a page verified itself. If you have checked the " +
             "page, type \"Verified\" into the notice on the wiki.",
             view.HasPage ? "Open the wiki" : "OK",
             view.HasPage ? "Close" : null,

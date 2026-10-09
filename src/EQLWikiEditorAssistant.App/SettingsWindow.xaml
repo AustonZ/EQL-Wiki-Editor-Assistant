@@ -96,7 +96,7 @@
                 <StackPanel>
                     <TextBlock Text="UI font" Style="{StaticResource PageHeading}" />
                     <TextBlock Style="{StaticResource Prose}"
-                               Text="The font the game draws its interface in. Set this to whatever the game is using: the tool reads item windows letter by letter, and the font decides how it reads a bare vertical stroke." />
+                               Text="The font the game draws its interface in. Set this to whatever the game is using: item windows are read letter by letter, and the font decides what a bare vertical stroke means." />
 
                     <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                         <TextBlock Text="The game draws in" VerticalAlignment="Center" />
@@ -119,7 +119,7 @@
                 <StackPanel>
                     <TextBlock Text="Capture hotkey" Style="{StaticResource PageHeading}" />
                     <TextBlock Style="{StaticResource Prose}"
-                               Text="Captures the game window from anywhere, so you never have to leave the game. Choose a combination the game does not use: Windows hands the keystroke to this tool, and the game never sees it." />
+                               Text="Captures the game window from anywhere, so you never have to leave the game. Choose a combination the game does not use: Windows hands the keystroke to this app, and the game never sees it." />
 
                     <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                         <!-- Shows the live hotkey, or while recording the keys held so far. -->
@@ -218,7 +218,7 @@
                 <StackPanel>
                     <TextBlock Text="Wiki account" Style="{StaticResource PageHeading}" />
                     <TextBlock Style="{StaticResource Prose}"
-                               Text="Reading the wiki needs no account. Saving an edit, creating a page or uploading an icon does: the tool logs in with a bot password the first time it writes. The password is kept in Windows Credential Manager, never in a file." />
+                               Text="Reading the wiki needs no account. Saving an edit, creating a page or uploading an icon does: this app logs in with a bot password the first time it writes. The password is kept in Windows Credential Manager, never in a file." />
 
                     <TextBlock Text="Stored login" Style="{StaticResource SectionHeading}" />
                     <TextBlock x:Name="StoredText" Style="{StaticResource Prose}" Foreground="{StaticResource TextBrush}" />
@@ -308,7 +308,7 @@
 
                     <TextBlock Text="Categories" Style="{StaticResource SectionHeading}" />
                     <TextBlock Style="{StaticResource Prose}" Margin="0,0,0,6"
-                               Text="Categories the tool derives from a capture and adds when missing. It never removes one, and every other category on a page is left alone. A class category is only earned by an item with a slot." />
+                               Text="Categories derived from a capture, added when missing. None is ever removed, and every other category on a page is left alone. A class category is only earned by an item with a slot." />
                     <ItemsControl x:Name="CategoriesTable" Style="{StaticResource MappingTable}" />
 
                     <TextBlock Text="Template" Style="{StaticResource SectionHeading}" />

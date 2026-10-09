@@ -120,9 +120,9 @@ public partial class SettingsWindow : Window
             "A modified Arial with a serifed capital I and an r one pixel wider. Every bare stroke is a lowercase l, " +
             "so nothing is guessed.",
         _ =>
-            "The game's default. Its capital I and lowercase l are the same pixels, so the tool guesses from the word: " +
-            "a stroke that starts a word is read as I. That is right for item names and wrong in lore, where \"lost\" " +
-            "reads \"Iost\" — a known limitation of this font.",
+            "The game's default. Its capital I and lowercase l are the same pixels, so each is decided from the word, " +
+            "and from a dictionary where the word alone cannot say: \"Iron\" and \"lost\" both read correctly. A " +
+            "rare word or a name the dictionary does not know can still come out with the wrong one.",
     };
 
     // ============================ Saved captures ============================

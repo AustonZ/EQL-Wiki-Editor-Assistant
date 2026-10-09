@@ -725,10 +725,10 @@ public class ItemCheckPipelineTests
         Assert.Equal(ItemCheckStatus.WrongFont, results[0].Status);
         string warning = Assert.Single(results[0].Warnings);
 
-        // Both remedies, each naming the font that fixes it — and the tool's first, since it is one click in
+        // Both remedies, each naming the font that fixes it — and the setting first, since it is one click in
         // Settings while the game's font is set per character and loadout (user, 2026-10-07).
-        Assert.StartsWith("Drawn in Arial, but the tool is set to EQL Wiki Editor Assistant.", warning);
-        int tool = warning.IndexOf("Switch the tool to Arial under Settings > UI font", StringComparison.Ordinal);
+        Assert.StartsWith("Drawn in Arial, but Settings > UI font is set to EQL Wiki Editor Assistant.", warning);
+        int tool = warning.IndexOf("Switch that setting to Arial", StringComparison.Ordinal);
         int game = warning.IndexOf("switch the game's font to EQL Wiki Editor Assistant", StringComparison.Ordinal);
         Assert.True(tool >= 0, warning);
         Assert.True(game > tool, warning);

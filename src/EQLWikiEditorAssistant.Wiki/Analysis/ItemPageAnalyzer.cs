@@ -242,13 +242,13 @@ public static class ItemPageAnalyzer
                 !wanted.Any(w => string.Equals(w, category, StringComparison.OrdinalIgnoreCase)))
                 findings.Add(new FieldFinding(
                     CategoryField, FieldVerdict.NeedsReview, null, category,
-                    $"The page is in [[Category:{category}]], but nothing in the capture implies it. The tool does " +
-                    "not remove categories — check whether the item changed or the category is wrong."));
+                    $"The page is in [[Category:{category}]], but nothing in the capture implies it. Categories are " +
+                    "never removed — check whether the item changed or the category is wrong."));
 
         foreach (string unknown in unrecognized)
             findings.Add(new FieldFinding(
                 CategoryField, FieldVerdict.NeedsReview, unknown, null,
-                $"'{unknown}' is a class or slot the tool has no category for — possibly new. No category was " +
+                $"'{unknown}' is a class or slot with no known category — possibly new. No category was " +
                 "guessed at; add it to the category rules."));
     }
 
@@ -308,7 +308,7 @@ public static class ItemPageAnalyzer
         {
             findings.Add(new FieldFinding(
                 MerchantValueField, FieldVerdict.NeedsReview, captured.MerchantValue, onWiki,
-                $"'{captured.MerchantValue}' is not a merchant value this tool recognizes, so it was not used."));
+                $"'{captured.MerchantValue}' is not a merchant value in a recognized form, so it was not used."));
             return;
         }
 
@@ -464,9 +464,9 @@ public static class ItemPageAnalyzer
                 findings.Add(new FieldFinding(
                     gameLabel, FieldVerdict.NeedsReview, capturedValue, null,
                     known
-                        ? $"The game shows '{gameLabel}' but the wiki has no agreed field for it, so this tool will " +
-                          "not invent one. Decide where it belongs and add it to the mapping."
-                        : $"'{gameLabel}' is a stat this tool has no mapping for at all — possibly new. It has been " +
+                        ? $"The game shows '{gameLabel}' but the wiki has no agreed field for it, so none was " +
+                          "invented. Decide where it belongs and add it to the mapping."
+                        : $"'{gameLabel}' is a stat with no mapping at all — possibly new. It has been " +
                           "left alone rather than guessed at; add it to the mapping."));
                 continue;
             }
@@ -643,7 +643,7 @@ public static class ItemPageAnalyzer
                 isCapturedFocus
                     ? $"The capture shows '{orphan.Name}' as a focus effect, which belongs in " +
                       $"{mapping.FocusEffectParameter} rather than a statsblock line. The parameter is being set; " +
-                      "this line is left for you to remove, since deleting somebody's line is not the tool's call."
+                      "this line is left for you to remove, since deleting somebody's line is a person's call."
                     : "This effect line names an effect the captured window does not show at all. Left exactly as " +
                       "the page wrote it — the item may have lost the effect, or the page may know something the " +
                       "window cannot display."));

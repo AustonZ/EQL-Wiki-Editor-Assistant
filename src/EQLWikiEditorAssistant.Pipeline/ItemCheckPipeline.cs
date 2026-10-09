@@ -232,8 +232,8 @@ public sealed class ItemCheckPipeline
                 WindowImage = crop,
                 Warnings =
                 [
-                    $"Drawn in {UiFonts.DisplayName(drawn)}, but the tool is set to {UiFonts.DisplayName(configured)}. " +
-                    $"Switch the tool to {UiFonts.DisplayName(drawn)} under Settings > UI font, or switch the game's " +
+                    $"Drawn in {UiFonts.DisplayName(drawn)}, but Settings > UI font is set to " +
+                    $"{UiFonts.DisplayName(configured)}. Switch that setting to {UiFonts.DisplayName(drawn)}, or switch the game's " +
                     $"font to {UiFonts.DisplayName(configured)}, then capture again.",
                 ],
             };

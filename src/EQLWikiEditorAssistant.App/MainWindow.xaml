@@ -7,8 +7,11 @@
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
-        Title="{x:Static local:AppInfo.Name}" Height="900" Width="1300" MinWidth="700" MinHeight="400"
+        Title="{x:Static local:AppInfo.Name}" Height="900" Width="1320" MinWidth="700" MinHeight="400"
         Style="{StaticResource DarkWindow}">
+    <!-- 1320 wide, not narrower (user, 2026-10-09): below a window width of about 1307 the wiki's own skin lays the
+         Preview page's item box out badly. That is the wiki's stylesheet, not ours, but a tester meeting it on first
+         launch would reasonably blame the Assistant. -->
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
@@ -529,7 +532,7 @@
                          this is purely "do you still like what the page says?". -->
                     <StackPanel Visibility="{Binding HasLoreToCompare, Converter={StaticResource BoolToVis}}">
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,6,0,6"
-                                   Text="The page's lore and the captured lore differ. The tool does not overwrite lore, so the page keeps its own wording unless you change it by hand." />
+                                   Text="The page's lore and the captured lore differ. Lore is never overwritten, so the page keeps its own wording unless you change it by hand." />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

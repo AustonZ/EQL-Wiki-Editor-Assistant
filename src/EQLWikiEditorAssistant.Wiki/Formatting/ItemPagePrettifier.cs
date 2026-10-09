@@ -355,7 +355,7 @@ public static class ItemPagePrettifier
         // only job is layout. Discarding legacy flags is the *data* pass's decision, made against a live capture.
         if (lines.SelectMany(l => l.Flags).FirstOrDefault(f => !IsCurrentFlag(f)) is { } legacy)
             return $"'{legacy}' is not a current EQL flag — it is a legacy one, or prose the grammar read as a " +
-                   "flag. Laying out a line the tool does not understand is how a formatter loses meaning, so the " +
+                   "flag. Laying out a line that is not understood is how a formatter loses meaning, so the " +
                    "whole block was left as it is.";
 
         // A blank line is normally a reason to leave the block alone — it is a paragraph break that may be doing
@@ -381,7 +381,7 @@ public static class ItemPagePrettifier
 
         return duplicates.Count > 0
             ? $"'{duplicates[0]}' appears more than once with different values, which is a page defect a human " +
-              "should settle rather than a layout the tool should tidy."
+              "should settle rather than a layout to tidy."
             : null;
     }
 
