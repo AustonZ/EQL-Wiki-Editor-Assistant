@@ -114,6 +114,11 @@ The full design rationale, wiki research findings, and milestone plan live in
   failed at runtime with a missing-model-file error until given its own direct reference). `EQLWikiEditorAssistant.App`
   has the same direct reference, **verified by a real run** (2026-09-28): the models land in its own output and the
   app starts.
+  **Keep a clone's path short.** ONNX Runtime's native DLL sits deep in the output
+  (`bin\Debug\net10.0-windows10.0.19041.0\runtimes\win-x64\native\`), and once that path passes Windows' 260-character
+  limit the load falls back to the much older `onnxruntime.dll` Windows ships in System32: the test host dies with
+  `0xC0000005` inside `OnnxRuntime.NativeMethods`, which says nothing about paths (found 2026-10-08, cloning into a deep
+  temp folder: 280 characters crashed, the same commit at 181 passed). An installed app is unaffected; its path is short.
 
 Note: WinRT namespaces like `Windows.Media.Ocr` and `Windows.Graphics.Capture` are only projected on a Windows-SDK-
 versioned TFM (`net10.0-windows10.0.19041.0`), not plain `net10.0-windows` — every project that touches them must
