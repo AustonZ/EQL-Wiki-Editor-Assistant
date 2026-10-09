@@ -287,9 +287,10 @@ public — **DONE 2026-10-08**; (4) the installer and the update notice — **bu
 `Pipeline.ReleaseCheck`; see CLAUDE.md, "Releases"); install, repair and uninstall tested by the user 2026-10-09, after
 which the updater and the uninstall question were added (below) and tested by the user 2026-10-09 between two local
 builds — in-app update, a newer Setup over an older install, a downgrade warning, and both uninstall answers;
-(5) the user makes the repo public;
+(5) the user makes the repo public — **DONE 2026-10-09**;
 (6) tag and publish
-`v1.0.0-alpha.1`.
+`v1.0.0-alpha.1` — **DONE 2026-10-09**: built by `tools/release.ps1 -Draft` from `9b5cd89`, published by the user and
+sent to the first tester.
 
 Same resolution and UI scale as the user, default Arial font, so the Assistant should work for them as it stands once the
 font default changes.
@@ -386,6 +387,10 @@ font default changes.
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
 - **Updating without being asked**, in the background on close, if testers want it. Updating on a click is in the alpha
   (above).
+- **Saved captures stay off by default in full releases** (the first tester, 2026-10-09). They are full screenshots that
+  can show character names, other players and chat. They are already off by default in every build
+  (`AppSettings.KeepCaptures`, pinned by `AppSettingsTests`), alpha included. So this is a rule to keep, not a change to
+  make: if a pre-release ever turns them on by default to gather samples from testers, a full release must not.
 - Everything above from the alpha, settled.
 
 ### Keeping up with the wiki's conventions (user, 2026-10-08)
