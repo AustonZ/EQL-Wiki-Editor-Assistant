@@ -119,7 +119,9 @@ Get-ChildItem $releases | ForEach-Object { Write-Host ("  {0,-55} {1,8:N1} MB" -
 if ($Draft) {
     # This version's files only: the previous release's package, downloaded above for the delta, is already published.
     $files = Get-ChildItem $releases | Where-Object { $_.Name -notlike '*.nupkg' -or $_.Name -like "*-$version-*" }
-    $prerelease = if ($version.Contains('-')) { @('--prerelease') } else { @() }
+    # @(...) around the whole if: an if returning a one-item array unrolls it to a string, and splatting a string
+    # passes it one character at a time.
+    $prerelease = @(if ($version.Contains('-')) { '--prerelease' })
     gh release create $tag --repo $repoUrl --draft @prerelease --target $commit --title "$product $version" `
         --notes "Draft: replace with the release notes before publishing." @($files.FullName)
     if ($LASTEXITCODE -ne 0) { throw "Creating the draft release failed (exit code $LASTEXITCODE)." }
