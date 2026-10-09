@@ -17,7 +17,7 @@ namespace EQLWikiEditorAssistant.Core.Ocr;
 public enum UiFont
 {
     /// <summary>Windows' Arial, the game's default. The bare bar is genuinely ambiguous between l and I, and the
-    /// reader resolves it from the surrounding word — a known limitation, deliberately not improved on here.</summary>
+    /// reader resolves it from the surrounding word, with a dictionary for a bar that starts a lowercase word.</summary>
     Arial,
 
     /// <summary>The user's personal modification of Arial (<c>fonts/</c>, gitignored): a serifed I and a wider r.

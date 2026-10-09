@@ -431,9 +431,8 @@ public static class GlyphReader
     ///
     /// In <see cref="UiFont.EqlWikiEditorAssistant"/> it is <b>always 'l'</b>: that font gives the capital I serifs, so a
     /// bar is never an I, and there is nothing to decide. In <see cref="UiFont.Arial"/> the two really are the same
-    /// pixels and <see cref="ResolveAmbiguous"/> decides from the word — the guess a human makes too, and a known
-    /// limitation (it reads the lore word "lost" as "Iost"), deliberately left exactly as it was rather than
-    /// improved on (user, 2026-10-05).
+    /// pixels and <see cref="ResolveAmbiguous"/> decides from the word, with a dictionary for the one position the word
+    /// cannot settle (see <see cref="BarWords"/>).
     ///
     /// The font is the caller's statement, not a detection. If the game is really drawing the other font, an
     /// Arial capture read as EQL Wiki Editor Assistant turns every capital I into an l — which is why each line also
@@ -448,23 +447,32 @@ public static class GlyphReader
     private const char AmbiguousMarker = '\u0001';
 
     /// <summary>
-    /// Decides whether each bare vertical bar is a lowercase 'l' or an uppercase 'I', from the case of the other
-    /// letters in its word.
+    /// Decides whether each bare vertical bar is a lowercase 'l' or an uppercase 'I', from the word around it.
     ///
     /// <b>This is the one place the reader chooses rather than reports, and it is deliberate.</b> The two
     /// characters are the same pixels — there is no measurement that separates them, so "don't guess" would mean
     /// emitting both and corrupting every word containing either ("Bladestopper" as "BlIadestopper"). A human
-    /// reading the screen resolves it exactly this way, from the surrounding word, and so does this:
+    /// reading the screen resolves it from the surrounding word, and so does this:
     /// <list type="bullet">
-    /// <item>word-initial, it is 'I' — this UI writes item names, labels and effect names in Title Case, so a
-    /// leading bare bar is a capital ("Idol", "Improved", "IV", "Illusion");</item>
-    /// <item>elsewhere it follows the word's other letters: any lowercase makes it 'l' ("Bladestopper",
-    /// "Healing", "Shield"), all-uppercase makes it 'I' ("MEDIUM", "GIANT");</item>
-    /// <item>a word of nothing but bars is 'I', because in this UI that is a roman numeral ("III").</item>
+    /// <item>a bar that <b>starts a word</b> is 'I' — this UI writes item names, labels and effect names in Title Case
+    /// ("Idol", "Improved", "IV", "Illusion") — <b>unless</b> the rest of the word is lowercase and only the l reading is an
+    /// English word ("lost", "level"; see <see cref="BarWords"/>);</item>
+    /// <item>elsewhere it follows the token's other letters: any lowercase makes it 'l' ("Bladestopper", "Healing",
+    /// "Al'Kabor"); with none it is 'I' ("MEDIUM", "GIANT", "XIII") — unless the word is one capital followed only by
+    /// bars and only the l reading is a word ("All", which is otherwise indistinguishable from "VII");</item>
+    /// <item>a word of nothing but bars is 'I', because in this UI that is a roman numeral ("III") or the pronoun —
+    /// except the two bars of a "'ll" contraction ("I'll", "we'll"), and a word inside a token that has lowercase
+    /// elsewhere, which reads like any other word there ("Ill-Fitting").</item>
     /// </list>
-    /// The residual risk is a lowercase word beginning with 'l' mid-sentence, which item windows do not produce.
-    /// Anything this gets wrong is a *name*, where the wiki lookup's fuzzy matching is the existing backstop —
-    /// unlike a digit, which has no such recourse and is never guessed at anywhere in this pipeline.
+    /// **A word, for these rules, is a run of letters, digits and grave accents**: other punctuation, a hyphen included,
+    /// starts a new one, so "(lost" and "Cast-Iron" are each decided like a word of their own. A digit is part of the
+    /// word, so the bar in "13lb" is not word-initial, and so is a grave accent, because names written with one carry on
+    /// in lowercase after it more often than not (measured on the wiki's titles: "Ku`lul", "Zo`lun" and "S`lon" against
+    /// "S`Ion"). Whether there is any lowercase is still asked of the whole token, which keeps "Al'Kabor" an l.
+    ///
+    /// Measured with <c>GlyphSpike bars</c> by hiding every l and I in real wiki text (2026-10-09): see CLAUDE.md, "Two UI
+    /// fonts". What is left wrong is a *word*, where the wiki lookup's fuzzy matching is the existing backstop — unlike a
+    /// digit, which has no such recourse and is never guessed at anywhere in this pipeline.
     /// </summary>
     public static string ResolveAmbiguous(string text)
     {
@@ -473,22 +481,62 @@ public static class GlyphReader
         char[] resolved = text.ToCharArray();
         foreach ((int start, int end) in Words(text))
         {
-            bool anyLower = false, anyUpper = false;
+            bool tokenHasLower = false;
             for (int i = start; i < end; i++)
-            {
-                if (char.IsLower(text[i])) anyLower = true;
-                else if (char.IsUpper(text[i])) anyUpper = true;
-            }
+                if (char.IsLower(text[i])) tokenHasLower = true;
 
-            for (int i = start; i < end; i++)
+            for (int i = start; i < end;)
             {
-                if (text[i] != AmbiguousMarker) continue;
-                bool wordInitial = i == start;
-                resolved[i] = wordInitial || (!anyLower && anyUpper) || (!anyLower && !anyUpper) ? 'I' : 'l';
+                if (!IsWordChar(text[i])) { i++; continue; }
+                int stop = i;
+                while (stop < end && IsWordChar(text[stop])) stop++;
+                ResolveWord(text, i, stop, start, tokenHasLower, resolved);
+                i = stop;
             }
         }
         return new string(resolved);
     }
+
+    private static void ResolveWord(string text, int start, int stop, int tokenStart, bool tokenHasLower, char[] resolved)
+    {
+        string word = text[start..stop];
+        if (!word.Contains(AmbiguousMarker)) return;
+
+        if (word.All(c => c == AmbiguousMarker))
+        {
+            // A letter before the apostrophe is what makes it a contraction rather than a quoted 'II'.
+            bool contraction = word.Length == 2 && start - tokenStart >= 2 && text[start - 1] is '\'' or '’' &&
+                               IsWordChar(text[start - 2]);
+            Array.Fill(resolved, contraction || tokenHasLower ? 'l' : 'I', start, word.Length);
+            if (tokenHasLower && !contraction) resolved[start] = 'I';
+            return;
+        }
+
+        for (int i = start; i < stop; i++)
+        {
+            if (text[i] != AmbiguousMarker) continue;
+            resolved[i] = i == start ? InitialBar(word)
+                : tokenHasLower ? 'l'
+                : TitleCaseOverBars(word) ? 'l' : 'I';
+        }
+    }
+
+    /// <summary>A word-initial bar: a capital I unless the letters after it are lowercase and only the l reading is a
+    /// word. Its other bars count as l's for the lookup, since a word with lowercase in it reads them that way.</summary>
+    private static char InitialBar(string word)
+    {
+        string rest = word[1..].Replace(AmbiguousMarker, 'l');
+        bool lowercase = rest.Any(char.IsLower) && !rest.Any(c => char.IsUpper(c) || char.IsDigit(c));
+        return lowercase && BarWords.ReadsAsL(AmbiguousMarker + rest, AmbiguousMarker) ? 'l' : 'I';
+    }
+
+    /// <summary>"All": one capital and then only bars, which reads equally as Title Case or as a roman numeral ("VII"),
+    /// so the dictionary decides. Two letters are too short to judge — "Al" and "AI" are both in it.</summary>
+    private static bool TitleCaseOverBars(string word) =>
+        word.Length >= 3 && char.IsUpper(word[0]) && word[1..].All(c => c == AmbiguousMarker) &&
+        BarWords.ReadsAsL(word, AmbiguousMarker);
+
+    private static bool IsWordChar(char c) => c == AmbiguousMarker || c == '`' || char.IsLetterOrDigit(c);
 
     private static IEnumerable<(int Start, int End)> Words(string text)
     {

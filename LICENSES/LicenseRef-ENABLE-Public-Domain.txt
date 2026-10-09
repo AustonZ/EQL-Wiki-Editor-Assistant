@@ -1,0 +1,11 @@
+The ENABLE word list (Enhanced North American Benchmark LExicon), compiled by Alan Beale with contributions from
+M. Cooper.
+
+Its own README states: "The ENABLE master word list, WORD.LST, is herewith formally released into the Public Domain.
+Anyone is free to use it or distribute it in any manner they see fit." It asks that the source be mentioned and its
+compilers credited as the originators of the list, and that nobody copyright or restrict redistribution of the list
+itself.
+
+The file src/EQLWikiEditorAssistant.Core/Glyphs/enable-i-l-words.txt is a subset of that list, taken from enable1.txt
+(172,823 words) as distributed at https://github.com/dolph/dictionary. It remains in the public domain: the MIT licence
+that covers the rest of this repository does not apply to it, and nothing here restricts its redistribution.

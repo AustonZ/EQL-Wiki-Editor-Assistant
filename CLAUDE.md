@@ -25,9 +25,10 @@ The full design rationale, wiki research findings, and milestone plan live in
   reasonably expect to send it** (user, 2026-10-07, clarifying the original "only user-approved edits"). The purpose
   is to never publish anything unknowingly and never add load to the wiki for nothing — so a preview rendered by the
   wiki's `action=parse` when the user presses Preview is fine, and one fired automatically on every capture is not.
-- **The repository is MIT, except for two things that are not ours to license** (user, 2026-10-08): the game's item
-  icons in `game_assets/item_icons` (the publisher's artwork, tolerated on fan wikis, licensed to nobody) and the wiki
-  pages copied as test fixtures (the wiki's contributors', under no stated licence). `REUSE.toml` records this and
+- **The repository is MIT, except for what is not ours to license** (user, 2026-10-08): the game's item icons in
+  `game_assets/item_icons` (the publisher's artwork, tolerated on fan wikis, licensed to nobody), the wiki pages copied
+  as test fixtures (the wiki's contributors', under no stated licence), the audited screenshots in `samples/` (the
+  publisher's artwork) and the ENABLE word list subset in `Core/Glyphs` (public domain, 2026-10-09). `REUSE.toml` records this and
   `reuse lint` must keep passing: anything added that is not the project's own work — more wiki text, game data,
   artwork — gets its own annotation and `LICENSES/` entry rather than falling under MIT by default. Never describe the
   repository as wholly MIT, and never reuse the icons outside the Assistant's own purpose.
@@ -2382,8 +2383,9 @@ builds the labelled atlas, `verify` reads a real region back.
 - **`l` versus `I` is the one place the reader chooses rather than reports.** They are the same pixels, so
   "don't guess" would mean emitting both and corrupting every word containing either. It resolves from the word:
   initial means `I` (this UI is Title Case), otherwise it follows the word's other letters, and a word of nothing
-  but bars is `I` (a roman numeral). A human reading the screen does the same. Anything it gets wrong is a *name*,
-  where fuzzy wiki lookup is the existing backstop — never a digit, which is guessed at nowhere.
+  but bars is `I` (a roman numeral). A human reading the screen does the same — and since 2026-10-09 so does a
+  dictionary, where the word cannot say: see "Two UI fonts" below. Anything it gets wrong is a *word*, where fuzzy wiki
+  lookup is the existing backstop — never a digit, which is guessed at nowhere.
 - **A fragment with no letter or digit is chrome and is dropped.** The title bar's decorations match `.` and `_`
   exactly, and since the parser joins a row's fragments, that turned a title of "Spit" into `_ . Spit .. .. . . .`
   — enough to trip the title-vs-content occlusion check and condemn a good capture.
@@ -2412,8 +2414,40 @@ both fonts; Arial reading is exactly what it was.
   `GlyphSpike atlas ... --font <name> --merge-into <atlas>`, which refuses a shared shape gaining a label — a
   mislabelled sheet must not teach the reader that two characters look alike.
 - **The font changes one rule: what the bare bar means.** `GlyphReader.ResolveBar`: in EQL Wiki Editor Assistant it is always
-  an l; in Arial the word decides, as before. **Arial keeps its known limitation deliberately** (user, 2026-10-05) — it
-  reads the lore word "lost" as "Iost", and is not to be improved on; a test pins it so nobody does by accident.
+  an l; in Arial the word decides, and a dictionary where it cannot.
+- **Arial's l/I is settled by a dictionary where the word cannot settle it** (`Core.Glyphs.BarWords`, user,
+  2026-10-09, reversing their 2026-10-05 decision to keep "lost" reading as "Iost" — Arial is now the testers' font, so
+  its limitation became everyone's).
+  - **Two positions only.** A bar *starting* a lowercase word is an l when only the l reading is an English word
+    ("lost", "level"); a capital followed *only* by bars is Title Case when only the l reading is a word ("All", which
+    is otherwise exactly "VII"). Everything else keeps the old rule. Two plain rules ride along: the two bars of a
+    `'ll` contraction after a letter ("I'll"), and a hyphen starts a word ("Cast-Iron").
+  - **An unknown word keeps the capital I, with no warning** (user, agreeing 2026-10-09). An unknown word is almost
+    always a name and names are capitalised, so I is right; a warning would fire on every name in lore and say
+    nothing. The residue is a lowercase name or a word the list lacks (`lionskin`, `lookin'`), and a capitalised name
+    that is also a word (`Ias` reads as `las`).
+  - **ENABLE, public domain**, cut to the 12,045 words the two questions can ask about (`enable-i-l-words.txt`, with
+    the grep that regenerates it). Its own REUSE entry and licence file, since public domain is not MIT; credited in
+    THIRD-PARTY-NOTICES as its compilers asked.
+  - **Edited in code, not in the file** (user, 2026-10-09), so the file stays an unedited piece of ENABLE:
+    `BarWords.GameWords` adds `lvl` and `loc` (and plurals), which this game writes constantly, and `lizardman`/
+    `lizardmen`, a race it names on items, and
+    `BarWords.UnlikelyWords` drops `iamb` and `lota` (and plurals) — the only words that were real both ways, against
+    `lamb` and `Iota`. So **no word reads both ways**, and every word the list knows is decided outright;
+    `NoWordReadsBothWays` fails if a regenerated list or a new game word brings a collision back. `Ill` against `III`
+    stays the roman numeral, by the user's judgement that item text says `III` far more often.
+  - **A grave accent does not start a word, and the data decided it**: as a boundary it fixed `S`Ion` and broke
+    `S`lon`, `Ku`lul` and `Zo`lun`. A hyphen does start one, which costs a lowercase name after it (`post-luclin`, 2)
+    and fixes more (`Cast-Iron`, `Turn-In`, 15). A digit is part of the word, or `10lb` reads `10Ib` — the census
+    caught that in the first draft.
+  - **Measured by hiding every l and I in real text** (`GlyphSpike bars`), old rule against new: quest-page prose
+    9.01% -> **0.20%** of 49,415 words, page titles 0.93% -> **0.05%** of 20,169, item-page notes 4.08% -> 0.96%,
+    statsblocks 4 -> 0, item names 0 -> 0 of 750. The Arial corpus is unchanged (0 wrong, 0 silent-wrong). The text is
+    the 1,183 cached item pages plus every main-namespace title and 500 quest pages, fetched once into `.local-data`.
+  - **Lore compares l and I as one letter when read in Arial** (`ItemPageAnalyzer.Analyze(loreMayConfuseLAndI)`, set
+    by the pipeline from `ConfiguredFont`). Lore is never overwritten, so the only effect of a misread there was a
+    false "lore differs"; this removes it whatever the dictionary knows. The dictionary still matters where lore is
+    written: a new page, or a page with none.
 - **The font is an explicit setting, not detected, by the user's decision.** It is chosen in Settings > UI font and
   saved in `settings.json`; `UiFonts.AppDefault` applies when nothing is saved. **It is Arial, the game's own default**
   (user, 2026-10-08, for the first release): it was EQL Wiki Editor Assistant, which nobody but the user has, so a tester on
@@ -2435,7 +2469,8 @@ both fonts; Arial reading is exactly what it was.
 - **The corpus needed no regeneration.** Each ground-truth entry names its font, absent meaning Arial, so the 48
   Arial samples are untouched and new-font samples are simply added (`15a-eql-wiki-editor-assistant-font.png` onward).
   `15c-lowercase-l-lore.png` is the case the font exists for: Token of Reclamation's lore reads "recover lost items"
-  in it, and the same pixels read with the Arial rule (`ParseSpike --font Arial`) still give "Iost".
+  in it, and since 2026-10-09 the same pixels read with the Arial rule (`ParseSpike --font Arial`) give it too — they
+  gave "Iost" before the dictionary.
   `SampleFonts` decides the font every tool reads a screenshot in: `--font`, else the sample's ground truth, else
   `SampleFonts.UnlistedScreenshot` — EQL Wiki Editor Assistant, the font the developer's own captures are in. It followed the
   app default until that became Arial for testers (2026-10-08), and the tools read the developer's captures, not a
@@ -2737,6 +2772,10 @@ dotnet run --project tools/GlyphSpike -- read "samples/some screenshot.png" 774,
 # ParseSpike, AccuracySpike and WikiSpike's screenshot commands take --font too; without it a sample is read in the
 # font its ground truth names (absent = Arial) and any other screenshot in EQL Wiki Editor Assistant
 # (SampleFonts.UnlistedScreenshot — the developer's font, deliberately not the app's Arial default).
+
+# How well Arial's l/I rule reads real text: hides every l and I in cached wiki pages (and optionally a title list and
+# other pages' text, e.g. quest dialogue) and counts what comes back wrong. The measurement behind BarWords:
+dotnet run --project tools/GlyphSpike -- bars .local-data/wiki-pages [--titles <file>] [--prose <dir>]
 
 # Regenerate the atlas from the in-game Notes Window glyph sheet. The region only has to *contain* the character
 # rows as consecutive bands — it is matched by glyph-count sequence, not by coordinates, because the sheet can

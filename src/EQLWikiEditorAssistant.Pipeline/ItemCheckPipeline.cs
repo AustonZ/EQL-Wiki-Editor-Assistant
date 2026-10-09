@@ -487,7 +487,8 @@ public sealed class ItemCheckPipeline
         // `item` already carries the lore — see the top of this method for why that happens once, up there.
         ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
             item, page, wikiPage.Title, _mapping,
-            effectLinkTargets: await ResolveEffectLinksAsync(item, page, cancellationToken).ConfigureAwait(false));
+            effectLinkTargets: await ResolveEffectLinksAsync(item, page, cancellationToken).ConfigureAwait(false),
+            loreMayConfuseLAndI: ConfiguredFont == UiFont.Arial);
         ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis, _mapping);
 
         (IconComparison? icon, string? iconNote, CapturedImage? wikiIcon) =

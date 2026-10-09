@@ -63,6 +63,12 @@ System.Numerics.Tensors 9.0.0                       MIT License
   https://github.com/dotnet/runtime
   Copyright (c) .NET Foundation and Contributors.
 
+ENABLE word list (a subset, built into the app)     Public domain
+  Enhanced North American Benchmark LExicon, compiled by Alan Beale with
+  contributions from M. Cooper, who released it into the public domain.
+  Used to tell a lowercase l from a capital I in the game's default font.
+  Taken from enable1.txt at https://github.com/dolph/dictionary.
+
 
 Screen capture
 --------------

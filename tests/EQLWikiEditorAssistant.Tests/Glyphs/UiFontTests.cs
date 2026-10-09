@@ -120,10 +120,10 @@ public class UiFontTests
     public void InEqlWikiEditorAssistantTheBarIsAlwaysAnL(string text, string expected) =>
         Assert.Equal(expected, GlyphReader.ResolveBar(text, UiFont.EqlWikiEditorAssistant));
 
-    /// <summary>In Arial nothing changes: the word decides, exactly as before. "Iost" is the known limitation the
-    /// user chose to keep rather than have the tool guess harder — pinned so nobody "fixes" it by accident.</summary>
+    /// <summary>In Arial the word decides, and the dictionary where the word cannot: "lost" reads correctly since
+    /// 2026-10-09, when the user reversed the decision to keep "Iost" as a known limitation.</summary>
     [Theory]
-    [InlineData("\u0001ost items", "Iost items")]
+    [InlineData("\u0001ost items", "lost items")]
     [InlineData("B\u0001adestopper", "Bladestopper")]
     [InlineData("\u0001mproved", "Improved")]
     public void InArialTheWordDecides(string text, string expected) =>
@@ -144,15 +144,16 @@ public class UiFontTests
         Assert.Equal(UiFont.EqlWikiEditorAssistant, line.DrawnIn);
     }
 
-    /// <summary>Arial reads as it always has, limitation included.</summary>
+    /// <summary>Arial reads both words right, though every l and I in them is the same bar: "Iron" by the Title Case
+    /// rule, "lost" by the dictionary.</summary>
     [Fact]
-    public void ArialTextReadsAsBefore()
+    public void ArialTextReadsBothWordsRight()
     {
         CapturedImage image = Paint(UiFont.Arial, "Iron", "lost");
 
         OcrLine line = Assert.Single(Read(image, UiFont.Arial));
 
-        Assert.Equal("Iron Iost", line.Text);
+        Assert.Equal("Iron lost", line.Text);
         Assert.Equal(UiFont.Arial, line.DrawnIn);
     }
 

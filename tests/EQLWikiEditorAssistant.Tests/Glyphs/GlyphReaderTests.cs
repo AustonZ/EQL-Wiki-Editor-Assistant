@@ -26,8 +26,72 @@ public class GlyphReaderTests
     [InlineData("\u0001\u0001\u0001", "III")]              // nothing but bars: a roman numeral
     [InlineData("\u0001V", "IV")]
     [InlineData("Cast Time: \u0001nstant", "Cast Time: Instant")]
+    [InlineData("Ha\u0001as 10\u0001b Meat Pie", "Halas 10lb Meat Pie")] // a digit keeps the bar mid-word
     public void ResolveAmbiguous_UsesTheWordAroundTheBar(string text, string expected) =>
         Assert.Equal(expected, GlyphReader.ResolveAmbiguous(text));
+
+    /// <summary>
+    /// Where the word cannot decide, the dictionary does (user, 2026-10-09). Every case is one the old rule got wrong
+    /// on real text — lore, quest dialogue or a page title — measured by <c>GlyphSpike bars</c>.
+    /// </summary>
+    [Theory]
+    [InlineData("recover \u0001ost items", "recover lost items")] // the lore word that started this
+    [InlineData("the \u0001ight of \u0001ong ago", "the light of long ago")]
+    [InlineData("\u0001eve\u0001 50", "level 50")]
+    [InlineData("(\u0001ost)", "(lost)")]                       // leading punctuation does not hide the start
+    [InlineData("we\u0001\u0001-\u0001it", "well-lit")]          // nor does a hyphen
+    [InlineData("Cast-\u0001ron", "Cast-Iron")]
+    [InlineData("A\u0001\u0001 who enter", "All who enter")]      // a capital, then only bars
+    [InlineData("\u0001'\u0001\u0001 go", "I'll go")]               // the 'll of a contraction
+    [InlineData("we'\u0001\u0001", "we'll")]
+    [InlineData("\u0001\u0001\u0001-Fitting", "Ill-Fitting")]       // all bars, inside a lowercase token
+    [InlineData("a \u0001amb's wool", "a lamb's wool")]           // "iamb" is dropped from the list
+    [InlineData("at \u0001v\u0001 50 (/\u0001oc 12, 40)", "at lvl 50 (/loc 12, 40)")] // the game's own words
+    [InlineData("a \u0001izardman's ta\u0001e", "a lizardman's tale")]
+    public void ResolveAmbiguous_AsksTheDictionaryWhereTheWordCannotSay(string text, string expected) =>
+        Assert.Equal(expected, GlyphReader.ResolveAmbiguous(text));
+
+    /// <summary>
+    /// The controls: a word the dictionary does not know stays a capital I, because it is almost always a capitalised
+    /// name; a word that is real both ways stays I; roman numerals stay roman numerals, which is exactly what "All" could
+    /// otherwise be mistaken for; and a quoted 'II' is not a contraction.
+    /// </summary>
+    [Theory]
+    [InlineData("\u0001ksar", "Iksar")]
+    [InlineData("\u0001nnoruuk's", "Innoruuk's")]
+    [InlineData("\u0001ron", "Iron")]
+    [InlineData("\u0001ce", "Ice")]
+    [InlineData("\u0001t \u0001s", "It Is")]
+    [InlineData("\u0001ota", "Iota")]                             // "lota" is dropped from the list
+    [InlineData("V\u0001\u0001", "VII")]
+    [InlineData("X\u0001\u0001\u0001", "XIII")]
+    [InlineData("Vampirism \u0001\u0001\u0001", "Vampirism III")]
+    [InlineData("'\u0001\u0001'", "'II'")]
+    [InlineData("A\u0001'Kabor", "Al'Kabor")]                    // lowercase elsewhere in the token decides
+    [InlineData("Ku`\u0001u\u0001", "Ku`lul")]                   // a grave accent does not start a word
+    public void ResolveAmbiguous_KeepsTheDefaultWhereTheDictionaryCannotHelp(string text, string expected) =>
+        Assert.Equal(expected, GlyphReader.ResolveAmbiguous(text));
+
+    /// <summary>
+    /// No word in the list may be real both ways, or the reader has to guess between two words (user, 2026-10-09). The
+    /// four ENABLE had are dropped; a list regenerated without dropping them, or a game word that collides, fails here.
+    /// Both shapes the reader asks about are checked: a first letter l against i, and one letter followed by l's
+    /// against the same letter followed by i's, from three letters up as the reader asks it ("al"/"ai" never is).
+    /// </summary>
+    [Fact]
+    public void NoWordReadsBothWays()
+    {
+        IReadOnlySet<string> words = BarWords.Words;
+        string[] collisions = [.. words
+            .Where(w => w[0] == 'l' && words.Contains("i" + w[1..]))
+            .Concat(words.Where(w => w.Length >= 3 && w[1..].All(c => c == 'l') &&
+                                     words.Contains(w[0] + new string('i', w.Length - 1))))];
+
+        Assert.Empty(collisions);
+        Assert.Contains("lost", words);                       // the control: the list did load
+        Assert.Contains("lvl", words);
+        Assert.DoesNotContain("iamb", words);
+    }
 
     [Fact]
     public void ResolveAmbiguous_TextWithoutTheMarker_IsUntouched() =>

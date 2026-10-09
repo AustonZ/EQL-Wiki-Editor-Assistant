@@ -101,12 +101,13 @@ dotnet run --project src/EQLWikiEditorAssistant.App
 
 ## Licence
 
-The Assistant's own code is [MIT licensed](LICENSE). **Three things in this repository are not**:
+The Assistant's own code is [MIT licensed](LICENSE). **Four things in this repository are not**:
 
 - the game's item icons in `game_assets/item_icons`, which belong to the game's publisher — see
   [game_assets/README.md](game_assets/README.md);
 - item pages copied from the wiki as test fixtures, which belong to the wiki's contributors;
-- the game screenshots in `samples/` that the tests run against, which show the publisher's artwork.
+- the game screenshots in `samples/` that the tests run against, which show the publisher's artwork;
+- a word list taken from ENABLE, which its compilers released into the public domain.
 
 Licensing is recorded machine-readably in [REUSE.toml](REUSE.toml). The components the Assistant is built on, such as
 RapidOCR and the PaddleOCR models it uses, are listed with their licences in

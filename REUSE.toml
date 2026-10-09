@@ -24,6 +24,13 @@ precedence = "override"
 SPDX-FileCopyrightText = "Daybreak Game Company LLC"
 SPDX-License-Identifier = "LicenseRef-EverQuest-Screenshots"
 
+# A subset of the ENABLE word list, which its compilers released into the public domain. NOT MIT: see the licence file.
+[[annotations]]
+path = "src/EQLWikiEditorAssistant.Core/Glyphs/enable-i-l-words.txt"
+precedence = "override"
+SPDX-FileCopyrightText = "Alan Beale and M. Cooper, compilers of ENABLE"
+SPDX-License-Identifier = "LicenseRef-ENABLE-Public-Domain"
+
 # Item pages copied from the EverQuest Legends Wiki as test fixtures. NOT MIT; the wiki names no licence.
 [[annotations]]
 path = "tests/EQLWikiEditorAssistant.Tests/Wiki/Fixtures/*.txt"

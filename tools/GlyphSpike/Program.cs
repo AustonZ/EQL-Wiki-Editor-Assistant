@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using EQLWikiEditorAssistant.Core.Locate;
 using EQLWikiEditorAssistant.Ocr;
 using EQLWikiEditorAssistant.Core.Glyphs;
@@ -20,6 +21,11 @@ using EQLWikiEditorAssistant.TestSupport;
 //   GlyphSpike read <image> [x,y,w,h] [--font <name>] [--atlas f]
 //                                               read a region through the real engine, in a UI font (app default
 //                                               unless given)
+//   GlyphSpike bars <wiki-pages-dir> [--titles <file>] [--prose <dir>]
+//                                               how well Arial's l/I rule reads real text: hides every l and I in
+//                                               the cached pages' item names, statsblocks, lore and notes (and in a
+//                                               list of page titles, one per line, and any other pages' text) and
+//                                               scores what the rule gives back
 //
 // The whole approach rests on the font being a deterministic bitmap blit: see GlyphRamp for the measurements.
 
@@ -28,6 +34,9 @@ if (args.Length < 2)
     Console.Error.WriteLine("usage: GlyphSpike <dump|segment|cluster|atlas|verify> <imagePath> [args]");
     return 1;
 }
+
+// Reads text, not an image, so it is dispatched before the image is loaded.
+if (args[0] == "bars") return Bars(args);
 
 string command = args[0];
 CapturedImage image = await ImageFile.LoadAsync(args[1]);
@@ -353,6 +362,77 @@ static int ReadRegion(CapturedImage image, Rect region, string[] args)
 /// Separate from `atlas` because the two need different sources: shapes come from the Notes Window sheet, whose
 /// characters are all space-separated and therefore show no advances at all, while advances can only be seen in
 /// ordinary text where glyphs sit side by side. Run `atlas` first, then this.</summary>
+// Arial draws l and I as the same bar, so the reader decides from the word (GlyphReader.ResolveAmbiguous). This hides
+// both letters in real wiki text exactly as the font does and counts the words the rule gives back wrong — the
+// measurement behind BarWords. The notes are human prose rather than game text, which makes them the larger
+// stand-in for lore: the wiki's own lore is mostly short.
+static int Bars(string[] args)
+{
+    if (args.Length < 2 || !Directory.Exists(args[1]))
+    {
+        Console.Error.WriteLine("usage: GlyphSpike bars <wiki-pages-dir> [--titles <file>] [--prose <dir>]");
+        return 1;
+    }
+
+    var sources = new Dictionary<string, List<string>>
+    {
+        ["item names"] = [], ["statsblocks"] = [], ["lore"] = [], ["notes (prose)"] = [],
+    };
+    foreach (string file in Directory.EnumerateFiles(args[1], "*.txt"))
+    {
+        string page = File.ReadAllText(file);
+        if (!page.Contains("Itempage")) continue;
+        if (Parameter(page, "itemname") is { } name) sources["item names"].Add(name);
+        if (Parameter(page, "statsblock") is { } stats) sources["statsblocks"].Add(PlainText(stats));
+        foreach (Match lore in Regex.Matches(page, @"\{\{\s*Item Lore\s*\|([^{}]*)\}\}"))
+            sources["lore"].Add(PlainText(lore.Groups[1].Value));
+        if (Parameter(page, "notes") is { } notes)
+            sources["notes (prose)"].Add(PlainText(TemplateFree(notes)));
+    }
+    int titles = Array.IndexOf(args, "--titles");
+    if (titles > 0 && titles + 1 < args.Length) sources["page titles"] = [.. File.ReadAllLines(args[titles + 1])];
+    int prose = Array.IndexOf(args, "--prose");
+    if (prose > 0 && prose + 1 < args.Length)
+        sources["other pages (prose)"] = [.. Directory.EnumerateFiles(args[prose + 1], "*.txt")
+            .Select(f => PlainText(TemplateFree(File.ReadAllText(f))))];
+
+    foreach ((string kind, List<string> texts) in sources)
+    {
+        int words = 0;
+        var wrong = new Dictionary<(string Got, string Want), int>();
+        foreach (string text in texts)
+        foreach (string word in text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!word.Contains('l') && !word.Contains('I')) continue;
+            words++;
+            string got = GlyphReader.ResolveAmbiguous(word.Replace('l', '\u0001').Replace('I', '\u0001'));
+            if (got != word) wrong[(got, word)] = wrong.GetValueOrDefault((got, word)) + 1;
+        }
+        int misread = wrong.Values.Sum();
+        Console.WriteLine($"{kind}: {texts.Count} texts, {words} words with l or I, {misread} misread " +
+                          $"({100.0 * misread / Math.Max(words, 1):F2}%)");
+        foreach (((string got, string want), int n) in wrong.OrderByDescending(w => w.Value).Take(30))
+            Console.WriteLine($"  {n,5}  {got}  should be  {want}");
+    }
+    return 0;
+
+    static string? Parameter(string page, string name)
+    {
+        Match m = Regex.Match(page, @"\|\s*" + name + @"\s*=([^|]*)");
+        return m.Success && m.Groups[1].Value.Trim() is { Length: > 0 } value ? value : null;
+    }
+
+    static string TemplateFree(string wikitext) => Regex.Replace(wikitext, @"\{\{[^{}]*\}\}", " ");
+
+    // Markup is not text the game draws: links keep their visible words, tags and categories go.
+    static string PlainText(string wikitext)
+    {
+        string text = Regex.Replace(wikitext, @"\[\[Category:[^\]]*\]\]", " ");
+        text = Regex.Replace(text, @"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", "$1");
+        return Regex.Replace(text, @"<[^>]+>|\{\{|\}\}|'''|''", " ");
+    }
+}
+
 static async Task<int> Advances(string[] args)
 {
     int atlasIndex = Array.IndexOf(args, "--atlas");

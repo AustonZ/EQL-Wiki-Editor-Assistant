@@ -134,6 +134,35 @@ public class LoreTests
         Assert.Equal(FieldVerdict.NeedsReview, analysis.Find(ItemPageAnalyzer.LoreField)!.Verdict);
     }
 
+    /// <summary>
+    /// Read in Arial, l and I are the same pixels, so a misread between exactly those two must not report a page's
+    /// correct lore as different (user, 2026-10-09). The page is never overwritten either way; this only stops a false
+    /// warning.
+    /// </summary>
+    [Fact]
+    public void InArialLAndIAreTheSameLetter()
+    {
+        ItemPageDocument page = Page("{{Item Lore|Few recover lost items.}}");
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(lore: "Few recover Iost items."), page, "Thing", loreMayConfuseLAndI: true);
+
+        Assert.Equal(FieldVerdict.Matches, analysis.Find(ItemPageAnalyzer.LoreField)!.Verdict);
+    }
+
+    /// <summary>The control: read in a font with no ambiguity, the same two texts really do differ, and any other
+    /// letter differs in Arial too.</summary>
+    [Fact]
+    public void OnlyLAndIAreConfusedAndOnlyInArial()
+    {
+        ItemPageDocument page = Page("{{Item Lore|Few recover lost items.}}");
+
+        Assert.Equal(FieldVerdict.NeedsReview, ItemPageAnalyzer.Analyze(
+            Captured(lore: "Few recover Iost items."), page, "Thing").Find(ItemPageAnalyzer.LoreField)!.Verdict);
+        Assert.Equal(FieldVerdict.NeedsReview, ItemPageAnalyzer.Analyze(
+            Captured(lore: "Few recover most items."), page, "Thing", loreMayConfuseLAndI: true)
+            .Find(ItemPageAnalyzer.LoreField)!.Verdict);
+    }
+
     /// <summary>A Description-only capture has no lore, and that absence must not read as "the page's lore is
     /// wrong" — it means the second capture has not happened yet.</summary>
     [Fact]

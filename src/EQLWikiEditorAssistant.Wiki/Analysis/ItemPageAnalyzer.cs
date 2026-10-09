@@ -87,13 +87,16 @@ public static class ItemPageAnalyzer
     /// <param name="wholePageWikitext">The complete page source, for the compliance checks that look outside the
     /// template call (the <c>&lt;onlyinclude&gt;</c> wrapper and the era banner both sit around it). Defaults to the
     /// document's own text, which is the same thing unless a caller has a reason to differ.</param>
+    /// <param name="loreMayConfuseLAndI">The lore was read in a font that draws l and I identically (Arial), so the
+    /// lore comparison treats the two as the same letter — see <see cref="LoreReadsTheSame"/>.</param>
     public static ItemPageAnalysis Analyze(
         ParsedItem captured,
         ItemPageDocument page,
         string pageTitle,
         WikiMapping? mapping = null,
         string? wholePageWikitext = null,
-        IReadOnlyDictionary<string, string>? effectLinkTargets = null)
+        IReadOnlyDictionary<string, string>? effectLinkTargets = null,
+        bool loreMayConfuseLAndI = false)
     {
         ArgumentNullException.ThrowIfNull(captured);
         ArgumentNullException.ThrowIfNull(page);
@@ -104,7 +107,7 @@ public static class ItemPageAnalyzer
         StatsBlock? block = page.ReadStatsBlock();
 
         AddNameFindings(findings, captured, page, pageTitle);
-        AddLoreFinding(findings, captured, page);
+        AddLoreFinding(findings, captured, page, loreMayConfuseLAndI);
         AddMerchantValueFinding(findings, captured, page);
         AddFlagFindings(findings, captured, block);
         AddListFinding(findings, ClassesField, captured.Classes, block);
@@ -137,7 +140,8 @@ public static class ItemPageAnalyzer
     /// replacing it is not: there is nothing to destroy, and the item demonstrably has lore because the game showed
     /// a Lore tab.
     /// </summary>
-    private static void AddLoreFinding(List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page)
+    private static void AddLoreFinding(
+        List<FieldFinding> findings, ParsedItem captured, ItemPageDocument page, bool loreMayConfuseLAndI)
     {
         if (captured.Lore is not { Length: > 0 } lore) return; // no second capture — not a finding either way
 
@@ -145,7 +149,7 @@ public static class ItemPageAnalyzer
 
         if (onWiki is { Length: > 0 })
         {
-            findings.Add(LoreReadsTheSame(lore, onWiki)
+            findings.Add(LoreReadsTheSame(lore, onWiki, loreMayConfuseLAndI)
                 ? new FieldFinding(LoreField, FieldVerdict.Matches, lore, onWiki)
                 : new FieldFinding(
                     LoreField, FieldVerdict.NeedsReview, lore, onWiki,
@@ -166,11 +170,22 @@ public static class ItemPageAnalyzer
         findings.Add(new FieldFinding(LoreField, FieldVerdict.MissingOnWiki, lore, null));
     }
 
-    /// <summary>Whitespace-insensitive, because the game wraps lore to fit its window and the parser rejoins those
-    /// rows with single spaces — a page that breaks the same sentence differently is not a different sentence.
-    /// Everything else compares exactly, since this is prose and punctuation is content.</summary>
-    private static bool LoreReadsTheSame(string a, string b) =>
-        string.Equals(CollapseWhitespace(a), CollapseWhitespace(b), StringComparison.Ordinal);
+    /// <summary>
+    /// Whitespace-insensitive, because the game wraps lore to fit its window and the parser rejoins those rows with
+    /// single spaces — a page that breaks the same sentence differently is not a different sentence. Everything else
+    /// compares exactly, since this is prose and punctuation is content.
+    ///
+    /// **Except l and I, when the lore was read in Arial** (user, 2026-10-09), where the two are the same pixels and the
+    /// reader can only judge from the word. A misread there would report a page's correct lore as different, and lore is
+    /// never overwritten, so treating the two as one letter costs nothing but a wiki typo between exactly those two —
+    /// the reader's guess is good (see <c>BarWords</c>); this makes what is left of its error harmless.
+    /// </summary>
+    private static bool LoreReadsTheSame(string a, string b, bool confuseLAndI)
+    {
+        string x = CollapseWhitespace(a), y = CollapseWhitespace(b);
+        if (confuseLAndI) (x, y) = (x.Replace('I', 'l'), y.Replace('I', 'l'));
+        return string.Equals(x, y, StringComparison.Ordinal);
+    }
 
     private static string CollapseWhitespace(string text) =>
         string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));

@@ -348,6 +348,9 @@ font default changes.
   useful at all: an updater only helps from the release after the one that ships it, and an alpha is when fixes come
   fastest. The notice gains *Update*: one confirmation (which says the open items will close), the download behind a
   cancellable progress dialog, then Velopack restarts the app on the new version. Never without a click.
+- **Arial's l/I settled by a dictionary** (user, 2026-10-09, added before the release, reversing the 2026-10-05
+  decision to keep "Iost"): ENABLE (public domain) decides a word-initial bar and "All"; no warning for unknown words.
+  Quest prose misreads 9.01% -> 0.20%. See CLAUDE.md, "Two UI fonts".
 - **Uninstalling asks whether to delete the user's data too** (user, 2026-10-09: "I'm not a fan of programs that leave
   trash behind"). Default No, since the history is real work and a reinstall wants it back.
 
