@@ -2,7 +2,7 @@
 # Everything is MIT unless an annotation below says otherwise; the full texts are in LICENSES/.
 version = 1
 SPDX-PackageName = "EQL Wiki Editor Assistant"
-SPDX-PackageDownloadLocation = "https://github.com/AustonZ/EQLWiki-EditorAssistant"
+SPDX-PackageDownloadLocation = "https://github.com/AustonZ/EQL-Wiki-Editor-Assistant"
 
 [[annotations]]
 path = "**"

@@ -28,7 +28,7 @@ an item the wiki has no page for, it proposes the whole page.
 
 ## Getting started
 
-1. **Install it** from the [Releases](https://github.com/AustonZ/EQLWiki-EditorAssistant/releases) page. The installer is
+1. **Install it** from the [Releases](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/releases) page. The installer is
    not code-signed yet, so Windows SmartScreen may warn about an unknown publisher; choose *More info*, then *Run
    anyway*.
 2. **Create a bot password** on the wiki at [Special:BotPasswords](https://eqlwiki.com/Special:BotPasswords), granting
@@ -71,7 +71,7 @@ other players and chat.
 
 ## Reporting a problem
 
-Open an [issue](https://github.com/AustonZ/EQLWiki-EditorAssistant/issues) and include the version (shown at the
+Open an [issue](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/issues) and include the version (shown at the
 bottom of Settings), what you did, and what happened. If the app reported an unexpected error, the end of `errors.log`
 helps. Please don't attach a screenshot without checking it for names and chat first.
 
