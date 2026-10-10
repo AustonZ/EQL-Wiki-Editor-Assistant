@@ -68,6 +68,9 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed (exit code $LASTEXITCODE
 # versions the build itself recorded, since those follow the SDK; the app's other notices come from its project file.
 $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $HOME '.nuget\packages' }
 $runtimeConfig = Get-Content (Join-Path $publish 'EQLWikiEditorAssistant.App.runtimeconfig.json') -Raw | ConvertFrom-Json
+# Made here, not assumed: the build used to create it by copying ONNX Runtime's and Skia's notices, which left with the
+# text-recognition model, and nothing else the build ships goes in it.
+New-Item -ItemType Directory -Force (Join-Path $publish 'licenses') | Out-Null
 $runtimeNotices = @{
     'Microsoft.NETCore.App'        = @(@('LICENSE.TXT', 'dotnet-runtime-LICENSE.txt'),
                                        @('THIRD-PARTY-NOTICES.TXT', 'dotnet-runtime-THIRD-PARTY-NOTICES.txt'))
