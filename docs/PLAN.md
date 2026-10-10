@@ -372,8 +372,30 @@ font default changes.
 - **For step 3's audit**: the glyph atlas is bitmaps of game-rendered Arial (and three glyphs of the user's modified
   font) — rendered pixels, not font software, so probably fine, but it is the one tracked file derived from Arial.
 
+### Feedback after alpha.3 (2026-10-10)
+From the first tester (via the user):
+- **Minimize to the system tray instead of the taskbar**, as an option.
+- **Minimize automatically when Done is pressed and nothing else needs attention**, as an option. "Needs attention"
+  should be the same rule the item list and the status bar's "N need attention" already use, not a second copy.
+- **Combine the edit and formatting steps into one** (decided by the user, 2026-10-10, reversing the 2026-09-25 rule
+  that formatting is always its own edit). The tester's case, which the user accepted: for this project the review value
+  of a separate "reformatted, no data changes" revision is not worth its cost — a second step for the user on every item
+  and a second revision in the history of every page touched. What the separation protected and has to survive the
+  merge: the data edit stays the minimal, surgical patch it is computed as (the formatter then lays out the result), and
+  the formatter still proves it changed nothing but layout before its part is accepted — a refused layout leaves the data
+  edit to be saved alone. CLAUDE.md's "Formatting is a separate edit" and the review timeline's Formatting step are to
+  be rewritten when this is built.
+
+From the user:
+- **Categories are not kept in the blueprint's order.** The data pass appends each new category after the existing ones
+  (`ItemPageDocument.WithCategory`), and the formatter never touches categories, so an added `Beastlord Equipment` lands
+  after whatever was last. They should be sorted the way the blueprint lists them. Likely the formatter's job, since an
+  order is layout — and with the steps combined it reaches the page in the same save.
+
 ### To investigate
-- **A false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Fully visible, reported as partly covered.
+- **Fixed 2026-10-10: a false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Its title bar sat flush
+  under a Storage Trunk's across the whole width, which the old top-edge rule refused; the top is now a fixed 16 rows
+  above the bar's bottom (see CLAUDE.md, "Locating item windows"). Fully visible, reported as partly covered.
   Two frames, `samples/21a-...-description.png` and `21b-...-lore.png`, the same five item windows with this one bottom
   middle over a storage trunk, on its Description tab and then its Lore tab. Both were reported occluded, so probably
   one cause; check both when it is fixed. Not audited yet (they show chat), so they stay out of git until they are.

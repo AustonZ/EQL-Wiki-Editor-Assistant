@@ -35,10 +35,8 @@ namespace EQLWikiEditorAssistant.Core.Locate;
 ///
 /// **The top edge uses a different piece of the window's chrome.** There is no grey outline at the window's outer
 /// top, and the parser needs the title bar inside the crop (it reconciles the title-bar name against the
-/// content-area name), so the top is traced from the *title bar's own pure-black band* instead — see
-/// <see cref="ScanToWindowTop"/>. This also started as a brightness scan ("stop at a sustained bright run") and
-/// failed for exactly the same reason as the side edges: with another dark UI panel directly above a window, no
-/// bright run exists and the scan ran to its limit, failing the window outright.
+/// content-area name), so the top is placed from the *title bar's own pure-black band* instead — see
+/// <see cref="ScanToTitleBarBottom"/>.
 ///
 /// Every threshold here was measured against real screenshots, not derived on paper. Re-tune only with
 /// <c>tools/LocateSpike</c> against the full real-sample set — <c>--probe</c> for raw pixel values, and
@@ -71,33 +69,22 @@ public static class WindowBoundsFinder
     private const int FrameMinRun = 2;
     private const int FrameSearchDistance = 25;
 
-    // --- Top edge: identify the title bar by its *shape*, not by walking until black runs out ---
+    // --- Top edge: a fixed height up from the title bar's bottom ---
     //
-    // **Rewritten 2026-10-01, replacing a scan that walked up through black and stopped when it ran out.** That
-    // rule was ambiguous by construction: on a dark UI, black is the least distinctive thing on screen, so "keep
-    // going while black" cannot tell this window's title bar from any other dark chrome above it. Every fix it
-    // received added a tolerance — skip glyph rows, tolerate a short non-black run, cap the band height, widen the
-    // probe span — and each tolerance widened what could be mistaken for a title bar. The bug that ended it
-    // (`Armor Ornamentation Token`, user, 2026-10-01) used the glyph tolerance to bridge **12 rows of open game
-    // world** into unrelated black chrome 15px above the window, which shifted the crop and with it the icon strip.
+    // **The title bar is always 16 rows** (user, 2026-10-10, replacing a rule that confirmed the bar's shape). The
+    // first pure-black row above the content area is the bar's bottom, and the window's top is 15 rows above it,
+    // clamped to the top of the screen, where the game lets up to 2 rows be clipped. Nothing above the bar is
+    // looked at, so nothing above it can mislead: black chrome a little above with world between, a HUD panel flush
+    // on top, or another window's title bar flush across the whole width (`Speckled Molded Mushroom`, user,
+    // 2026-10-09, reported covered when it was not).
     //
-    // What replaces it is a positive description of the thing being looked for, so a column either matches it or
-    // abstains: **a band of pure black whose bottom row sits directly on the content interior, that is about 16
-    // rows tall, and that actually ends.** Measured across the whole sample corpus — 47 screenshots, 109 located
-    // windows — **103 windows read exactly 16**. Of the six that did not: one is the corpus's known-occluded
-    // window, one is a window flush against the top of the screen whose bar is genuinely clipped to 14, and four
-    // read 17, which is the old scan already sitting a pixel high on them.
+    // What it replaced, from 2026-10-01: a band of pure black about 16 rows tall that had to *end*, with columns
+    // abstaining when it did not. Every case it guarded is above the bar, and its one refusal — a merged band
+    // across the whole width, "nothing to measure" — was exactly the false occlusion above. Measured across 147
+    // located windows in the sample set, 103 of 109 at the time read exactly 16; the rest were a covered window, the
+    // screen-edge clip, and four the old scan read a pixel high.
     private const int TitleBarSearchDistance = 60;  // content interior up to the black band
-    // The measured band is 16. The floor admits the screen-edge case (14) with a little room; the ceiling is what
-    // rejects a band that has merged with adjacent black chrome, since a merged band is unbounded rather than
-    // slightly tall.
-    private const int TitleBarMinHeight = 13;
-    private const int TitleBarMaxHeight = 18;
-    // How far up a column may be examined at all. Deliberately barely above TitleBarMaxHeight: the walk is not
-    // searching for the top, it is confirming a band of known size, so it never needs to travel far. This is what
-    // makes the world-gap bug structurally impossible — the black chrome that caused it sat 13 rows above the band
-    // and is now simply never looked at.
-    private const int TitleBarWalkLimit = 20;
+    private const int TitleBarHeight = 16;
 
     private const int ProbeCount = 11;
     private const int AgreementTolerancePx = 6;
@@ -109,12 +96,11 @@ public static class WindowBoundsFinder
     //    to reject the covered edge (0.7) also rejects a legitimately clean window touching a neighbour and one
     //    sitting at the screen edge. So this stays permissive and <see cref="IsRectangleClosed"/> does the real
     //    work of rejecting a partly-covered window.
-    //  - The title-bar scan is legitimately noisier (a probe column running down a letter of the title breaks
-    //    early), scoring 64-82% on clean windows.
+    //  - The title bar's bottom is clean: every column reads the same row.
     private const double MinOutlineAgreementFraction = 0.45;
     private const double MinTopAgreementFraction = 0.4;
-    // Used for the two scans that run *before* the window's width is known (the bottom outline). Once left and
-    // right are traced, the top scan spans those instead — see TryFindBounds.
+    // Used for the scan that runs *before* the window's width is known (the bottom outline). Once left and right
+    // are traced, the top scan spans those instead.
     private const int SafeHorizontalProbeHalfWidth = 100;
 
     // Inset from the traced content outline when probing the title bar, so no column lands on the window's own
@@ -144,31 +130,10 @@ public static class WindowBoundsFinder
         if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4, cx, dx: -1, out int left)) return null;
         if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4, cx, dx: 1, out int right)) return null;
 
-        // **The narrow span first, the window's full traced width only as a fallback** (bug found by the user,
-        // 2026-09-30, on `Shield of the Stalwart Seas`). The player's HP bar is a black HUD panel, and it sat
-        // directly above that window's title bar with no gap at all: the two black regions were contiguous, so every
-        // column under the panel correctly refused (a 41px band against a real ~16px one). The panel covered x
-        // 780-1145 of a window spanning 807-1210, so the only columns that could answer were the ~65px to its right
-        // — outside the ±100 span, leaving zero usable probes and a fully visible window reported as occluded. That
-        // is ScanToWindowTop's abstain-and-let-the-others-decide rule working as designed and being given nowhere to
-        // work: refusing a merged column only helps if an unmerged one is sampled.
-        //
-        // **Widening unconditionally was tried first and the corpus rejected it**, which is why this is a fallback
-        // rather than a replacement. The wider span also admitted columns that merged *slightly* — so they answered
-        // instead of abstaining — and since TryGetConsensus averages its agreeing cluster, one such column dragged
-        // the result a pixel high. On `12e-3-neck-items.png` that moved a window's top from 272 to 271 (measured:
-        // background to 271, black from 272), which was enough to flip two windows' reading order and score 32
-        // fields against the wrong item. A pixel of top edge is not worth that.
-        //
-        // The 2026-10-01 rewrite of ScanToWindowTop removed that hazard — a column merged by even one row now fails
-        // its must-end check and abstains — so the fallback is no longer the risk it was. The two-step is kept
-        // regardless, because the narrow span already decides every window in the corpus that can be decided, and
-        // collapsing them would be a behaviour change bought for nothing.
-        if (!TryConsensusWindowTop(image, cx - SafeHorizontalProbeHalfWidth, cx + SafeHorizontalProbeHalfWidth,
-                interiorY, out int top) &&
-            !TryConsensusWindowTop(image, left + TitleBarProbeInset, right - TitleBarProbeInset,
-                interiorY, out top))
+        if (!TryConsensusTitleBarBottom(image, left + TitleBarProbeInset, right - TitleBarProbeInset,
+                interiorY, out int titleBarBottom))
             return null;
+        int top = Math.Max(0, titleBarBottom - TitleBarHeight + 1);
 
         int width = right - left, height = bottom - top;
         if (width < 50 || height < 50) return null;
@@ -381,78 +346,31 @@ public static class WindowBoundsFinder
         return total >= LineVerifyHalfRun && (double)matches / total >= LineVerifyMinMatch;
     }
 
-    /// <summary>Probes ProbeCount columns and returns the consensus Y of the window's outer top.</summary>
-    private static bool TryConsensusWindowTop(CapturedImage image, int xRangeStart, int xRangeEnd, int fromY, out int consensus)
+    /// <summary>Probes ProbeCount columns and returns the consensus Y of the title bar's bottom row.</summary>
+    private static bool TryConsensusTitleBarBottom(
+        CapturedImage image, int xRangeStart, int xRangeEnd, int fromY, out int consensus)
     {
         var found = new List<int>();
         for (int i = 0; i < ProbeCount; i++)
         {
             int x = xRangeStart + (xRangeEnd - xRangeStart) * i / Math.Max(1, ProbeCount - 1);
             if (x < 0 || x >= image.Width) continue;
-            if (ScanToWindowTop(image, x, fromY) is { } v) found.Add(v);
+            if (ScanToTitleBarBottom(image, x, fromY) is { } v) found.Add(v);
         }
         return TryGetConsensus(found, MinTopAgreementFraction, out consensus);
     }
 
-    /// <summary>
-    /// Returns the window's outer top edge for one column, or null when this column cannot answer.
-    ///
-    /// **It confirms a shape rather than searching for an end**, which is the whole difference from the scan this
-    /// replaced. The title bar is a band of pure black sitting directly on the content interior, about 16 rows
-    /// tall, with something other than black above it. A column either sees that or abstains — and abstaining is
-    /// useful, because consensus then comes from the columns that can see it.
-    ///
-    /// The three ways a column legitimately fails, each of which used to produce a wrong answer instead:
-    /// <list type="bullet">
-    /// <item><b>A HUD panel or another window's chrome flush on top.</b> The black does not end, so the band
-    /// measures the full walk limit and is rejected. The player's HP bar does this (user, 2026-09-30).</item>
-    /// <item><b>Unrelated black chrome a little above, with background between.</b> Never reached: the walk stops
-    /// after TitleBarWalkLimit rows, and the band it has measured by then is the real one. This is the bug that
-    /// prompted the rewrite — the old scan treated the intervening game world as glyph rows and kept going.</item>
-    /// <item><b>Another window overlapping just above.</b> Its interior grey ends the walk early, the band comes
-    /// out too short, and the column abstains. The two title bars can sit ~7px apart.</item>
-    /// </list>
-    ///
-    /// Bright rows inside the band are the title's own glyphs and are skipped rather than ended on: anti-aliasing
-    /// means a stroke is not simply "bright" (a real capture reads 192, 115, 77, 38 down one), so an exit test of
-    /// "black or bright, else stop" stops on a glyph's soft edge. Skipping them is safe here in a way it was not
-    /// before, because the height bounds and the must-end check now do the work that tolerance used to be asked to
-    /// do alone.
-    /// </summary>
-    private static int? ScanToWindowTop(CapturedImage image, int x, int fromY)
+    /// <summary>The first pure-black row going up from inside the content area — the title bar's bottom — or null
+    /// when there is none within reach.</summary>
+    private static int? ScanToTitleBarBottom(CapturedImage image, int x, int fromY)
     {
-        // Up from inside the content area to the first pure-black row: the title bar's bottom.
         int y = fromY;
         int searched = 0;
         while (!IsPureBlack(image, x, y))
         {
             if (++searched > TitleBarSearchDistance || --y < 0) return null;
         }
-
-        int bandBottom = y;
-        int bandTop = y;
-        int limit = Math.Max(0, bandBottom - TitleBarWalkLimit + 1);
-        for (int row = bandBottom - 1; row >= limit; row--)
-        {
-            // **Black first, and the order is load-bearing**: IsInterior is a max-channel test, which pure black
-            // also satisfies, so testing interior first ends the walk on the band's own second row.
-            if (IsPureBlack(image, x, row)) { bandTop = row; continue; }
-
-            // Interior grey means we have left this window's title bar — it is only ever its own black plus its
-            // glyphs — so whatever is here belongs to something else.
-            if (IsInterior(image, x, row)) break;
-        }
-
-        int height = bandBottom - bandTop + 1;
-        if (height < TitleBarMinHeight || height > TitleBarMaxHeight) return null;
-
-        // **The band has to end.** Still black above means this column is reading a merged region and has no idea
-        // where the window starts; the height test alone cannot catch that, because a merged band is simply
-        // truncated at the walk limit and can land inside the permitted range. A band that runs to the top of the
-        // frame is a window clipped by the screen edge, which is real and allowed.
-        if (bandTop > 0 && IsPureBlack(image, x, bandTop - 1)) return null;
-
-        return bandTop;
+        return y;
     }
 
     /// <summary>The largest same-value cluster (within tolerance), if at least MinAgreementFraction of the

@@ -150,18 +150,22 @@ public class WindowTopEdgeTests
     }
 
     /// <summary>
-    /// **The negative control for the two above.** A rule that simply answered "the first black row going up" would
-    /// pass neither, but one that answered "wherever the black ends" would pass the flush-panel case by accident.
-    /// Covering the window's whole width flush with the title bar leaves no clear column, so there is genuinely no
-    /// way to know where it starts — and the finder must say so rather than invent a top edge.
+    /// **Another window's title bar flush across the whole width** (bug found by the user, 2026-10-09, on `Speckled
+    /// Molded Mushroom`, sitting over a Storage Trunk). The two black bands join into one 24 rows tall and no column
+    /// can see where this window's starts, so the rule that confirmed the band's shape refused it, and a fully visible
+    /// window was reported covered. The bar is always 16 rows, so its bottom is all that is needed. The panel here is
+    /// taller than the old walk limit and covers every column, which is the arrangement that rule could not answer.
     /// </summary>
     [Fact]
-    public void APanelCoveringTheWholeWidthLeavesNothingToMeasureAndIsRefused()
+    public void ATitleBarFlushAcrossTheWholeWidthDoesNotHideTheWindow()
     {
         Frame f = AWindow();
         f.Fill(0, TitleTop - 25, 599, TitleTop - 1, 0);
 
-        Assert.Null(Find(f));
+        Rect? bounds = Find(f);
+
+        Assert.NotNull(bounds);
+        Assert.Equal(TitleTop, bounds.Value.Y);
     }
 
     /// <summary>
