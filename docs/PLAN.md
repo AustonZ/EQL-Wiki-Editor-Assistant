@@ -380,6 +380,11 @@ font default changes.
   Two frames, `samples/21a-...-description.png` and `21b-...-lore.png`, the same five item windows with this one bottom
   middle over a storage trunk, on its Description tab and then its Lore tab. Both were reported occluded, so probably
   one cause; check both when it is fixed. Not audited yet (they show chat), so they stay out of git until they are.
+- **The icon check calls `Spiderling Silk`'s icon a mismatch although it is plainly right** (user, 2026-10-09).
+  Suspected: the game's ~1.1x resampling blurs this sprite past `SameIconThreshold` (0.13), the known limit recorded
+  under "Icon comparison" in CLAUDE.md, where `Black Chain Bridle` matches its own artwork worse than some unrelated
+  pairs. Frame: `samples/22-spiderling-silk-icon-false-mismatch.png`, not audited yet. Start with `WikiSpike icons` on
+  it for the actual distance.
 
 ### Revisit before beta
 - **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
@@ -391,22 +396,66 @@ font default changes.
   (everything is measured relative to the window); UI scale and skin do, since every edge-finding constant and the glyph
   atlas belong to one scale and skin. Likely shape: a one-time calibration on a known window that measures the frame and
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
-- **The game's other two skins — probably a blocker for broad rollout; spike first** (user, 2026-10-09). The game ships
-  three skins and the Assistant knows one. The others draw the window with different textures, and the user has
-  confirmed the window finder fails on them. That fits: `WindowBoundsFinder` traces the default skin's measured grey
-  outline (50-62) and black title bar, and every constant there was measured on that skin alone. The spike should answer
-  how much work it is before anything is built:
-  - **Samples first**: a capture of item windows in each skin, both tabs, taken through the Assistant's own capture path
-    (the user sets the scene). Then `LocateSpike --probe` to measure each skin's frame, outline, title bar and interior,
-    as the default skin's profile was measured.
-  - **Which stages break.** Locate is known to. Then: whether the text is still the same blit on a different background
-    (glyph matching calibrates each glyph against its own background, so it may survive untouched); whether the tab
-    colours `ActiveTab` reads still hold; whether `ItemIconReader.IconStrip`'s window-relative position moves with a
-    different frame thickness; and whether the parser's row layout is unchanged.
-  - **The shape of a fix**: a measured profile per skin (constants as data, chosen by setting or detected from the frame),
-    or a locator that relies less on the chrome's exact colours. Overlaps with the calibration idea above; settle whether
-    to do them together.
-  - **Corpus**: audited samples in each skin join the accuracy corpus, so each skin's locate is gated like the default's.
+- **The game's skins: `default_modern` is required, and the Assistant says so** (user, 2026-10-09, after a spike). The
+  game ships three: `default`, `default_light` and `default_modern`. Everything so far was built on `default_modern`.
+  Measured on five frames of each other skin (`samples/30*`, `31*`, gitignored and not yet audited):
+  - **Text is drawn the same way in all three**: the same glyphs on the same anti-aliasing ramp. The other two blend it
+    over a textured background, channel by channel, so a partly covered pixel is that pixel's texture plus coverage times
+    (peak - texture). In `default` the texture runs about 8-41 behind the window text, in `default_light` about 56-132.
+  - **So finding windows works in every skin, and everything after it does not.** Window borders are thick and 3D and
+    the title bar is textured, so the bounds tracing and its pure-black title-bar rule fail. The glyph reader needs exact
+    values and would need the blend model per letter, where a letter has a few dozen pixels against a label's ~700, so the
+    tolerance that is safe for a word is unproven for `.` against `,`. That needs its own verified corpus in each skin
+    before it could be trusted, since today's reader has never had a silent-wrong. And the icon fingerprint treats
+    anything above the flat background as ink, which the light texture is everywhere.
+  - **Decided**: require `default_modern`, detect the other skins and say so (see the redesign below), and leave support
+    for them until a tester asks. If one does: bounds per skin first, then the per-letter blend reader with its own
+    ground truth, then icons.
+
+### Finding windows without a text-recognition model (user, 2026-10-09, after the memory measurement)
+The full-frame RapidOCR pass exists only to find each window's "Description" tab, and it is the whole of a capture's
+memory peak (about 1.6-1.9 GB private in the app, even with the engine released after each capture) and most of its time
+(2.5-4 s). Replace it with a search for the label itself, and remove RapidOCR, ONNX Runtime, SkiaSharp and the models from
+the app. Corners of the window were considered as the anchor and rejected: they are drawn by the skin, they would find
+tooltips and bags too, and the "Description" anchor is what has kept tooltips out from the start.
+
+**Measured with a throwaway prototype** (not in the repository):
+- **Exact template** (the label cut from one real window, every pixel required to land on the ramp): 131 of 131 tabs in
+  the modern-skin frames, both fonts, no false matches, about 1 ms per frame on 32 logical cores.
+- **Blend-model template**, the one to build: full-coverage pixels must equal the peak; the background pixels inside the
+  label's box give the local texture's range; each partly covered pixel must fall inside the range its coverage allows,
+  with 4 levels of slack and up to 3 of the ~380 partly covered pixels outside it. **148 of 148 tabs across all three
+  skins and both fonts, no false matches, about 30 ms per frame.** Compared in the **green channel**, not the brightest:
+  the selected tab's label is yellow, the light skin's texture is not neutral, and the blend happens per channel, so the
+  brightest channel of the texture is the wrong base. Green is at the peak in both white and yellow text. Each relaxation
+  was found by a miss and checked against the corpus: brightest channel 7 of 16 in the skins, green 13, slack 4 15, three
+  misses 16.
+- **Reading each window** (unchanged): 15-35 ms per window. So a capture's local work goes from 2.5-4 s to well under
+  half a second, and the wiki requests become the slow part. Peak memory should be the frame and its copies; to measure.
+
+**Plan:**
+1. **`Core.Locate.DescriptionTabFinder`**: one template per UI font, built from the atlas (glyph bitmaps and learned
+   advances), not cut from a sample. A test proves each matches the real label in a sample pixel for pixel. The search
+   is the blend model above. It returns each label's ink box and the font whose template matched, which gives
+   `LocatedWindow.DrawnIn` from the label, so the wrong-font refusal keeps working.
+2. **A partly covered label is reported, not lost.** Today the model's fuzzy match (edit distance 3) accepts a label
+   missing a few letters and the window is reported occluded. A whole-word template would drop it silently, so a long
+   run of the label's letters in place also counts, as an occluded window. No corpus sample has one (`06c`'s covered tab
+   is missed by both methods), so this is pinned by a synthetic test.
+3. **`ItemWindowLocator` takes its anchors from the finder; nothing after it changes.** `WindowBoundsFinder` uses the
+   anchor's centre x and bottom edge, and the ink box's bottom sits a few pixels above the model's padded box. **Every
+   window rectangle in the corpus must come out byte-identical**, checked by listing them before and after, not by the
+   accuracy counts, which once stayed the same while a rectangle moved a pixel.
+4. **The other skins are recognized and named.** The background just inside a found tab is the flat modern grey or a
+   texture. Measure the separation on `30*`/`31*` against the corpus, then report such a window as a new
+   `ItemCheckStatus` ("This looks like the `default` skin; the Assistant needs `default_modern`"), with no ledger row,
+   like a wrong font. README Requirements gains the skin.
+5. **RapidOCR leaves the app**: `OnDemandRapidOcrEngine`, the package reference, the full-frame path in
+   `RoutingOcrEngine`, and ONNX Runtime's and Skia's notices from the shipped licences and THIRD-PARTY-NOTICES. The tools
+   keep it for now (`--rapid` comparisons, `OcrSpike`); whether to drop the Ocr project entirely is a separate decision.
+6. **Verification**: the accuracy corpus unchanged (2442 correct, 0 in every error count); the rectangles identical;
+   every tab in `21*`, `22`, `30*` and `31*` found; capture time and peak memory measured in the app; CLAUDE.md's locate,
+   OCR-engine and memory sections rewritten to match.
 - **Updating without being asked**, in the background on close, if testers want it. Updating on a click is in the alpha
   (above).
 - **Saved captures stay off by default in full releases** (the first tester, 2026-10-09). They are full screenshots that
