@@ -375,6 +375,12 @@ font default changes.
 - **For step 3's audit**: the glyph atlas is bitmaps of game-rendered Arial (and three glyphs of the user's modified
   font) — rendered pixels, not font software, so probably fine, but it is the one tracked file derived from Arial.
 
+### To investigate
+- **A false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Fully visible, reported as partly covered.
+  Two frames, `samples/21a-...-description.png` and `21b-...-lore.png`, the same five item windows with this one bottom
+  middle over a storage trunk, on its Description tab and then its Lore tab. Both were reported occluded, so probably
+  one cause; check both when it is fixed. Not audited yet (they show chat), so they stay out of git until they are.
+
 ### Revisit before beta
 - **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
   tester can have it, since it is never distributed, so choosing it only gets every capture refused. Options then: show
@@ -385,6 +391,22 @@ font default changes.
   (everything is measured relative to the window); UI scale and skin do, since every edge-finding constant and the glyph
   atlas belong to one scale and skin. Likely shape: a one-time calibration on a known window that measures the frame and
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
+- **The game's other two skins — probably a blocker for broad rollout; spike first** (user, 2026-10-09). The game ships
+  three skins and the Assistant knows one. The others draw the window with different textures, and the user has
+  confirmed the window finder fails on them. That fits: `WindowBoundsFinder` traces the default skin's measured grey
+  outline (50-62) and black title bar, and every constant there was measured on that skin alone. The spike should answer
+  how much work it is before anything is built:
+  - **Samples first**: a capture of item windows in each skin, both tabs, taken through the Assistant's own capture path
+    (the user sets the scene). Then `LocateSpike --probe` to measure each skin's frame, outline, title bar and interior,
+    as the default skin's profile was measured.
+  - **Which stages break.** Locate is known to. Then: whether the text is still the same blit on a different background
+    (glyph matching calibrates each glyph against its own background, so it may survive untouched); whether the tab
+    colours `ActiveTab` reads still hold; whether `ItemIconReader.IconStrip`'s window-relative position moves with a
+    different frame thickness; and whether the parser's row layout is unchanged.
+  - **The shape of a fix**: a measured profile per skin (constants as data, chosen by setting or detected from the frame),
+    or a locator that relies less on the chrome's exact colours. Overlaps with the calibration idea above; settle whether
+    to do them together.
+  - **Corpus**: audited samples in each skin join the accuracy corpus, so each skin's locate is gated like the default's.
 - **Updating without being asked**, in the background on close, if testers want it. Updating on a click is in the alpha
   (above).
 - **Saved captures stay off by default in full releases** (the first tester, 2026-10-09). They are full screenshots that
