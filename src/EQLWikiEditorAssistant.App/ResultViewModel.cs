@@ -544,6 +544,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public string IconVerdict => Result.Icon switch
     {
         { Matches: true } => "Appears to be correct.",
+        { WikiFileDiffersFromGame: true } c =>
+            $"The ID is right, but the wiki's file for icon #{c.IconId} is different artwork from the game's.",
         { Matches: false } when Result.IconSuggestion is { CanApplyToPage: true } =>
             $"May be incorrect on the wiki. The in-game icon looks like icon #{Result.IconSuggestion.IconId}.",
         { Matches: false } => "May be incorrect on the wiki. Failed to automatically determine icon ID.",

@@ -525,9 +525,11 @@ public sealed class ItemCheckPipeline
                 : null;
 
         // The library agreeing with the page is a different finding: the id is right and the *file* holds the wrong
-        // artwork, which is the 31-file numbering divergence the icon audit found. Re-uploading over it is the one
-        // act this tool refuses, so there is nothing to offer and the mismatch stays flagged.
-        if (iconFix is not null && string.Equals(iconFix.IconId, page.IconId, StringComparison.Ordinal))
+        // artwork (IconComparison.WikiFileDiffersFromGame). Re-uploading over it is the one act this tool refuses, so
+        // there is nothing to offer and the mismatch stays flagged.
+        if (iconFix is not null &&
+            (icon is { WikiFileDiffersFromGame: true } ||
+             string.Equals(iconFix.IconId, page.IconId, StringComparison.Ordinal)))
             iconFix = null;
 
         if (needsLore)
@@ -738,16 +740,19 @@ public sealed class ItemCheckPipeline
         }
 
         if (!IconHasher.TryFingerprint(
-                wikiIcon, new Rect(0, 0, wikiIcon.Width, wikiIcon.Height), out IconFingerprint onWiki))
-            return (null, $"The wiki's icon {iconId} has too little ink to compare.", wikiIcon);
-
-        if (!onWiki.IsComparable)
+                wikiIcon, new Rect(0, 0, wikiIcon.Width, wikiIcon.Height), out IconFingerprint onWiki) ||
+            !onWiki.IsComparable)
             return (null, $"The wiki's icon {iconId} is too low-contrast to judge — compare them by eye below.", wikiIcon);
 
         // The wiki image comes back even when the capture could not be fingerprinted, so the user can still see both.
-        return captured is null
-            ? (null, unreadableNote, wikiIcon)
-            : (new IconComparison(iconId!, captured, onWiki, captured.CorrelationDistanceTo(onWiki)), null, wikiIcon);
+        if (captured is null) return (null, unreadableNote, wikiIcon);
+
+        // Judged against the best icon in the whole library rather than by a fixed distance — see
+        // IconLibrary.SameArtworkMargin. A search over every icon per capture is milliseconds.
+        double? best = _iconLibrary?.Search(captured, take: 1) is [var top, ..] ? top.Distance : null;
+        double? ownInLibrary = _iconLibrary?.DistanceTo(iconId!, captured);
+        return (new IconComparison(
+            iconId!, captured, onWiki, captured.CorrelationDistanceTo(onWiki), best, ownInLibrary), null, wikiIcon);
     }
 
     /// <summary>

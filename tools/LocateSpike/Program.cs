@@ -64,7 +64,7 @@ for (int i = 0; i < windows.Count; i++)
         // The icon sits in the strip left of the content text, drawn with transparency straight onto the window's
         // 16-grey — there is no frame around it. Chrome rules and the content outline live in the 26-70 band, so
         // requiring a brighter pixel keeps them out; x starts at 2 to clear the outline column entirely.
-        const int scanLeft = 2, scanTop = 30, scanRight = 53, scanBottom = 130, inkFloor = 70;
+        const int scanLeft = 2, scanTop = 30, scanRight = 58, scanBottom = 130, inkFloor = 70;
         int minX = int.MaxValue, minY = int.MaxValue, maxX = -1, maxY = -1, lit = 0;
         for (int y = scanTop; y < scanBottom; y++)
             for (int x = scanLeft; x < scanRight; x++)

@@ -50,15 +50,33 @@ public enum ItemCheckStatus
     Failed,
 }
 
-/// <summary>How the captured icon compared against the one the page points at. Flag-only: the tool never proposes a
-/// new <c>lucy_img_ID</c>, because it cannot know whether the page is wrong or the capture caught something odd.</summary>
+/// <summary>How the captured icon compared against the file the page points at.</summary>
+/// <param name="Distance">The capture against the wiki's file.</param>
+/// <param name="BestInLibrary">The capture against the closest icon in the game's library, when there is a library.
+/// The match is judged against it — see <see cref="IconLibrary.SameArtworkMargin"/>.</param>
+/// <param name="PageIdInLibrary">The capture against the library's own icon for the page's id, when it has one.</param>
 public sealed record IconComparison(
     string IconId,
     IconFingerprint Captured,
     IconFingerprint OnWiki,
-    double Distance)
+    double Distance,
+    double? BestInLibrary = null,
+    double? PageIdInLibrary = null)
 {
-    public bool Matches => Captured.LooksLike(OnWiki);
+    /// <summary>Whether the wiki's file shows the artwork the game drew: within the margin of the best icon in the
+    /// library, or by the absolute threshold when there is no library.</summary>
+    public bool Matches => BestInLibrary is { } best
+        ? Distance - best <= IconLibrary.SameArtworkMargin
+        : Captured.LooksLike(OnWiki);
+
+    /// <summary>
+    /// **The id is right and the wiki's file is not**: the game's own icon for this id matches the capture, while the
+    /// file the wiki holds under that id is different artwork. Measured on 4 of 96 corpus items. The fix is a new
+    /// version of the wiki's file, which this tool does not upload over, so it is reported rather than offered.
+    /// </summary>
+    public bool WikiFileDiffersFromGame =>
+        !Matches && BestInLibrary is { } best && PageIdInLibrary is { } own &&
+        own - best <= IconLibrary.SameArtworkMargin;
 }
 
 /// <summary>

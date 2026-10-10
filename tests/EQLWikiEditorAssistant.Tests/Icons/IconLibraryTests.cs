@@ -14,7 +14,7 @@ namespace EQLWikiEditorAssistant.Tests.Icons;
 /// </summary>
 public class IconLibraryTests
 {
-    private const int SignatureLength = 12 * 12 * 3;
+    private const int SignatureLength = IconHasher.GridSize * IconHasher.GridSize * 3;
 
     /// <summary>A fingerprint whose signature is a smooth ramp offset by <paramref name="seed"/>, so two different
     /// seeds correlate imperfectly and the same seed correlates exactly.</summary>
@@ -27,7 +27,7 @@ public class IconLibraryTests
             value += skew * Math.Sin(i / 9.0) * 40;
             signature[i] = (byte)Math.Clamp(value, 0, 255);
         }
-        return new IconFingerprint(signature, 40, 40);
+        return new IconFingerprint(signature);
     }
 
     /// <summary>A copy perturbed in every other cell starting at <paramref name="from"/>, so two different starting
@@ -119,7 +119,7 @@ public class IconLibraryTests
     [Fact]
     public void AnIconTooFlatToCompareIsRefusedRatherThanAnswered()
     {
-        var flat = new IconFingerprint(new byte[SignatureLength], 40, 40);
+        var flat = new IconFingerprint(new byte[SignatureLength]);
         IconLibrary library = LibraryOf(("100", Fingerprint(1)), ("200", Fingerprint(2)));
 
         Assert.False(flat.IsComparable);
@@ -157,7 +157,6 @@ public class IconLibraryTests
         {
             Assert.Equal(icons[i].IconId, read[i].IconId);
             Assert.Equal(icons[i].Fingerprint.Signature, read[i].Fingerprint.Signature);
-            Assert.Equal(icons[i].Fingerprint.InkWidth, read[i].Fingerprint.InkWidth);
         }
     }
 

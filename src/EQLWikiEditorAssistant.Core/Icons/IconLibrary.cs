@@ -17,8 +17,9 @@ public sealed record IconMatch(string IconId, double Distance);
 /// built to answer "does this page point at the right artwork?" — one capture against one known file. Here the
 /// question is "which of 11,592 icons is this?", which is a harder question in a way worth stating: a comparison only
 /// has to separate one right answer from one wrong one, while a search has to beat *every* wrong one. The same
-/// signature is reused deliberately, because a second fingerprint would be a second home for a measured rule, but
-/// the thresholds are its own — see <see cref="ConfidentMargin"/>.
+/// signature is reused deliberately, because a second fingerprint would be a second home for a measured rule. Since
+/// 2026-10-10 the library also decides the check itself: a page's icon matches when it is as close to the capture as
+/// the best icon here — see <see cref="SameArtworkMargin"/>.
 ///
 /// **The ids are the game's own filenames**, which is what makes this usable at all: the extracted asset folder names
 /// each icon by its id, so identifying the artwork identifies the id. Nothing here derives an id from the wiki, and
@@ -43,39 +44,47 @@ public sealed class IconLibrary
     /// How much closer the best match must be than the runner-up before the id is written into the wikitext without
     /// a human choosing it.
     ///
-    /// **A margin, and deliberately *not* an absolute distance — which was measured rather than reasoned, and the
-    /// measurement went against the obvious choice.** `WikiSpike iconsearch` over 90 distinct captured items, each
-    /// against all 11,562 indexed icons, with the item's own live wiki page as ground truth: top-1 is 87/90 (96.7%),
-    /// nothing refused. Gating on <see cref="IconFingerprint.SameIconThreshold"/> (0.13) as well *loses* 5 correct
-    /// answers and catches nothing the margin does not — a correct match reaches 0.2977 (`Cloak of Scales`), because
-    /// the game draws each icon about 1.10x its stored size and interpolates, which moves the absolute score far more
-    /// than it moves the ranking. So the second-place gap is the only signal worth gating on.
+    /// **A margin, and deliberately *not* an absolute distance.** An absolute cutoff loses correct answers: the game
+    /// draws each icon 1.1x and interpolates, which moves the absolute score far more than it moves the ranking, so the
+    /// gap to the runner-up is the signal worth gating on.
     ///
-    /// Margin sweep, counting `Puppet Strings` as the one genuinely wrong answer (see below):
+    /// Measured with the whole-cell fingerprint (2026-10-10, `WikiSpike iconsearch`): 101 distinct captured items,
+    /// each against all 11,592 icons, the item's own wiki page as ground truth. **Top-1 is 100/101**, from 87/90 on the
+    /// old ink-box fingerprint. The one miss is `Puppet Strings`, which the game draws unlike its file, at a margin of
+    /// 0.0066.
     ///
     /// <code>
     /// margin    accepted   wrong accepted   correct rejected
-    ///  0.0020        88            0                1
-    ///  0.0075        87            0                2
-    ///  0.0100        86            0                2
-    ///  0.0200        85            0                3
-    ///  0.0300        82            0                6
+    ///  0.006       100            1                1
+    ///  0.008        99            0                1
+    ///  0.010        98            0                2
+    ///  0.030        95            0                5
     /// </code>
     ///
-    /// 0.01 sits in the middle of the flat part: 8x above the one genuine error (`Puppet Strings`, margin 0.0013,
-    /// whose best distance is 0.3754 — nothing in the library resembles it) and 2x below the closest correct answer
-    /// it gives up (`Bloodstar Pendant`, 0.0050).
-    ///
-    /// **No threshold separates the two classes perfectly, and that is worth knowing rather than hiding**: the same
-    /// shape of result as the icon check's own threshold. `Cloak of Scales` is a *correct* answer at a margin of
-    /// 0.0002 — below the genuine error — so it is a coin flip this tool happened to win, and it is excluded here.
-    /// Which is the right outcome: it becomes a shortlist for the user instead of a silent guess.
-    ///
-    /// What makes the residual risk acceptable is the same thing that made the icon check's thresholds acceptable —
-    /// **the review screen shows the matched artwork beside the captured one**, so a wrong match is a glance rather
-    /// than a silent edit.
+    /// 0.01 sits 1.5x above the one wrong answer; the two correct answers below it (`Bloodstar Pendant` 0.0054,
+    /// `Mote of Grand Potential` 0.0080) become a shortlist for the user rather than a silent guess. What makes the
+    /// residual risk acceptable is that **the review screen shows the matched artwork beside the captured one**, so a
+    /// wrong match is a glance rather than a silent edit.
     /// </summary>
     public const double ConfidentMargin = 0.01;
+
+    /// <summary>
+    /// How much further a page's icon may be from the capture than the best icon in the whole library, and still be
+    /// the same artwork (user, 2026-10-10).
+    ///
+    /// **Relative to the best match, not an absolute distance**, because the library already ranks correctly and an
+    /// absolute cutoff cannot: two recoloured twins of one drawing (icons 590 and 603, both swords) sit closer to
+    /// each other than some genuine pairs sit to themselves, while against the best match each twin is clearly the
+    /// other's runner-up. And the game's own rendering quirks — the 1.1x interpolation, a grey outline it adds
+    /// around dark sprites — penalise every candidate alike, so they cancel.
+    ///
+    /// Measured on the 16x16 grid over 96 captured items against 87 wiki icons: the worst genuine pair is 0.016 over
+    /// the best, the closest different icon 0.043 over. The pairs above it are not false alarms: on four the page's
+    /// id is right and the wiki's *file* for it is different artwork from the game's (`Obtenebrate Mithril Guard`,
+    /// `Black Chain Bridle`, `Cloak of Scales`, `Void-Touched Potential`), and on `Puppet Strings` the game draws
+    /// something unlike either file.
+    /// </summary>
+    public const double SameArtworkMargin = 0.03;
 
     /// <summary>
     /// The closest icons to <paramref name="captured"/>, nearest first.
@@ -99,6 +108,18 @@ public sealed class IconLibrary
 
         scored.Sort((a, b) => a.Distance.CompareTo(b.Distance));
         return scored.Count <= take ? scored : scored[..take];
+    }
+
+    /// <summary>How far <paramref name="captured"/> is from the library's icon <paramref name="iconId"/>, or null when
+    /// the library has no such icon or the capture is not worth comparing.</summary>
+    public double? DistanceTo(string iconId, IconFingerprint captured)
+    {
+        ArgumentNullException.ThrowIfNull(captured);
+        if (!captured.IsComparable) return null;
+        LibraryIcon? icon = _icons.FirstOrDefault(i => string.Equals(i.IconId, iconId, StringComparison.Ordinal));
+        return icon is null || icon.Fingerprint.Signature.Length != captured.Signature.Length
+            ? null
+            : captured.CorrelationDistanceTo(icon.Fingerprint);
     }
 
     /// <summary>

@@ -399,7 +399,10 @@ From the user:
   Two frames, `samples/21a-...-description.png` and `21b-...-lore.png`, the same five item windows with this one bottom
   middle over a storage trunk, on its Description tab and then its Lore tab. Both were reported occluded, so probably
   one cause; check both when it is fixed. Not audited yet (they show chat), so they stay out of git until they are.
-- **The icon check calls `Spiderling Silk`'s icon a mismatch although it is plainly right** (user, 2026-10-09).
+- **Fixed 2026-10-10: the icon check called `Spiderling Silk`'s icon a mismatch although it is plainly right** (user,
+  2026-10-09). A cropping bug, not a limit: the old strip clipped the last column of an icon that uses its full width.
+  Now fixed by comparing the whole fixed 44x44 cell against the best icon in the library (see CLAUDE.md, "Icon
+  comparison").
   Suspected: the game's ~1.1x resampling blurs this sprite past `SameIconThreshold` (0.13), the known limit recorded
   under "Icon comparison" in CLAUDE.md, where `Black Chain Bridle` matches its own artwork worse than some unrelated
   pairs. Frame: `samples/22-spiderling-silk-icon-false-mismatch.png`, not audited yet. Start with `WikiSpike icons` on

@@ -985,7 +985,7 @@ skips the wiki fetch entirely.
   - **The existing tests could not have caught it, and that is the lesson.** They all went through the
     automatic-match path, which uses the real fingerprint; and they ran against a blank frame, where there is no icon
     to read — so a fingerprint computed with one and without one are *identical* and the assertion passes either way.
-    `FrameWithIcon()` exists for this: it paints the icon strip so `CapturedIcon` is non-null, and the round-trip
+    `FrameWithIcon()` exists for this: it paints the icon cell so `CapturedIcon` is non-null, and the round-trip
     tests assert that before anything else. A test that cannot fail against the bug is not a test.
 - **The fingerprint (`Core.Items.ItemFingerprint`) covers what an edit depends on and nothing else.** Lists are
   sorted, because a class list is a set and the window's emission order must not invalidate a row. The captured
@@ -1055,16 +1055,10 @@ something odd, so choosing is a human's call — and that rule is about the *wri
 already identified the artwork in order to notice the mismatch; a page that does not exist gets its id filled in
 outright, there being nothing to overwrite. Either way nothing reaches a page without the user looking at two images
 and pressing something. See "Identifying an item's icon" below.
-- **The in-game icon has no frame.** The game draws the sprite with transparency straight onto the window's 16-grey,
-  left of the item's name — nothing to trace, unlike the window outline. `ItemIconReader.IconStrip` is the region it
-  occupies, measured across all 43 screenshots (`LocateSpike --icon`): window-relative x 12..52, y 52..100, with the
-  name and flag rows starting at x ≈ 56.
-  - **What the review screen shows is a tighter crop, `ItemIconReader.IconCell`: x 12..55, y 54..97, 44x44** — the
-    40x40 artwork's own cell at the game's ~1.1x (user, 2026-10-07). Shown in the same 160px box as the wiki file,
-    the two sprites then match in scale and position; the strip's spare background had made the captured one look
-    smaller. Measured over 119 sample icons with the fingerprint's ink floor (28): ink starts at y 54 on 60 and ends
-    at y 97 on 54, starts at x 12 on 48, and never passes x 55 with the scan widened beyond it. **The strip, not the
-    cell, is still what gets fingerprinted**, because every icon threshold below was measured through it.
+- **The icon is read from a fixed cell, every pixel of it** (user, 2026-10-10). The game draws every icon at the
+  same place in the window and always at 44x44 — the 40x40 artwork at 1.1x — so `ItemIconReader.IconCell` (x 12..55,
+  y 54..97) is the whole capture and the whole 40x40 file is the other side. Nothing is traced or searched for. The
+  review screen shows the same cell, so the two sprites appear at the same scale.
 - **An exact pixel diff is not possible against these files, and this was tested rather than assumed.** The idea is
   sound in principle — the wiki icons were pulled programmatically from the game's own assets and PNG is lossless,
   so a fixed offset and a byte comparison ought to work. It fails on measurement (`WikiSpike icondiff`):
@@ -1084,49 +1078,51 @@ and pressing something. See "Identifying an item's icon" below.
     regenerate the atlas for that profile. Icons have no such luxury: the wiki's files are fixed at 40x40 for
     everyone, so whatever a given player's client renders has to be compared against that one size. A comparison
     that tolerates scale is the only kind that can work across scales and skins at all.
-- **So the comparison is perceptual**, and scale-invariant by construction: the ink's own bounding box is found on
-  both sides and resampled onto a 12x12 colour grid, so neither the sprite's position in its cell nor the padding a
-  caller included matters.
-- **Three bugs found by measurement, each of which made the check useless in a different way**, and none of which
-  any unit test would have caught:
-  - **Alpha was being discarded.** `ImageFile.LoadAsync` decodes with `BitmapAlphaMode.Ignore`, which is right for
-    screenshots and wrong for a wiki PNG: transparent pixels keep whatever RGB the encoder left, usually white, so
-    the whole 40x40 file read as ink. Every icon came back a mismatch at close to the random baseline.
-    `LoadOverBackgroundAsync` composites over the game's own background grey instead, so both sides are the same
-    sprite on the same backdrop.
-  - **The ink floor was far too high.** At 70, a dark brown pauldrons icon is almost entirely below it, so only its
-    white highlights counted and a 38x14 sprite was measured as a 27x10 sliver — read as a confident mismatch. The
-    floor belongs just above the 16-grey background; it is 28.
-  - **A luminance-only 64-bit difference hash could not separate the classes.** Rings and earrings are all small
-    objects on a dark field with much the same brightness pattern; what distinguishes them is hue. Keeping colour,
-    on a 12x12x3 signature compared by mean absolute difference, does.
-- **The negative control is what proved any of this.** A check that says "match" to everything looks perfect;
-  `WikiSpike icons` therefore also compares each captured icon against the *other* items' wiki icons. That is what
-  exposed the first two designs, both of which passed the same-item cases.
-- **Comparison is by correlation, not absolute difference**, and that too was measured: mean absolute difference
-  gave 7 false alerts out of 80 at its best zero-false-match threshold, correlation gives 4. Correlation ignores an
-  overall brightness or contrast shift, which is precisely what two different renderings of one sprite differ by.
-- **An icon with too little contrast is not judged at all.** `Nightmare Hide` is almost entirely black with a faint
-  outline: the ink box ends up driven by the outline, the signature is nearly uniform, and the comparison produced a
-  confident mismatch against the item's *own* correct icon. `IconFingerprint.IsComparable` gates on signature
-  standard deviation (0.06), and `ItemIconReader` refuses to return a fingerprint below it — an alert nobody can act
-  on is worse than no alert.
-- **The threshold was measured, not chosen**: 0.13. **Correction (2026-09-28): the earlier claim here that it is
-  "the last point with zero false matches" was true only of the small control set it was measured on** (134
-  controls). Re-measured properly with `WikiSpike icons --corpus` — every captured icon against every distinct wiki
-  icon, **6,688 pairs from 88 items and 76 icons** — 0.13 admits **6 false matches**, the closest at 0.053. Several
-  look like genuinely similar artwork rather than comparison failures (a mask scoring against another mask's icon).
-- **And no threshold fixes it, which is the part worth knowing.** `Black Chain Bridle` matches its *own* artwork at
-  0.067 — worse than the nearest control pair at 0.053. The measure cannot separate those two cases, so tightening
-  the threshold to eliminate false matches would reject real ones. 0.13 stays, and the images are shown instead.
-- **The contrast gate came down from 0.06 to 0.02 on the same measurement.** At 0.06 it refused icons that compare
-  perfectly well: six dark ones become judgeable at 0.02, and five match their own artwork at 0.017-0.067. The
-  sixth, `Nightmare Hide`, still misreads at 0.22 — the very icon the gate was built for.
-- **What makes those costs acceptable is that the review screen now shows both icons side by side, always** (user,
-  2026-09-28). The old reasoning — "an alert nobody can act on is worse than no alert" — held only while the user
-  could not see what the tool was comparing. A false alert is now a glance, and a false *match* is visible too,
-  which no amount of threshold tuning achieves. A false match silently blessing a wrong icon remains the failure
-  this project most wants to avoid; showing the artwork is a better defence against it than a number.
+- **So the comparison is perceptual**: both sides are shrunk onto the same **16x16 colour grid** by exact area
+  averaging (fractions included, so 44 and 40 land on identical grids) and compared by correlation, which ignores an
+  overall brightness or contrast shift — precisely what two renderings of one sprite differ by.
+  - **Why the whole cell, which reverses the earlier design.** Until 2026-10-10 the fingerprint was fitted to the
+    ink's bounding box, so neither the sprite's position nor the crop's padding mattered. That made one stray pixel or
+    one clipped column move the whole grid: `Spiderling Silk` fills its full 44 columns and lost the last one to the
+    old crop (a correct icon at 0.156, over the threshold), and widening the crop pulled in a 2-pixel mark the game
+    draws beside `Bag of Sea Salt`, which stretched its box (0.013 to 0.212). With the cell fixed, every comparison
+    is on the same scale, and a stray mark is two pixels of 1,936.
+  - **Colour is kept**: small icons on a dark field look alike in brightness, and hue is what tells them apart.
+  - **The grid was measured**, 8 through 40: 16 left the widest gap between the worst genuine pair and the closest
+    different icon. Finer grids feel the game's interpolation and the grey outline it draws around dark sprites;
+    coarser ones merge recoloured twins.
+- **A match is judged against the best icon in the whole library, not by a fixed distance** (user, 2026-10-10):
+  the page's icon is the same artwork when the capture is within `IconLibrary.SameArtworkMargin` (0.03) of the best
+  of all 11,592. `IconComparison.Matches` holds the rule; `IconFingerprint.SameIconThreshold` is only the fallback
+  for when there is no library.
+  - **Why relative**: icons 590 and 603 are recoloured twins of one sword drawing, and against a fixed threshold no
+    number separated them from genuine pairs — the twin sat closer than some icons sit to themselves. Against the best
+    match each twin is plainly the other's runner-up. And the game's rendering quirks — the 1.1x interpolation, the
+    grey outline round dark sprites — penalise every candidate alike, so they cancel.
+  - **Measured** (`WikiSpike icons --corpus`, 96 items against 87 wiki icons, 8,256 different-icon pairs): the worst
+    genuine pair is 0.021 over the best, the closest different icon 0.042 over; 0 false matches at 0.03. The old ink-box
+    measure had 5 false alerts and 12 false matches on the same pairs.
+  - **The five alerts that remain are mostly true.** On four, the page's id is right and **the wiki's file for it is
+    different artwork from the game's** — the game's own icon for that id matches at +0.000: `Obtenebrate Mithril
+    Guard`, `Black Chain Bridle`, `Cloak of Scales`, `Void-Touched Potential`. That is its own outcome,
+    `IconComparison.WikiFileDiffersFromGame`, said as such on the review screen, with nothing offered: the fix is a
+    new version of the wiki's file, and this tool does not upload over one. The fifth, `Puppet Strings`, is drawn by
+    the game unlike either file — the one genuine limit of comparing against files.
+  - **"Byte-identical" is not "same artwork"**: 86 of the 87 cached wiki icon files differ from the game's file of the
+    same id byte for byte, presumably re-encoded, while looking the same. Compare pictures, not bytes.
+- **The negative control is what proves any of this.** A check that says "match" to everything looks perfect;
+  `WikiSpike icons` therefore also compares each captured icon against the *other* items' wiki icons, and
+  `icons --corpus` prints every pair. Three earlier designs passed the same-item cases and failed the controls.
+- **Alpha must be composited, not discarded.** A wiki PNG's transparent pixels keep whatever colour the encoder left,
+  so decoding with alpha ignored read the whole 40x40 file as ink. Both sides are composited over the game's own
+  background grey (`AlphaComposite`), so they are the same sprite on the same backdrop.
+- **A cell too uniform to compare is not judged** (`IconFingerprint.MinimumContrast`, 0.02): the darkest captured icon
+  in the corpus is 0.039, so it only ever refuses a blank cell. 100 library icons fall under it, blank artwork no
+  capture could identify anyway.
+- **The review screen shows both icons side by side, always** (user, 2026-09-28), so a false alert costs a glance and
+  a false match is visible too, which no threshold achieves.
+- **Changing the fingerprint expires every settled ledger row once**, since the captured icon's signature is part of
+  the ledger's fingerprint: the next capture of each item re-checks it and settles it again.
 - **The cache** keeps each `File:item_<ID>.png` on disk, keyed by id, and is consulted before any network call —
   icons are static and heavily shared (three corpus breastplates all use id 624, so three items cost one download).
   No expiry; Settings > Icon cache clears it or re-downloads one icon (`IconCache.Clear`/`RedownloadAsync`). A
@@ -1136,7 +1132,7 @@ and pressing something. See "Identifying an item's icon" below.
 - **The decoder port closed the last dev-only gap here** (2026-09-28). Decoding a downloaded PNG used to go through
   `TestSupport.ImageFile`, which is file-based and not shippable. `Core.Icons.IImageDecoder` is now the port and
   `Capture.WindowsImageDecoder` the implementation — and **`ImageFile.LoadOverBackgroundAsync` delegates to it**
-  rather than keeping its own copy. That direction matters: every threshold above was measured *through* that
+  rather than keeping its own copy. That direction matters: every number above was measured *through* that
   loader, and the numbers only transfer to the shipping tool if both sides decode identically. The alpha
   compositing itself lives once, in `Core.Imaging.AlphaComposite`.
 - Decoding is from bytes, never from a path — several items share one icon id (three corpus breastplates all use
@@ -1287,34 +1283,21 @@ git (they are the game's artwork, not a capture of anyone's screen, so none of t
 `samples/` out of the repo). That turns `lucy_img_ID` from the one field no capture could supply into one the tool can
 usually read: match the captured sprite against the library, and the matching file's *name* is the id.
 
-- **It inverts what the icon code was for, and that is a harder question than it looks.** `IconFingerprint` was built
-  to answer "does this page point at the right artwork?" — one capture against one known file, where the comparison
-  only has to separate one right answer from one wrong one. A search has to beat **every** wrong one. The same 12x12x3
-  signature is reused (a second fingerprint would be a second home for a measured rule), but the thresholds are its
-  own.
-- **Measured before it was designed, with `WikiSpike iconsearch`**: 90 distinct captured items, each against all
-  11,562 indexed icons, ground truth being the `lucy_img_ID` on the item's own live wiki page. **Top-1 is 87/90
-  (96.7%), nothing refused.** A separate proxy run first — the 76 cached *wiki* icon files against the library, which
-  removes the game's resample from the question — scored 74/74 where ground truth is self-consistent, which is what
-  established that the library is discriminable at all before any app code existed.
-- **Gating is on the margin to the runner-up, not on the absolute distance, and that reversed the obvious choice.**
-  Adding `SameIconThreshold` (0.13) as a second gate *loses 5 correct answers and catches nothing the margin does not*:
-  a correct match reaches **0.2977** (`Cloak of Scales`), because the game draws each icon ~1.10x its stored size and
-  interpolates, which moves the absolute score far more than it moves the ranking. `IconLibrary.ConfidentMargin` is
-  **0.01**, in the middle of the flat part of the sweep — 8x above the one genuine error and 2x below the closest
-  correct answer it gives up.
-- **No threshold separates the two classes perfectly, which is the same shape of answer as the icon check's own
-  threshold and is worth not hiding.** `Cloak of Scales` is a *correct* answer at a margin of 0.0002 — below the one
-  genuine error (`Puppet Strings`, 0.0013) — so it is a coin flip the tool happened to win, and it is excluded. That
-  is the right outcome: it becomes a shortlist rather than a silent guess.
-- **The three apparent failures are two different things, and only one is a matcher failure.**
-  - `Puppet Strings` is the real one: its best match is 0.3754, far past the same-icon threshold, so *nothing in the
-    library resembles what was captured*. The margin gate rejects it.
-  - `Mote of Grand Potential` and `Void-Touched Potential` are **wiki data inconsistencies, not matcher errors**.
-    `File:Item_2896.png` holds the artwork the library files as **10275**, and `File:Item_10275.png` does not exist on
-    the wiki at all; same shape for 2899/2002. Both were confirmed independently by the proxy run at distance 0.0000.
-    Whether this is a historical Lucy-vs-asset numbering difference or an old mis-upload is unresolved and does not
-    need resolving — see the consistency rule below.
+- **It inverts what the icon code was for, and that is a harder question than it looks.** The icon check answers
+  "does this page point at the right artwork?"; a search has to beat **every** wrong answer. The same fingerprint is
+  reused (a second would be a second home for a measured rule), and since 2026-10-10 the check itself is judged
+  against the library's best match — see "Icon comparison" above.
+- **Measured with `WikiSpike iconsearch`**: 101 distinct captured items, each against all 11,592 icons, ground truth
+  being the `lucy_img_ID` on the item's own live wiki page. **Top-1 is 100/101** on the whole-cell fingerprint, from
+  87/90 on the ink-box one. The one miss is `Puppet Strings`, which the game draws unlike its file.
+- **Gating is on the margin to the runner-up, not on the absolute distance**, because the game's 1.1x interpolation
+  moves the absolute score far more than the ranking. `IconLibrary.ConfidentMargin` is **0.01**: 1.5x above the one
+  wrong answer (`Puppet Strings`, 0.0066), giving up two correct answers that become a shortlist instead
+  (`Bloodstar Pendant` 0.0054, `Mote of Grand Potential` 0.0080). No margin separates the classes perfectly, and the
+  review screen showing the matched artwork is what makes the residual risk acceptable.
+- **The wiki's numbering does not always match the game's.** `File:Item_2896.png` holds the artwork the library files
+  as 10275, and `File:Item_10275.png` does not exist; same shape for 2899/2002. Whether historical or a mis-upload
+  does not need resolving — see the consistency rule below.
 - **The id and the artwork are written as a pair, which is what makes the previous point harmless.** The tool writes
   `lucy_img_ID = N` and, when the wiki lacks the file, uploads `game_assets/item_icons/N.png` as `File:Item_N.png` —
   the same N on both sides. So a created page renders the artwork the capture actually showed, whichever numbering the
@@ -1329,8 +1312,9 @@ usually read: match the captured sprite against the library, and the matching fi
     offering a different one there would be guessing. The blank case was the user's call (asked, 2026-10-02) and has
     the same gap with none of the risk.
   - **The library agreeing with the page produces no offer**, which is a different finding and must not be confused
-    with this one: the id is right and the *file* holds the wrong artwork — the 31-file numbering divergence the icon
-    audit found — and the fix for that is re-uploading over somebody's file, which this tool refuses to do.
+    with this one: the id is right and the *file* holds the wrong artwork (`IconComparison.WikiFileDiffersFromGame`,
+    said as such on the review screen), and the fix for that is re-uploading over somebody's file, which this tool
+    refuses to do.
   - **One button that does whatever is needed**, which the user chose over an upload-only one after the measurement
     made the gap concrete: `File:Item_617.png` is *already on the wiki*, so an upload-only button would have shown
     nothing at all on the case they reported. It uploads first when the wiki lacks the file (93% of the library) and
@@ -1375,6 +1359,9 @@ usually read: match the captured sprite against the library, and the matching fi
   - **Start-up shows the build** (user, 2026-10-09): `AppServices` reports each slow step, and the window shows it in
     the capture's own progress bar — "Loading the game's icons…", or "Indexing the game's icons, N%…" when it builds —
     because "Starting…" in the status bar alone read as a hang.
+  - **The index's format version is in its file name** (`item-icons-v2.index` since the whole-cell fingerprint),
+    not only its header: the developer's build and an installed release share the folder, and with one name a release
+    on the old format and a build on the new would each rebuild the other's index on every switch.
   - **Not committed beside the icons**, deliberately: a committed index is a second record of which icons exist, and
     the moment the two disagree the tool starts matching against an out-of-date library. The folder is the only
     answer to "what icons are there".
@@ -2747,7 +2734,7 @@ dotnet run --project tools/WikiSpike -- preview "samples/some screenshot.png"
 # looks perfect, which is exactly how two earlier designs passed:
 dotnet run --project tools/WikiSpike -- icons "samples/12a-3-ear-items.png"
 
-# Find the icon strip in a window (the icon has no frame, so it has to be measured, not traced):
+# Measure where an icon's ink sits in a window, to check IconCell still holds (it was measured, not traced):
 dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --icon
 
 # The icon library: fingerprint every icon the game ships (game_assets/item_icons, 11,592 files) into the index the
@@ -2759,6 +2746,13 @@ dotnet run --project tools/WikiSpike -- iconindex [--force]
 # corpus capture against the whole library, scored against the item's own live wiki page. Writes a TSV so the
 # threshold can be re-swept without touching the wiki again:
 dotnet run --project tools/WikiSpike -- iconsearch
+
+# Every item icon file on the wiki against the game's own icon of the same id, with the app's comparison. Every file
+# goes through it, byte-identical ones included, which must score exactly 0 (else BUG). Downloads are cached by SHA-1
+# under .local-data/icon-audit/, so a re-run fetches only what changed; writes icon-audit.tsv and icon-audit.html.
+# First run (2026-10-10): 11,598 files, 10,815 byte-identical (all 0.000), 2 mismatches (1330 and 1575, the right
+# drawing moved 2 and 4 pixels in the file, since re-uploaded), 6 ids the game lacks (flagged for deletion):
+dotnet run --project tools/WikiSpike -- iconaudit
 # The analyze summary also cross-tabs template-compliance findings by rule and by whether the tool can fix them.
 
 # Store the bot password (prompts; never pass it as an argument — that lands in shell history and the process

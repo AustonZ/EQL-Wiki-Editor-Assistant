@@ -20,10 +20,15 @@ namespace EQLWikiEditorAssistant.Core.Icons;
 /// </summary>
 public static class IconLibraryIndex
 {
-    /// <summary>The name the index is built and loaded under, beside the icon folder.</summary>
-    public const string FileName = "item-icons.index";
+    /// <summary>
+    /// The name the index is built and loaded under. **The format's version is part of the name**, not only of the
+    /// header: a developer build and an installed release share this folder, and with one file name a release on the
+    /// old format and a build on the new one would each rebuild the other's index — seconds at start-up — on every
+    /// switch. Version 2 (2026-10-10) is the whole-cell fingerprint.
+    /// </summary>
+    public const string FileName = "item-icons-v2.index";
 
-    private const string Magic = "EQLICON1";
+    private const string Magic = "EQLICON2";
 
     /// <summary>
     /// Writes the index: a header, then one record per icon. Deflated, because the signatures are smooth colour data
@@ -52,8 +57,6 @@ public static class IconLibraryIndex
                     $"of the index uses {signatureLength}. A mixed index cannot be searched.", nameof(icons));
 
             writer.Write(icon.IconId);
-            writer.Write(icon.Fingerprint.InkWidth);
-            writer.Write(icon.Fingerprint.InkHeight);
             writer.Write(icon.Fingerprint.Signature);
         }
     }
@@ -80,14 +83,12 @@ public static class IconLibraryIndex
         for (int i = 0; i < count; i++)
         {
             string id = reader.ReadString();
-            int inkWidth = reader.ReadInt32();
-            int inkHeight = reader.ReadInt32();
             byte[] signature = reader.ReadBytes(signatureLength);
             if (signature.Length != signatureLength)
                 throw new InvalidDataException(
                     $"The icon index ends partway through '{id}'. Rebuild it with `WikiSpike iconindex`.");
 
-            icons.Add(new LibraryIcon(id, new IconFingerprint(signature, inkWidth, inkHeight)));
+            icons.Add(new LibraryIcon(id, new IconFingerprint(signature)));
         }
 
         return icons;

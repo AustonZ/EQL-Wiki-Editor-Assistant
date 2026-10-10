@@ -3,68 +3,35 @@ using EQLWikiEditorAssistant.Core.Imaging;
 namespace EQLWikiEditorAssistant.Core.Icons;
 
 /// <summary>
-/// A scale-invariant fingerprint of an item icon, for telling "this page points at the right artwork" from "it does
-/// not".
+/// An item icon reduced to a small colour grid, for telling "this page points at the right artwork" from "it does
+/// not", and for finding the artwork among the game's whole library.
 ///
-/// **It has to be scale-invariant, which is why this resamples rather than compares pixels.** The wiki stores icons
-/// as 40x40 PNGs; the game draws the same sprite about 1.1x larger (measured: a Water Flask's ink is 21x44 on screen
-/// against 19x40 on the wiki). Any exact comparison would report every icon as wrong.
+/// **The whole icon cell, every pixel, on both sides** (user, 2026-10-10). The game draws every icon in the same
+/// place in the window and always at 44x44 — the 40x40 artwork at 1.1x — so the captured cell and the 40x40 file are
+/// the same picture at two known sizes, and each is shrunk onto the same grid. This replaced fingerprinting the
+/// ink's bounding box, which let one stray pixel or one clipped column move the whole grid: `Spiderling Silk` fills
+/// its full width and lost its last column to the old crop, and a 2-pixel mark beside `Bag of Sea Salt` stretched
+/// its box, each reading as a different icon. With the cell fixed, every comparison is on the same scale.
 ///
-/// **It is only ever used to flag, never to fix** (per the plan): a mismatch means "check this by eye", because the
-/// tool cannot know whether the page's icon id is wrong or the capture caught something odd, and choosing a new
+/// **It flags; it never writes on its own** (per the plan): a mismatch means "check this by eye", and choosing a new
 /// `lucy_img_ID` is a human's call.
 /// </summary>
-public sealed record IconFingerprint(byte[] Signature, int InkWidth, int InkHeight)
+public sealed record IconFingerprint(byte[] Signature)
 {
     /// <summary>
-    /// Mean absolute difference between two signatures, 0 (identical) to 1 (maximally different).
+    /// How far apart two renderings of the same icon may be, as a correlation distance, **when there is no library to
+    /// compare against**. With the library, a match is judged against the best icon in it instead — see
+    /// <see cref="IconLibrary.SameArtworkMargin"/>, which separates far better, and is what the app uses.
     ///
-    /// A plain difference rather than a bit-hash Hamming distance, because that was tried and measurably failed:
-    /// a 64-bit luminance-only difference hash put same-icon pairs at 0..16 and *different*-icon pairs at 6 and up,
-    /// so the two overlapped and no threshold separated them. Keeping the actual cell values — in colour — retains
-    /// the information that was being thrown away.
+    /// Measured on the 16x16 grid over 96 captured items against 87 distinct wiki icons (8,256 different-icon pairs):
+    /// 0.059 is the largest threshold with no false match, at 11 false alerts. The two closest different icons are a
+    /// pair of recoloured twins of one sword drawing (590 and 603), which no absolute threshold can tell apart.
     /// </summary>
-    public double DistanceTo(IconFingerprint other)
-    {
-        ArgumentNullException.ThrowIfNull(other);
-        if (other.Signature.Length != Signature.Length)
-            throw new ArgumentException("Fingerprints were built with different grids and cannot be compared.", nameof(other));
-
-        long total = 0;
-        for (int i = 0; i < Signature.Length; i++) total += Math.Abs(Signature[i] - other.Signature[i]);
-        return total / (255.0 * Signature.Length);
-    }
+    public const double SameIconThreshold = 0.055;
 
     /// <summary>
-    /// How different two renderings of the same icon may be, as a correlation distance.
-    ///
-    /// **Measured, and the measurement is the only reason to trust it.** Over 80 real same-icon pairs and 134
-    /// different-icon controls (`WikiSpike icons`):
-    ///
-    /// <code>
-    /// threshold   false mismatches (of 80)   false matches (of 134)
-    ///   0.10               6                          0
-    ///   0.12               4                          0
-    ///   0.13               4                          0
-    ///   0.15               4                          2
-    /// </code>
-    ///
-    /// 0.13 is the last point with **no false matches**, which is the error that matters: a false mismatch costs the
-    /// user a glance, while a false match silently blesses a page pointing at the wrong artwork.
-    ///
-    /// Combined with the <see cref="MinimumContrast"/> gate this leaves 2 false alerts out of the 75 pairs it is
-    /// willing to judge — under 3%, against 9% for the mean-absolute-difference measure it replaced.
-    /// </summary>
-    public const double SameIconThreshold = 0.13;
-
-    /// <summary>
-    /// How much the signature varies. A near-black icon has almost none, and comparing two of those is comparing
-    /// noise.
-    ///
-    /// Real case: `Nightmare Hide` is an almost entirely black sprite with a faint outline. The ink box ends up
-    /// driven by that thin outline rather than by the artwork, the 12x12 signature is nearly uniform, and the
-    /// comparison produced a confident mismatch against the item's own correct icon. Refusing to judge is the right
-    /// answer — this check exists to flag wrong icons, and an alert nobody can act on is worse than no alert.
+    /// How much the signature varies. A blank or near-blank cell has almost none, and comparing two of those is
+    /// comparing noise.
     /// </summary>
     public double Contrast
     {
@@ -78,37 +45,27 @@ public sealed record IconFingerprint(byte[] Signature, int InkWidth, int InkHeig
     }
 
     /// <summary>
-    /// Below this there is not enough variation in the sprite to tell one icon from another.
+    /// Below this there is not enough variation in the cell to tell one icon from another.
     ///
-    /// **Lowered from 0.06 to 0.02 (2026-09-28), measured across every pair in the corpus** — 88 items against 76
-    /// distinct wiki icons, 6,688 pairs. At 0.06 the gate was refusing icons that compare perfectly well: six dark
-    /// ones become judgeable at 0.02 and five of them match their own artwork at 0.017-0.067, against a 0.13
-    /// threshold. `Black Chain Bridle` is the case that prompted it — a user can see the icon plainly while only 48
-    /// of its pixels clear the ink floor.
-    ///
-    /// The sixth is `Nightmare Hide`, which still misreads as a mismatch at 0.22 — the very icon the gate was built
-    /// for. **That is now an acceptable cost because the review screen shows both icons side by side**, so a false
-    /// alert costs a glance rather than a hunt. The old reasoning — "an alert nobody can act on is worse than no
-    /// alert" — was sound only while the user could not see what the tool was comparing.
+    /// **Measured on the whole-cell signature (2026-10-10)**: the darkest captured icon in the corpus is 0.039
+    /// (`Nightmare Hide`, black on the window's grey, at 0.044, is comparable now), while 100 of the library's 11,592
+    /// icons fall under 0.02 — blank or near-blank artwork no capture could identify anyway.
     /// </summary>
     public const double MinimumContrast = 0.02;
 
     /// <summary>Whether this fingerprint carries enough signal to be worth comparing at all.</summary>
     public bool IsComparable => Signature.Length > 0 && Contrast >= MinimumContrast;
 
-    /// <summary>Whether these are the same artwork. Uses the correlation measure, which separated the classes
-    /// measurably better than comparing absolute values — see <see cref="SameIconThreshold"/>. Callers should check
-    /// <see cref="IsComparable"/> first; this answers the question it is asked either way.</summary>
+    /// <summary>Whether these are the same artwork by <see cref="SameIconThreshold"/> alone — the fallback for when
+    /// no library is available. Callers should check <see cref="IsComparable"/> first.</summary>
     public bool LooksLike(IconFingerprint other) => CorrelationDistanceTo(other) <= SameIconThreshold;
 
     /// <summary>
-    /// An alternative distance that ignores overall brightness and contrast, expressed as 1 - Pearson correlation
-    /// so that 0 is identical and larger is worse, like <see cref="DistanceTo"/>.
+    /// 1 - Pearson correlation between the two signatures: 0 is identical, larger is worse.
     ///
-    /// Worth having because the two sides are not the same rendering: the game draws the icon about 1.10x larger
-    /// than the wiki's file and interpolates when it does, which shifts values slightly across the whole sprite.
-    /// A measure that only cares about the *pattern* should be less sensitive to that than one comparing absolute
-    /// values — whether it actually is, is a question for the corpus rather than for reasoning.
+    /// Correlation rather than absolute difference because the two sides are not the same rendering: the game draws
+    /// the icon 1.1x and interpolates, which shifts values slightly across the whole cell, and correlation ignores
+    /// an overall brightness or contrast shift. Measured better than mean absolute difference when it was chosen.
     /// </summary>
     public double CorrelationDistanceTo(IconFingerprint other)
     {
@@ -135,113 +92,81 @@ public sealed record IconFingerprint(byte[] Signature, int InkWidth, int InkHeig
     }
 }
 
-/// <summary>Computes <see cref="IconFingerprint"/>s. See that type for why the comparison is perceptual.</summary>
+/// <summary>Computes <see cref="IconFingerprint"/>s. See that type for why the whole cell is used.</summary>
 public static class IconHasher
 {
     /// <summary>
     /// The signature is a <see cref="GridSize"/> x <see cref="GridSize"/> grid of average colour, one byte per
-    /// channel.
+    /// channel. **Colour is kept deliberately**: small icons on a dark field look alike in brightness, and what tells
+    /// a brown leather band from a silver one is hue.
     ///
-    /// **Colour is kept deliberately.** A luminance-only signature was tried first and could not separate small,
-    /// similar icons — rings and earrings are all little objects on a dark field, and their brightness patterns
-    /// look much alike. What actually distinguishes them is hue: a brown leather band against a silver one.
+    /// **16, measured (2026-10-10)** against 8, 10, 12, 14, 20, 24 and 40, comparing each capture's own icon with the
+    /// best match in the library and with every other icon: 16 left the widest gap between the worst genuine pair
+    /// and the closest different icon (0.016 against 0.043). Finer grids feel the game's 1.1x interpolation and its
+    /// edge outline; coarser ones merge recoloured twins.
     /// </summary>
-    private const int GridSize = 12;
+    public const int GridSize = 16;
 
     /// <summary>
-    /// A pixel at or below this (max channel) is background rather than sprite. The game draws icons straight onto
-    /// the window's flat 16-grey with no frame, so this only has to clear that plus a little noise.
+    /// Fingerprints all of <paramref name="region"/>: the 44x44 icon cell of a capture, or a whole 40x40 icon file.
+    /// Returns false only when the region lies outside the image.
     ///
-    /// **It must stay close to the background, not at some comfortable mid-brightness.** A floor of 70 was tried
-    /// first and produced a silent, item-specific failure: a dark brown pauldrons icon is almost entirely below it,
-    /// so only its few white highlights counted as ink and the "icon" was measured as a 27x10 sliver of a 38x14
-    /// sprite. The signature of a fragment is meaningless, and it read as a confident mismatch — the worst outcome
-    /// for a check whose only job is to flag.
-    /// </summary>
-    public const int InkFloor = 28;
-
-    /// <summary>Smallest ink area worth fingerprinting. Below this there is not enough sprite to say anything, and
-    /// a confident answer from a handful of pixels would be worse than none.</summary>
-    public const int MinimumInkPixels = 40;
-
-    /// <summary>
-    /// Fingerprints the artwork inside <paramref name="region"/>, or returns false when there is too little there.
-    ///
-    /// The region only has to *contain* the icon: the ink's own bounding box is found first and the signature is
-    /// built from that, which is what makes the result independent of where the sprite sits in its cell and of how
-    /// much padding the caller included — and what lets a 40x40 wiki file and a larger on-screen sprite compare.
+    /// Each grid cell is the area-weighted average of the pixels it covers, fractions included, so a 44-pixel side
+    /// and a 40-pixel side land on exactly the same grid rather than on rounded, slightly different ones.
     /// </summary>
     public static bool TryFingerprint(CapturedImage image, Rect region, out IconFingerprint fingerprint)
     {
         ArgumentNullException.ThrowIfNull(image);
-        fingerprint = new IconFingerprint([], 0, 0);
-
-        if (!TryFindInk(image, region, out Rect ink, out int inkPixels) || inkPixels < MinimumInkPixels)
+        fingerprint = new IconFingerprint([]);
+        if (region.Width <= 0 || region.Height <= 0 || region.X < 0 || region.Y < 0 ||
+            region.X + region.Width > image.Width || region.Y + region.Height > image.Height)
             return false;
 
+        (int Source, double Weight)[][] columns = Weights(region.X, region.Width);
+        (int Source, double Weight)[][] rows = Weights(region.Y, region.Height);
         var signature = new byte[GridSize * GridSize * 3];
 
         for (int gy = 0; gy < GridSize; gy++)
             for (int gx = 0; gx < GridSize; gx++)
             {
-                int x0 = ink.X + gx * ink.Width / GridSize;
-                int x1 = Math.Max(x0 + 1, ink.X + (gx + 1) * ink.Width / GridSize);
-                int y0 = ink.Y + gy * ink.Height / GridSize;
-                int y1 = Math.Max(y0 + 1, ink.Y + (gy + 1) * ink.Height / GridSize);
-
-                long b = 0, g = 0, r = 0;
-                int count = 0;
-                // Averaged rather than point-sampled: point sampling a 21px-wide sprite onto 12 columns would throw
-                // away most of it, and the two sides sample different source resolutions.
-                for (int y = y0; y < y1 && y < image.Height; y++)
-                    for (int x = x0; x < x1 && x < image.Width; x++)
+                double b = 0, g = 0, r = 0, total = 0;
+                foreach ((int y, double wy) in rows[gy])
+                    foreach ((int x, double wx) in columns[gx])
                     {
+                        double w = wx * wy;
                         int offset = (y * image.Width + x) * 4;
-                        b += image.Pixels[offset];
-                        g += image.Pixels[offset + 1];
-                        r += image.Pixels[offset + 2];
-                        count++;
+                        b += image.Pixels[offset] * w;
+                        g += image.Pixels[offset + 1] * w;
+                        r += image.Pixels[offset + 2] * w;
+                        total += w;
                     }
 
                 int cell = (gy * GridSize + gx) * 3;
-                if (count == 0) continue;
-                signature[cell] = (byte)(b / count);
-                signature[cell + 1] = (byte)(g / count);
-                signature[cell + 2] = (byte)(r / count);
+                signature[cell] = (byte)Math.Round(b / total);
+                signature[cell + 1] = (byte)Math.Round(g / total);
+                signature[cell + 2] = (byte)Math.Round(r / total);
             }
 
-        fingerprint = new IconFingerprint(signature, ink.Width, ink.Height);
+        fingerprint = new IconFingerprint(signature);
         return true;
     }
 
-    /// <summary>The bounding box of everything bright enough to be sprite rather than background.</summary>
-    private static bool TryFindInk(CapturedImage image, Rect region, out Rect ink, out int inkPixels)
+    /// <summary>For each of the grid's cells along one axis, the source pixels it covers and how much of each.</summary>
+    private static (int, double)[][] Weights(int start, int length)
     {
-        int minX = int.MaxValue, minY = int.MaxValue, maxX = -1, maxY = -1;
-        inkPixels = 0;
-
-        int right = Math.Min(region.X + region.Width, image.Width);
-        int bottom = Math.Min(region.Y + region.Height, image.Height);
-
-        for (int y = Math.Max(0, region.Y); y < bottom; y++)
-            for (int x = Math.Max(0, region.X); x < right; x++)
-            {
-                int offset = (y * image.Width + x) * 4;
-                int max = Math.Max(image.Pixels[offset + 2], Math.Max(image.Pixels[offset + 1], image.Pixels[offset]));
-                if (max <= InkFloor) continue;
-
-                inkPixels++;
-                minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
-                minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
-            }
-
-        if (maxX < 0)
+        var cells = new (int, double)[GridSize][];
+        double step = (double)length / GridSize;
+        for (int i = 0; i < GridSize; i++)
         {
-            ink = new Rect(0, 0, 0, 0);
-            return false;
+            double from = i * step, to = (i + 1) * step;
+            var covered = new List<(int, double)>();
+            for (int p = (int)Math.Floor(from); p < Math.Min(length, (int)Math.Ceiling(to)); p++)
+            {
+                double overlap = Math.Min(to, p + 1) - Math.Max(from, p);
+                if (overlap > 1e-9) covered.Add((start + p, overlap));
+            }
+            cells[i] = [.. covered];
         }
-
-        ink = new Rect(minX, minY, maxX - minX + 1, maxY - minY + 1);
-        return true;
+        return cells;
     }
 }

@@ -54,6 +54,7 @@ switch (args[0])
     case "icondiff": return await DiffIconPixelsAsync();
     case "iconindex": return await BuildIconIndexAsync();
     case "iconsearch": return await MeasureIconSearchAsync();
+    case "iconaudit": return await AuditWikiIconsAsync();
     case "verified": return await VerifiedAsync();
     case "preview": return await PreviewEditsAsync();
     case "login": return Login();
@@ -410,6 +411,10 @@ async Task<int> CompareIconsAsync()
     string scratch = Path.Combine(RepoPaths.LocalDataDirectory, "icon-scratch");
     Directory.CreateDirectory(scratch);
 
+    // As in the app: a match is judged against the best icon in the library when there is one.
+    IconLibrary? library = await IconLibraryStore.LoadOrBuildAsync(
+        RepoPaths.IconLibraryDirectory, AppPaths.IconIndexFile, new WindowsImageDecoder());
+
     var fingerprints = new List<(string Name, IconFingerprint Captured, string IconId)>();
     var wikiIcons = new List<(string Name, IconFingerprint OnWiki, string IconId)>();
 
@@ -418,7 +423,7 @@ async Task<int> CompareIconsAsync()
     {
         if (!ItemIconReader.TryRead(image, window, out IconFingerprint captured))
         {
-            Console.WriteLine("  (no readable icon — occluded, a Lore capture, or too little ink)");
+            Console.WriteLine("  (no readable icon — occluded, a Lore capture, or a blank cell)");
             continue;
         }
 
@@ -426,7 +431,7 @@ async Task<int> CompareIconsAsync()
         ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
         if (lookup.Outcome != LookupOutcome.Found)
         {
-            Console.WriteLine($"  {item.Name,-34} captured icon {captured.InkWidth}x{captured.InkHeight}, no page");
+            Console.WriteLine($"  {item.Name,-34} no page");
             continue;
         }
 
@@ -454,18 +459,20 @@ async Task<int> CompareIconsAsync()
 
         if (!IconHasher.TryFingerprint(wikiIcon, new Rect(0, 0, wikiIcon.Width, wikiIcon.Height), out IconFingerprint onWiki))
         {
-            Console.WriteLine($"  {item.Name,-34} the wiki's icon {iconId} has no readable ink");
+            Console.WriteLine($"  {item.Name,-34} the wiki's icon {iconId} could not be fingerprinted");
             continue;
         }
 
         fingerprints.Add((item.Name, captured, iconId));
         wikiIcons.Add((item.Name, onWiki, iconId));
 
-        double distance = captured.DistanceTo(onWiki);
+        double? best = library?.Search(captured, take: 1) is [var top, ..] ? top.Distance : null;
+        var comparison = new IconComparison(iconId, captured, onWiki, captured.CorrelationDistanceTo(onWiki),
+            best, library?.DistanceTo(iconId, captured));
         Console.WriteLine(
-            $"  {item.Name,-34} id {iconId,-5} captured {captured.InkWidth}x{captured.InkHeight} " +
-            $"vs wiki {onWiki.InkWidth}x{onWiki.InkHeight}  distance {distance,6:F3} corr {captured.CorrelationDistanceTo(onWiki),6:F3} contrast {captured.Contrast,5:F3}/{onWiki.Contrast,5:F3}  " +
-            $"{(captured.LooksLike(onWiki) ? "match" : "MISMATCH")}");
+            $"  {item.Name,-34} id {iconId,-5} corr {comparison.Distance,6:F3}  best in library " +
+            $"{(best is { } b ? b.ToString("F3") : "-"),6}  contrast {captured.Contrast,5:F3}/{onWiki.Contrast,5:F3}  " +
+            $"{(comparison.Matches ? "match" : comparison.WikiFileDiffersFromGame ? "WIKI FILE DIFFERS" : "MISMATCH")}");
     }
 
     // The negative control, and the only thing that makes the "match" results above mean anything: a check that
@@ -478,10 +485,11 @@ async Task<int> CompareIconsAsync()
             foreach ((string otherName, IconFingerprint onWiki, string otherId) in wikiIcons)
             {
                 if (otherId == iconId) continue;
-                double distance = captured.DistanceTo(onWiki);
+                double? best = library?.Search(captured, take: 1) is [var top, ..] ? top.Distance : null;
+                var comparison = new IconComparison(otherId, captured, onWiki, captured.CorrelationDistanceTo(onWiki), best);
                 Console.WriteLine(
-                    $"  {name,-30} vs {otherName}'s icon {otherId,-5} distance {distance,6:F3} corr {captured.CorrelationDistanceTo(onWiki),6:F3} contrast {captured.Contrast,5:F3}/{onWiki.Contrast,5:F3}  " +
-                    $"{(captured.LooksLike(onWiki) ? "FALSE MATCH" : "correctly rejected")}");
+                    $"  {name,-30} vs {otherName}'s icon {otherId,-5} corr {comparison.Distance,6:F3}  " +
+                    $"{(comparison.Matches ? "FALSE MATCH" : "correctly rejected")}");
             }
     }
 
@@ -523,8 +531,8 @@ async Task<int> DiffIconPixelsAsync()
 
         // Ink boxes on both sides, using the same floor, so the two are measured identically.
         Rect captured = InkBox(image, new Rect(
-            window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
-            ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height));
+            window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
+            ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height));
         Rect onWiki = InkBox(wiki, new Rect(0, 0, wiki.Width, wiki.Height));
         if (captured.Width == 0 || onWiki.Width == 0) continue;
 
@@ -564,7 +572,8 @@ async Task<int> DiffIconPixelsAsync()
             for (int x = Math.Max(0, region.X); x < Math.Min(region.X + region.Width, img.Width); x++)
             {
                 int o = (y * img.Width + x) * 4;
-                if (Math.Max(img.Pixels[o + 2], Math.Max(img.Pixels[o + 1], img.Pixels[o])) <= IconHasher.InkFloor) continue;
+                // Just above the window's 16-grey background.
+                if (Math.Max(img.Pixels[o + 2], Math.Max(img.Pixels[o + 1], img.Pixels[o])) <= 28) continue;
                 minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
                 minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
             }
@@ -978,10 +987,14 @@ int ShowPrettified()
 }
 
 // Measures the icon comparison across every sample, with the contrast gate *off*, printing one row per judged pair
-// so a threshold can be chosen from data rather than from a single example. Same-item pairs should score low and
-// control pairs high; the gate and the match threshold are then whatever separates them with zero false matches.
+// so a margin can be chosen from data rather than from a single example. Each row carries the capture's distance to
+// the wiki file and to the best icon in the library; the match rule is the difference between them (see
+// IconLibrary.SameArtworkMargin). Same-item pairs should sit near 0 over the best, control pairs well above it.
 async Task<int> MeasureIconsAcrossCorpusAsync()
 {
+    IconLibrary? library = await IconLibraryStore.LoadOrBuildAsync(
+        RepoPaths.IconLibraryDirectory, AppPaths.IconIndexFile, new WindowsImageDecoder());
+
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
     using var http = new HttpClient();
     http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
@@ -1002,8 +1015,8 @@ async Task<int> MeasureIconsAcrossCorpusAsync()
 
             // Deliberately *not* ItemIconReader.TryRead: that applies the contrast gate this run exists to measure.
             var region = new Rect(
-                window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
-                ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height);
+                window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
+                ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height);
             if (!IconHasher.TryFingerprint(image, region, out IconFingerprint icon)) continue;
 
             ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
@@ -1024,12 +1037,16 @@ async Task<int> MeasureIconsAcrossCorpusAsync()
     }
 
     Console.WriteLine();
-    Console.WriteLine("pair\tkind\tcapturedContrast\twikiContrast\tcorrelation");
+    Console.WriteLine("pair\tkind\tcapturedContrast\twikiContrast\tcorrelation\tbestInLibrary\tpageIdInLibrary");
     foreach ((string name, (IconFingerprint icon, string iconId)) in captured)
+    {
+        string best = library?.Search(icon, take: 1) is [var top, ..] ? top.Distance.ToString("F4") : "";
         foreach ((string otherId, IconFingerprint other) in wikiIcons)
             Console.WriteLine(
                 $"{name} vs {otherId}\t{(otherId == iconId ? "same" : "control")}\t" +
-                $"{icon.Contrast:F4}\t{other.Contrast:F4}\t{icon.CorrelationDistanceTo(other):F4}");
+                $"{icon.Contrast:F4}\t{other.Contrast:F4}\t{icon.CorrelationDistanceTo(other):F4}\t{best}\t" +
+                $"{library?.DistanceTo(otherId, icon)?.ToString("F4")}");
+    }
 
     Console.WriteLine();
     Console.WriteLine($"{captured.Count} item(s) with both icons readable; {wikiIcons.Count} distinct wiki icon(s).");
@@ -1115,6 +1132,128 @@ async Task<int> BuildIconIndexAsync()
     // and still look like it was working.
     Console.WriteLine($"  icon files: {files}, fingerprinted: {library.Count}, " +
                       $"skipped as too blank to fingerprint: {files - library.Count}");
+    return 0;
+}
+
+// Audits every item icon file on the wiki against the game's own icon of the same id, with the app's own comparison:
+// a file is the game's artwork when the game's icon for its id is within IconLibrary.SameArtworkMargin of the best
+// match for it in the whole library. Catches an icon uploaded under the wrong id, and an id whose icon the game has
+// since redrawn. Writes .local-data/icon-audit.tsv and a visual report, .local-data/icon-audit.html.
+//
+// **Every file goes through the comparison, byte-identical ones included** (user, 2026-10-10), so the audit also tests
+// the comparison: a wiki file whose bytes are the game's file must score exactly 0, and one that does not is reported
+// as BUG. Downloads are kept under .local-data/icon-audit/ by SHA-1, so a re-run after fixes fetches only what changed.
+async Task<int> AuditWikiIconsAsync()
+{
+    IconLibrary? library = await IconLibraryStore.LoadOrBuildAsync(
+        RepoPaths.IconLibraryDirectory, AppPaths.IconIndexFile, new WindowsImageDecoder());
+    if (library is null) { Console.Error.WriteLine($"No icon library at {RepoPaths.IconLibraryDirectory}."); return 1; }
+
+    using var http = new HttpClient();
+    http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
+    var decoder = new WindowsImageDecoder();
+    string downloads = Path.Combine(RepoPaths.LocalDataDirectory, "icon-audit");
+    Directory.CreateDirectory(downloads);
+
+    // Every File:Item_<id>.png, with its URL and SHA-1, 500 to a request.
+    var files = new List<(string Id, string Url, string Sha1)>();
+    string? continueFrom = null;
+    do
+    {
+        string query = "action=query&list=allimages&aiprefix=Item_&aiprop=url%7Csha1&ailimit=500&format=json&formatversion=2" +
+                       (continueFrom is null ? "" : "&aicontinue=" + Uri.EscapeDataString(continueFrom));
+        using var document = System.Text.Json.JsonDocument.Parse(await http.GetStringAsync($"{endpoint}?{query}"));
+        foreach (System.Text.Json.JsonElement image in document.RootElement.GetProperty("query").GetProperty("allimages").EnumerateArray())
+        {
+            string name = image.GetProperty("name").GetString()!;                 // Item_1234.png
+            string id = Path.GetFileNameWithoutExtension(name)["Item_".Length..];
+            if (id.Length > 0 && id.All(char.IsAsciiDigit))
+                files.Add((id, image.GetProperty("url").GetString()!, image.GetProperty("sha1").GetString()!));
+        }
+        continueFrom = document.RootElement.TryGetProperty("continue", out System.Text.Json.JsonElement more)
+            ? more.GetProperty("aicontinue").GetString()
+            : null;
+    } while (continueFrom is not null);
+    Console.WriteLine($"wiki: {files.Count} item icon file(s); library: {library.Count} icon(s)");
+
+    var rows = new List<(string Id, string Verdict, double? Own, double Best, string BestId, string WikiFile)>();
+    int identical = 0, downloaded = 0, done = 0;
+    foreach ((string id, string url, string sha1) in files.OrderBy(f => int.Parse(f.Id)))
+    {
+        if (++done % 1000 == 0) Console.WriteLine($"  {done}/{files.Count}");
+        string gameFile = Path.Combine(RepoPaths.IconLibraryDirectory, id + ".png");
+        bool sameBytes = File.Exists(gameFile) && string.Equals(
+            Convert.ToHexStringLower(System.Security.Cryptography.SHA1.HashData(File.ReadAllBytes(gameFile))),
+            sha1, StringComparison.OrdinalIgnoreCase);
+        if (sameBytes) identical++;
+
+        string wikiFile = Path.Combine(downloads, $"{id}_{sha1}.png");
+        if (!File.Exists(wikiFile))
+        {
+            await File.WriteAllBytesAsync(wikiFile, await http.GetByteArrayAsync(url));
+            downloaded++;
+        }
+
+        CapturedImage image = await decoder.DecodeAsync(await File.ReadAllBytesAsync(wikiFile));
+        if (!IconHasher.TryFingerprint(image, new Rect(0, 0, image.Width, image.Height), out IconFingerprint onWiki) ||
+            !onWiki.IsComparable)
+        {
+            rows.Add((id, "blank", null, 0, "", wikiFile));
+            continue;
+        }
+
+        IconMatch best = library.Search(onWiki, take: 1)[0];
+        double? own = library.DistanceTo(id, onWiki);
+        string verdict = !File.Exists(gameFile) ? "no game icon"
+            : own is null ? "game icon blank"
+            : sameBytes && own.Value != 0 ? "BUG: same bytes, nonzero distance"
+            : own.Value - best.Distance <= IconLibrary.SameArtworkMargin ? "match"
+            : "MISMATCH";
+        rows.Add((id, verdict, own, best.Distance, best.IconId, wikiFile));
+    }
+
+    Console.WriteLine($"  compared: {rows.Count}, of which byte-identical to the game's file: {identical} " +
+                      $"(downloaded this run: {downloaded})");
+    foreach (IGrouping<string, (string, string Verdict, double?, double, string, string)> g in rows.GroupBy(r => r.Verdict).OrderBy(g => g.Key))
+        Console.WriteLine($"    {g.Key}: {g.Count()}");
+
+    await File.WriteAllLinesAsync(Path.Combine(RepoPaths.LocalDataDirectory, "icon-audit.tsv"),
+        new[] { "id\tverdict\townDistance\tbestDistance\tbestId" }.Concat(
+            rows.Select(r => $"{r.Id}\t{r.Verdict}\t{r.Own:F4}\t{r.Best:F4}\t{r.BestId}")));
+
+    // The report: every file the comparison does not call a match, worst first, with the wiki's file beside the
+    // game's own icon for that id and the library's best match for the wiki's file.
+    string Img(string path) => File.Exists(path)
+        ? $"<img src=\"data:image/png;base64,{Convert.ToBase64String(File.ReadAllBytes(path))}\">"
+        : "<div class=none>none</div>";
+    var flagged = rows.Where(r => r.Verdict != "match")
+        .OrderByDescending(r => r.Verdict.StartsWith("BUG")).ThenByDescending(r => r.Verdict == "MISMATCH").ThenByDescending(r => (r.Own ?? 9) - r.Best).ToList();
+    var html = new System.Text.StringBuilder();
+    html.Append("""
+        <!doctype html><html lang="en"><head><meta charset="utf-8"><title>Wiki icon audit</title><style>
+        body { font: 15px/1.5 "Segoe UI", system-ui, sans-serif; background: #1e1e1e; color: #e4e4e4; margin: 24px; }
+        table { border-collapse: collapse; } th, td { border: 1px solid #3a3a3a; padding: 6px 10px; vertical-align: middle; }
+        th { background: #2a2a2a; text-align: left; } td.id { font-family: Consolas, monospace; font-size: 17px; }
+        img, .none { width: 120px; height: 120px; image-rendering: pixelated; background: #101010; display: block; }
+        .none { line-height: 120px; text-align: center; color: #888; } .bad { color: #ff8a80; font-weight: 600; }
+        </style></head><body>
+        """);
+    html.Append($"<h1>Wiki icon audit</h1><p>{files.Count} item icon files on the wiki, every one compared " +
+                $"({identical} byte-identical to the game's file, each of which must score exactly 0). " +
+                $"{rows.Count(r => r.Verdict == "match")} match and {flagged.Count} are listed below. Distances are the app's correlation distance on the 16x16 grid; " +
+                $"a file matches when the game's icon for its id is within {IconLibrary.SameArtworkMargin} of the best " +
+                "match in the whole library.</p>");
+    html.Append("<table><tr><th>ID</th><th>Verdict</th><th>Wiki's file</th><th>Game's icon for this ID</th>" +
+                "<th>Closest game icon to the wiki's file</th></tr>");
+    foreach (var r in flagged)
+        html.Append($"<tr><td class=id>{r.Id}</td><td class=\"{(r.Verdict is "MISMATCH" || r.Verdict.StartsWith("BUG") ? "bad" : "")}\">{r.Verdict}" +
+                    $"{(r.Own is { } o ? $"<br>own {o:F3}, best {r.Best:F3}" : "")}</td>" +
+                    $"<td>{Img(r.WikiFile)}</td><td>{Img(Path.Combine(RepoPaths.IconLibraryDirectory, r.Id + ".png"))}</td>" +
+                    $"<td>{(r.BestId.Length == 0 ? "" : Img(Path.Combine(RepoPaths.IconLibraryDirectory, r.BestId + ".png")) + $"#{r.BestId}")}</td></tr>");
+    html.Append("</table></body></html>");
+    string report = Path.Combine(RepoPaths.LocalDataDirectory, "icon-audit.html");
+    await File.WriteAllTextAsync(report, html.ToString());
+    Console.WriteLine($"wrote {report}");
     return 0;
 }
 
@@ -1220,21 +1359,17 @@ async Task<int> MeasureIconSearchAsync()
     Console.WriteLine();
     Console.WriteLine($"wrote {tsv}");
 
-    // **Two gates, because the three failures are two different kinds.** An absolute distance catches "nothing in
-    // the library looks like this" (Puppet Strings, best match 0.3754 — far past the measured 0.13 same-icon
-    // threshold). A margin catches "several things look like this and one barely won". Neither catches both.
+    // The margin to the runner-up is the only gate: an absolute distance loses correct answers (see
+    // IconLibrary.ConfidentMargin).
     Console.WriteLine();
-    Console.WriteLine($"--- gate sweep: distance <= {IconFingerprint.SameIconThreshold} AND margin >= threshold ---");
+    Console.WriteLine("--- margin sweep: margin >= threshold ---");
     Console.WriteLine("  threshold   accepted   of which wrong   correct answers rejected");
     var gated = rows.Where(r => r.Found is not null)
         .Select(r => (r.Found!.Distance, r.Found.Margin, Correct: r.Found.Candidates[0].IconId == r.TrueId))
         .ToList();
-    int byDistance = gated.Count(g => g.Distance > IconFingerprint.SameIconThreshold);
-    Console.WriteLine($"  (rejected by the distance gate alone: {byDistance})");
-    foreach (double t in new[] { 0.0, 0.005, 0.01, 0.02, 0.03, 0.04, 0.05, 0.075, 0.10 })
+    foreach (double t in new[] { 0.0, 0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.03, 0.05 })
     {
-        bool Pass((double Distance, double Margin, bool Correct) g) =>
-            g.Distance <= IconFingerprint.SameIconThreshold && g.Margin >= t;
+        bool Pass((double Distance, double Margin, bool Correct) g) => g.Margin >= t;
         int accepted = gated.Count(Pass);
         int acceptedWrong = gated.Count(g => Pass(g) && !g.Correct);
         int rejectedRight = gated.Count(g => !Pass(g) && g.Correct);

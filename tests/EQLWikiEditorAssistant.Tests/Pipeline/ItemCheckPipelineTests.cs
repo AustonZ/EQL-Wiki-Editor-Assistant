@@ -68,12 +68,12 @@ public class ItemCheckPipelineTests
     /// **Needed because a blank frame makes fingerprint bugs invisible**: with no icon, a fingerprint computed with
     /// one and a fingerprint computed without one are identical, so a test on <see cref="BlankFrame"/> passes whether
     /// or not the icon is included. That is exactly how the ledger bug of 2026-09-29 went uncaught. The pattern only
-    /// has to clear the ink floor and carry enough variation to be comparable; it is not meant to resemble an item.
+    /// has to carry enough variation to be comparable; it is not meant to resemble an item.
     /// </summary>
     private static CapturedImage FrameWithIcon(int width = 500, int height = 700)
     {
         var pixels = new byte[width * height * 4];
-        Rect strip = ItemIconReader.IconStrip;
+        Rect strip = ItemIconReader.IconCell;
 
         for (int y = 0; y < strip.Height; y++)
             for (int x = 0; x < strip.Width; x++)
@@ -129,13 +129,13 @@ public class ItemCheckPipelineTests
             wiki, new FakeLocator(window), ledger, null, icons, new StubDecoder(), null, library, files), wiki, ledger);
     }
 
-    /// <summary>The library's entry is the fingerprint of the very strip the frame paints, which is what a correct
+    /// <summary>The library's entry is the fingerprint of the very cell the frame paints, which is what a correct
     /// match looks like; the decoy is an unrelated pattern, far enough away to leave a clear margin.</summary>
     private static IconLibrary LibraryMatching(LocatedWindow window, CapturedImage frame, string iconId)
     {
         var region = new Rect(
-            window.Bounds.X + ItemIconReader.IconStrip.X, window.Bounds.Y + ItemIconReader.IconStrip.Y,
-            ItemIconReader.IconStrip.Width, ItemIconReader.IconStrip.Height);
+            window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
+            ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height);
         Assert.True(IconHasher.TryFingerprint(frame, region, out IconFingerprint painted));
 
         var decoy = new byte[painted.Signature.Length];
@@ -143,7 +143,7 @@ public class ItemCheckPipelineTests
 
         return new IconLibrary([
             new LibraryIcon(iconId, painted),
-            new LibraryIcon("9999", new IconFingerprint(decoy, 40, 40)),
+            new LibraryIcon("9999", new IconFingerprint(decoy)),
         ]);
     }
 
@@ -195,11 +195,11 @@ public class ItemCheckPipelineTests
             LibraryMatching(window, frame, libraryIconId), new IconLibraryFolder(IconFolderWith(libraryIconId)));
     }
 
-    /// <summary>The icon strip exactly as the frame painted it, for a wiki file that *does* hold this item's
+    /// <summary>The icon cell exactly as the frame painted it, for a wiki file that *does* hold this item's
     /// artwork — the control case, where the page is right and nothing should be offered.</summary>
-    private static CapturedImage IconStripOf(CapturedImage frame, LocatedWindow window)
+    private static CapturedImage IconCellOf(CapturedImage frame, LocatedWindow window)
     {
-        Rect strip = ItemIconReader.IconStrip;
+        Rect strip = ItemIconReader.IconCell;
         int x0 = window.Bounds.X + strip.X, y0 = window.Bounds.Y + strip.Y;
         var pixels = new byte[strip.Width * strip.Height * 4];
         for (int y = 0; y < strip.Height; y++)
@@ -1598,11 +1598,32 @@ public class ItemCheckPipelineTests
         CapturedImage frame = FrameWithIcon();
         LocatedWindow window = Window(EarringLines);
         ItemCheckPipeline pipeline = BuildForIconFix(
-            window, frame, EarringPage(), "617", ["752", "617"], IconStripOf(frame, window));
+            window, frame, EarringPage(), "617", ["752", "617"], IconCellOf(frame, window));
 
         ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
 
         Assert.True(result.Icon!.Matches);
+        Assert.Null(result.IconSuggestion);
+    }
+
+    /// <summary>
+    /// **The id is right and the wiki's file is not** (2026-10-10): the game's own icon for the page's id is the
+    /// capture's best match, while the file the wiki holds under that id is different artwork — measured on 4 of 96
+    /// corpus items, `Obtenebrate Mithril Guard` among them. Said as that, not as a wrong id, and nothing is offered:
+    /// the fix is a new version of the wiki's file, which this tool does not upload over.
+    /// </summary>
+    [Fact]
+    public async Task ARightIdWhoseWikiFileIsDifferentArtworkIsSaidSoAndOffersNothing()
+    {
+        CapturedImage frame = FrameWithIcon();
+        LocatedWindow window = Window(EarringLines);
+        ItemCheckPipeline pipeline = BuildForIconFix(
+            window, frame, EarringPage(), "752", ["752"], UnrelatedIcon());
+
+        ItemCheckResult result = (await pipeline.CheckAsync(frame))[0];
+
+        Assert.False(result.Icon!.Matches);
+        Assert.True(result.Icon.WikiFileDiffersFromGame);
         Assert.Null(result.IconSuggestion);
     }
 

@@ -34,7 +34,7 @@ public static class AppPaths
     /// confidently matching against an out-of-date library. Keeping it here, next to a stamp of what it was built
     /// from, means there is only ever one answer to "what icons are there" — the folder.
     /// </summary>
-    public static string IconIndexFile => Path.Combine(Root, "item-icons.index");
+    public static string IconIndexFile => Path.Combine(Root, Core.Icons.IconLibraryIndex.FileName);
 
     /// <summary>
     /// Where the game's extracted item icons live: <c>game_assets/item_icons</c>, found by walking up from the
