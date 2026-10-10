@@ -54,8 +54,8 @@ public class CorpusAccuracyTests
             return;
         }
 
-        // The shipping configuration: RapidOCR finds the windows, the glyph atlas reads inside them — each sample in
-        // the UI font its ground truth names (absent means Arial).
+        // The shipping configuration: the Description tab's pixels find the windows, the glyph atlas reads inside them
+        // — each sample in the UI font its ground truth names (absent means Arial).
         ExpectedCorpus expected = ExpectedCorpus.Load(RepoPaths.ExpectedItemsFile);
         IReadOnlyList<CorpusSample> samples = await CorpusRunner.RunAllAsync(files, threads => new RapidOcrEngine(threads),
             (file, rapid) =>
@@ -65,8 +65,10 @@ public class CorpusAccuracyTests
             });
 
         // A sample whose pixels contradict the font its ground truth names was read by the wrong l/I rule, so its
-        // scores would be measuring the mislabel rather than the reader.
-        Assert.Equal(0, samples.Sum(s => s.FontMismatches));
+        // scores would be measuring the mislabel rather than the reader. Only samples with ground truth: an unscored
+        // one is read in SampleFonts' guess, which is wrong whenever the developer captured it in the other font, and
+        // nothing is scored against it anyway — AccuracySpike still marks it.
+        Assert.Equal(0, samples.Where(s => expected.Find(Path.GetFileName(s.File)) is not null).Sum(s => s.FontMismatches));
         AccuracyReport report = CorpusRunner.Score(samples, expected);
 
         _output.WriteLine(report.Render(

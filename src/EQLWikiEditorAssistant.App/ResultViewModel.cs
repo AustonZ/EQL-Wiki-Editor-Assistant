@@ -317,7 +317,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(capture);
         if (!HasWorkInProgress) return false;
-        if (capture.Item is null || capture.Status is ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont) return true;
+        if (capture.Item is null ||
+            capture.Status is ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont or ItemCheckStatus.UnsupportedSkin)
+            return true;
         if (Result.Item is null) return false;
 
         return string.Equals(
@@ -649,6 +651,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     {
         ItemCheckStatus.Occluded => "Occluded",
         ItemCheckStatus.WrongFont => "Wrong font",
+        ItemCheckStatus.UnsupportedSkin => "Unsupported UI skin",
         ItemCheckStatus.Ineligible => "Not eligible",
         ItemCheckStatus.AlreadyChecked => "Already checked",
         ItemCheckStatus.LoreRecorded => "Description tab capture needed",
@@ -667,7 +670,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Palette.Attention,
         { NeedsLoreCapture: true } or { Status: ItemCheckStatus.LoreRecorded } => Palette.Attention,
         { Status: ItemCheckStatus.EditProposed } => Palette.Warning,
-        { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont } => Palette.Attention,
+        { Status: ItemCheckStatus.Failed or ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont
+            or ItemCheckStatus.UnsupportedSkin } => Palette.Attention,
         _ => Palette.Neutral,
     };
 

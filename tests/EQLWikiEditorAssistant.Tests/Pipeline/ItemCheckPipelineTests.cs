@@ -782,6 +782,32 @@ public class ItemCheckPipelineTests
         Assert.Equal(0, ledger.Count);
     }
 
+    // ---- the game's other UI skins (user, 2026-10-09) ----
+
+    /// <summary>
+    /// A window in one of the game's other skins is found but cannot be read. It is named as such — not reported as
+    /// covered, which it is also marked as so that everything skipping unreadable windows skips it, and which moving
+    /// it would not fix — with no ledger row and no wiki traffic, whatever the user then does with it.
+    /// </summary>
+    [Fact]
+    public async Task AWindowInAnotherSkinIsNamedAndNeverRecorded()
+    {
+        var window = new LocatedWindow(new Rect(10, 10, 62, 11), [], HasLoreTab: false, PossiblyOccluded: true,
+            DrawnIn: UiFont.Arial, InOtherSkin: true);
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(window, EarringPage());
+        pipeline.ConfiguredFont = UiFont.Arial;
+
+        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+
+        Assert.Equal(ItemCheckStatus.UnsupportedSkin, results[0].Status);
+        Assert.Contains("default_modern", Assert.Single(results[0].Warnings));
+        ItemCheckResult named = results[0] with { ItemName = "Earring of Bashing" };
+        pipeline.RecordSkipped(named);
+        pipeline.RecordCheckedByHand(named);
+        Assert.Equal(0, ledger.Count);
+        Assert.Equal(0, wiki.Fetches);
+    }
+
     /// <summary>A page that agrees but still needs a human is `Flagged`, not `Matched` — and `Flagged` never lets a
     /// later capture skip the wiki, which is exactly the point.</summary>
     [Fact]

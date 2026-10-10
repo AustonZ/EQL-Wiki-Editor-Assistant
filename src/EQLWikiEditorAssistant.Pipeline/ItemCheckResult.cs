@@ -19,6 +19,10 @@ public enum ItemCheckStatus
     /// bare vertical bar means, so reading through the wrong one confuses capital I and lowercase l silently.</summary>
     WrongFont,
 
+    /// <summary>The window is drawn in one of the game's skins other than `default_modern`, which the Assistant can
+    /// find but not read (user, 2026-10-09). **No ledger row**, for the same reason as <see cref="Occluded"/>.</summary>
+    UnsupportedSkin,
+
     /// <summary>A foreign exaltation or a levelled item. **No ledger row**, for the same reason.</summary>
     Ineligible,
 

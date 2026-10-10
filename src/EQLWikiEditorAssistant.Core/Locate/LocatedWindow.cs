@@ -24,6 +24,11 @@ public enum ItemWindowTab
 /// <see cref="DrawnIn"/> is the UI font the window's text was drawn in, when its lines say — null when no line
 /// carried a font-specific character, or when they disagreed. Like the active tab, it is read from pixels, which is
 /// why it is decided here rather than by the parser.
+///
+/// <see cref="InOtherSkin"/> means the window is drawn in one of the game's skins other than `default_modern`, which
+/// the Assistant can find but not read (user, 2026-10-09). It is also marked <see cref="PossiblyOccluded"/>, so
+/// everything that skips a window it cannot read skips this one: it has no lines, and <see cref="Bounds"/> is only its
+/// tab's label. Whatever tells the user why must ask this first, since moving the window would not help.
 /// </summary>
 public sealed record LocatedWindow(
     Rect Bounds,
@@ -31,4 +36,5 @@ public sealed record LocatedWindow(
     bool HasLoreTab,
     bool PossiblyOccluded,
     ItemWindowTab ActiveTab = ItemWindowTab.Description,
-    UiFont? DrawnIn = null);
+    UiFont? DrawnIn = null,
+    bool InOtherSkin = false);

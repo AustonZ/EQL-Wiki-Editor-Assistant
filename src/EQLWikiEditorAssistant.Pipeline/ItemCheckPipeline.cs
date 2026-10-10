@@ -106,7 +106,8 @@ public sealed class ItemCheckPipeline
     /// the window, or what was read is ineligible. One rule shared by every path that records, so a new status
     /// cannot be excluded by one and recorded by another.</summary>
     private static bool NeverGetsALedgerRow(ItemCheckStatus status) =>
-        status is ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont or ItemCheckStatus.Ineligible;
+        status is ItemCheckStatus.Occluded or ItemCheckStatus.WrongFont or ItemCheckStatus.UnsupportedSkin
+            or ItemCheckStatus.Ineligible;
 
     /// <summary>
     /// Run before anything is written to the wiki. Returns null when the write may proceed, or a message for the
@@ -205,6 +206,21 @@ public sealed class ItemCheckPipeline
         CapturedImage frame, LocatedWindow window, CancellationToken cancellationToken)
     {
         CapturedImage crop = frame.Crop(window.Bounds);
+
+        // Found, but in a skin whose windows cannot be read. Said outright rather than reported as covered, which it
+        // would otherwise look like, and which moving the window would not fix.
+        if (window.InOtherSkin)
+            return new ItemCheckResult
+            {
+                Status = ItemCheckStatus.UnsupportedSkin,
+                ItemName = "",
+                WindowImage = crop,
+                Warnings =
+                [
+                    "This window is drawn in another of the game's UI skins. Only default_modern can be read: switch " +
+                    "the game's UI skin to it, then capture again.",
+                ],
+            };
 
         // Nothing read from a partly-covered window can be trusted. The parser's own title-vs-content check is a
         // second line of defence, not a reason to proceed past this one.

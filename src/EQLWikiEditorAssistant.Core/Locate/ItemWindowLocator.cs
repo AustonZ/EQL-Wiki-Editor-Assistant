@@ -4,14 +4,17 @@ using EQLWikiEditorAssistant.Core.Text;
 namespace EQLWikiEditorAssistant.Core.Locate;
 
 /// <summary>
-/// Finds item detail windows in a full screenshot. A whole-screenshot OCR pass finds each window's
-/// "Description" tab (every real item window has exactly one — see the plan's window-vs-tooltip rule; a
+/// Finds item detail windows in a full screenshot. <see cref="DescriptionTabFinder"/> finds each window's
+/// "Description" tab by its pixels (every real item window has exactly one — see the plan's window-vs-tooltip rule; a
 /// tooltip has none, so it's never mistaken for a window). From each tab, <see cref="WindowBoundsFinder"/>
 /// traces the window's actual pixel bounds; if those bounds aren't clean (the edge is inconsistent — something
 /// else is drawn over part of the window), the window is reported as occluded and is **not** parsed — no
 /// partial/guessed data, just "found something here, but it's obstructed." For a window with clean bounds, the
-/// image is cropped to it and re-OCR'd (matching milestone 1's already-validated crop-based accuracy) to get
-/// its actual field data, rather than reusing the whole-image pass's own line detections for that.
+/// image is cropped to it and read by the window-crop engine to get its actual field data.
+///
+/// The tabs used to come from a full-frame RapidOCR pass, which cost a capture 1.6-1.9 GB and 2.5-4 s (user,
+/// 2026-10-09). Switching changed no window: every rectangle and every occlusion verdict across the 54 samples was
+/// compared before and after and came out identical.
 ///
 /// This replaced an earlier design that tried to find each window purely by clustering OCR lines by text
 /// proximity. That could not reliably tell "this window's own content" apart from "a different, adjacent dark
@@ -24,19 +27,29 @@ public static class ItemWindowLocator
     public static async Task<IReadOnlyList<LocatedWindow>> LocateAsync(
         CapturedImage image, IOcrEngine ocrEngine, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<OcrLine> wholeImageLines = await ocrEngine.RecognizeAsync(image, OcrIntent.FullFrame, cancellationToken);
-        List<OcrLine> anchors = wholeImageLines.Where(l => IsDescriptionTab(l.Text)).ToList();
-
         var windows = new List<LocatedWindow>();
-        foreach (OcrLine anchor in anchors)
+        foreach (DescriptionTab anchor in DescriptionTabFinder.Find(image))
         {
-            Rect? bounds = WindowBoundsFinder.TryFindBounds(image, anchor.BoundingBox);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Another skin: found, and named, but not traced or read — its borders and its textured background are
+            // beyond the bounds tracing and the glyph reader alike (see DescriptionTabFinder.TexturedSpread). Marked
+            // occluded too, so everything that skips a window it cannot read skips this one; the pipeline asks about
+            // the skin first, so the user is told the real reason.
+            if (anchor.Textured)
+            {
+                windows.Add(new LocatedWindow(anchor.Label, Array.Empty<OcrLine>(), HasLoreTab: false,
+                    PossiblyOccluded: true, DrawnIn: anchor.Font, InOtherSkin: true));
+                continue;
+            }
+
+            Rect? bounds = WindowBoundsFinder.TryFindBounds(image, anchor.Label);
             if (bounds is null)
             {
                 // Found a real item window (it has a Description tab) but couldn't establish clean bounds for
                 // it — something is drawn over part of it. Report it as occluded with no data, rather than
                 // guessing; the caller should tell the user to rearrange windows and recapture.
-                windows.Add(new LocatedWindow(anchor.BoundingBox, Array.Empty<OcrLine>(), HasLoreTab: false, PossiblyOccluded: true));
+                windows.Add(new LocatedWindow(anchor.Label, Array.Empty<OcrLine>(), HasLoreTab: false, PossiblyOccluded: true));
                 continue;
             }
 
@@ -63,10 +76,6 @@ public static class ItemWindowLocator
         List<UiFont> seen = [.. lines.Where(l => l.DrawnIn is not null).Select(l => l.DrawnIn!.Value).Distinct()];
         return seen.Count == 1 ? seen[0] : null;
     }
-
-    /// <summary>"Description" tab label, tolerant of OCR noise (e.g. "Descripbon").</summary>
-    public static bool IsDescriptionTab(string text) =>
-        EditDistance.IsCloseMatch(text.Trim(), "Description", maxDistance: 3);
 
     /// <summary>"Lore" tab label — short, so a tight edit-distance budget. Only ever matches a line whose
     /// *entire* text is close to "Lore" (e.g. the tab label itself), not a substring — so it doesn't false-hit
