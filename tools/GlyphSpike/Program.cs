@@ -19,8 +19,8 @@ using EQLWikiEditorAssistant.TestSupport;
 //                                               add a second UI font's sheet to an existing atlas: shapes both
 //                                               fonts draw stay shared, the rest are tagged with their font
 //   GlyphSpike read <image> [x,y,w,h] [--font <name>] [--atlas f]
-//                                               read a region through the real engine, in a UI font (app default
-//                                               unless given)
+//                                               read a region through the real engine, in the image's UI font
+//                                               (SampleFonts: --font, ground truth, file-name marker, else Arial)
 //   GlyphSpike bars <wiki-pages-dir> [--titles <file>] [--prose <dir>]
 //                                               how well Arial's l/I rule reads real text: hides every l and I in
 //                                               the cached pages' item names, statsblocks, lore and notes (and in a
@@ -341,8 +341,7 @@ static int ReadRegion(CapturedImage image, Rect region, string[] args)
         ? GlyphAtlas.Parse(File.ReadAllText(args[atlasIndex + 1]))
         : GlyphAtlas.Bundled;
 
-    int fontIndex = Array.IndexOf(args, "--font");
-    UiFont font = fontIndex >= 0 && fontIndex + 1 < args.Length ? UiFonts.Parse(args[fontIndex + 1]) : SampleFonts.UnlistedScreenshot;
+    UiFont font = SampleFonts.For(args[1], args);
 
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     IReadOnlyList<OcrLine> lines = GlyphReader.Read(image, region, atlas, font);

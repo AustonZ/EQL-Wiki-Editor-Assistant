@@ -286,8 +286,9 @@ public partial class MainWindow : Window
             // Kept when Settings > Saved captures says so, named after what was in it, so a bug can be reported by
             // naming an item rather than by keeping it in the game — see CaptureArchive. Encoding a full frame as PNG
             // takes long enough to be felt, so it is off the UI thread too.
+            UiFont font = services.Settings.Font;
             string? archived = services.Settings.KeepCaptures
-                ? await Task.Run(() => CaptureArchive.Save(frame, results.Select(r => r.ItemName).ToList()))
+                ? await Task.Run(() => CaptureArchive.Save(frame, results.Select(r => r.ItemName).ToList(), font))
                 : null;
 
             // Results accumulate across captures rather than replacing each other (user, 2026-09-28), so an item

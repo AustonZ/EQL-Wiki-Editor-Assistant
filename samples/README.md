@@ -9,7 +9,9 @@ accident; an audited one is added deliberately.
 
 To add a sample:
 
-1. Capture it (see CLAUDE.md, "The sample set") and name it `NN-description.png`.
+1. Capture it (see CLAUDE.md, "The sample set") and name it `NN-description.png`. A frame taken in a UI font other
+   than Arial keeps the Assistant's `[font <name>]` marker: `NN-description [font EqlWikiEditorAssistant].png`. The
+   tools read an unmarked frame as Arial.
 2. Look at the whole frame. Black out anything private with a solid box (a private chat channel's name is the
    example so far), editing the PNG losslessly, never re-encoding it as JPEG.
 3. Add its ground truth (`AccuracySpike --bootstrap --only <name>`) and re-run `AccuracySpike`: the scores must not

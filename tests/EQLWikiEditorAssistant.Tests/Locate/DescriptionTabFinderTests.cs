@@ -22,7 +22,7 @@ public class DescriptionTabFinderTests
     /// </summary>
     [Theory]
     [InlineData("01-single-weapon-lvl0-tradeable-pink-background.png", UiFont.Arial)]
-    [InlineData("15a-eql-wiki-editor-assistant-font.png", UiFont.EqlWikiEditorAssistant)]
+    [InlineData("15a-eql-wiki-editor-assistant-font [font EqlWikiEditorAssistant].png", UiFont.EqlWikiEditorAssistant)]
     public async Task TheTemplateIsTheRealLabelPixelForPixel(string sample, UiFont font)
     {
         CapturedImage image = await Sample(sample);
@@ -140,7 +140,7 @@ public class DescriptionTabFinderTests
     /// <see cref="DescriptionTabFinder.TexturedSpread"/> that real frames can pin.</summary>
     [Theory]
     [InlineData("07-three-distinct-items.png")]
-    [InlineData("15b-r-and-rn-words.png")]
+    [InlineData("15b-r-and-rn-words [font EqlWikiEditorAssistant].png")]
     public async Task NoTabInTheModernSkinIsTextured(string sample) =>
         Assert.All(Tabs(await Sample(sample)), tab => Assert.False(tab.Textured));
 

@@ -1784,6 +1784,8 @@ a global hotkey is worth having.
 - **Each captured frame can be kept on disk** (`App.CaptureArchive`, user 2026-09-29), named after the items in it, so
   a bug can be reported by naming an item rather than by keeping it in the game. The list entry's tooltip carries the
   path.
+  - **A frame taken in any font but Arial says so in its name** (`[font <name>]`, from Settings > UI font at the time;
+    user, 2026-10-10), so the tools read it in that font once it is copied into the samples. See "Two UI fonts".
   - **Off unless chosen, and never inside the repository.** A frame is a full screenshot and can hold character names,
     other players' names and chat — the reason `samples/` admits only audited frames and the reason the pipeline otherwise keeps
     every frame in memory. These go to `%APPDATA%\EQLWikiEditorAssistant\debug-captures`, outside any working copy, so no
@@ -2521,14 +2523,21 @@ both fonts; Arial reading is exactly what it was.
 - **Advances are keyed by entry, not label** (`AtlasEntry.Key`). Two r's keyed by "r" collapsed into the smaller
   cell, and every wide r would have been followed by a phantom space.
 - **The corpus needed no regeneration.** Each ground-truth entry names its font, absent meaning Arial, so the 48
-  Arial samples are untouched and new-font samples are simply added (`15a-eql-wiki-editor-assistant-font.png` onward).
-  `15c-lowercase-l-lore.png` is the case the font exists for: Token of Reclamation's lore reads "recover lost items"
+  Arial samples are untouched and new-font samples are simply added (`15a-eql-wiki-editor-assistant-font [font EqlWikiEditorAssistant].png` onward).
+  `15c-lowercase-l-lore [font EqlWikiEditorAssistant].png` is the case the font exists for: Token of Reclamation's lore reads "recover lost items"
   in it, and since 2026-10-09 the same pixels read with the Arial rule (`ParseSpike --font Arial`) give it too — they
   gave "Iost" before the dictionary.
-  `SampleFonts` decides the font every tool reads a screenshot in: `--font`, else the sample's ground truth, else
-  `SampleFonts.UnlistedScreenshot` — EQL Wiki Editor Assistant, the font the developer's own captures are in. It followed the
-  app default until that became Arial for testers (2026-10-08), and the tools read the developer's captures, not a
-  tester's. A sample whose pixels contradict its declared font is a corpus defect and fails the corpus test.
+  `SampleFonts` decides the font every tool reads a screenshot in: `--font`, else the sample's ground truth, else the
+  file name's `[font <name>]` marker, else **Arial**. **Arial is the default everywhere in the repository and any other
+  font is the override** (user, 2026-10-10, who now plays in Arial to see what testers see), so a contributor or a fork
+  never has to know the other font exists. It replaced `SampleFonts.UnlistedScreenshot`, which assumed the developer's
+  own font for any screenshot the corpus had not seen and misread three Arial frames that way. A sample whose pixels
+  contradict its declared font is a corpus defect and fails the corpus test, and so does a marker that contradicts the
+  ground truth.
+  - **The marker comes from the Assistant's own setting** (`UiFonts.FileNameMarker`): a saved capture taken while
+    Settings > UI font names anything but Arial is named `2026-10-10 12-00-00 [font EqlWikiEditorAssistant] - <items>.png`.
+    A sample copied from one keeps the marker in its name (`23-description [font EqlWikiEditorAssistant].png`), so no step
+    between copying and bootstrapping can lose it. A marker naming no known font throws rather than reading as Arial.
 - **One shared glyph gained an advance**: `)` had none (no Arial sample ever had it directly followed by another
   glyph) and learned 4px from the first new-font capture. Re-scored before anything else changed: the Arial corpus
   was identical, 2230 correct and 0 everywhere.
@@ -2560,9 +2569,9 @@ invisible that way by definition.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
   corpus pass is about 15 seconds since the windows are found without a model (it was minutes); in the default
   `dotnet test` path it would get muted within a week. The pure comparer tests run always and need no samples.
-  - **Its font check covers only samples with ground truth.** A sample without any is read in `SampleFonts`' guess,
-    which is wrong whenever it was captured in the other font (three frames set aside on 2026-10-09 were Arial, read as
-    EQL Wiki Editor Assistant), and nothing is scored against it anyway. `AccuracySpike` still marks such a sample.
+  - **Its font check covers every sample on disk, scored or not.** It was narrowed to samples with ground truth on
+    2026-10-09, while an unlisted sample's font was a guess; since every sample's font is now declared (ground truth or
+    marker) or Arial, a mismatch is a mislabel wherever it is.
 - **The corpus runs several samples at once** (`CorpusRunner.RunAllAsync`, user, 2026-10-09), each worker with its own
   RapidOCR engine, since one is not safe to share between threads; results come back in file order, so a report is
   identical at any worker count — checked at 1, 2, 4, 8 and 16 on all 52 samples. **Each engine is told its share of
@@ -2839,9 +2848,8 @@ $env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracy
 # then read it back through the real engine:
 dotnet run --project tools/GlyphSpike -- dump "samples/some screenshot.png" 864,373,12,12 [--raw]
 dotnet run --project tools/GlyphSpike -- read "samples/some screenshot.png" 774,279,388,522 [--font Arial]
-# ParseSpike, AccuracySpike and WikiSpike's screenshot commands take --font too; without it a sample is read in the
-# font its ground truth names (absent = Arial) and any other screenshot in EQL Wiki Editor Assistant
-# (SampleFonts.UnlistedScreenshot — the developer's font, deliberately not the app's Arial default).
+# ParseSpike, AccuracySpike and WikiSpike's screenshot commands take --font too; without it a screenshot is read in the
+# font its ground truth names, else the one its file name's [font <name>] marker names, else Arial (SampleFonts).
 
 # How well Arial's l/I rule reads real text: hides every l and I in cached wiki pages (and optionally a title list and
 # other pages' text, e.g. quest dialogue) and counts what comes back wrong. The measurement behind BarWords:
@@ -2857,7 +2865,7 @@ dotnet run --project tools/GlyphSpike -- advances "samples/any screenshot.png"  
 
 # A second UI font: merge its glyph sheet into the existing atlas instead of replacing it. Shapes both fonts draw
 # stay shared; the rest are tagged with their font. Then rerun `advances` so the new shapes learn their cells.
-dotnet run --project tools/GlyphSpike -- atlas "samples/15a-eql-wiki-editor-assistant-font.png" 1330,860,650,112 \
+dotnet run --project tools/GlyphSpike -- atlas "samples/15a-eql-wiki-editor-assistant-font [font EqlWikiEditorAssistant].png" 1330,860,650,112 \
   --font EqlWikiEditorAssistant --merge-into src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas \
   --out src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas
 
@@ -2929,17 +2937,21 @@ Arrange the game, alt-tab to a terminal, then capture — Graphics Capture reads
 are named `NN-description.png` (with a sub-letter for variants of one scenario, e.g. `06a`/`06b`), and the golden
 tests reference those names directly, so renaming one means updating the tests. Current coverage is the geometry
 and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*`), one race-restricted item
-(`14`), the custom UI font (`15*`, each named in its ground truth as `"font": "EqlWikiEditorAssistant"`) and one window
+(`14`), the custom UI font (`15*`, each marked `[font EqlWikiEditorAssistant]` in its name and in its ground truth as
+`"font": "EqlWikiEditorAssistant"`) and one window
 in each of the game's other two skins (`30a` `default`, `31a` `default_light`, reported as unsupported). Exaltations are
 covered already, though no sample was taken for them: 57 levelled windows carry 11 native and 27 foreign filled slots,
 and `ItemEligibilityTests.EveryRealWindowIsJudgedAsItsGroundTruthSays` judges every one. A foreign exaltation on a
 `+0` item cannot exist in game (an exaltation can only be added to a levelled item), and no sample has a filled
-Ornamentation slot; unit tests cover both. **A capture in a font other than the app default needs `--font` when
-bootstrapping**, or its ground truth will be read by the wrong l/I rule.
+Ornamentation slot; unit tests cover both. **A capture in a font other than Arial carries a `[font <name>]` marker in
+its name**, which the tools read it by; without one it is read as Arial, and its ground truth would be read by the
+wrong l/I rule. A saved capture is marked by the Assistant itself; a fresh `CaptureSpike` capture needs the marker
+added by hand.
 
 **A sample can come from the capture archive rather than a fresh capture.** With Settings > Saved captures on, the app
 files every frame under `%APPDATA%\EQLWikiEditorAssistant\debug-captures`, named after the items in it, so an interesting
 item the user has already looked at is usually sitting there — which is how `14-race-restricted-item.png` was added
-without asking them to go and find the item again. Copy it into `samples/` under the naming convention, then
+without asking them to go and find the item again. Copy it into `samples/` under the naming convention, keeping any
+`[font <name>]` marker, then
 `AccuracySpike --bootstrap --only <substring>` merges one entry into the tracked ground truth without touching the
 others.

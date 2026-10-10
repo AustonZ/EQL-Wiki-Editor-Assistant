@@ -196,6 +196,25 @@ public class UiFontTests
         Assert.Null(ItemWindowLocator.DrawnIn([Line(UiFont.Arial), Line(UiFont.EqlWikiEditorAssistant)]));
     }
 
+    // ---- the file-name marker ----
+
+    /// <summary>A saved capture names its font only when it is not Arial, and reading the name gives the font back —
+    /// what lets a capture copied into the samples be read in the font it was taken in (user, 2026-10-10).</summary>
+    [Fact]
+    public void AFileNameCarriesEveryFontButArial()
+    {
+        Assert.Equal("", UiFonts.FileNameMarker(UiFont.Arial));
+        foreach (UiFont font in Enum.GetValues<UiFont>())
+            Assert.Equal(font == UiFont.Arial ? null : font,
+                UiFonts.FromFileName($@"C:\x\2026-10-10 12-00-00 {UiFonts.FileNameMarker(font)} - Spit.png"));
+    }
+
+    /// <summary>A marker naming no known font is refused, not read as Arial: that would be the silent wrong-font read
+    /// the marker exists to prevent.</summary>
+    [Fact]
+    public void AMarkerNamingNoFontIsRefused() =>
+        Assert.Throws<ArgumentException>(() => UiFonts.FromFileName("23-spit [font Comic].png"));
+
     // ---- helpers ----
 
     private static IReadOnlyList<OcrLine> Read(CapturedImage image, UiFont font) =>

@@ -21,8 +21,8 @@ using EQLWikiEditorAssistant.TestSupport.Accuracy;
 //   AccuracySpike --workers <n>        how many samples to run at once (default CorpusRunner.DefaultWorkers);
 //                                      the report is identical at any count
 //   AccuracySpike --font <name>        read the selected samples in this UI font (Arial, EqlWikiEditorAssistant) rather
-//                                      than the one their ground truth names; needed to bootstrap a new sample
-//                                      captured in a font other than the app default
+//                                      than the one their ground truth or [font <name>] file-name marker names
+//                                      (neither means Arial)
 //
 // --bootstrap never overwrites the tracked file; it writes a candidate for you to review and copy in. Every
 // field the parser flagged is emitted as "?TODO" so the known misses become ground truth a human supplies,
@@ -52,7 +52,7 @@ var stopwatch = Stopwatch.StartNew();
 Console.WriteLine($"  window-crop engine: {(args.Contains("--rapid") ? "RapidOCR" : "glyph atlas")}");
 ExpectedCorpus? truthForFonts = File.Exists(expectedPath) ? ExpectedCorpus.Load(expectedPath) : null;
 
-// Each sample is read in its own font: its ground truth names it (absent means Arial), or --font overrides.
+// Each sample is read in its own font: --font, else its ground truth or file-name marker, else Arial (SampleFonts).
 IReadOnlyList<CorpusSample> samples = await CorpusRunner.RunAllAsync(files, threads => new RapidOcrEngine(threads), (file, rapid) =>
 {
     UiFont font = SampleFonts.For(file, args, truthForFonts);

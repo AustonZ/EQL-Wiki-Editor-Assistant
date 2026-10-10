@@ -32,10 +32,14 @@ public static class CaptureArchive
     /// Writes the frame and returns its path, or null when the write failed. Whether to call it at all is the
     /// caller's, from <c>AppSettings.KeepCaptures</c>.
     ///
+    /// <paramref name="font"/> is the one Settings > UI font named for this capture. Any font but Arial is written
+    /// into the name (<see cref="UiFonts.FileNameMarker"/>), so a frame copied into the sample corpus is read in it
+    /// without anyone having to remember which font was set that day.
+    ///
     /// A failure is swallowed: not being able to keep a debugging aid is never a reason to fail the capture the user
     /// actually asked for.
     /// </summary>
-    public static string? Save(CapturedImage frame, IEnumerable<string> itemNames)
+    public static string? Save(CapturedImage frame, IEnumerable<string> itemNames, UiFont font)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(itemNames);
@@ -48,9 +52,11 @@ public static class CaptureArchive
                 ", ",
                 itemNames.Where(n => !string.IsNullOrWhiteSpace(n)).Select(Sanitize).Distinct().Take(4));
 
+            string marker = UiFonts.FileNameMarker(font);
             string path = Path.Combine(
                 Directory,
-                $"{DateTime.Now:yyyy-MM-dd HH-mm-ss}{(named.Length == 0 ? "" : " - " + named)}.png");
+                $"{DateTime.Now:yyyy-MM-dd HH-mm-ss}{(marker.Length == 0 ? "" : " " + marker)}" +
+                $"{(named.Length == 0 ? "" : " - " + named)}.png");
 
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(

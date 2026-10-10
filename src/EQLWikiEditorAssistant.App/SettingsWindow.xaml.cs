@@ -31,8 +31,8 @@ public partial class SettingsWindow : Window
 {
     private readonly AppServices _services;
 
-    /// <summary>The fonts in the order offered: the one the user plays in first.</summary>
-    private static readonly UiFont[] Fonts = [UiFont.EqlWikiEditorAssistant, UiFont.Arial];
+    /// <summary>The fonts in the order offered: Arial, the game's default and the Assistant's, first.</summary>
+    private static readonly UiFont[] Fonts = [UiFont.Arial, UiFont.EqlWikiEditorAssistant];
 
     /// <summary>True while the controls are being filled in, so selecting the saved font does not save it again.</summary>
     private bool _loading = true;

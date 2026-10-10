@@ -59,4 +59,21 @@ public static class UiFonts
             ? font
             : throw new ArgumentException(
                 $"'{text}' is not a UI font. Known: {string.Join(", ", Enum.GetNames<UiFont>())}.", nameof(text));
+
+    /// <summary>
+    /// What a screenshot's file name carries to say it was taken in a font other than Arial: <c>[font &lt;name&gt;]</c>,
+    /// and nothing at all for Arial (user, 2026-10-10). A saved capture is named with it, and a sample keeps it, so
+    /// every tool reads the frame in the font the Assistant was set to when it was taken. **Arial is the default and
+    /// any other font is the override**, so an unmarked name means Arial.
+    /// </summary>
+    public static string FileNameMarker(UiFont font) => font == UiFont.Arial ? "" : $"[font {font}]";
+
+    /// <summary>The font a file name's <see cref="FileNameMarker"/> names, or null when it has none. A marker naming
+    /// no known font throws rather than being read as Arial.</summary>
+    public static UiFont? FromFileName(string fileName)
+    {
+        System.Text.RegularExpressions.Match marker =
+            System.Text.RegularExpressions.Regex.Match(Path.GetFileName(fileName), @"\[font ([^\]]+)\]");
+        return marker.Success ? Parse(marker.Groups[1].Value) : null;
+    }
 }
