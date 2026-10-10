@@ -5,7 +5,7 @@ window in the game and press a hotkey: the Assistant reads the window, finds the
 differs, and proposes the edit. You review it step by step, see the wiki's own preview, and decide whether to save. For
 an item the wiki has no page for, it proposes the whole page.
 
-**This is an alpha** (1.0.0-alpha.1). It works well on the setup it was built on; your setup is what testing is for.
+**This is an alpha.** It works well on the setup it was built on; your setup is what testing is for.
 
 ## What it does and never does
 
