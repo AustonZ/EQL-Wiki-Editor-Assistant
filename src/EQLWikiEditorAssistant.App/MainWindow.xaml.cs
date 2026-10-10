@@ -45,8 +45,9 @@ public partial class MainWindow : Window
         _results.CollectionChanged += (_, _) =>
             ResultsHeader.Visibility = _results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        // Built off the UI thread: RapidOcrEngine loads three ONNX models in its constructor, which is seconds of a
-        // frozen window if it happens here. The capture button stays disabled until it is ready.
+        // Built off the UI thread: loading the icon index takes a moment, and building it the first time takes
+        // several seconds, which would be a frozen window if it happened here. The capture button stays disabled
+        // until it is ready.
         CaptureButton.IsEnabled = false;
         LedgerLink.IsEnabled = false;
         AttentionLink.IsEnabled = false;
@@ -228,7 +229,22 @@ public partial class MainWindow : Window
 
     private async Task CaptureAsync()
     {
-        if (_capturing || _services is null) return;
+        if (!await CaptureAndCheckAsync()) return;
+
+        // **The memory a capture used goes back to Windows once it is over** (user, 2026-10-09). .NET keeps the space
+        // freed screenshot buffers took, expecting to need it again: measured in the running app, 238 MB reserved for
+        // 20 MB of live objects. An aggressive collection is the runtime's own way for an app going idle to hand that
+        // back; with so little alive it takes tens of milliseconds. Run here, after the capture's method has returned,
+        // so nothing of that capture is still referenced.
+        await Task.Run(() =>
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true));
+    }
+
+    /// <summary>One capture, start to finish. False when none ran, because one already is or start-up has not
+    /// finished.</summary>
+    private async Task<bool> CaptureAndCheckAsync()
+    {
+        if (_capturing || _services is null) return false;
         _capturing = true;
         CaptureButton.IsEnabled = false;
         // The ledger too: a capture writes rows, so a ledger view opened mid-capture would show some of them stale.
@@ -254,7 +270,7 @@ public partial class MainWindow : Window
             if (frame is null)
             {
                 ReportCaptureProblem(problem ?? "The game window could not be captured.");
-                return;
+                return true;
             }
 
             // Each stage named as it starts (user, 2026-10-07): finding the windows is the slow full-frame OCR pass,
@@ -328,6 +344,7 @@ public partial class MainWindow : Window
             SettingsButton.IsEnabled = true;
             BusyPanel.Visibility = Visibility.Collapsed;
         }
+        return true;
     }
 
     /// <summary>A capture that produced nothing to review: said in the status line and in a dialog, because the

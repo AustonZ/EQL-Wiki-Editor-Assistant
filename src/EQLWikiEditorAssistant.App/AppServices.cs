@@ -17,10 +17,10 @@ namespace EQLWikiEditorAssistant.App;
 /// <summary>
 /// Everything the app owns for its whole lifetime, built once.
 ///
-/// **Built once quite deliberately.** <see cref="RapidOcrEngine"/> loads three ONNX models in its constructor, so
-/// per-capture construction would add seconds to every hotkey press; the ledger and the icon cache are the app's
-/// state and only mean anything shared; and the <see cref="MediaWikiClient"/> must keep one cookie container for its
-/// whole session, since MediaWiki ties the login token, the session and the CSRF token together through cookies.
+/// **Built once quite deliberately.** The ledger and the icon cache are the app's state and only mean anything shared,
+/// and the <see cref="MediaWikiClient"/> must keep one cookie container for its whole session, since MediaWiki ties
+/// the login token, the session and the CSRF token together through cookies. The one exception is the full-frame
+/// reader, which is loaded for each capture and released after it: see <see cref="OnDemandRapidOcrEngine"/>.
 ///
 /// This is a plain composition root rather than a DI container: there is one graph, built in one place, and nothing
 /// resolves anything at runtime.
@@ -50,7 +50,6 @@ public sealed class AppServices : IDisposable
     /// </summary>
     public const string GameWindowTitle = "EverQuest";
 
-    private readonly RapidOcrEngine _rapidOcr;
     private readonly GlyphOcrEngine _windowReader;
     private readonly HttpClient _http;
     private GlobalHotKey? _hotKey;
@@ -92,9 +91,9 @@ public sealed class AppServices : IDisposable
     /// null when it is. Capturing still works from the button either way.</summary>
     public string? HotKeyProblem { get; private set; }
 
-    /// <param name="progress">Told each slow step as it starts, so the window can say what it is waiting for: the OCR
-    /// models, and the icon index, which is built with a running count the first time (user, 2026-10-09: "Starting…"
-    /// alone looked like a hang).</param>
+    /// <param name="progress">Told each slow step as it starts, so the window can say what it is waiting for: the icon
+    /// index, loaded, or built with a running count the first time (user, 2026-10-09: "Starting…" alone looked like a
+    /// hang).</param>
     public AppServices(IProgress<string>? progress = null)
     {
         AppPaths.EnsureExists();
@@ -104,10 +103,8 @@ public sealed class AppServices : IDisposable
         // The UI font is one value given to both the reader and the pipeline's wrong-font guard, so they cannot
         // disagree — here, and afterwards only through UseFontAsync, which sets both.
         Settings = AppSettings.Load(AppPaths.SettingsFile);
-        progress?.Report("Loading the text reader…");
-        _rapidOcr = new RapidOcrEngine();
         _windowReader = new GlyphOcrEngine(Settings.Font);
-        IOcrEngine ocr = new RoutingOcrEngine(fullFrame: _rapidOcr, windowCrop: _windowReader);
+        IOcrEngine ocr = new RoutingOcrEngine(fullFrame: new OnDemandRapidOcrEngine(), windowCrop: _windowReader);
 
         Wiki = MediaWikiClient.Create(Endpoint, UserAgent);
         // Every edit and upload says which app and version made it — see MediaWikiClient.SummaryTag.
@@ -414,7 +411,6 @@ public sealed class AppServices : IDisposable
         Capturer.Dispose();
         Wiki.Dispose();
         _http.Dispose();
-        _rapidOcr.Dispose();
     }
 }
 

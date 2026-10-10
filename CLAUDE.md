@@ -1386,8 +1386,8 @@ usually read: match the captured sprite against the library, and the matching fi
     The one change it misses is a redrawn icon of exactly the same byte size; hashing contents would catch that too,
     for about a second on every start, which was judged not worth it. `NewDatesAloneDoNotRebuildTheIndex` pins it.
   - **Start-up shows the build** (user, 2026-10-09): `AppServices` reports each slow step, and the window shows it in
-    the capture's own progress bar — "Loading the text reader…", then "Indexing the game's icons, N%…" — because
-    "Starting…" in the status bar alone read as a hang.
+    the capture's own progress bar — "Loading the game's icons…", or "Indexing the game's icons, N%…" when it builds —
+    because "Starting…" in the status bar alone read as a hang.
   - **Not committed beside the icons**, deliberately: a committed index is a second record of which icons exist, and
     the moment the two disagree the tool starts matching against an out-of-date library. The folder is the only
     answer to "what icons are there".
@@ -1732,9 +1732,29 @@ a global hotkey is worth having.
   message box left is the crash handler's, which has to work when the UI itself is broken. The global hotkey is ignored
   while one is open, as it is while Settings or History is.
 - Icon uploads are still confirmed, as the one write that is not on the Submit page and the one only an admin can undo.
-- `AppServices` is a plain composition root, built **once** and **off the UI thread** — `RapidOcrEngine` loads three
-  ONNX models in its constructor, the `MediaWikiClient` must keep one cookie container for its whole session, and
-  the ledger and icon cache only mean anything shared. Measured: the window is responsive in ~485ms.
+- `AppServices` is a plain composition root, built **once** and **off the UI thread** — the `MediaWikiClient` must
+  keep one cookie container for its whole session, and the ledger and icon cache only mean anything shared.
+- **The full-frame reader is the exception: RapidOCR is loaded for each capture and released after it**
+  (`Ocr.OnDemandRapidOcrEngine`; user, 2026-10-09, after the app's working set passed 2 GB). ONNX Runtime's memory
+  pool grows to fit the largest input it has run and never shrinks, and every capture hands it a whole 2560x1440 frame.
+  - **Not a leak, and measured to be sure**: one long-lived engine over 153 real frames reached ~1.75 GB working set and
+    2.5 GB private within two captures and stayed flat, with the .NET heap at 30 MB.
+  - **Loaded per capture**: ~0.25 GB between captures and ~1.1 GB at a capture's peak, at the same speed, for ~140 ms
+    of model loading against a 2.5-4 s recognition. Output byte-identical, boxes included, over 3,336 lines.
+  - **Turning the pool off instead** (`EnableCpuMemArena = false`) keeps ~0.5 GB between captures and makes every
+    capture ~40% slower, so it was not taken. RapidOcrNet accepts `SessionOptions` through `InitModels` if it is ever
+    wanted.
+  - **This retires "construct it once"**, which rested on the models taking seconds to load; they take ~140 ms. The
+    corpus and the spike tools still keep one engine per run, since they recognize many frames and exit.
+  - **.NET hands its share back too: an aggressive collection runs after each capture** (`MainWindow.CaptureAsync`).
+    With the engine freed, the app still settled at 570 MB private, and a heap dump found only 20 MB of live objects:
+    .NET was keeping 238 MB for the freed screenshot buffers, expecting to reuse it. `GCCollectionMode.Aggressive` is
+    the runtime's own way for an app going idle to return that, and it runs after the capture's method has returned,
+    so nothing of it is still referenced.
+  - **Measured in the real app over a session of use, nothing open afterwards** (user, 2026-10-09): ~1.75 GB working
+    set before any of this; 645 MB (570 MB private) with the engine freed; **355 MB (270 MB private, .NET 53 MB
+    committed) with the collection too**. Peak 1.6 GB private during a capture. The review browser's own processes are
+    ~390 MB on top, as any embedded Edge is. No leak at any stage: the live .NET heap is ~20 MB.
 - **A capture runs off the UI thread: the screenshot, the whole check, and saving the frame** (bug found by the
   user, 2026-10-07: the window hung and the progress label stuck on "Taking game screenshot"). Both OCR engines are
   synchronous behind an async signature — they return `Task.FromResult` — so awaiting the pipeline from a click
@@ -2622,8 +2642,9 @@ correction covering just the handful of known field labels handles it. Also keep
 — cheap insurance, and an isolated dropped digit was seen even with the better engine; and "a field the parser
 expects but doesn't find is 'OCR uncertain,' not 'absent from the game'" — ask the user rather than assume. Drop:
 the mandatory upscale-before-recognition step and any multi-scale-pass plan — not needed for `RapidOcrEngine`, and
-upscaling measurably hurt it in testing. Construct `RapidOcrEngine` once and reuse it (it loads 3 ONNX models in
-its constructor) rather than per-capture.
+upscaling measurably hurt it in testing. In the app, load `RapidOcrEngine` per capture and release it
+(`OnDemandRapidOcrEngine`): loading its three models takes ~140 ms, and a long-lived engine keeps ~2 GB of ONNX Runtime
+memory for good (see "The review UI").
 
 A broader census across 6 real windows (~100+ recognized lines: weapons, armor, ammo, a charge item, a consumable,
 a quest token) found the `orn`->`om`-ish cluster to be the **only** recurring substantive error — digits (incl.
