@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using EQLWikiEditorAssistant.Core.Input;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
 
 namespace EQLWikiEditorAssistant.Pipeline;
 

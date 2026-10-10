@@ -1,4 +1,5 @@
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 
 namespace EQLWikiEditorAssistant.Core.Locate;
 
@@ -32,7 +33,7 @@ public enum ItemWindowTab
 /// </summary>
 public sealed record LocatedWindow(
     Rect Bounds,
-    IReadOnlyList<OcrLine> Lines,
+    IReadOnlyList<TextLine> Lines,
     bool HasLoreTab,
     bool PossiblyOccluded,
     ItemWindowTab ActiveTab = ItemWindowTab.Description,

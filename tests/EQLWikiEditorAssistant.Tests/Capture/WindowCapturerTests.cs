@@ -1,5 +1,5 @@
 using EQLWikiEditorAssistant.Capture;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using Xunit.Abstractions;
 
 namespace EQLWikiEditorAssistant.Tests.Capture;
@@ -7,7 +7,7 @@ namespace EQLWikiEditorAssistant.Tests.Capture;
 /// <summary>
 /// Live capture requires an interactive desktop session (DWM compositing a real window) — not guaranteed in
 /// every environment this repo might be built in (e.g. a headless CI runner), so this exits early rather than
-/// hard-failing when no window can be captured, same tolerance as the OCR golden tests. On the primary dev
+/// hard-failing when no window can be captured, same tolerance as the screenshot golden tests. On the primary dev
 /// machine (or any normal interactive session) it exercises the real Windows Graphics Capture pipeline
 /// end-to-end, including the [GeneratedComInterface] interop (see the plan's milestone 1 writeup for why that
 /// matters — [ComImport] silently fails against CsWinRT ComWrappers objects here).

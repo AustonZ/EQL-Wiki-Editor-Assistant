@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using EQLWikiEditorAssistant.Core.Icons;
 using EQLWikiEditorAssistant.Core.Items;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.Pipeline;
 using EQLWikiEditorAssistant.Wiki.Analysis;
 using EQLWikiEditorAssistant.Wiki.Ledger;

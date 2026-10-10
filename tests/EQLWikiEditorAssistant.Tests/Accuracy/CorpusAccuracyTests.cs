@@ -1,5 +1,4 @@
-using EQLWikiEditorAssistant.Core.Ocr;
-using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.TestSupport;
 using EQLWikiEditorAssistant.TestSupport.Accuracy;
 using Xunit.Abstractions;
@@ -12,20 +11,15 @@ namespace EQLWikiEditorAssistant.Tests.Accuracy;
 /// drift.
 ///
 /// **Gated behind <c>EQLWIKI_ACCURACY=1</c>** (precedent: <c>EQLWIKI_LOCATE_DIAG</c>). A corpus pass runs the real
-/// pipeline over every screenshot and takes about a minute; in the default <c>dotnet test</c> path that would get
+/// pipeline over every screenshot and takes about 15 seconds; in the default <c>dotnet test</c> path that would get
 /// muted within a week, which is worse than an opt-in gate that people actually run.
 ///
 ///     EQLWIKI_ACCURACY=1 dotnet test --filter FullyQualifiedName~CorpusAccuracyTests
 /// </summary>
 public class CorpusAccuracyTests
 {
-    // Ratchets. They may only ever go down. All three are now 0 and must stay there: the glyph-matching engine
-    // reads the corpus exactly, so any regression is a real defect rather than a known gap being re-measured.
-    //
-    // They were non-zero under RapidOCR — 24 missing, 15 wrong, 13 silently wrong — and every one of those was a
-    // glyph-level failure: isolated stat digits the detector never found, the "rn"->"m" cluster in payload names,
-    // a roman numeral losing a stroke, a grave accent read as an apostrophe, an item icon read as a stray letter.
-    // Exact template matching against the UI font removed the class outright rather than mitigating it.
+    // Ratchets. They may only ever go down. All three are 0 and must stay there: the glyph reader reads the corpus
+    // exactly, so any regression is a real defect rather than a known gap being re-measured.
     private const int MaxMissingFields = 0;
     private const int MaxWrongFields = 0;
     private const int MaxSilentWrongFields = 0;
@@ -38,7 +32,7 @@ public class CorpusAccuracyTests
     {
         if (Environment.GetEnvironmentVariable("EQLWIKI_ACCURACY") != "1")
         {
-            _output.WriteLine("Skipping: set EQLWIKI_ACCURACY=1 to run the corpus pass (about a minute).");
+            _output.WriteLine("Skipping: set EQLWIKI_ACCURACY=1 to run the corpus pass (about 15 seconds).");
             return;
         }
 
@@ -55,14 +49,10 @@ public class CorpusAccuracyTests
         }
 
         // The shipping configuration: the Description tab's pixels find the windows, the glyph atlas reads inside them
-        // — each sample in the UI font its ground truth names (absent means Arial).
+        // — each sample in its own UI font (SampleFonts).
         ExpectedCorpus expected = ExpectedCorpus.Load(RepoPaths.ExpectedItemsFile);
-        IReadOnlyList<CorpusSample> samples = await CorpusRunner.RunAllAsync(files, threads => new RapidOcrEngine(threads),
-            (file, rapid) =>
-            {
-                UiFont font = SampleFonts.For(file, [], expected);
-                return (SampleFonts.Engine(rapid, font), font);
-            });
+        IReadOnlyList<CorpusSample> samples =
+            await CorpusRunner.RunAllAsync(files, file => SampleFonts.For(file, [], expected));
 
         // A sample whose pixels contradict its declared font was read by the wrong l/I rule, so its scores would be
         // measuring the mislabel rather than the reader. Every sample, scored or not: the font is declared by the

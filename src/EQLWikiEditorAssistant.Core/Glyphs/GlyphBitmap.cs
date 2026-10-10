@@ -8,7 +8,7 @@ namespace EQLWikiEditorAssistant.Core.Glyphs;
 /// Equality is exact and structural, which is the point: because the font is a deterministic bitmap blit, two
 /// renderings of the same character are byte-identical, so a dictionary keyed on this type clusters glyphs with
 /// no threshold, no distance metric and no tuning. Anything fuzzy here would be the wrong tool — fuzziness is for
-/// OCR output (<c>EditDistance</c>), not for pixels that are supposed to match exactly.
+/// text compared with text a human wrote (<c>EditDistance</c>), not for pixels that are supposed to match exactly.
 /// </summary>
 public sealed class GlyphBitmap : IEquatable<GlyphBitmap>
 {

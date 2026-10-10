@@ -386,7 +386,7 @@ public class ItemFingerprintTests
             ItemFingerprint.Compute(Item(classes: ["WAR", "CLR"])),
             ItemFingerprint.Compute(Item(classes: ["CLR", "WAR"])));
 
-    /// <summary>Warnings quote OCR fragments and churn with every tuning change, so a fingerprint that included them
+    /// <summary>Warnings quote fragments of text and churn with every parser change, so a fingerprint that included them
     /// would expire every row on every release.</summary>
     [Fact]
     public void WarningsDoNotChangeTheFingerprint() =>

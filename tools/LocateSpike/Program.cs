@@ -1,9 +1,8 @@
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
-using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.TestSupport;
 
-// Milestone 2 spike tool: run ItemWindowLocator (whole-screenshot OCR to find Description tabs, pixel border
+// Milestone 2 spike tool: run ItemWindowLocator (each window's Description tab found by its pixels, pixel border
 // tracing to find each window's real bounds, occluded windows reported with no data) against a real
 // screenshot. --save draws a rectangle around each found window (green = clean, red = occluded) for visual
 // verification.
@@ -47,9 +46,8 @@ if (probe is not null)
     return 0;
 }
 
-using var engine = new RapidOcrEngine();
 var sw = System.Diagnostics.Stopwatch.StartNew();
-IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, engine);
+IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(image, SampleFonts.Reader(imagePath, args));
 Console.WriteLine($"Located {windows.Count} window(s) in {sw.ElapsedMilliseconds}ms:");
 
 for (int i = 0; i < windows.Count; i++)

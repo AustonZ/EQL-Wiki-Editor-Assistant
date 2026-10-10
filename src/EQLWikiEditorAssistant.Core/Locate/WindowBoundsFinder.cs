@@ -1,15 +1,15 @@
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 
 namespace EQLWikiEditorAssistant.Core.Locate;
 
 /// <summary>
 /// Finds an item window's bounds by tracing the **content area's own outline** — the thin neutral-grey line the
-/// game draws around the Description/Lore tab contents — outward from a known interior point (the tab's OCR box).
+/// game draws around the Description/Lore tab contents — outward from a known interior point (the tab label's box).
 /// Returns null rather than guessing when that line can't be found consistently, which the caller treats as
 /// "occluded, don't parse".
 ///
 /// **Why the grey line and not a brightness transition.** Two earlier designs failed, and the reasons are the
-/// design: (1) clustering OCR lines by text proximity can't tell a window's own content from an adjacent dark
+/// design: (1) clustering recognized lines by text proximity can't tell a window's own content from an adjacent dark
 /// window's; (2) tracing the edge of the near-black interior — "scan out until it stops being dark" — works only
 /// while whatever is *outside* the window is brighter than the window. It isn't, often: the player's own 3D
 /// character model standing behind the window measures ~33-75, and another dark UI panel measures about the same

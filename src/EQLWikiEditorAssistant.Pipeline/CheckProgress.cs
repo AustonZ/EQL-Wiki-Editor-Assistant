@@ -3,7 +3,7 @@ namespace EQLWikiEditorAssistant.Pipeline;
 /// <summary>The stages of <see cref="ItemCheckPipeline.CheckAsync"/>, in the order they happen.</summary>
 public enum CheckStage
 {
-    /// <summary>The full-frame OCR pass that finds every item window in the screenshot. The slow one.</summary>
+    /// <summary>Finding every item window in the screenshot.</summary>
     FindingWindows,
 
     /// <summary>One located window being read and compared with its wiki page.</summary>

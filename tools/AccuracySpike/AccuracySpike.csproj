@@ -9,14 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Core\EQLWikiEditorAssistant.Core.csproj" />
-    <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Ocr\EQLWikiEditorAssistant.Ocr.csproj" />
     <ProjectReference Include="..\EQLWikiEditorAssistant.TestSupport\EQLWikiEditorAssistant.TestSupport.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Direct reference required, not just transitive via .Ocr: RapidOcrNet's bundled .onnx models only copy
-         reliably to an executable's own output directory this way. See CLAUDE.md. -->
-    <PackageReference Include="RapidOcrNet" Version="4.2.0" />
   </ItemGroup>
 
 </Project>

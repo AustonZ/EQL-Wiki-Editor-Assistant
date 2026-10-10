@@ -9,7 +9,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using EQLWikiEditorAssistant.Core.Icons;
 using EQLWikiEditorAssistant.Core.Input;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Pipeline;
 using EQLWikiEditorAssistant.Wiki.Mapping;
 using EQLWikiEditorAssistant.Wiki.MediaWiki;

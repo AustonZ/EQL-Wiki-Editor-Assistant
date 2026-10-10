@@ -1,6 +1,6 @@
 using EQLWikiEditorAssistant.Capture;
 using EQLWikiEditorAssistant.Core.Input;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.TestSupport;
 
 // Milestone 1 spike tool: validate WindowCapturer (Windows Graphics Capture) and GlobalHotKey against real

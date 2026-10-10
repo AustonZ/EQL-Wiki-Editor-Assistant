@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Media.Imaging;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Pipeline;
 
 namespace EQLWikiEditorAssistant.App;

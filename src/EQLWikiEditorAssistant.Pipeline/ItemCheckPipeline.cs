@@ -1,7 +1,8 @@
 using EQLWikiEditorAssistant.Core.Icons;
 using EQLWikiEditorAssistant.Core.Items;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Wiki.Analysis;
 using EQLWikiEditorAssistant.Wiki.Formatting;
 using EQLWikiEditorAssistant.Wiki.Ledger;
@@ -140,9 +141,8 @@ public sealed class ItemCheckPipeline
     /// nothing could be done with — a frame may hold several item windows, and a window the tool refused is exactly
     /// what the user needs to be told about.
     ///
-    /// <paramref name="progress"/> hears each stage as it starts, so a caller can say what is actually happening —
-    /// finding the windows is the full-frame OCR pass and the slowest step, and a label that lumps it in with taking
-    /// the screenshot makes the screenshot look slow (user, 2026-10-07).
+    /// <paramref name="progress"/> hears each stage as it starts, so a caller can say what is actually happening
+    /// rather than blaming one step's time on another (user, 2026-10-07).
     /// </summary>
     public async Task<IReadOnlyList<ItemCheckResult>> CheckAsync(
         CapturedImage frame, CancellationToken cancellationToken = default, IProgress<CheckProgress>? progress = null)

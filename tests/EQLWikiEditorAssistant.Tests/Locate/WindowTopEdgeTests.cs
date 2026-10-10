@@ -1,5 +1,5 @@
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 
 namespace EQLWikiEditorAssistant.Tests.Locate;
 

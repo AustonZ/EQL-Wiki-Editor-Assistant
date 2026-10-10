@@ -1,11 +1,8 @@
 namespace EQLWikiEditorAssistant.Core.Text;
 
 /// <summary>
-/// Small fuzzy-matching helper. OCR (even the good engine — see the plan's milestone 1/2 writeups) makes
-/// consistent, small, single-character-class mistakes on this game's UI text (e.g. "Ornamentation" ->
-/// "Omamentation"), so exact string equality is the wrong tool for matching OCR'd text against known field
-/// labels, item names, or wiki page titles. Used by the field-label lexicon, window-anchor detection, and the
-/// native-vs-foreign exaltation name check.
+/// Small fuzzy-matching helper, for text that may differ from what it should match by a character or two: field
+/// labels, the Lore tab's label, and the native-vs-foreign exaltation name check.
 /// </summary>
 public static class EditDistance
 {

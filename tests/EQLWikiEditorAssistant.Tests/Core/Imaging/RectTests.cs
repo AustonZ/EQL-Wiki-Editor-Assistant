@@ -1,6 +1,6 @@
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 
-namespace EQLWikiEditorAssistant.Tests.Core.Ocr;
+namespace EQLWikiEditorAssistant.Tests.Core.Imaging;
 
 public class RectTests
 {

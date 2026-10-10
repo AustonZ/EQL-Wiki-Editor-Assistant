@@ -1,5 +1,5 @@
 using EQLWikiEditorAssistant.Core.Input;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Pipeline;
 
 namespace EQLWikiEditorAssistant.Tests.Pipeline;

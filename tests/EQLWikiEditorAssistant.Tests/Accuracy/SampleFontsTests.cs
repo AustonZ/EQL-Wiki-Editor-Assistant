@@ -1,4 +1,4 @@
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.TestSupport;
 using EQLWikiEditorAssistant.TestSupport.Accuracy;
 

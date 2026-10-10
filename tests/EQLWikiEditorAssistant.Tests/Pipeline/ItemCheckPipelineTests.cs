@@ -1,6 +1,7 @@
 using EQLWikiEditorAssistant.Core.Locate;
 using EQLWikiEditorAssistant.Core.Icons;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Pipeline;
 using EQLWikiEditorAssistant.Tests.Wiki;
 using EQLWikiEditorAssistant.Wiki.Ledger;
@@ -20,11 +21,11 @@ namespace EQLWikiEditorAssistant.Tests.Pipeline;
 /// </summary>
 public class ItemCheckPipelineTests
 {
-    private static OcrLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
+    private static TextLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
 
     /// <summary>A verbatim-shaped Description capture of `Earring of Bashing`, the page also used as a wikitext
     /// fixture — so the analysis run here is against real page text.</summary>
-    private static readonly OcrLine[] EarringLines =
+    private static readonly TextLine[] EarringLines =
     [
         L("Earring of Bashing", 96, 0),
         L("Description", 170, 18),
@@ -46,10 +47,10 @@ public class ItemCheckPipelineTests
     ];
 
     /// <summary>The same item with a levelled name — ineligible, because the wiki stores level-0 data only.</summary>
-    private static readonly OcrLine[] LevelledLines =
-        [.. EarringLines.Select(l => new OcrLine(l.Text.Replace("Earring of Bashing", "Earring of Bashing +3"), l.BoundingBox, l.Words))];
+    private static readonly TextLine[] LevelledLines =
+        [.. EarringLines.Select(l => new TextLine(l.Text.Replace("Earring of Bashing", "Earring of Bashing +3"), l.BoundingBox, l.Words))];
 
-    private static readonly OcrLine[] LoreTabLines =
+    private static readonly TextLine[] LoreTabLines =
     [
         L("Earring of Bashing", 96, 0),
         L("Lore", 170, 18),
@@ -88,7 +89,7 @@ public class ItemCheckPipelineTests
     }
 
     private static LocatedWindow Window(
-        IReadOnlyList<OcrLine> lines,
+        IReadOnlyList<TextLine> lines,
         bool occluded = false,
         bool hasLoreTab = false,
         ItemWindowTab tab = ItemWindowTab.Description,
@@ -814,8 +815,8 @@ public class ItemCheckPipelineTests
     public async Task APageThatAgreesButNeedsAHumanIsFlaggedRatherThanMatched()
     {
         // The title bar and the body disagree — the parser's occlusion safety net — which the pipeline must not
-        // paper over. Truncated past the parser's length-scaled tolerance, since ordinary OCR noise reconciles.
-        OcrLine[] lines = [.. EarringLines];
+        // paper over. Truncated past the parser's length-scaled tolerance, since a single misread character reconciles.
+        TextLine[] lines = [.. EarringLines];
         lines[0] = L("of Bashing", 96, 0);
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
@@ -920,7 +921,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task AStalePageProducesAReviewableEditAndWritesNothing()
     {
-        OcrLine[] lines = [.. EarringLines];
+        TextLine[] lines = [.. EarringLines];
         lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
@@ -937,7 +938,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task CommittingWritesThePageAndRecordsTheEdit()
     {
-        OcrLine[] lines = [.. EarringLines];
+        TextLine[] lines = [.. EarringLines];
         lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
@@ -962,7 +963,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task OnlyAPreviewRendersAndItWritesNothing()
     {
-        OcrLine[] lines = [.. EarringLines];
+        TextLine[] lines = [.. EarringLines];
         lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
@@ -1004,7 +1005,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task CommittingRefusesAPageSomebodyElseEditedSinceTheCheck()
     {
-        OcrLine[] lines = [.. EarringLines];
+        TextLine[] lines = [.. EarringLines];
         lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
@@ -1030,7 +1031,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task CommittingWritesTheUsersOwnTextWhenTheyAmendedIt()
     {
-        OcrLine[] lines = [.. EarringLines];
+        TextLine[] lines = [.. EarringLines];
         lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(lines), EarringPage());
@@ -1052,7 +1053,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task CommittingAnItemThatStillNeedsAHumanRecordsItAsFlagged()
     {
-        OcrLine[] lines = [.. EarringLines];
+        TextLine[] lines = [.. EarringLines];
         lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
 
         // A Lore tab that has not been captured is an outstanding judgement, and the edit is real and unrelated.
@@ -1109,7 +1110,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task SkippingRecordsAnUnresolvedRow()
     {
-        OcrLine[] lines = [.. EarringLines];
+        TextLine[] lines = [.. EarringLines];
         lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(lines), EarringPage());
@@ -1286,8 +1287,8 @@ public class ItemCheckPipelineTests
         wiki.Pages["Earring of Bashing"] =
             new WikiPage("Earring of Bashing", EarringPage(), 100, DateTimeOffset.UnixEpoch);
 
-        OcrLine[] levelledLore =
-            [.. LoreTabLines.Select(l => new OcrLine(l.Text.Replace("Earring of Bashing", "Earring of Bashing +3"), l.BoundingBox, l.Words))];
+        TextLine[] levelledLore =
+            [.. LoreTabLines.Select(l => new TextLine(l.Text.Replace("Earring of Bashing", "Earring of Bashing +3"), l.BoundingBox, l.Words))];
         var locator = new FakeLocator(Window(levelledLore, hasLoreTab: true, tab: ItemWindowTab.Lore));
         var ledger = new CheckedItemsLedger();
         var pipeline = new ItemCheckPipeline(wiki, locator, ledger);
@@ -1793,7 +1794,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task AnItemWhosePageExistsUnderAQuoteVariantIsNotOfferedCreation()
     {
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Kavruul's Mystic Pouch", 96, 0),
             L("Description", 170, 18),

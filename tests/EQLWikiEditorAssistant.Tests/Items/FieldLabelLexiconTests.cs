@@ -1,22 +1,22 @@
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Items;
 
-namespace EQLWikiEditorAssistant.Tests.Core.Ocr;
+namespace EQLWikiEditorAssistant.Tests.Items;
 
 public class FieldLabelLexiconTests
 {
     [Theory]
-    [InlineData("Omamentation", "Ornamentation")] // the confirmed real "rn"->"m" OCR confusion
+    [InlineData("Omamentation", "Ornamentation")] // the "rn"->"m" misread
     [InlineData("Wom Exaltation", "Worn Exaltation")] // "Worn" only ever appears as "Worn Exaltation" in-game
     [InlineData("Womn Exaltation", "Worn Exaltation")]
     [InlineData("Ornamentation", "Ornamentation")] // already correct
-    public void Correct_KnownConfusions_FixesToCanonicalLabel(string ocrLabel, string expected) =>
-        Assert.Equal(expected, FieldLabelLexicon.Correct(ocrLabel));
+    public void Correct_KnownConfusions_FixesToCanonicalLabel(string label, string expected) =>
+        Assert.Equal(expected, FieldLabelLexicon.Correct(label));
 
     [Fact]
     public void Correct_UnrecognizedText_ReturnsInputUnchanged()
     {
         // Something with no close match to any known label shouldn't be forced onto the nearest one — an
-        // unrecognized label may just be a field this lexicon hasn't catalogued yet, not an OCR error.
+        // unrecognized label may just be a field this lexicon hasn't catalogued yet, not a misread.
         Assert.Equal("Some Unrelated Field", FieldLabelLexicon.Correct("Some Unrelated Field"));
     }
 
@@ -55,9 +55,9 @@ public class FieldLabelLexiconTests
     }
 
     [Fact]
-    public void TryMatchPrefixLabel_LeadingOcrJunkBeforeLabel_DoesNotCorruptRemainder()
+    public void TryMatchPrefixLabel_LeadingJunkBeforeLabel_DoesNotCorruptRemainder()
     {
-        // Regression: a real capture had OCR add a stray leading '.' before "Class:" (".Class: WAR PAL RNG SHD
+        // Regression: a real capture once read with a stray leading '.' before "Class:" (".Class: WAR PAL RNG SHD
         // ROG"). The fuzzy prefix match still succeeds (within edit-distance tolerance), but slicing the
         // remainder at a fixed `label.Length` offset then landed mid-label, leaving "s: WAR PAL..." instead of
         // "WAR PAL...". Must find the real separator instead of trusting a fixed-length cut.

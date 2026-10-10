@@ -6,12 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Windows desktop tool (C# / .NET, WPF) that helps maintain item pages on the EverQuest Legends Wiki
 (eqlwiki.com). The user plays EverQuest Legends and cross-references items against wiki pages by hand; this tool
-automates the repetitive parts: capture the in-game item window via a hotkey, OCR it locally, fetch and parse the
+automates the repetitive parts: capture the in-game item window via a hotkey, read it locally, fetch and parse the
 corresponding wiki page, diff the two, and let the user approve/tweak/commit the edit.
 
 Iteration 1 covers **items only**. The design is meant to extend to spells, monsters, and quests later via an
-`IEntityKind` abstraction — don't hardcode item-specific assumptions into the shared pipeline (capture, OCR
-plumbing, wiki client, review UI).
+`IEntityKind` abstraction — don't hardcode item-specific assumptions into the shared pipeline (capture, reading,
+wiki client, review UI).
 
 The full design rationale, wiki research findings, and milestone plan live in
 [docs/PLAN.md](docs/PLAN.md) — read it for background on *why*, not just *what*.
@@ -20,7 +20,8 @@ The full design rationale, wiki research findings, and milestone plan live in
 
 - **No network traffic interception, no game memory access.** Both violate the game's EULA. The only inputs are
   local screenshots (via Windows Graphics Capture) and the public MediaWiki API.
-- **Screenshots and OCR never leave the local machine.** No cloud OCR/vision APIs, ever. Wikitext and wiki images
+- **Screenshots and what is read from them never leave the local machine.** No cloud vision or text-recognition
+  APIs, ever. Wikitext and wiki images
   are fetched over the network (inbound); **nothing goes to the wiki unless the user takes an action they would
   reasonably expect to send it** (user, 2026-10-07, clarifying the original "only user-approved edits"). The purpose
   is to never publish anything unknowingly and never add load to the wiki for nothing — so a preview rendered by the
@@ -46,11 +47,12 @@ The full design rationale, wiki research findings, and milestone plan live in
 ## Solution layout
 
 - `src/EQLWikiEditorAssistant.Core` (`net10.0`, no Windows APIs) — wiki-agnostic domain models (`Item` etc.), shared
-  pipeline abstractions (`IEntityKind` and friends), the portable ports `IOcrEngine` + `CapturedImage`/`Rect`/
-  `OcrLine`/`OcrWord` and `FieldLabelLexicon` (`Core.Ocr`), **`ItemWindowLocator`/`WindowBoundsFinder`**
-  (`Core.Locate` — finds each item window's real pixel bounds in a full screenshot by tracing its border, not by
-  clustering text; see "Locating item windows" below), **`ItemParser`/`ParsedItem`** (`Core.Items` — turns a
-  located window's OCR lines into item data; see "Parsing item windows" below), and `EditDistance` (`Core.Text` —
+  pipeline abstractions (`IEntityKind` and friends), the portable image types `CapturedImage`/`Rect`
+  (`Core.Imaging`), the glyph reader and its output `TextLine`/`TextWord` (`Core.Glyphs`; see "Glyph matching"
+  below), **`ItemWindowLocator`/`WindowBoundsFinder`** (`Core.Locate` — finds each item window's Description tab by
+  its pixels and its real bounds by tracing its border; see "Locating item windows" below),
+  **`ItemParser`/`ParsedItem`** and `FieldLabelLexicon` (`Core.Items` — turns a located window's lines into item
+  data; see "Parsing item windows" below), and `EditDistance` (`Core.Text` —
   fuzzy string matching, used by locate, the field-label lexicon, and the exaltation name/title-reconciliation
   checks). Anything here must stay portable and free of MediaWiki syntax knowledge — see "Wiki mapping layer"
   below. Interfaces the pipeline depends on live here even though their real implementations are Windows-only,
@@ -62,12 +64,6 @@ The full design rationale, wiki research findings, and milestone plan live in
   icon PNGs; it lives here because this is the project whose job is turning Windows pixels into a `CapturedImage`).
   **Read the `[GeneratedComInterface]` note below before touching `Interop/`** — it documents a real, confirmed
   runtime failure mode, not a style preference.
-- `src/EQLWikiEditorAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — the general-OCR `IOcrEngine`: **`RapidOcrEngine`
-  wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline). See "OCR engine choice" below — this
-  wasn't arbitrary: the OS-provided `Windows.Media.Ocr` was tried first and replaced after real testing showed it
-  meaningfully less accurate, then removed outright once it had no remaining use. **The app does not reference this
-  project any more** (2026-10-09): windows are found by template and read by the glyph atlas. The tools and tests keep it
-  for `--rapid` comparisons and `OcrSpike`; whether to drop it entirely is an open decision.
 - `src/EQLWikiEditorAssistant.Wiki` (`net10.0`) — **`MediaWikiClient`/`IMediaWikiClient`** (`Wiki.MediaWiki` — bot-password
   auth, read-only fetch, conflict-guarded edit), **`ICredentialStore`/`WindowsCredentialStore`** (same namespace —
   Windows Credential Manager), **`WikitextScanner`/`TemplateCall`/`ItemPageDocument`/`StatsBlock`**
@@ -75,7 +71,7 @@ The full design rationale, wiki research findings, and milestone plan live in
   "Reading and editing wiki pages" below), the local icon file cache, and the checked-items ledger.
   `WindowsCredentialStore` is the one Windows-only type in this otherwise portable assembly. That is deliberate:
   it is plain Win32 P/Invoke (`advapi32`), which needs no WinRT projection and so no versioned TFM, unlike the
-  `Capture`/`Ocr` projects. It uses `[DllImport]` rather than `[LibraryImport]` because the latter's generator
+  `Capture` project. It uses `[DllImport]` rather than `[LibraryImport]` because the latter's generator
   emits unsafe code, and enabling `<AllowUnsafeBlocks>` across a domain assembly for four P/Invokes is the worse
   trade — unrelated to the `[GeneratedComInterface]` rule below, which is about CsWinRT COM objects.
 - `src/EQLWikiEditorAssistant.Pipeline` (`net10.0`) — **`ItemCheckPipeline`** and its report types: the whole sequence from
@@ -90,13 +86,12 @@ The full design rationale, wiki research findings, and milestone plan live in
   it), and `SettingsWindow` (the UI font, the capture hotkey, kept captures, the icon cache, the wiki login and a
   read-only view of the mapping — see "The settings window" below).
 - `tests/EQLWikiEditorAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
-- `tools/EQLWikiEditorAssistant.TestSupport`, `tools/OcrSpike`, `tools/CaptureSpike`, `tools/LocateSpike`,
+- `tools/EQLWikiEditorAssistant.TestSupport`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
   screenshot file from disk into a `CapturedImage` (the real app only ever captures a live window, never reads a
   file — this exists for tests/tooling), `TestSupport.RepoPaths` for finding `samples/` reliably from a
-  test/tool's output directory, and `TestSupport.DebugDraw` for drawing debug rectangle overlays; `OcrSpike`
-  iterates on OCR accuracy against real sample screenshots (`--crop`, `--scale`, `--save`, dump recognized
-  lines+bounding boxes); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
+  test/tool's output directory, `TestSupport.DebugDraw` for drawing debug rectangle overlays, and
+  `TestSupport.SampleFonts` for the font a screenshot is read in (see "Two UI fonts"); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
   windows, capture one to a PNG, test-fire a hotkey); `LocateSpike` runs `ItemWindowLocator` over a whole screenshot
   and can `--save` a debug overlay (green/red by `PossiblyOccluded`) for eyeballing results, or
   `--probe x,y,dx,dy,count` to dump raw pixel RGB along a ray — that's how the window-chrome colour profile in
@@ -108,21 +103,9 @@ The full design rationale, wiki research findings, and milestone plan live in
   parsed fields, `roundtrip`/`grammar` validate the wikitext layer against a live sample of item pages (`grammar`
   additionally prints the label and flag census that is the only thing which catches a *wrong* split, see
   "Reading and editing wiki pages"), and `login`/`whoami`/`logout`/`edit` exercise the credential and write paths.
-  `ParseSpike` and `AccuracySpike` both take `--rapid` to run the superseded RapidOCR-everywhere configuration for
-  comparison.
   Keep using these — don't recreate ad hoc versions — when tuning parse logic or debugging capture/locate.
-  **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
-  `RapidOcrNet`, not just a transitive one via `EQLWikiEditorAssistant.Ocr` — the package's bundled `.onnx` model files
-  only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
-  failed at runtime with a missing-model-file error until given its own direct reference). The app no longer uses
-  RapidOCR at all (2026-10-09), so this concerns the tools and the tests only.
-  **Keep a clone's path short.** ONNX Runtime's native DLL sits deep in the output
-  (`bin\Debug\net10.0-windows10.0.19041.0\runtimes\win-x64\native\`), and once that path passes Windows' 260-character
-  limit the load falls back to the much older `onnxruntime.dll` Windows ships in System32: the test host dies with
-  `0xC0000005` inside `OnnxRuntime.NativeMethods`, which says nothing about paths (found 2026-10-08, cloning into a deep
-  temp folder: 280 characters crashed, the same commit at 181 passed). The app does not load ONNX Runtime any more.
 
-Note: WinRT namespaces like `Windows.Media.Ocr` and `Windows.Graphics.Capture` are only projected on a Windows-SDK-
+Note: WinRT namespaces like `Windows.Graphics.Capture` are only projected on a Windows-SDK-
 versioned TFM (`net10.0-windows10.0.19041.0`), not plain `net10.0-windows` — every project that touches them must
 use the versioned form.
 
@@ -361,10 +344,10 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
 - **"Zero unparsed lines" is not evidence the split is right.** A wrong boundary still produces a field, just one
   with a nonsense label, so the unparsed count read zero while `MEDIUM WT` and `Blunt Atk Delay` were being
   produced. What caught them is the label census (`WikiSpike grammar`, which prints every distinct label and flag
-  token it produced with an example) — the wikitext equivalent of the OCR corpus's silent-wrong count, and worth
+  token it produced with an example) — the wikitext equivalent of the screenshot corpus's silent-wrong count, and worth
   reaching for the same way: eyeball the vocabulary, not the error count.
 - **Pages that are genuinely broken stay broken.** One page writes `SV FIRE +5 SV COLD +5` with no colons at all;
-  it is reported as one unrecognized token rather than repaired into fields. Same principle as the OCR side: a
+  it is reported as one unrecognized token rather than repaired into fields. Same principle as the capture side: a
   flagged gap beats a silent guess.
 - Parsing is tolerant by contract — unterminated braces, a stray `}}`, an unclosed `[[` and a missing parameter
   all yield "couldn't read this", never an exception and never a confidently wrong span (a wrong span is an edit
@@ -1004,7 +987,7 @@ skips the wiki fetch entirely.
 - **The fingerprint (`Core.Items.ItemFingerprint`) covers what an edit depends on and nothing else.** Lists are
   sorted, because a class list is a set and the window's emission order must not invalidate a row. The captured
   level is included so a future version that processes levelled items can never confuse `+0` with `+7`. **Parser
-  warnings are excluded**: they quote OCR fragments and churn with every tuning change, so including them would
+  warnings are excluded**: they quote fragments of text and churn with every parser change, so including them would
   expire every row on every release — the same reasoning that keeps warning *text* out of the accuracy corpus.
 - No expiry by default: a checked item does not drift on its own, and the fingerprint and mapping version are what
   actually invalidate a row. `MaximumAge` exists for the user who wants one.
@@ -1152,7 +1135,7 @@ and pressing something. See "Identifying an item's icon" below.
   `Capture.WindowsImageDecoder` the implementation — and **`ImageFile.LoadOverBackgroundAsync` delegates to it**
   rather than keeping its own copy. That direction matters: every threshold above was measured *through* that
   loader, and the numbers only transfer to the shipping tool if both sides decode identically. The alpha
-  compositing itself lives once, in `Core.Ocr.AlphaComposite`.
+  compositing itself lives once, in `Core.Imaging.AlphaComposite`.
 - Decoding is from bytes, never from a path — several items share one icon id (three corpus breastplates all use
   624), the decoder keeps a file mapped while it reads, and rewriting that file mid-run failed outright.
 
@@ -1735,20 +1718,12 @@ a global hotkey is worth having.
 - Icon uploads are still confirmed, as the one write that is not on the Submit page and the one only an admin can undo.
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — the `MediaWikiClient` must
   keep one cookie container for its whole session, and the ledger and icon cache only mean anything shared.
-- **The app runs no text-recognition model** (user, 2026-10-09). Windows are found by their Description tab's pixels
-  (see "Locating item windows") and read by the glyph atlas; RapidOCR, ONNX Runtime, SkiaSharp and the models left the
-  app with it. What led there, since it is the reason not to bring a model back for convenience:
-  - **ONNX Runtime keeps what it allocates.** Its memory pool grows to fit the largest input it has run and never
-    shrinks, and every capture handed it a whole 2560x1440 frame. Measured, not a leak: one long-lived engine over 153
-    real frames reached ~1.75 GB working set and 2.5 GB private within two captures and stayed flat, with the .NET heap
-    at 30 MB. alpha.1 shipped like that.
-  - **alpha.2 loaded the model for each capture and released it after**: about 140 ms to load (so "construct it once",
-    which rested on loading taking seconds, was never right), ~0.25 GB between captures. Turning the pool off instead
-    (`EnableCpuMemArena = false`) kept ~0.5 GB and made captures ~40% slower. But a capture's peak was still 1.6-1.9 GB
-    private, "more than the game itself" (user), and that is what removing the model fixed.
-  - **Measured in the real app without it** (user, 12 captures including one in the `default` skin, which reported
-    itself as expected): peak **294 MB private** (372 MB working set) against 1.6 GB; resting with nothing open 197 MB
-    private (281 MB working set) against 270 MB; .NET reserving 19 MB. ONNX Runtime is not loaded in the process.
+- **The repository runs no text-recognition model, and that is the reason not to bring one back for convenience.**
+  Windows are found by their Description tab's pixels (see "Locating item windows") and read by the glyph atlas. Until
+  alpha.3 a general-purpose model found the tabs, and its runtime's memory pool grew to fit the largest input it had run
+  (a whole 2560x1440 frame) and never shrank: alpha.1 sat at ~2.5 GB private for good, and alpha.2, loading the model
+  per capture, still peaked at 1.6-1.9 GB, "more than the game itself" (user). Without it (user, 12 real captures): peak
+  **294 MB private**, 197 MB resting. It was removed from the app on 2026-10-09 and from the tools on 2026-10-10.
 - **An aggressive collection runs after each capture** (`MainWindow.CaptureAsync`). With the model released, the app
   still settled at 570 MB private, and a heap dump found only 20 MB of live objects: .NET was keeping 238 MB for the
   freed screenshot buffers, expecting to reuse it. `GCCollectionMode.Aggressive` is the runtime's own way for an app going
@@ -1756,17 +1731,15 @@ a global hotkey is worth having.
   Measured in the real app, nothing open afterwards: 355 MB working set (270 MB private, .NET 53 MB committed). The
   review browser's own processes are ~390 MB on top, as any embedded Edge is.
 - **A capture runs off the UI thread: the screenshot, the whole check, and saving the frame** (bug found by the
-  user, 2026-10-07: the window hung and the progress label stuck on "Taking game screenshot"). Both OCR engines are
-  synchronous behind an async signature — they return `Task.FromResult` — so awaiting the pipeline from a click
-  handler ran the full-frame pass *on the UI thread*. Nothing repainted, and the "Finding item windows" report sat
-  queued behind the work it described, which is why the screenshot looked like the slow step. Hence `Task.Run`.
+  user, 2026-10-07: the window hung and the progress label stuck on "Taking game screenshot"). Finding and reading
+  the windows is synchronous work behind an async signature (`BorderTracingWindowLocator` returns `Task.FromResult`),
+  so awaiting the pipeline from a click handler ran it *on the UI thread*. Nothing repainted, and the "Finding item
+  windows" report sat queued behind the work it described. Hence `Task.Run`.
   - **That made the shared state genuinely concurrent**, because the review screen's buttons stay live during a
     capture: Save on one item can record a ledger row while the capture records another. `CheckedItemsLedger` is
     locked (and serializes its saves, reading the rows only once a save has its turn, so an older snapshot never
     lands over a newer one), and so is the pipeline's pending-lore table. `RecordingEnumeratingAndSavingAtOnceIsSafe`
     fails with the locks removed. `VerifiedPages` and `MediaWikiClient` only ever swap a reference, which is safe.
-- **The `.onnx`-copy trap is handled for `App`**: the direct `PackageReference` puts the models in the app's own
-  output, and the app starts.
 - `WikitextDiff` is a real LCS line diff, replacing the spike tool's set subtraction — that was fine for eyeballing
   whether an edit is surgical, but it collapsed duplicate lines (real statsblocks repeat `<br>`) and paired a changed
   line with an unrelated one. Long unchanged runs fold away, because an item page can carry a `dropsfrom` table with
@@ -2067,8 +2040,8 @@ touching this code, read the plan's milestone 2 section in full**: two earlier d
 measured against real screenshots rather than derived, and re-tuning in isolation without retesting `tools/LocateSpike`
 against the full real-sample set is very likely to reintroduce a bug this history already found and fixed.
 - **The tab is found by template, not by a text-recognition model** (`DescriptionTabFinder`, user, 2026-10-09). A
-  full-frame RapidOCR pass used to find it, and it was the whole of a capture's memory peak (1.6-1.9 GB) and most of its
-  time (2.5-4 s); the search takes tens of milliseconds. The label is laid out from the glyph atlas, one template per UI
+  model run over the whole frame used to find it, and it was the whole of a capture's memory peak (1.6-1.9 GB) and most
+  of its time (2.5-4 s); the search takes tens of milliseconds. The label is laid out from the glyph atlas, one template per UI
   font, and `TheTemplateIsTheRealLabelPixelForPixel` proves it is the real label exactly. Which font's template matched
   is the window's font, so the wrong-font refusal does not need the text read first.
   - **It matches by the blend model, not exact equality**, because the game's other two skins draw the same glyphs
@@ -2092,7 +2065,7 @@ against the full real-sample set is very likely to reintroduce a bug this histor
     `ItemCheckStatus.UnsupportedSkin`, with no ledger row, naming `default_modern` as the fix. It is also marked
     `PossiblyOccluded`, so everything that skips an unreadable window skips it; the pipeline asks about the skin first.
     See the plan for what supporting the other skins would take.
-- **Trace the grey outline, not a brightness transition.** Two superseded designs: (1) clustering OCR lines by
+- **Trace the grey outline, not a brightness transition.** Two superseded designs: (1) clustering recognized lines by
   text proximity, which can't tell a window's own content from an adjacent window's; (2) tracing the edge of the
   near-black interior — "scan outward until it stops being dark" — which silently assumed whatever is *outside*
   the window is brighter than it. Often it isn't, and then those scans tunnelled straight through the real edge:
@@ -2232,7 +2205,7 @@ against the full real-sample set is very likely to reintroduce a bug this histor
   left edge into the neighbouring window. Parse's title-vs-content reconciliation is still implemented and still
   worth keeping as defence in depth, but it is no longer propping up a known geometry hole.
 
-**Parsing item windows (`ItemParser`, `Core.Items`; `FieldLabelLexicon`, `Core.Ocr`).** Turns a clean
+**Parsing item windows (`ItemParser` and `FieldLabelLexicon`, `Core.Items`).** Turns a clean
 `LocatedWindow.Lines` list into a `ParsedItem`. Ground truth came from real `LocateSpike` dumps against four
 structurally different real windows (armor with a foreign exaltation, a weapon with both a native and foreign
 exaltations plus three effect types, a quest item, and a plain consumable with no slot/exaltations at all) — see
@@ -2243,10 +2216,10 @@ convention -> UI chrome -> a two-column stat block -> "Modified" chrome (the nam
 exaltation rows -> optional effect rows -> optional merchant value), so the header is parsed positionally and the
 body by pattern-matching each row, since the body's actual field set varies a lot by item type (a weapon shows
 `Base Dmg`/`Delay`/`Skill`/`Ratio` where armor shows `AC`/resists).
-- **A real OCR-layout quirk the row-reconstruction logic depends on**: unlike almost every other label:value line
-  (which comes back as one self-contained `OcrLine`, e.g. `"Class: WAR CLR PAL..."`), the classic two-column stat
-  block (Size/Weight/AC/stats/resists/etc.) is recognized as *separate* fragments for a label and its value even
-  on the same row — apparently because the game renders the value in a visually distinct box. `ItemParser` groups
+- **A layout the row-reconstruction logic depends on**: unlike almost every other label:value line (which comes
+  back as one self-contained `TextLine`, e.g. `"Class: WAR CLR PAL..."`), the classic two-column stat block
+  (Size/Weight/AC/stats/resists/etc.) comes back as *separate* fragments for a label and its value even on the same
+  row, because the reader splits a row at the stat block's column gap (see "Glyph matching"). `ItemParser` groups
   lines into rows by Y-proximity first (8px tolerance, same reasoning as `WindowBoundsFinder`'s consensus
   tolerances), then pairs fragments within a row generically (self-contained "Label: Value", or a bare
   "Label:"/"Label." fragment immediately followed by a separate value fragment — including two such pairs on one
@@ -2304,26 +2277,28 @@ item's own name again for others.
 - **Which tab is showing is read from the label's colour, in Locate, not inferred in the parser.** The selected
   tab's text is yellow (measured `191,191,4` / `159,159,6` / `255,255,0` — red≈green, blue near zero), unselected
   is neutral white. `LocatedWindow.ActiveTab` carries it. This is a question about pixels, and Locate is the layer
-  holding the image — OCR output carries no colour at all. Structural guesses ("no `Class:` row, so it must be
-  lore") were rejected: OCR does sometimes drop a `Class:`/`Race:` row, and that would silently reinterpret a
-  whole Description capture as lore.
+  holding the image — what was read carries no colour at all. Structural guesses ("no `Class:` row, so it must be
+  lore") were rejected: a dropped `Class:`/`Race:` row would silently reinterpret a whole Description capture as
+  lore.
 - `HasLoreTab` (the window *offers* a Lore tab — drives the two-capture flow) and `ActiveTab` (which one is on
   screen) are different things; both captures of a lore-bearing item have `HasLoreTab = true`.
 - Lore wrapped across rows is joined with spaces — the game breaks it purely to fit the window.
-- **OCR renders the label separator as `.` often enough to matter** (`Accuracy. +13.6%`, `Container. CLOSED.`,
-  and `Weight.`/`Dexterity.` as bare labels). Splitting on `.` unconditionally would cut decimal values in half,
-  so it only applies when the text before the dot is a label the lexicon knows.
-- **`FieldLabelLexicon`** is deliberately the small, fixed vocabulary the milestone 1 writeup scoped it to: it
-  fixes only the confirmed recurring corruption (`Ornamentation`->`Omamentation`, `Worn Exaltation`->
-  `Wom`/`Womn Exaltation`) before a label is matched to a stat field or an exaltation/effect kind. It only
-  contains full labels as they actually appear in-game (e.g. `"Worn Exaltation"`, not a bare `"Worn"` — there's
-  no bare "Worn" field), so don't add bare-word entries without a real line that needs one.
+- **A label followed by `.` instead of `:` is still a label** (`Container. CLOSED.`). Splitting on `.`
+  unconditionally would cut decimal values in half, so it only applies when the text before the dot is a label the
+  lexicon knows.
+- **`FieldLabelLexicon`** is a small, fixed vocabulary of the labels as they actually appear in-game (e.g.
+  `"Worn Exaltation"`, not a bare `"Worn"` — there's no bare "Worn" field), matched with a small edit-distance
+  tolerance, so don't add bare-word entries without a real line that needs one.
+  - **The parser's tolerances predate the glyph reader**, which reads exactly: the fuzzy label match, the `.`
+    separator, the split-row shapes below, the title-bar noise strip. They were built for a text-recognition model's
+    misreads (`Omamentation`, a dropped colon, a dropped value), cost nothing on exact text, and were kept when the
+    model went. Tightening them to exact matching is a possible change of its own, to be judged on the corpus.
 - **Occlusion safety net (defence in depth).** `ParsedItem.TitleContentNameMismatch` fuzzy-compares the
   title-bar name against the content-area name (threshold scaled to name length: tight enough that a truncated
-  title trips it, loose enough that ordinary single-character OCR noise doesn't). A caller must treat a set flag
+  title trips it, loose enough that a single misread character doesn't). A caller must treat a set flag
   as "don't trust this capture", not as advisory. It no longer covers a known geometry hole — the sample that
   supposedly proved one turned out to be a bounds bug, now fixed (see "Locating item windows") — but it still
-  earns its place: on the 4-window sample it correctly rejects a Bank/Tradeskill panel that OCR'd a literal
+  earned its place: on the 4-window sample it rejected a Bank/Tradeskill panel whose text read as a literal
   "Description" and got picked up as a false-positive window, catching it via a title/content name mismatch plus
   a pile of "expected row not found" warnings.
 - **Native-vs-foreign exaltation check** (`ItemParser.IsForeignExaltation`, fuzzy `EditDistance` against the
@@ -2332,38 +2307,34 @@ item's own name again for others.
   "removable native exaltation" case from the Augmentations section above), while its Click/Proc exaltations
   (different items) and Lustrous Russet Bracer's Focus exaltation are all correctly flagged foreign.
 - **An exaltation or effect row is matched across a whole row, not only a single-fragment one.** Requiring
-  `row.Count == 1` (what this used to do) silently demoted the row to an ordinary *stat* whenever OCR fragmented
-  it, which dropped the exaltation or effect from its own list entirely. All three shapes are real, measured on
-  the corpus:
+  `row.Count == 1` (what this used to do) silently demoted the row to an ordinary *stat* whenever the row arrived
+  fragmented, which dropped the exaltation or effect from its own list entirely. Three shapes were seen in real
+  captures:
   - the label split from its value, with the separator duplicated across the break — `"Click Exaltation:"` +
     `": Earthshaker's Mantle (Exaltation)"` (so a second leading `:` has to be trimmed off the value);
   - the effect's trailing parenthetical detected as its own fragment, leaving a dangling open paren behind —
     `"Click Effect Careless Lightning ("` + `"(Can Equip)"` (so `BuildEffect` trims a trailing `(` after peeling
     the real parenthetical);
-  - the exaltation slot's own **icon** recognized as a stray fragment *before* the label — `"0"` +
+  - the exaltation slot's own **icon** read as a stray fragment *before* the label — `"0"` +
     `"Click Exaltation: Bladestopper (Exaltation)"`.
   `TryMatchRowLabel` scans from each fragment in turn, which covers leading junk and rejoins a split label with
   its value without assuming either shape. Safe because these labels are long and specific — a stat value won't
-  fuzzy-match "Focus Exaltation". This is also why 08a and 08b disagreed on the *same* item window: identical
-  pixels, but OCR happened to split the Combat Effect line in one and not the other.
+  fuzzy-match "Focus Exaltation".
 - **A punctuation-only junk row shifts the whole positional header.** The window's own chrome occasionally reads
-  as text — a real capture had the tab-bar corner, clipped at the crop's left edge, recognized as `()` on its own
+  as text — a real capture had the tab-bar corner, clipped at the crop's left edge, read as `()` on its own
   row between the tab row and the content-area name, which made the name parse as `()` and pushed the real name
   row into the flags field. Rows with no letters or digits at all are dropped before parsing. Note the safer fix
   is dropping junk, *not* identifying the name row by similarity to the title — that would quietly defeat the
   title-vs-content occlusion check, whose whole job is to notice when those two genuinely differ.
-- **Closed: RapidOCR dropped isolated stat digits, and it was the dominant data gap.** Measured over 100 real
-  item windows it lost ~24 stat values — roughly 1 item in 5 missing at least one stat — with the digits plainly
-  present in the pixels (a window showing four `7`s returned no `7` fragment at all) while `AC: 6` and `HP: 55`
-  in the same window read fine. Glyph matching reads all of them; the count is now 0. Kept here because it is the
-  clearest illustration of *why* the window-crop pass stopped using a general recognizer: the failure was not
-  tuning, it was the wrong tool.
-- `tools/ParseSpike` (mirrors `OcrSpike`/`LocateSpike`) runs the full Locate -> Parse pipeline against a real
+- `tools/ParseSpike` (mirrors `LocateSpike`) runs the full Locate -> Parse pipeline against a real
   screenshot and dumps every parsed field per window (including a `[FOREIGN]` marker on foreign exaltations) —
   use this, don't recreate an ad hoc version, when tuning parser rules against new samples.
 
 **Glyph matching (`Core.Glyphs`, atlas in `Glyphs/eql-ui-font.atlas`) — the UI font is a deterministic bitmap
-blit, so reading it is exact template matching, not recognition.** Measured, not assumed: the same 'A' in an item
+blit, so reading it is exact template matching, not recognition.** That is why the Assistant reads it this way and
+not with a general-purpose text-recognition model: a model trained on documents lost about one stat value in five on
+these windows (a lone `7` in a stat column, plainly in the pixels, never came back), read `rn` as `m` and every grave
+accent as an apostrophe, and no tuning fixed it — it was the wrong tool. Measured, not assumed: the same 'A' in an item
 window and in the in-game Notes Window is byte-identical, anti-aliasing intermediates included. Build and inspect
 with `tools/GlyphSpike` — `dump` prints a region's raw intensities (the `--probe` of this work; measure before
 changing a constant), `segment` shows the bands/runs/glyphs found, `cluster` groups by exact equality, `atlas`
@@ -2396,11 +2367,10 @@ builds the labelled atlas, `verify` reads a real region back.
 - **Result: 90 characters, 89 distinct shapes.** The single collision is `l` = `I`, both a bare 2x9 bar with no
   serif or crossbar. That is irreducible at the glyph level: the atlas records both labels and leaves the choice
   to context. Guessing one would be a silent substitution, which is the failure this engine exists to remove.
-- The atlas is an **embedded resource** of `Core` (`GlyphAtlas.Bundled`), not a file beside the executable —
-  contrast the RapidOCR models, whose loose-file dependency has already caused a real runtime failure twice.
+- The atlas is an **embedded resource** of `Core` (`GlyphAtlas.Bundled`), not a file beside the executable, so an
+  install cannot lose it.
 - **The apostrophe and the grave accent are distinct entries, and both occur in real item names** — `Kilva's Skin
-  of Flame` against `Kavruul`s Mystic Pouch`. RapidOCR read every grave as an apostrophe; glyph matching keeps
-  them apart, which a test pins. The sheet originally had only the grave, so both quote characters were added to
+  of Flame` against `Kavruul`s Mystic Pouch`. Glyph matching keeps them apart, which a test pins. The sheet originally had only the grave, so both quote characters were added to
   it in a second capture — if the sheet is ever recaptured, it must keep them.
 - **Reading a window is `GlyphReader`, and every candidate calibrates itself.** The obvious design — segment into
   text bands, measure each band's background and peak, match within it — was built first and fails: a band that
@@ -2445,17 +2415,15 @@ builds the labelled atlas, `verify` reads a real region back.
 - **A fragment with no letter or digit is chrome and is dropped.** The title bar's decorations match `.` and `_`
   exactly, and since the parser joins a row's fragments, that turned a title of "Spit" into `_ . Spit .. .. . . .`
   — enough to trip the title-vs-content occlusion check and condemn a good capture.
-- **Output shape deliberately mirrors `RapidOcrEngine`'s**, so `ItemParser` needed no change to switch engines: a
-  row is split into separate `OcrLine`s at the stat block's *column* gap (measured 19-67px against 4-5px between
+- **A row is split into separate `TextLine`s at the stat block's *column* gap** (measured 19-67px against 4-5px between
   words), because emitting "Size: MEDIUM   AC: 43" as one string makes the parser read the value as
   "MEDIUM AC: 43". Baselines within 2px are one visual row, since the two stat columns are not always rendered on
   exactly the same baseline and grouping on the exact value emitted the right column before the left.
 - **Result on the verified corpus: every field exact.** 2094 correct, 0 wrong, 0 missing, 0 extra, 0 silent-wrong,
-  0 structural, 0 warnings — against RapidOCR's 13 silent-wrong, 24 missing and 24 warnings on the same corpus
-  and the same ground truth. `AccuracySpike --rapid` and `ParseSpike --rapid` still run the old configuration for
-  comparison.
+  0 structural, 0 warnings, where the model it replaced scored 13 silent-wrong, 24 missing and 24 warnings on the same
+  corpus and ground truth.
 
-**Two UI fonts (`Core.Ocr.UiFont`, 2026-10-05).** The game lets the player choose its UI font, and the user now
+**Two UI fonts (`Core.Glyphs.UiFont`, 2026-10-05).** The game lets the player choose its UI font, and the user now
 plays in **EQL Wiki Editor Assistant**: their own modification of Windows' Arial with a serifed capital I (so it can never be
 an l) and a 1px-wider r (so `rn` stops reading as `m`). It lives in `fonts/`, gitignored, because Arial's licence
 forbids modifying or distributing it — `fonts/README.md` records every version and how to rebuild it. The tool reads
@@ -2509,14 +2477,14 @@ both fonts; Arial reading is exactly what it was.
   (user, 2026-10-08, for the first release): it was EQL Wiki Editor Assistant, which nobody but the user has, so a tester on
   stock Arial would have had every capture refused as the wrong font. The user's own settings name their font, so the
   change does nothing to their copy. Every
-  `GlyphOcrEngine` must be given a font — no default, so no caller makes the choice by accident. Reading it from the game is a future feature: the per-character UI ini
+  `GlyphTextReader` must be given a font — no default, so no caller makes the choice by accident. Reading it from the game is a future feature: the per-character UI ini
   (`C:\Users\Public\Daybreak Game Company\Installed Games\EverQuest Legends\UI_<char>_<server>_<loadout>.ini`)
   carries it as `[Fonts] Font.us.0=Arial`, but the player switches loadout on the fly, so which file applies is itself
   a question.
 - **A capture in the other font is refused, not misread** (`ItemCheckStatus.WrongFont`, no ledger row). Read as EQL
   Wiki Assistant, an Arial capture turns every capital I into an l, plausibly: "Iron" reads "lron", a page that does
   not exist, which the tool would offer to create. So each line records the font it was drawn in when it holds a
-  font-specific shape (`OcrLine.DrawnIn`), the locator takes the window's verdict from them (`LocatedWindow.DrawnIn`
+  font-specific shape (`TextLine.DrawnIn`), the locator takes the window's verdict from them (`LocatedWindow.DrawnIn`
   — every window's own "Description" tab has an r), and the pipeline compares it with `ConfiguredFont`, which the
   composition root sets from the same variable it gives the reader. This is a guard on the explicit setting, not
   detection driving behaviour: the reader always reads by the setting.
@@ -2542,15 +2510,15 @@ both fonts; Arial reading is exactly what it was.
   glyph) and learned 4px from the first new-font capture. Re-scored before anything else changed: the Arial corpus
   was identical, 2230 correct and 0 everywhere.
 
-**Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to OCR
-settings or parser rules must be judged by a number, not by eyeballing warning counts — 18 tunable OCR parameters
-against ~100 item windows is unmeasurable by eye, and the failure that matters most (a *silently* wrong value) is
-invisible that way by definition.
+**Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to the
+reader, the locator or the parser rules must be judged by a number, not by eyeballing warning counts — a hundred-odd
+item windows are unmeasurable by eye, and the failure that matters most (a *silently* wrong value) is invisible that
+way by definition.
 - Ground truth lives in `tests/EQLWikiEditorAssistant.Tests/Accuracy/expected-items.json`, **tracked in git**. It holds
   only parsed item-window fields — the same public game data this tool publishes to the wiki. The private-info
   risk in `samples/` is everything *outside* a window, so the hard rule (documented in `ExpectedCorpus.cs`) is:
-  never whole-frame OCR text, never a line the locator didn't attribute to a window crop, no coordinates, and
-  warning **counts** rather than verbatim warning strings (those quote OCR fragments and churn with every tuning
+  never whole-frame text, never a line the locator didn't attribute to a window crop, no coordinates, and
+  warning **counts** rather than verbatim warning strings (those quote fragments of text and churn with every parser
   change). It lives under `tests/` rather than beside the screenshots because `samples/` is gitignored — a sidecar
   there would silently vanish on a fresh clone and take the regression guard with it.
 - `AccuracySpike --bootstrap` writes a candidate to `.local-data/` (never over the tracked file). Every field the
@@ -2572,15 +2540,9 @@ invisible that way by definition.
   - **Its font check covers every sample on disk, scored or not.** It was narrowed to samples with ground truth on
     2026-10-09, while an unlisted sample's font was a guess; since every sample's font is now declared (ground truth or
     marker) or Arial, a mismatch is a mislabel wherever it is.
-- **The corpus runs several samples at once** (`CorpusRunner.RunAllAsync`, user, 2026-10-09), each worker with its own
-  RapidOCR engine, since one is not safe to share between threads; results come back in file order, so a report is
-  identical at any worker count — checked at 1, 2, 4, 8 and 16 on all 52 samples. **Each engine is told its share of
-  the cores** (`RapidOcrEngine(threads)`, which RapidOcrNet hands to ONNX Runtime), and that is what made it work: left
-  to size itself, every engine took the whole machine, and 4 or 8 workers were no faster than one (243 s and 246 s
-  against 245 s). With the share, on 32 logical cores: 1 worker 271 s, 2 141 s, 4 81 s, 8 **56 s**, 16 52 s. The
-  default (`CorpusRunner.DefaultWorkers`) is a quarter of the logical cores, at most 8, which takes nearly all of the
-  gain at half the memory of 16; `AccuracySpike --workers <n>` overrides it. These timings are from when RapidOCR found
-  the windows; now that the tab template does, the whole corpus takes ~15 s, and the engines matter only to `--rapid`.
+- **The corpus runs several samples at once** (`CorpusRunner.RunAllAsync`, user, 2026-10-09); results come back in
+  file order, so a report is identical at any worker count. The default (`CorpusRunner.DefaultWorkers`) is a quarter of
+  the logical cores, at most 8; `AccuracySpike --workers <n>` overrides it. The whole corpus takes ~15 s.
 - Baseline (2026-10-07): **52 samples — 48 in Arial, 4 in EQL Wiki Editor Assistant — 120 windows located (1 correctly
   occluded), 2442 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
   extra. Parser warnings are 2, not 0**: both are
@@ -2589,11 +2551,9 @@ invisible that way by definition.
   structural, silent-wrong, wrong and missing, never warnings. Those ratchets in `CorpusAccuracyTests` are all 0 and
   must stay there; a regression is a real defect rather than a known gap being re-measured. **54 samples since
   2026-10-09**: `30a` and `31a`, one window each in the game's other two skins, expected unreadable, take the correct
-  count to 2444 and nothing else. Under the previous
-  configuration (RapidOCR reading window crops) the same
-  corpus and the same ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them
-  a glyph-level failure that exact template matching removed outright. `AccuracySpike --rapid` still scores the old
-  configuration, so the comparison stays reproducible.
+  count to 2444 and nothing else. Under the text-recognition model the glyph reader replaced, the same corpus and
+  ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them a glyph-level failure
+  that exact template matching removed outright.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
     newly bootstrapped sample guards against regressions immediately; the flag only records whether a human has
     checked it against the screenshot, and the summary counts it (`52 samples scored (52 verified)`). **All 52 are
@@ -2602,35 +2562,14 @@ invisible that way by definition.
   - **`unscored: N sample(s) on disk with no ground truth` is a normal line, not a failure** — a sample that is
     located and parsed but compared against nothing. `AccuracySpike --bootstrap --only <substring>` adds one entry
     for it, merging into the tracked corpus rather than regenerating the whole file.
-- **Ground-truth ordering was a latent defect, fixed once and mechanically.** The bootstrap recorded RapidOCR's
-  *detection* order, which is not the window's reading order; the user verified values, never order, and the plan
-  makes order part of the contract because it is how the wikitext gets laid back out. 9 windows were reordered by
-  `AccuracySpike --adopt-reading-order`, which rewrites a window only when its stats are the **same multiset** in
-  both — so it can reorder entries and can never add, remove or alter a value, and it reports anything it refuses.
-  Reach for it only when an engine change moves reading order legitimately, never to make a failing value pass.
-- **Verified ground truth can still be wrong, and a wrong entry hides a real error.** One entry kept an OCR
-  artifact through review (`Bumning Affliction III` — the `rn`->`m` cluster; corrected to `Burning` only after
-  reading the pixels at 6x). While it stood, the window that reproduced that same artifact scored as *correct*.
-  Fixing one word moved `silent-wrong` from 12 to 13. When a ground-truth value looks like a known OCR
-  corruption, check it against the image (`OcrSpike --crop ... --scale 6 --save`) rather than trusting the review.
-
-**Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.** This and the next note now apply
-only to the tools that still run RapidOCR (`--rapid`, `OcrSpike`); the app finds windows without it (2026-10-09).
-`RapidOcrOptions.Default.ImgResize` (1024) downsamples any larger image before detection; at a real 2560x1440
-screenshot that shrinks our ~9-11px UI text below a usable threshold (confirmed: default settings found 33
-garbled lines and zero `Description` tokens on a real screenshot with 3 real item windows). Fixed inside
-`RapidOcrEngine` itself: `ImgResize = Math.Max(1024, Math.Max(image.Width, image.Height))` — the 1024 floor keeps
-small per-window crops (milestone 1's use case) behaving identically to before; the dynamic ceiling fixes
-full-frame recognition (361 lines, all real `Description` anchors found, on the same screenshot post-fix). Costs
-~4s for a full frame — fine for a hotkey-triggered, non-realtime action, but don't be surprised by it.
-
-**Model files resolve against the assembly directory, not the working directory.** `RapidOcr.InitModels()` with
-no arguments looks for `models/v5/*.onnx` relative to the *current* directory, which made every documented
-`dotnet run --project tools/...` command fail with "Detector model file does not exist" — `dotnet run` sets the
-working directory to the project folder, while the models are copied next to the binary. `RapidOcrEngine` now
-passes explicit paths built from `AppContext.BaseDirectory`. This is separate from (and in addition to) the
-direct-`PackageReference` requirement noted in the solution layout: one controls whether the files are *copied*,
-this controls whether they're *found*.
+- **Reading order is part of the ground truth**, because it is how the wikitext gets laid back out. Entries first
+  recorded in the old model's detection order were reordered once (2026-09-24), by a guard that could only reorder a
+  window whose stats were the same multiset either way, never add, remove or alter a value.
+- **Verified ground truth can still be wrong, and a wrong entry hides a real error.** One entry kept a misread
+  through review (`Bumning Affliction III` — the `rn`->`m` cluster; corrected to `Burning` only after reading the
+  pixels at 6x). While it stood, the window that reproduced that same misread scored as *correct*. When a
+  ground-truth value looks like a misread, check it against the image (`GlyphSpike dump`) rather than trusting the
+  review.
 
 **Item leveling (`+X`) — v1 only processes `+0`.** Items (and spells) can be leveled up in-game (`Robe of the Ishva
 +2`); the wiki only stores level-0 data. The `+X` suffix is always stripped before using the name to key the ledger
@@ -2658,48 +2597,6 @@ disambiguate these, so a flag mismatch here needs the user's judgment rather tha
 it was written by someone who saw the item before it was attuned. See "Reading and editing wiki pages" for the
 detail, including that the user may later want this pair treated as *matching* via a setting.
 
-**OCR engine choice: RapidOCR — this was tested, not assumed, and the alternative has been deleted.** The
-OS-provided `Windows.Media.Ocr` was the original default; testing against real item windows (`tools/OcrSpike`)
-found it unreliable on the game's ~9-11px UI text even after upscaling (dropped numeric values, `rn`->`m`/
-`ti`->`b` misreads on labels, occasional single-character corruption in payload text like item/exaltation names).
-Ruled out JPEG compression as the cause (reproduced identically against a live, lossless capture). Tried
-`RapidOcrNet` (PaddleOCR PP-OCRv5 via ONNX) next and it was dramatically better on the *same* crops **at native
-resolution, with no upscaling** — nearly everything came back correct, including roman numerals and payload text
-Windows OCR had corrupted; upscaling it actually made results slightly worse. Full before/after comparison is in
-the plan's milestone 1 writeup — read that before reaching for a different engine.
-
-`WindowsOcrEngine` was kept for a while as a fallback/comparison, then **removed** once it was clear it had no
-remaining use: it needs an OS language pack the user must install, needs 3x upscaling to be usable at all, and
-still misreads on clean lossless captures (it read `Race: ALL` as `Race: Al I` on a current sample). Two engine
-implementations to maintain wasn't worth that. `IOcrEngine` stays — `Core` can't reference the Windows-only `Ocr`
-project, so the port is needed for layering regardless, and it keeps the engine swappable.
-
-**OCR is still not perfect — the milestone 2 parser must not trust it blindly, just with lighter mitigations than
-originally planned.** With `RapidOcrEngine` at native res: `Ornamentation` -> `Omamentation` and `Worn` ->
-`Wom`/`Womn` (an `rn`-ish confusion) persisted across every test regardless of engine or scale — treat it as a
-genuinely hard case for this exact font/pixel-size, not something to keep chasing. A small lexicon/edit-distance
-correction covering just the handful of known field labels handles it. Also keep: fuzzy/edit-distance comparison
-(not exact equality) for the native-vs-foreign exaltation name check and any wiki-page-title lookup by OCR'd name
-— cheap insurance, and an isolated dropped digit was seen even with the better engine; and "a field the parser
-expects but doesn't find is 'OCR uncertain,' not 'absent from the game'" — ask the user rather than assume. Drop:
-the mandatory upscale-before-recognition step and any multi-scale-pass plan — not needed for `RapidOcrEngine`, and
-upscaling measurably hurt it in testing. The app no longer runs `RapidOcrEngine` at all (2026-10-09; see "The review
-UI" for the memory that cost and "Locating item windows" for what replaced it), so this paragraph now describes the
-tools' `--rapid` configuration.
-
-A broader census across 6 real windows (~100+ recognized lines: weapons, armor, ammo, a charge item, a consumable,
-a quest token) found the `orn`->`om`-ish cluster to be the **only** recurring substantive error — digits (incl.
-lone `1`), fractions, apostrophes, and decimals all came through reliably. Don't pre-emptively guard against other
-classic small-text OCR confusions (`0`/`O`, `1`/`l`/`I`, `cl`/`d`, etc.) without evidence; none showed up here.
-
-**Where the label-correction fix belongs**: not inside either `IOcrEngine` implementation (that's game-domain
-vocabulary, not an OCR-engine concern, and will differ per future `IEntityKind`) — it's a milestone 2 Parse-step
-component, e.g. `Core.Ocr.FieldLabelLexicon`, living with the Item parser: a small list of expected field labels
-with edit-distance (≤1-2) correction applied per recognized label token before matching it to a field. Keep it
-separate from the wiki mapping config (that's user-editable MediaWiki vocabulary; this is stable game-UI
-vocabulary) and testable on plain strings without an image/OCR round-trip. Start small (really just
-`Ornamentation`/`Worn` today) and grow only as real evidence demands.
-
 **Releases (`tools/release.ps1`, Velopack, 2026-10-08).** Testers install from a `Setup.exe` that Velopack builds; the
 developer's own quick install stays `tools/install.ps1`. Versioning rules are in `AppInfo` and the plan.
 - **What a tester gets**: a self-contained win-x64 build (no .NET install), the icon library beside it, installed per
@@ -2710,9 +2607,8 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
   with their hook arguments; that is why `App.xaml` is a Page rather than the generated entry point. `vpk pack` checks
   the call is there. From a build folder it does nothing.
 - **`vpk` is pinned as a repo-local tool** (`dotnet-tools.json`) and must match the `Velopack` package's version.
-- **Every licence ships beside the executable.** The project file copies `LICENSE`, `THIRD-PARTY-NOTICES.txt` and ONNX
-  Runtime's and Skia's own notices, pinned to those packages' versions so a package bump fails the build instead of
-  shipping a stale notice. The .NET runtime's and WPF's are added by the script from the versions the published build
+- **Every licence ships beside the executable.** The project file copies `LICENSE` and `THIRD-PARTY-NOTICES.txt`. The
+  .NET runtime's and WPF's are added by the script from the versions the published build
   records in its `runtimeconfig.json`, since those follow the SDK and exist only for a self-contained build.
 - **A draft release is exactly one pushed commit**: `-Draft` refuses a dirty tree or an unpushed commit, pins the tag
   to that commit, and uploads through `gh`, because `vpk upload` takes the GitHub token only on its command line.
@@ -2800,8 +2696,6 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
 ## Commands
 
 No dependencies beyond the .NET SDK (net10.0 / net10.0-windows10.0.19041.0 targets — see Solution layout above).
-RapidOCR's models are bundled with its NuGet package, so there is nothing to install and no OS OCR language pack
-to configure.
 
 ```powershell
 dotnet build                                                    # build everything
@@ -2823,9 +2717,6 @@ powershell -ExecutionPolicy Bypass -File tools/install.ps1
 # release for v<Version>, from a clean, pushed commit; read it over and publish it on GitHub.
 powershell -ExecutionPolicy Bypass -File tools/release.ps1 [-Draft]
 
-# OCR tuning against a real sample screenshot (feed it native resolution — upscaling hurts this engine):
-dotnet run --project tools/OcrSpike -- "samples/some screenshot.png" --crop x,y,w,h --save out.png
-
 # Locate tuning against a real full screenshot:
 dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --save out.png
 
@@ -2836,7 +2727,7 @@ dotnet run --project tools/LocateSpike -- "samples/some screenshot.png" --probe 
 # Full Locate -> Parse pipeline, dumping every parsed field per window:
 dotnet run --project tools/ParseSpike -- "samples/some screenshot.png"
 
-# Score the whole corpus against tracked ground truth (the number to judge any OCR/parser change by):
+# Score the whole corpus against tracked ground truth (the number to judge any reader/parser change by):
 dotnet run --project tools/AccuracySpike                 # summary
 dotnet run --project tools/AccuracySpike -- --diff       # plus every differing field
 dotnet run --project tools/AccuracySpike -- --bootstrap  # regenerate ground truth after a new capture batch

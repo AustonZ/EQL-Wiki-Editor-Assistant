@@ -1,6 +1,6 @@
 using EQLWikiEditorAssistant.Core.Icons;
 using EQLWikiEditorAssistant.Core.Items;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.Wiki.Analysis;
 using EQLWikiEditorAssistant.Wiki.Ledger;
 using EQLWikiEditorAssistant.Wiki.MediaWiki;

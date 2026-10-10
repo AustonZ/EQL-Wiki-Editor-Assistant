@@ -1,5 +1,5 @@
 using EQLWikiEditorAssistant.Core.Glyphs;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 
 namespace EQLWikiEditorAssistant.Core.Locate;
 
@@ -13,7 +13,7 @@ public sealed record DescriptionTab(Rect Label, UiFont Font, bool Textured = fal
 /// text-recognition model (user, 2026-10-09). Every item window has exactly one such tab and a hover tooltip has none,
 /// which is why the label has been the anchor from the start; what changed is how it is found.
 ///
-/// **Why not the model that used to find it.** A full-frame RapidOCR pass existed only for this, and it was the whole
+/// **Why not the model that used to find it.** A text-recognition model over the whole frame existed only for this, and it was the whole
 /// of a capture's memory peak (1.6-1.9 GB) and most of its time (2.5-4 s). This search takes tens of milliseconds and
 /// next to no memory. On every sample it finds exactly the tabs the model found: 148 of 148 across the game's three skins
 /// and both UI fonts, with no false matches (measured with a prototype, 2026-10-09; see the plan).

@@ -1,14 +1,14 @@
 using EQLWikiEditorAssistant.Core.Items;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
-using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.TestSupport;
 using Xunit.Abstractions;
 
 namespace EQLWikiEditorAssistant.Tests.Items;
 
 /// <summary>
-/// Deterministic unit tests build an OcrLine list by hand from a real, verbatim <c>LocateSpike</c> capture (a
+/// Deterministic unit tests build an TextLine list by hand from a real, verbatim <c>LocateSpike</c> capture (a
 /// "Lustrous Russet Bracer +6" window — see the plan's milestone 2 writeup for the full dump) so the parser's
 /// logic is covered without needing samples/ present. Golden tests below additionally run the real pipeline
 /// end-to-end against real screenshots, same pattern as ItemWindowLocatorTests.
@@ -18,11 +18,11 @@ public class ItemParserTests
     private readonly ITestOutputHelper _output;
     public ItemParserTests(ITestOutputHelper output) => _output = output;
 
-    private static OcrLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
+    private static TextLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
 
     // Verbatim real capture of "Lustrous Russet Bracer +6", a native (removable) Focus Exaltation, and the
-    // confirmed real OCR corruptions "Omamentation" (Ornamentation) and "Wom Exaltation" (Worn Exaltation).
-    private static readonly OcrLine[] LustrousBracerLines =
+    // misreads "Omamentation" (Ornamentation) and "Wom Exaltation" (Worn Exaltation), which the label lexicon absorbs.
+    private static readonly TextLine[] LustrousBracerLines =
     [
         L("Lustrous Russet Bracer +6 (Augmented)", 96, 0),
         L("Description", 170, 18),
@@ -71,7 +71,7 @@ public class ItemParserTests
     /// app, and it produced a *rendered wiki line* reading `(Clicky, Can, ...)` — a truncated condition written to a
     /// public wiki, which is the silently-wrong output this project exists to avoid.
     /// </summary>
-    private static readonly OcrLine[] WrappedEffectLines =
+    private static readonly TextLine[] WrappedEffectLines =
     [
         L("Petamorph Wand: Murderbee", 993, 470),
         L("Description", 942, 491),
@@ -182,11 +182,11 @@ public class ItemParserTests
 
     // Verbatim real capture of "Bladestopper +7" — two effects (Focus, Click), where Cast Time/Required
     // Level/Cooldown belong specifically to the Click Effect (they follow it, not the Focus Effect above it).
-    // Also has "SV. Void:" with no adjacent value at all (a real OCR-dropped value, not a grouping bug) and OCR
+    // Also has "SV. Void:" with no adjacent value at all (a dropped value, not a grouping bug) and
     // noise "? ×" trailing the title's "(Augmented)" from a nearby checkbox/close icon — confirmed real as the
     // Unicode multiplication sign U+00D7, NOT the ASCII letter 'x' (they're easy to conflate by eye; an earlier
     // version of this fixture used ASCII 'x' and so didn't actually exercise the real bug).
-    private static readonly OcrLine[] BladestopperLines =
+    private static readonly TextLine[] BladestopperLines =
     [
         L("Bladestopper +7 (Augmented)", 125, 0),
         L("? ×", 378, 0),
@@ -250,7 +250,7 @@ public class ItemParserTests
         // checkbox/close-icon noise relative to those tokens, so a plain level-0 title like this one passed
         // through with the junk still attached, corrupting the name and wrongly flagging a name mismatch against
         // the (clean) content-area name.
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Drake-Hide Mask", 211, 0),
             L("? ×", 428, 0),
@@ -290,7 +290,7 @@ public class ItemParserTests
     {
         ParsedItem item = ItemParser.Parse(BladestopperLines);
 
-        // "SV. Void:" has no adjacent value fragment in the real capture (OCR dropped it) — must be flagged,
+        // "SV. Void:" has no adjacent value fragment in this capture — must be flagged,
         // never silently paired with an unrelated neighboring label/value.
         Assert.DoesNotContain(item.Stats, kv => kv.Key == "SV. Void");
         Assert.Contains(item.Warnings, w => w.Contains("SV. Void"));
@@ -303,7 +303,7 @@ public class ItemParserTests
         // recognized as "()" and landed on its own row between the tab row and the content-area name. Because
         // the header is positional, that made the name parse as "()", pushed the real name row into the flags
         // field, and tripped the title-vs-content occlusion check on a completely clean capture.
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Kavruul's Mystic Pouch", 134, 0),
             L("Description", 159, 18),
@@ -330,7 +330,7 @@ public class ItemParserTests
         // Verbatim from a real capture: a class list too long for one row wraps onto an unlabeled second row.
         // That shifted the whole positional header by one — the class list came back truncated, races empty, and
         // the continuation row was consumed as the item's slot.
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Turmoil Warts +5", 155, 0),
             L("Description", 163, 17),
@@ -357,7 +357,7 @@ public class ItemParserTests
     [InlineData("Charge Effect Word of Healing", "Charge", "Word of Healing")]
     public void Parse_EffectKind_IsRecognized(string effectLine, string expectedKind, string expectedName)
     {
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Some Item", 100, 0),
             L("Description", 160, 17),
@@ -379,7 +379,7 @@ public class ItemParserTests
         // Verbatim from a real capture. The Lore view is a different layout, not a variant of the Description
         // one: no repeated content-area name, no stat block. So the name can only come from the title bar, and
         // there is nothing to reconcile it against.
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Chilled Tundra Root", 139, 0),
             L("Description", 63, 17),
@@ -401,7 +401,7 @@ public class ItemParserTests
     public void Parse_LoreTabActive_JoinsLoreWrappedAcrossRows()
     {
         // A long lore string wraps purely to fit the window, so the breaks aren't part of the text.
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Some Item", 139, 0),
             L("Description", 63, 17),
@@ -427,7 +427,7 @@ public class ItemParserTests
     [InlineData("Click Effect Haste (Can Equip)", "Haste", "Can Equip")]
     public void Parse_EffectConditions_AreSeparatedFromTheName(string effectLine, string expectedName, string expectedCondition)
     {
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Some Item", 100, 0), L("Description", 160, 17), L("Some Item", 60, 50),
             L("No Trade", 60, 65), L("Class: ALL", 60, 80), L("Race: ALL", 60, 96),
@@ -444,7 +444,7 @@ public class ItemParserTests
     {
         // … while a proc/combat effect folds it into the parenthetical instead. Both must end up in the same
         // place, so a consumer never has to know which style the game happened to use for a given effect.
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Some Item", 100, 0), L("Description", 160, 17), L("Some Item", 60, 50),
             L("No Trade", 60, 65), L("Class: ALL", 60, 80), L("Race: ALL", 60, 96),
@@ -469,11 +469,10 @@ public class ItemParserTests
     [Fact]
     public void Parse_LabelSeparatedByDotInsteadOfColon_IsStillPaired()
     {
-        // OCR renders the separator as '.' on this UI often enough to matter ("Accuracy. +13.6%",
-        // "Container. CLOSED."). Splitting on '.' unconditionally would cut decimal values in half, so it only
+        // A label can be followed by '.' rather than ':' ("Accuracy. +13.6%", "Container. CLOSED."). Splitting on '.' unconditionally would cut decimal values in half, so it only
         // applies when the text before the dot is a label the lexicon knows — asserted by the Ratio case below,
         // where the value itself contains a dot.
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Some Item", 100, 0),
             L("Description", 160, 17),
@@ -509,9 +508,9 @@ public class ItemParserTests
     [Fact]
     public void Parse_TitleAndContentNamesReconcileWithMinorOcrNoise_NoMismatchFlagged()
     {
-        OcrLine[] lines =
+        TextLine[] lines =
         [
-            L("Watar Flask", 171, 0), // single-char OCR noise in the title only
+            L("Watar Flask", 171, 0), // one misread character, in the title only
             L("Description", 164, 17),
             L("Water Flask", 62, 48),
             L("Quest", 63, 64),
@@ -529,7 +528,7 @@ public class ItemParserTests
     {
         // Reproduces the plan's documented residual Locate gap: a small occluder truncates only the title bar,
         // geometry reports clean bounds, and Parse's title-vs-content reconciliation must be what catches it.
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("s Russet Bracer +6 (Augmented)", 96, 0),
             L("Description", 170, 18),
@@ -547,7 +546,7 @@ public class ItemParserTests
     [Fact]
     public void Parse_ConsumableWithNoSlotOrExaltations_LeavesSlotNull()
     {
-        OcrLine[] lines =
+        TextLine[] lines =
         [
             L("Water Flask", 171, 0),
             L("Description", 164, 17),
@@ -571,7 +570,7 @@ public class ItemParserTests
 
     // --- Golden tests against real samples (see ItemWindowLocatorTests for the skip-if-missing rationale) ---
 
-    private async Task<(CapturedImage Image, IOcrEngine Engine)?> Load(string fileName)
+    private async Task<(CapturedImage Image, GlyphTextReader Reader)?> Load(string fileName)
     {
         string path = Path.Combine(RepoPaths.SamplesDirectory, fileName);
         if (!File.Exists(path))
@@ -579,94 +578,82 @@ public class ItemParserTests
             _output.WriteLine($"Skipping: {path} not present (samples/ is gitignored, personal data).");
             return null;
         }
-        return (await ImageFile.LoadAsync(path), new RapidOcrEngine());
+        return (await ImageFile.LoadAsync(path), SampleFonts.Reader(path, []));
     }
 
     [Fact]
     public async Task Parse_ThreeSeparateWindows_AllParseWithTheirOwnNames()
     {
         if (await Load("07-three-distinct-items.png") is not { } l) return;
-        using (l.Engine as IDisposable)
-        {
-            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
-            Assert.All(windows, w => Assert.False(w.PossiblyOccluded));
+        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Reader);
+        Assert.All(windows, w => Assert.False(w.PossiblyOccluded));
 
-            var items = windows.Select(w => ItemParser.Parse(w.Lines)).ToList();
-            foreach (ParsedItem item in items)
-                _output.WriteLine($"{item.Name} +{item.Level} mismatch={item.TitleContentNameMismatch}");
+        var items = windows.Select(w => ItemParser.Parse(w.Lines)).ToList();
+        foreach (ParsedItem item in items)
+            _output.WriteLine($"{item.Name} +{item.Level} mismatch={item.TitleContentNameMismatch}");
 
-            Assert.Equal(3, items.Count);
-            Assert.All(items, i => Assert.False(i.TitleContentNameMismatch));
-            Assert.Single(items, i => i.Name == "Rod of the Protecting Winds");
-            Assert.Single(items, i => i.Name == "Glassy Gauntlets");
-            Assert.Single(items, i => i.Name == "Fruit");
-        }
+        Assert.Equal(3, items.Count);
+        Assert.All(items, i => Assert.False(i.TitleContentNameMismatch));
+        Assert.Single(items, i => i.Name == "Rod of the Protecting Winds");
+        Assert.Single(items, i => i.Name == "Glassy Gauntlets");
+        Assert.Single(items, i => i.Name == "Fruit");
     }
 
     [Fact]
     public async Task Parse_SimpleConsumable_ExtractsNameFlagsAndMerchantValue()
     {
         if (await Load("03-single-item-noisy-background.png") is not { } l) return;
-        using (l.Engine as IDisposable)
-        {
-            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
-            LocatedWindow window = Assert.Single(windows);
+        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Reader);
+        LocatedWindow window = Assert.Single(windows);
 
-            ParsedItem item = ItemParser.Parse(window.Lines);
-            Assert.Equal("Water Flask", item.Name);
-            Assert.Equal(0, item.Level);
-            Assert.False(item.TitleContentNameMismatch);
-            Assert.Contains("Quest", item.Flags);
-            Assert.Equal("1 silver", item.MerchantValue);
-            Assert.Empty(item.Slots); // a consumable has no slot row at all
-            Assert.Empty(item.Warnings);
-        }
+        ParsedItem item = ItemParser.Parse(window.Lines);
+        Assert.Equal("Water Flask", item.Name);
+        Assert.Equal(0, item.Level);
+        Assert.False(item.TitleContentNameMismatch);
+        Assert.Contains("Quest", item.Flags);
+        Assert.Equal("1 silver", item.MerchantValue);
+        Assert.Empty(item.Slots); // a consumable has no slot row at all
+        Assert.Empty(item.Warnings);
     }
 
     [Fact]
     public async Task Parse_LeveledItem_ExtractsBaseNameAndLevel()
     {
         if (await Load("11-one-item-over-health-bar.png") is not { } l) return;
-        using (l.Engine as IDisposable)
-        {
-            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
-            LocatedWindow window = Assert.Single(windows);
+        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Reader);
+        LocatedWindow window = Assert.Single(windows);
 
-            ParsedItem item = ItemParser.Parse(window.Lines);
+        ParsedItem item = ItemParser.Parse(window.Lines);
 
-            // The "+X" suffix is stripped from the name and kept separately — v1 only fully processes +0 items,
-            // so the eligibility step needs the level, and the ledger/wiki lookup needs the base name.
-            Assert.Equal("Crimson Ring of the Djinni", item.Name);
-            Assert.Equal(6, item.Level);
-            Assert.False(item.TitleContentNameMismatch);
-            Assert.Equal(["Fingers"], item.Slots);
-            Assert.Contains(item.Stats, kv => kv.Key == "AC" && kv.Value == "14");
-        }
+        // The "+X" suffix is stripped from the name and kept separately — v1 only fully processes +0 items,
+        // so the eligibility step needs the level, and the ledger/wiki lookup needs the base name.
+        Assert.Equal("Crimson Ring of the Djinni", item.Name);
+        Assert.Equal(6, item.Level);
+        Assert.False(item.TitleContentNameMismatch);
+        Assert.Equal(["Fingers"], item.Slots);
+        Assert.Contains(item.Stats, kv => kv.Key == "AC" && kv.Value == "14");
     }
 
     [Fact]
     public async Task Parse_WindowFlushAgainstOtherUi_IsIsolatedWithNoBleedIn()
     {
         if (await Load("04-single-item-over-bags-flush-with-inventory.png") is not { } l) return;
-        using (l.Engine as IDisposable)
-        {
-            IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(l.Image, l.Engine);
-            LocatedWindow window = Assert.Single(windows);
-            Assert.False(window.PossiblyOccluded);
+        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Reader);
+        LocatedWindow window = Assert.Single(windows);
+        Assert.False(window.PossiblyOccluded);
 
-            // This window is edge-to-edge with the inventory panel and has other dark UI directly above its
-            // title bar. An earlier tracer ran past the real edge into neighbouring windows entirely (one sample
-            // was traced 137px too far, parsing the neighbour's Class/Race/Size/Weight as this item's), so the
-            // width bound and the single-occurrence field checks below are what catch that class of bug.
-            Assert.InRange(window.Bounds.Width, 380, 430);
+        // This window is edge-to-edge with the inventory panel and has other dark UI directly above its
+        // title bar. An earlier tracer ran past the real edge into neighbouring windows entirely (one sample
+        // was traced 137px too far, parsing the neighbour's Class/Race/Size/Weight as this item's), so the
+        // width bound and the single-occurrence field checks below are what catch that class of bug.
+        Assert.InRange(window.Bounds.Width, 380, 430);
 
-            ParsedItem item = ItemParser.Parse(window.Lines);
-            Assert.Equal("Dark Cloak of the Sky", item.Name);
-            Assert.False(item.TitleContentNameMismatch);
-            Assert.Equal(["Back"], item.Slots);
-            Assert.Single(item.Stats, kv => kv.Key == "Size");
-            Assert.Single(item.Stats, kv => kv.Key == "Weight");
-            Assert.Single(item.Classes);
-        }
+        ParsedItem item = ItemParser.Parse(window.Lines);
+        Assert.Equal("Dark Cloak of the Sky", item.Name);
+        Assert.False(item.TitleContentNameMismatch);
+        Assert.Equal(["Back"], item.Slots);
+        Assert.Single(item.Stats, kv => kv.Key == "Size");
+        Assert.Single(item.Stats, kv => kv.Key == "Weight");
+        Assert.Single(item.Classes);
     }
 }

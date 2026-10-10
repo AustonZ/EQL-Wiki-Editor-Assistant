@@ -11,13 +11,6 @@
     <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Pipeline\EQLWikiEditorAssistant.Pipeline.csproj" />
     <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Wiki\EQLWikiEditorAssistant.Wiki.csproj" />
     <ProjectReference Include="..\EQLWikiEditorAssistant.TestSupport\EQLWikiEditorAssistant.TestSupport.csproj" />
-    <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Ocr\EQLWikiEditorAssistant.Ocr.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Direct reference so the bundled .onnx models copy to this tool's own output — see CLAUDE.md; a transitive
-         reference through EQLWikiEditorAssistant.Ocr does not copy them. -->
-    <PackageReference Include="RapidOcrNet" Version="4.2.0" />
   </ItemGroup>
 
 </Project>

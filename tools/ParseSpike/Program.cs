@@ -1,12 +1,11 @@
 using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Core.Items;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
-using EQLWikiEditorAssistant.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.TestSupport;
 
 // Milestone 2 spike tool: run the full Locate -> Parse pipeline against a real screenshot and dump each item's
-// parsed fields, for eyeballing against the real window during parser tuning. Mirrors OcrSpike/LocateSpike —
+// parsed fields, for eyeballing against the real window during parser tuning. Mirrors LocateSpike —
 // keep using this rather than recreating ad hoc versions.
 //
 // Usage: ParseSpike <imagePath>
@@ -20,14 +19,10 @@ if (args.Length < 1)
 CapturedImage image = await ImageFile.LoadAsync(args[0]);
 Console.WriteLine($"Loaded {args[0]} ({image.Width}x{image.Height})");
 
-// The shipping configuration reads window crops with the glyph atlas and keeps RapidOCR for the full-frame
-// locate pass; --rapid falls back to RapidOCR for both, to compare against the old behaviour.
-using var rapid = new RapidOcrEngine();
 UiFont font = SampleFonts.For(args[0], args);
-IOcrEngine engine = args.Contains("--rapid") ? rapid : SampleFonts.Engine(rapid, font);
 Console.WriteLine($"Reading as {UiFonts.DisplayName(font)} (--font to override)");
 
-IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, engine);
+IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(image, new GlyphTextReader(font));
 Console.WriteLine($"Located {windows.Count} window(s):");
 
 foreach (LocatedWindow window in windows)

@@ -1,6 +1,6 @@
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 
-namespace EQLWikiEditorAssistant.Tests.Core.Ocr;
+namespace EQLWikiEditorAssistant.Tests.Core.Imaging;
 
 public class CapturedImageTests
 {
@@ -67,36 +67,5 @@ public class CapturedImageTests
     {
         CapturedImage image = MakeCoordinateImage(20, 20);
         Assert.Throws<ArgumentOutOfRangeException>(() => image.Crop(new Rect(x, y, w, h)));
-    }
-
-    [Fact]
-    public void Resize_ToSameDimensions_IsIdentity()
-    {
-        CapturedImage image = MakeCoordinateImage(16, 12);
-        CapturedImage resized = image.Resize(16, 12);
-
-        Assert.Equal(image.Pixels, resized.Pixels);
-    }
-
-    [Fact]
-    public void Resize_Upscale_PreservesUniformColor()
-    {
-        var pixels = new byte[10 * 10 * 4];
-        for (int i = 0; i < pixels.Length; i += 4)
-        {
-            pixels[i + 0] = 10; pixels[i + 1] = 20; pixels[i + 2] = 30; pixels[i + 3] = 255;
-        }
-        var image = new CapturedImage(10, 10, pixels);
-
-        CapturedImage upscaled = image.Resize(30, 30);
-
-        Assert.Equal(30, upscaled.Width);
-        Assert.Equal(30, upscaled.Height);
-        for (int i = 0; i < upscaled.Pixels.Length; i += 4)
-        {
-            Assert.Equal(10, upscaled.Pixels[i + 0]);
-            Assert.Equal(20, upscaled.Pixels[i + 1]);
-            Assert.Equal(30, upscaled.Pixels[i + 2]);
-        }
     }
 }

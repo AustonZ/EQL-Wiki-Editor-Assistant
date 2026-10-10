@@ -1,5 +1,4 @@
 using EQLWikiEditorAssistant.Core.Glyphs;
-using EQLWikiEditorAssistant.Core.Ocr;
 using EQLWikiEditorAssistant.TestSupport.Accuracy;
 
 namespace EQLWikiEditorAssistant.TestSupport;
@@ -39,11 +38,7 @@ public static class SampleFonts
         return entry.FontOrArial;
     }
 
-    /// <summary>The shipping configuration for one screenshot: RapidOCR to find the windows, the glyph atlas to
-    /// read them, in that screenshot's font.</summary>
-    public static IOcrEngine Engine(IOcrEngine fullFrame, string path, IReadOnlyList<string> args) =>
-        Engine(fullFrame, For(path, args));
-
-    public static IOcrEngine Engine(IOcrEngine fullFrame, UiFont font) =>
-        new RoutingOcrEngine(fullFrame: fullFrame, windowCrop: new GlyphOcrEngine(font));
+    /// <summary>A glyph reader for one screenshot, in the font <see cref="For"/> gives it.</summary>
+    public static GlyphTextReader Reader(string path, IReadOnlyList<string> args, ExpectedCorpus? expected = null) =>
+        new(For(path, args, expected));
 }

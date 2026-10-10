@@ -1,6 +1,6 @@
 using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 
 namespace EQLWikiEditorAssistant.Tests.Glyphs;
 
@@ -138,7 +138,7 @@ public class UiFontTests
     {
         CapturedImage image = Paint(UiFont.EqlWikiEditorAssistant, "Iron", "lost");
 
-        OcrLine line = Assert.Single(Read(image, UiFont.EqlWikiEditorAssistant));
+        TextLine line = Assert.Single(Read(image, UiFont.EqlWikiEditorAssistant));
 
         Assert.Equal("Iron lost", line.Text);
         Assert.Equal(UiFont.EqlWikiEditorAssistant, line.DrawnIn);
@@ -151,7 +151,7 @@ public class UiFontTests
     {
         CapturedImage image = Paint(UiFont.Arial, "Iron", "lost");
 
-        OcrLine line = Assert.Single(Read(image, UiFont.Arial));
+        TextLine line = Assert.Single(Read(image, UiFont.Arial));
 
         Assert.Equal("Iron lost", line.Text);
         Assert.Equal(UiFont.Arial, line.DrawnIn);
@@ -167,7 +167,7 @@ public class UiFontTests
     {
         CapturedImage image = Paint(UiFont.Arial, "Iron", "lost");
 
-        OcrLine line = Assert.Single(Read(image, UiFont.EqlWikiEditorAssistant));
+        TextLine line = Assert.Single(Read(image, UiFont.EqlWikiEditorAssistant));
 
         Assert.Equal("lron lost", line.Text);
         Assert.Equal(UiFont.Arial, line.DrawnIn);
@@ -188,7 +188,7 @@ public class UiFontTests
     [Fact]
     public void AWindowTakesTheFontItsLinesAgreeOn()
     {
-        OcrLine Line(UiFont? font) => new("x", new Rect(0, 0, 1, 1), [], font);
+        TextLine Line(UiFont? font) => new("x", new Rect(0, 0, 1, 1), [], font);
 
         Assert.Equal(UiFont.Arial, ItemWindowLocator.DrawnIn([Line(null), Line(UiFont.Arial), Line(UiFont.Arial)]));
         Assert.Null(ItemWindowLocator.DrawnIn([Line(null), Line(null)]));
@@ -217,7 +217,7 @@ public class UiFontTests
 
     // ---- helpers ----
 
-    private static IReadOnlyList<OcrLine> Read(CapturedImage image, UiFont font) =>
+    private static IReadOnlyList<TextLine> Read(CapturedImage image, UiFont font) =>
         GlyphReader.Read(image, new Rect(0, 0, image.Width, image.Height), Atlas, font);
 
     /// <summary>The atlas entry a font draws a character with: its own shape if it has one, else the shared one.</summary>

@@ -1,16 +1,16 @@
 using EQLWikiEditorAssistant.Core.Text;
 
-namespace EQLWikiEditorAssistant.Core.Ocr;
+namespace EQLWikiEditorAssistant.Core.Items;
 
 /// <summary>
-/// Small fixed vocabulary of known item-window field labels, with edit-distance correction for the field-label
-/// OCR errors confirmed real in testing (see the plan/CLAUDE.md milestone 1 writeup): the "rn"-ish confusion
-/// (`Ornamentation` -&gt; `Omamentation`, `Worn` -&gt; `Wom`/`Womn`) persisted across every engine and scale
-/// tested. This is game-domain vocabulary, not an OCR-engine concern (spells/monsters/quests will have their own
-/// label sets later), so it lives in Core alongside the Item parser rather than inside an <see cref="IOcrEngine"/>
-/// implementation, and stays separate from the wiki mapping config (that's user-editable MediaWiki vocabulary
-/// that evolves with the wiki; this is stable, game-UI vocabulary). Deliberately small — grows only as real
-/// evidence demands, per the same philosophy that shaped the OCR error census.
+/// Small fixed vocabulary of known item-window field labels, matched with a small edit-distance tolerance
+/// (`Omamentation` still finds `Ornamentation`). This is game-domain vocabulary (spells/monsters/quests will have
+/// their own label sets later), so it lives alongside the Item parser, and stays separate from the wiki mapping
+/// config (that's user-editable MediaWiki vocabulary that evolves with the wiki; this is stable, game-UI
+/// vocabulary). Deliberately small — grows only as real windows demand.
+///
+/// The tolerance predates the glyph reader, which reads labels exactly; it was built for a text-recognition model's
+/// misreads, and is kept because it costs nothing on exact text.
 /// </summary>
 public static class FieldLabelLexicon
 {
@@ -29,12 +29,12 @@ public static class FieldLabelLexicon
         "Cast Time", "Cooldown", "Cooldown Group", "Required Level", "Charges",
     ];
 
-    /// <summary>Corrects an OCR'd field-label token to its closest known label, if one is close enough; returns
+    /// <summary>Corrects a field-label token to its closest known label, if one is close enough; returns
     /// the input unchanged (trimmed) if nothing matches closely enough to be confident — an unrecognized label
     /// isn't necessarily an error, it may just be a field not yet catalogued here.</summary>
-    public static string Correct(string ocrLabel)
+    public static string Correct(string label)
     {
-        string candidate = ocrLabel.Trim();
+        string candidate = label.Trim();
         if (candidate.Length == 0) return candidate;
 
         string? best = null;
@@ -53,15 +53,15 @@ public static class FieldLabelLexicon
     }
 
     /// <summary>True if <paramref name="text"/> corrects to a label this lexicon knows. Used to recognize a
-    /// label whose trailing ':' OCR dropped — a documented, unpredictable quirk of this engine on this UI — which
-    /// would otherwise leave the label and its value stranded as two unparsed fragments.</summary>
+    /// label without its trailing ':', which would otherwise leave the label and its value stranded as two unparsed
+    /// fragments.</summary>
     public static bool IsKnownLabel(string text) =>
         KnownLabels.Contains(Correct(text), StringComparer.OrdinalIgnoreCase);
 
     /// <summary>True if <paramref name="text"/>'s prefix (of the same length as <paramref name="label"/>) is a
     /// close match for <paramref name="label"/> — used to recognize a known label at the start of a line without
-    /// requiring a delimiter, since OCR unpredictably drops the colon after some labels (e.g. "Charge Effect" vs
-    /// "Charge Effect:").</summary>
+    /// requiring a delimiter, since the game writes some labels without a colon (e.g. "Focus Effect Reagent
+    /// Conservation II").</summary>
     public static bool StartsWithLabel(string text, string label)
     {
         string t = text.TrimStart();
@@ -99,8 +99,8 @@ public static class FieldLabelLexicon
         matchedLabel = best;
 
         // Find the real label/value separator near the expected boundary rather than assuming the label
-        // occupies exactly best.Length characters — a stray leading OCR character (confirmed real: ".Class:"
-        // instead of "Class:") still matches fuzzily but shifts where the label actually ends in the text, so
+        // occupies exactly best.Length characters — a stray leading character (".Class:" instead of "Class:")
+        // still matches fuzzily but shifts where the label actually ends in the text, so
         // slicing at a fixed offset previously corrupted the remainder (e.g. "s: WAR PAL..." instead of
         // "WAR PAL..."). Search a small window straddling the expected boundary (not from index 0 — a leading
         // junk character like that stray '.' is itself a candidate separator, and would otherwise be found
@@ -118,8 +118,8 @@ public static class FieldLabelLexicon
     }
 
     // Edit-distance budget scaled by label length: tight for short labels (a generous budget on e.g. "AC" or
-    // "End" would make almost anything match), looser for longer ones, matching the real corruptions confirmed
-    // by testing ("Ornamentation" -> "Omamentation" is 2 edits; "Worn" -> "Wom" is 2, "Womn" is 1).
+    // "End" would make almost anything match), looser for longer ones ("Ornamentation" -> "Omamentation" is 2
+    // edits; "Worn" -> "Wom" is 2, "Womn" is 1).
     private static int ToleranceFor(string label) => label.Length switch
     {
         <= 3 => 0,

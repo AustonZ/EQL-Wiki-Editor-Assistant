@@ -1,6 +1,7 @@
 using EQLWikiEditorAssistant.Core.Items;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 
 namespace EQLWikiEditorAssistant.TestSupport.Accuracy;
 
@@ -34,13 +35,12 @@ public static class CorpusRunner
             .OrderBy(Path.GetFileName, StringComparer.Ordinal)];
     }
 
-    /// <summary>Locates and parses one screenshot. Items are index-aligned with windows; an occluded window
-    /// yields a null item, because it is deliberately never parsed.</summary>
-    public static async Task<CorpusSample> RunAsync(
-        string path, IOcrEngine engine, UiFont font, CancellationToken cancellationToken = default)
+    /// <summary>Locates and parses one screenshot, read in <paramref name="font"/>. Items are index-aligned with
+    /// windows; an occluded window yields a null item, because it is deliberately never parsed.</summary>
+    public static async Task<CorpusSample> RunAsync(string path, UiFont font, CancellationToken cancellationToken = default)
     {
         CapturedImage image = await ImageFile.LoadAsync(path);
-        IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, engine, cancellationToken);
+        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(image, new GlyphTextReader(font), cancellationToken);
 
         var items = windows
             .Select(w => w.PossiblyOccluded ? null : ItemParser.Parse(w.Lines, w.ActiveTab))
@@ -50,52 +50,31 @@ public static class CorpusRunner
     }
 
     /// <summary>
-    /// Runs every sample, <paramref name="workers"/> at a time (user, 2026-10-09: the corpus took four minutes on a
-    /// 32-thread machine, one screenshot after another). Results come back in <paramref name="files"/>' order whatever
-    /// finished first, so a report is identical at any worker count.
-    ///
-    /// **Each worker gets an engine of its own** from <paramref name="createEngine"/>, rather than sharing one, because
-    /// RapidOCR is not written to be called from two threads at once. That costs a set of loaded models per worker,
-    /// which is why the count is a parameter rather than "every core". **The factory is told how many threads its
-    /// engine may use** — the machine's share per worker — because an engine left to size itself takes the whole
-    /// machine, and several of them then fight: measured, 4 and 8 such workers were no faster than one. <paramref name="configure"/> picks the engine and
-    /// font for one sample given its worker's engine, as <see cref="SampleFonts"/> does.
+    /// Runs every sample, <paramref name="workers"/> at a time, each read in the font <paramref name="fontFor"/> gives
+    /// it (<see cref="SampleFonts"/>). Results come back in <paramref name="files"/>' order whatever finished first, so
+    /// a report is identical at any worker count.
     /// </summary>
     public static async Task<IReadOnlyList<CorpusSample>> RunAllAsync(
         IReadOnlyList<string> files,
-        Func<int, IOcrEngine> createEngine,
-        Func<string, IOcrEngine, (IOcrEngine Engine, UiFont Font)> configure,
+        Func<string, UiFont> fontFor,
         int workers = 0,
         CancellationToken cancellationToken = default)
     {
         if (workers <= 0) workers = DefaultWorkers;
         var results = new CorpusSample[files.Count];
         int next = -1;
-        int threads = Math.Max(1, Environment.ProcessorCount / workers);
 
         await Task.WhenAll(Enumerable.Range(0, Math.Clamp(workers, 1, Math.Max(files.Count, 1))).Select(_ =>
             Task.Run(async () =>
             {
-                IOcrEngine own = createEngine(threads);
-                try
-                {
-                    for (int i = Interlocked.Increment(ref next); i < files.Count; i = Interlocked.Increment(ref next))
-                    {
-                        (IOcrEngine engine, UiFont font) = configure(files[i], own);
-                        results[i] = await RunAsync(files[i], engine, font, cancellationToken);
-                    }
-                }
-                finally
-                {
-                    (own as IDisposable)?.Dispose();
-                }
+                for (int i = Interlocked.Increment(ref next); i < files.Count; i = Interlocked.Increment(ref next))
+                    results[i] = await RunAsync(files[i], fontFor(files[i]), cancellationToken);
             }, cancellationToken)));
 
         return results;
     }
 
-    /// <summary>How many samples run at once when the caller does not say. Measured: see CLAUDE.md, "Measuring
-    /// extraction accuracy".</summary>
+    /// <summary>How many samples run at once when the caller does not say: a quarter of the cores, at most 8.</summary>
     public static int DefaultWorkers => Math.Clamp(Environment.ProcessorCount / 4, 1, 8);
 
     /// <summary>Scores a run against ground truth. Samples on disk with no expected entry are reported as
@@ -177,7 +156,7 @@ public static class CorpusRunner
                 })],
             };
 
-            // An orphaned-label warning means the parser saw a field whose value OCR never produced. Record the
+            // An orphaned-label warning means the parser saw a field whose value was never read. Record the
             // label with a TODO so the reviewer has to read the real value off the screenshot.
             foreach (string label in OrphanedLabels(item))
                 w.Stats.Add(new ExpectedField { Label = label, Value = ExpectedCorpus.TodoMarker });
@@ -188,10 +167,10 @@ public static class CorpusRunner
         return entry;
     }
 
-    /// <summary>Extracts the label out of an orphaned-label warning — i.e. a field whose value OCR dropped.
+    /// <summary>Extracts the label out of an orphaned-label warning — i.e. a field whose value was not read.
     ///
     /// Only fragments that actually look like a field label qualify: one the lexicon knows, or one carrying the
-    /// bare-label shape (a trailing ':' or OCR's '.'). The stat block also strands genuine junk — a stray "0", a
+    /// bare-label shape (a trailing ':' or '.'). The stat block also strands genuine junk — a stray "0", a
     /// wrapped "(Can Equip)" — and emitting those as TODO fields would hand the reviewer rows to *delete* rather
     /// than values to *read*, which is friction that invites mistakes in exactly the file that has to be right.</summary>
     private static IEnumerable<string> OrphanedLabels(ParsedItem item)

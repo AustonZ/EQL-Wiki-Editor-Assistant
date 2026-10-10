@@ -7,7 +7,7 @@ namespace EQLWikiEditorAssistant.Core.Glyphs;
 /// byte-identical pixels (measured — a 'A' in an item window and the same 'A' in the in-game Notes Window match
 /// exactly, including every anti-aliased intermediate). Anti-aliasing uses a fixed, quantized coverage ramp, so a
 /// glyph can be identified by exact comparison rather than by recognition. That is the whole basis of
-/// <c>GlyphOcrEngine</c>.
+/// <c>GlyphTextReader</c>.
 ///
 /// **The ramp is the same in every text colour and on every background — but only after normalizing.** Measured
 /// absolute values differ per colour because the ramp is applied to whichever channels the colour uses and scaled

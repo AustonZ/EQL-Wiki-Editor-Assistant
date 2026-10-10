@@ -9,12 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Core\EQLWikiEditorAssistant.Core.csproj" />
-    <ProjectReference Include="..\..\src\EQLWikiEditorAssistant.Ocr\EQLWikiEditorAssistant.Ocr.csproj" />
     <ProjectReference Include="..\EQLWikiEditorAssistant.TestSupport\EQLWikiEditorAssistant.TestSupport.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="RapidOcrNet" Version="4.2.0" />
   </ItemGroup>
 
 </Project>

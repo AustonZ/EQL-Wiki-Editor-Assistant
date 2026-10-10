@@ -1,4 +1,4 @@
-namespace EQLWikiEditorAssistant.Core.Ocr;
+namespace EQLWikiEditorAssistant.Core.Imaging;
 
 /// <summary>
 /// Flattens straight-alpha BGRA pixels onto a flat background colour.

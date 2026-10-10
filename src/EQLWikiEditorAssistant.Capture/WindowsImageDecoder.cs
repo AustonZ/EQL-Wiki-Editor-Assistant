@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using EQLWikiEditorAssistant.Core.Icons;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 

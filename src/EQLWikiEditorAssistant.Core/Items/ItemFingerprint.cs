@@ -16,7 +16,7 @@ namespace EQLWikiEditorAssistant.Core.Items;
 /// future version *does* process levelled items, a `+0` entry and a `+7` entry can never be confused for one
 /// another.
 ///
-/// **Parser warnings are deliberately excluded.** They quote OCR fragments and churn with every tuning change,
+/// **Parser warnings are deliberately excluded.** They quote fragments of text and churn with every parser change,
 /// which is the same reason the accuracy corpus stores warning counts rather than warning text. A fingerprint that
 /// changed whenever a warning's wording changed would expire every ledger row on every release.
 /// </summary>

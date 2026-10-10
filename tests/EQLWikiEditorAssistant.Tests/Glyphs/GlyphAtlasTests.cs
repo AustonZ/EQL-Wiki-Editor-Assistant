@@ -1,5 +1,4 @@
 using EQLWikiEditorAssistant.Core.Glyphs;
-using EQLWikiEditorAssistant.Core.Ocr;
 
 namespace EQLWikiEditorAssistant.Tests.Glyphs;
 
@@ -145,7 +144,7 @@ public class GlyphAtlasTests
     /// <summary>Both quote styles occur in real item names and mean different characters — "Kilva's Skin of
     /// Flame" carries an apostrophe where "Kavruul`s Mystic Pouch" carries a grave accent. They must be distinct
     /// atlas entries: collapsing them would make the reader emit a plausible wrong character into a wiki edit,
-    /// which is precisely what RapidOCR did (it read every grave as an apostrophe).</summary>
+    /// which is precisely what the text-recognition model before it did (it read every grave as an apostrophe).</summary>
     [Fact]
     public void BundledAtlas_ApostropheAndGrave_AreDistinctShapes()
     {

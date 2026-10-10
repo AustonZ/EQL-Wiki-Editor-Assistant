@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Ground truth for the gitignored samples/ corpus. Item-window fields only - public game data, the same data this tool publishes to the wiki. Never whole-frame OCR text, never anything outside a window crop, no coordinates, and warning counts rather than verbatim warning strings. See ExpectedCorpus.cs.",
+  "note": "Ground truth for the gitignored samples/ corpus. Item-window fields only - public game data, the same data this tool publishes to the wiki. Never whole-frame text, never anything outside a window crop, no coordinates, and warning counts rather than verbatim warning strings. See ExpectedCorpus.cs.",
   "samples": [
     {
       "file": "01-single-weapon-lvl0-tradeable-pink-background.png",

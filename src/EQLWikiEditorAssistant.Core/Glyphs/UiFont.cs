@@ -1,4 +1,4 @@
-namespace EQLWikiEditorAssistant.Core.Ocr;
+namespace EQLWikiEditorAssistant.Core.Glyphs;
 
 /// <summary>
 /// The font the game draws its UI text in. The game lets a player choose it; these are the two the glyph reader

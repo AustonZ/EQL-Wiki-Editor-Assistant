@@ -1,5 +1,4 @@
 using EQLWikiEditorAssistant.Core.Icons;
-using EQLWikiEditorAssistant.Core.Ocr;
 
 namespace EQLWikiEditorAssistant.Tests.Icons;
 

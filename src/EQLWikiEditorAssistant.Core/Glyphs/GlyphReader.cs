@@ -1,4 +1,4 @@
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 
 namespace EQLWikiEditorAssistant.Core.Glyphs;
 
@@ -112,7 +112,7 @@ public static class GlyphReader
     /// in, and it changes exactly one thing: what the bare vertical bar means — see <see cref="ResolveBar"/>.
     /// Every atlas entry is matched regardless, so a capture in the other font still reads, and each line records
     /// the font it was actually drawn in when it held a character only one font draws.</summary>
-    public static IReadOnlyList<OcrLine> Read(CapturedImage image, Rect region, GlyphAtlas atlas, UiFont font)
+    public static IReadOnlyList<TextLine> Read(CapturedImage image, Rect region, GlyphAtlas atlas, UiFont font)
     {
         List<GlyphMatch> matches = FindMatches(image, region, atlas);
         List<GlyphMatch> accepted = ResolveOverlaps(matches);
@@ -333,22 +333,21 @@ public static class GlyphReader
     public const int LoneGlyphMinInk = 20;
 
     /// <summary>
-    /// Groups accepted matches into <see cref="OcrLine"/>s.
+    /// Groups accepted matches into <see cref="TextLine"/>s.
     ///
     /// One line per *column segment*, not per baseline: the stat block puts two label/value pairs on one row
     /// ("Size: MEDIUM   AC: 43") separated by a wide gap, and emitting that as a single string would make
-    /// <c>ItemParser</c> read the value as "MEDIUM AC: 43". Splitting on the column gap reproduces exactly the
-    /// fragment shape <c>RapidOcrEngine</c> produces, which the parser's row-grouping already handles, so no
-    /// parser change is needed to switch engines.
+    /// <c>ItemParser</c> read the value as "MEDIUM AC: 43". Splitting on the column gap gives the parser one
+    /// fragment per label/value pair, which its row-grouping pairs back up.
     /// </summary>
     /// <summary>Baselines this close belong to the same visual row. The stat block's two columns are not always
     /// rendered on exactly the same baseline, and grouping on the exact value emitted the right-hand column
     /// before the left-hand one — reversing reading order for the parser downstream.</summary>
     public const int BaselineTolerance = 2;
 
-    private static List<OcrLine> BuildLines(List<GlyphMatch> accepted, UiFont font)
+    private static List<TextLine> BuildLines(List<GlyphMatch> accepted, UiFont font)
     {
-        var lines = new List<OcrLine>();
+        var lines = new List<TextLine>();
         foreach (List<GlyphMatch> row in ClusterRows(accepted))
         {
             List<GlyphMatch> ordered = [.. row.OrderBy(m => m.Left)];
@@ -391,7 +390,7 @@ public static class GlyphReader
         return rows;
     }
 
-    private static void Emit(List<OcrLine> lines, List<GlyphMatch> segment, UiFont font)
+    private static void Emit(List<TextLine> lines, List<GlyphMatch> segment, UiFont font)
     {
         if (segment.Count == 0) return;
         if (segment.Count == 1 && segment[0].Entry.Bitmap.InkWeight < LoneGlyphMinInk) return;
@@ -414,7 +413,7 @@ public static class GlyphReader
         int top = segment.Min(m => m.Top);
         var bounds = new Rect(left, top, segment.Max(m => m.Right) - left + 1, segment.Max(m => m.Bottom) - top + 1);
         string resolved = ResolveBar(text.ToString(), font);
-        lines.Add(new OcrLine(resolved, bounds, [new OcrWord(resolved, bounds)], DrawnIn(segment)));
+        lines.Add(new TextLine(resolved, bounds, [new TextWord(resolved, bounds)], DrawnIn(segment)));
     }
 
     /// <summary>The font a run of glyphs was drawn in, from the characters only one font draws: that font if every

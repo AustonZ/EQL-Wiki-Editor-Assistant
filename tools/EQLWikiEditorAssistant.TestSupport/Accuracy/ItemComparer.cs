@@ -18,7 +18,7 @@ public enum FieldVerdict
 
 /// <summary><see cref="Flagged"/> records whether the item carried any parser warning. That's the axis this
 /// project actually cares about: an unflagged wrong value is a wiki-corruption risk, while a flagged one is a
-/// manual-review cost. Deliberately item-level rather than per-field — warnings quote OCR fragments and matching
+/// manual-review cost. Deliberately item-level rather than per-field — warnings quote fragments of text and matching
 /// them back to a specific field would be guesswork.</summary>
 public sealed record FieldResult(string Field, FieldVerdict Verdict, string? Expected, string? Actual, bool Flagged);
 
@@ -26,7 +26,7 @@ public sealed record FieldResult(string Field, FieldVerdict Verdict, string? Exp
 /// Field-level diff of a parsed window against its ground truth.
 ///
 /// **Comparison is exact** (after <c>Trim()</c>), never fuzzy. Fuzzy matching is right at *runtime* — see
-/// <c>EditDistance</c>, used for exaltation names and wiki page-title lookup, where OCR noise must be tolerated —
+/// <c>EditDistance</c>, used for labels and exaltation names, where a stray character must be tolerated —
 /// and wrong for *measurement*: an edit-distance-tolerant comparer would score "Tarnished" -> "Tamished" as a
 /// pass and make an entire error class invisible, which is the opposite of what a harness is for.
 /// </summary>

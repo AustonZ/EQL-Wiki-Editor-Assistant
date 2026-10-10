@@ -10,8 +10,8 @@ public class EditDistanceTests
     [InlineData("abc", "", 3)]
     [InlineData("", "abc", 3)]
     [InlineData("kitten", "sitting", 3)]
-    [InlineData("Description", "Descripbon", 2)] // real OCR error seen on this exact word
-    [InlineData("Ornamentation", "Omamentation", 2)] // real OCR error (rn -> m)
+    [InlineData("Description", "Descripbon", 2)]
+    [InlineData("Ornamentation", "Omamentation", 2)] // rn -> m
     public void Levenshtein_MatchesExpectedDistance(string a, string b, int expected) =>
         Assert.Equal(expected, EditDistance.Levenshtein(a, b));
 

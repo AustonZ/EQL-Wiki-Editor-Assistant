@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Core.Text;
 
 namespace EQLWikiEditorAssistant.Core.Items;
@@ -20,10 +20,9 @@ namespace EQLWikiEditorAssistant.Core.Items;
 /// schema for the body — real windows vary a lot there (weapons show Base Dmg/Delay/Skill/Ratio where armor shows
 /// AC/resists; a plain consumable like Water Flask has none of that and skips straight to Value:).
 ///
-/// **Important OCR quirk this depends on**: unlike most label:value pairs, the classic two-column stat block
-/// (Size/Weight/AC/stats/resists/etc.) is recognized as *separate* OcrLine fragments for the label and its value
-/// even though they render on the same row — apparently because the game draws the value in a visually distinct
-/// box. Everything else (Class:, Race:, exaltation rows, effect rows) comes back as one self-contained
+/// **A layout this depends on**: unlike most label:value pairs, the classic two-column stat block
+/// (Size/Weight/AC/stats/resists/etc.) comes back as *separate* TextLine fragments for the label and its value
+/// even though they render on the same row, because the game draws the value apart from its label. Everything else (Class:, Race:, exaltation rows, effect rows) comes back as one self-contained
 /// "Label: Value" fragment. <see cref="ParseStatRow"/> handles both shapes generically by pairing fragments
 /// within a reconstructed row rather than assuming either shape specifically.
 ///
@@ -47,15 +46,15 @@ public static class ItemParser
     private static readonly string[] EffectModifierLabels =
         ["Cast Time", "Cooldown", "Cooldown Group", "Required Level", "Charges"];
 
-    public static ParsedItem Parse(IReadOnlyList<OcrLine> lines, ItemWindowTab activeTab = ItemWindowTab.Description)
+    public static ParsedItem Parse(IReadOnlyList<TextLine> lines, ItemWindowTab activeTab = ItemWindowTab.Description)
     {
         var warnings = new List<string>();
-        List<List<OcrLine>> rows = JoinWrappedRows([.. GroupIntoRows(lines).Where(HasAnyAlphanumeric)]);
+        List<List<TextLine>> rows = JoinWrappedRows([.. GroupIntoRows(lines).Where(HasAnyAlphanumeric)]);
         int i = 0;
 
         if (rows.Count == 0)
         {
-            warnings.Add("No OCR lines to parse.");
+            warnings.Add("No text to parse.");
             return new ParsedItem("", 0, TitleContentNameMismatch: true, [], [], [], [], [], [], [], null, null, warnings);
         }
 
@@ -130,7 +129,7 @@ public static class ItemParser
 
         for (; i < rows.Count; i++)
         {
-            List<OcrLine> row = rows[i];
+            List<TextLine> row = rows[i];
             string joined = JoinRow(row);
 
             if (IsChromeRow(row, joined)) continue;
@@ -178,7 +177,7 @@ public static class ItemParser
     /// there is no repeated content-area name and no stat block, just the lore prose. So the item's name can only
     /// come from the title bar here, and with nothing to reconcile it against, the title-vs-content occlusion
     /// check simply doesn't apply.</summary>
-    private static ParsedItem ParseLoreView(List<List<OcrLine>> rows, int i, string titleName, int titleLevel, List<string> warnings)
+    private static ParsedItem ParseLoreView(List<List<TextLine>> rows, int i, string titleName, int titleLevel, List<string> warnings)
     {
         // Everything below the tab row is lore. Joined with spaces because the game wraps a long lore string
         // across rows purely to fit the window — the breaks aren't part of the text.
@@ -234,16 +233,16 @@ public static class ItemParser
             }
         }
 
-        // OCR sometimes detects an effect's trailing parenthetical as its own fragment and leaves the open paren
-        // behind with the name ("Click Effect Careless Lightning (" + "(Can Equip)"). The peel above consumes the
+        // An effect's trailing parenthetical can arrive as its own fragment, leaving the open paren behind with
+        // the name ("Click Effect Careless Lightning (" + "(Can Equip)"). The peel above consumes the
         // real parenthetical and can't match this orphan, so drop it — no real effect name ends in an open paren.
         return new EffectEntry(kind, text.TrimEnd(' ', '('), conditions, modifiers);
     }
 
     /// <summary>True if a filled exaltation slot's name does NOT match the item's own base name — a foreign
     /// exaltation, per the plan's Augmentations section, making the item ineligible for automated processing.
-    /// Fuzzy, not exact: OCR'd payload text (names, not just labels) can take single-character hits too
-    /// (confirmed in testing — see the plan's milestone 1 writeup), so exact equality would false-positive.</summary>
+    /// Fuzzy, not exact, so a single misread character in either name cannot turn the item's own exaltation into a
+    /// foreign one and refuse it.</summary>
     public static bool IsForeignExaltation(ExaltationSlot slot, string itemBaseName)
     {
         if (slot.Name is null) return false;
@@ -276,11 +275,11 @@ public static class ItemParser
     ///
     /// Joined with a single space, because the game breaks at a word boundary.
     /// </summary>
-    private static List<List<OcrLine>> JoinWrappedRows(List<List<OcrLine>> rows)
+    private static List<List<TextLine>> JoinWrappedRows(List<List<TextLine>> rows)
     {
-        var joined = new List<List<OcrLine>>();
+        var joined = new List<List<TextLine>>();
 
-        foreach (List<OcrLine> row in rows)
+        foreach (List<TextLine> row in rows)
         {
             if (joined.Count > 0 && HasUnclosedBracket(JoinRow(joined[^1])))
             {
@@ -356,13 +355,13 @@ public static class ItemParser
         return [.. stats.Where(s => seen.Add($"{s.Key}\u0000{s.Value}"))];
     }
 
-    private static List<List<OcrLine>> GroupIntoRows(IReadOnlyList<OcrLine> lines)
+    private static List<List<TextLine>> GroupIntoRows(IReadOnlyList<TextLine> lines)
     {
         const int rowTolerancePx = 8; // see WindowBoundsFinder's similar tolerance constants for the same reasoning
 
-        List<OcrLine> sorted = lines.OrderBy(l => l.BoundingBox.Y).ThenBy(l => l.BoundingBox.X).ToList();
-        var rows = new List<List<OcrLine>>();
-        foreach (OcrLine line in sorted)
+        List<TextLine> sorted = lines.OrderBy(l => l.BoundingBox.Y).ThenBy(l => l.BoundingBox.X).ToList();
+        var rows = new List<List<TextLine>>();
+        foreach (TextLine line in sorted)
         {
             // Anchor on the row's first (topmost) member, not the most recently added one, so tolerance can't
             // chain/drift across several rows of slightly-increasing Y.
@@ -371,7 +370,7 @@ public static class ItemParser
             else
                 rows.Add([line]);
         }
-        foreach (List<OcrLine> row in rows) row.Sort((a, b) => a.BoundingBox.X.CompareTo(b.BoundingBox.X));
+        foreach (List<TextLine> row in rows) row.Sort((a, b) => a.BoundingBox.X.CompareTo(b.BoundingBox.X));
         return rows;
     }
 
@@ -382,18 +381,18 @@ public static class ItemParser
     /// then consumed as the flags row. No legitimate field is punctuation-only, so dropping these outright is
     /// safer than trying to identify the name row by similarity to the title (which would quietly defeat the
     /// title-vs-content occlusion check, whose entire job is to notice when those two *don't* match).</summary>
-    private static bool HasAnyAlphanumeric(List<OcrLine> row) =>
+    private static bool HasAnyAlphanumeric(List<TextLine> row) =>
         row.Any(l => l.Text.Any(char.IsLetterOrDigit));
 
-    private static string JoinRow(List<OcrLine> row) => string.Join(' ', row.Select(l => l.Text.Trim()));
+    private static string JoinRow(List<TextLine> row) => string.Join(' ', row.Select(l => l.Text.Trim()));
 
-    private static bool RowLooksLikeTabLabels(List<OcrLine> row) =>
+    private static bool RowLooksLikeTabLabels(List<TextLine> row) =>
         row.Count > 0 && row.All(l =>
             EditDistance.IsCloseMatch(l.Text.Trim(), "Description", maxDistance: 3) ||
             EditDistance.IsCloseMatch(l.Text.Trim(), "Lore", maxDistance: 1));
 
     /// <summary>Finds one of <paramref name="candidateLabels"/> anywhere in a row and returns the text following
-    /// it, tolerating the ways OCR fragments a row that is visually one line.
+    /// it, tolerating the ways a row that is visually one line can arrive in several fragments.
     ///
     /// Matching only a single-fragment row (what this used to do) missed three shapes that are all real, and each
     /// one fell through to the generic stat pairing — which recorded an exaltation or an effect as an ordinary
@@ -410,7 +409,7 @@ public static class ItemParser
     /// assuming either shape. These labels are long and specific, so a stat value is not going to fuzzy-match one.
     /// </summary>
     private static bool TryMatchRowLabel(
-        List<OcrLine> row, IReadOnlyList<string> candidateLabels, out string label, out string value)
+        List<TextLine> row, IReadOnlyList<string> candidateLabels, out string label, out string value)
     {
         for (int k = 0; k < row.Count; k++)
         {
@@ -428,7 +427,7 @@ public static class ItemParser
         return false;
     }
 
-    private static bool RowStartsWithLabel(List<OcrLine> row, string label) =>
+    private static bool RowStartsWithLabel(List<TextLine> row, string label) =>
         FieldLabelLexicon.TryMatchPrefixLabel(JoinRow(row), [label], out _, out _);
 
     private static string ValueAfterLabel(string text, string label)
@@ -451,8 +450,8 @@ public static class ItemParser
     private static IEnumerable<string> SplitList(string text, char separator = ',') =>
         text.Split(separator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-    /// <summary>Extracts the name and "+X" level, tolerant of trailing OCR noise from a nearby title-bar
-    /// checkbox/close icon — confirmed real on multiple captures, reading as "? x" (or similar) after the name,
+    /// <summary>Extracts the name and "+X" level, tolerant of trailing noise from a nearby title-bar
+    /// checkbox/close icon — reading as "? x" (or similar) after the name,
     /// with or without a "+X"/"(Augmented)" present to anchor on (a plain, non-augmented level-0 item's title has
     /// neither, so the noise strip can't only run relative to those). Stripped unconditionally before the level
     /// search, so trailing junk never corrupts the name or hides the level.</summary>
@@ -465,17 +464,17 @@ public static class ItemParser
         return (s.Trim(), 0);
     }
 
-    /// <summary>Strips a trailing title-bar checkbox/close-icon OCR artifact that is never part of the actual
-    /// name — confirmed real as "?" followed by a close-button glyph, which OCR'd as the Unicode multiplication
+    /// <summary>Strips a trailing title-bar checkbox/close-icon artifact that is never part of the actual
+    /// name — seen as "?" followed by a close-button glyph, which once read as the Unicode multiplication
     /// sign "×" (U+00D7), not the ASCII letter 'x' — easy to conflate by eye in a terminal, which is exactly what
     /// broke an earlier version of this pattern.</summary>
     private static string StripTrailingIconNoise(string s) =>
         Regex.Replace(s, @"\s*\?+\s*[x×]?\s*$", "", RegexOptions.IgnoreCase).TrimEnd();
 
     /// <summary>Strips a "(Word)" span if the parenthesized text closely matches <paramref name="word"/> — used
-    /// for both "(Augmented)" on titles and "(Exaltation)" on exaltation slot values, tolerant of OCR noise
+    /// for both "(Augmented)" on titles and "(Exaltation)" on exaltation slot values, tolerant of noise
     /// around the parens/word itself. Finds the matching ')' rather than assuming the parenthetical runs to the
-    /// end of the string, so trailing OCR noise after it (see <see cref="ExtractNameLevel"/>) doesn't prevent the
+    /// end of the string, so trailing noise after it (see <see cref="ExtractNameLevel"/>) doesn't prevent the
     /// match or get silently absorbed into the returned text.</summary>
     private static string StripParentheticalSuffix(string s, string word)
     {
@@ -491,7 +490,7 @@ public static class ItemParser
     }
 
     /// <summary>Fuzzy-compares the title-bar name against the content-area name. Threshold is generous enough to
-    /// absorb ordinary single-character OCR noise, but a partial-title-occlusion truncation (missing a whole
+    /// absorb a single misread character, but a partial-title-occlusion truncation (missing a whole
     /// leading word or more) reliably exceeds it — that's the point; see the class-level doc comment.</summary>
     private static bool NamesReconcile(string titleName, string contentName)
     {
@@ -507,7 +506,7 @@ public static class ItemParser
     ///
     /// Class and race codes are short and ALL-CAPS, which is what separates a continuation from the bare slot row
     /// that can also follow (slots read `Range Ammo`, `Primary Secondary`, `Ear` — always mixed case).</summary>
-    private static bool LooksLikeCodeListContinuation(List<OcrLine> row)
+    private static bool LooksLikeCodeListContinuation(List<TextLine> row)
     {
         if (row.Count != 1) return false;
         string text = row[0].Text.Trim();
@@ -518,7 +517,7 @@ public static class ItemParser
             && tokens.All(t => t.Length <= 4 && t.All(char.IsLetterOrDigit) && t == t.ToUpperInvariant());
     }
 
-    private static bool LooksLikeBareSlotRow(List<OcrLine> row)
+    private static bool LooksLikeBareSlotRow(List<TextLine> row)
     {
         if (row.Count != 1) return false;
         string text = row[0].Text.Trim();
@@ -530,7 +529,7 @@ public static class ItemParser
         return true;
     }
 
-    private static bool IsChromeRow(List<OcrLine> row, string joined)
+    private static bool IsChromeRow(List<TextLine> row, string joined)
     {
         if (row.Count > 0 && EditDistance.IsCloseMatch(row[0].Text.Trim(), "Merge", maxDistance: 1)) return true;
         if (row.Count > 0 && EditDistance.IsCloseMatch(row[0].Text.Trim(), "Item", maxDistance: 1)) return true;
@@ -552,9 +551,9 @@ public static class ItemParser
             return true;
         }
 
-        // OCR also renders the separator as '.' on this UI (real captures: "Accuracy. +13.6%",
-        // "Container. CLOSED."). Splitting on '.' unconditionally would cut decimals in half, so this only
-        // applies when the text before the dot is a label the lexicon actually knows.
+        // A label can also be followed by '.' rather than ':' ("Container. CLOSED."). Splitting on '.'
+        // unconditionally would cut decimals in half, so this only applies when the text before the dot is a label
+        // the lexicon actually knows.
         int dotIdx = text.IndexOf('.');
         if (dotIdx > 0 && dotIdx < text.Length - 1)
         {
@@ -595,7 +594,7 @@ public static class ItemParser
     /// a single self-contained "Label: Value" fragment (Class:, Race:, exaltation/effect rows), and the
     /// two-column stat block's split shape (a bare "Label:"/"Label." fragment immediately followed by a separate
     /// value fragment) — including two such pairs sharing one row (e.g. "Size:" "SMALL" "AC:" "15").</summary>
-    private static void ParseStatRow(List<OcrLine> row, List<KeyValuePair<string, string>> stats, List<string> warnings)
+    private static void ParseStatRow(List<TextLine> row, List<KeyValuePair<string, string>> stats, List<string> warnings)
     {
         int i = 0;
         while (i < row.Count)
@@ -608,17 +607,16 @@ public static class ItemParser
                 continue;
             }
 
-            // A label fragment normally keeps its ':' (or an OCR'd '.'), but this engine drops that colon
-            // unpredictably on this UI, which would otherwise strand the label and its value as two unparsed
-            // fragments — so a fragment that corrects to a known field label counts as a label either way.
+            // A label fragment normally keeps its ':' (or a '.'), but one without would otherwise strand the label
+            // and its value as two unparsed fragments — so a fragment that corrects to a known field label counts
+            // as a label either way.
             string labelText = text.TrimEnd(':', '.').Trim();
             bool bareLabel = text.EndsWith(':') || text.EndsWith('.') || FieldLabelLexicon.IsKnownLabel(labelText);
             if (bareLabel && i + 1 < row.Count)
             {
                 string nextText = row[i + 1].Text.Trim();
                 // The next fragment must actually look like a value, not another bare label — if a value
-                // fragment was dropped by OCR (confirmed real: a real capture had a numeric value missing
-                // entirely), the next surviving fragment is the *next label*, and pairing them would silently
+                // fragment is missing, the next surviving fragment is the *next label*, and pairing them would silently
                 // produce nonsense like "Strength: SV. Magic:". Flag the orphaned label instead.
                 bool nextLooksLikeValue = nextText.Length > 0 && !nextText.EndsWith(':') && !nextText.EndsWith('.');
                 if (nextLooksLikeValue)
@@ -628,7 +626,7 @@ public static class ItemParser
                     continue;
                 }
 
-                warnings.Add($"Unparsed line in stat block: \"{text}\" (no adjacent value found — likely an OCR-dropped value)");
+                warnings.Add($"Unparsed line in stat block: \"{text}\" (no adjacent value found)");
                 i++;
                 continue;
             }

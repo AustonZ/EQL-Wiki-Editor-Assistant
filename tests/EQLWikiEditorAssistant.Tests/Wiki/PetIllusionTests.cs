@@ -1,6 +1,7 @@
 using EQLWikiEditorAssistant.Core.Items;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Wiki.Analysis;
 using EQLWikiEditorAssistant.Wiki.Mapping;
 using EQLWikiEditorAssistant.Wiki.Wikitext;
@@ -14,7 +15,7 @@ namespace EQLWikiEditorAssistant.Tests.Wiki;
 /// </summary>
 public class PetIllusionTests
 {
-    private static OcrLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
+    private static TextLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
 
     private static ParsedItem Parse(string effectLine) =>
         ItemParser.Parse(

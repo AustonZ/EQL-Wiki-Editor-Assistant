@@ -213,8 +213,8 @@ public sealed class CheckedItemsLedger
         lock (_gate) _entries.Clear();
     }
 
-    /// <summary>Keys are case-insensitive because the same item captured twice must key the same way, and OCR is
-    /// not the only thing that varies case — the wiki's own pages disagree about it too.</summary>
+    /// <summary>Keys are case-insensitive because the same item must key the same way however its name is cased —
+    /// the wiki's own pages disagree about it.</summary>
     private static string KeyFor(string itemName, string entityKind) => $"{entityKind}\u0000{itemName.Trim()}";
 
     public static CheckedItemsLedger Load(string path, TimeProvider? time = null)

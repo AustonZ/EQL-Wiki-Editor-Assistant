@@ -92,7 +92,7 @@
                     <Hyperlink x:Name="HotKeyLink" Click="OnHotKeyLinkClick"><Run x:Name="HotKeyRun" /></Hyperlink>
                 </TextBlock>
 
-                <!-- A capture takes tens of seconds, most of it the full-frame OCR pass. A disabled button and a
+                <!-- A capture can take several seconds, most of it the wiki. A disabled button and a
                      status line were too quiet to read as "working" (user, 2026-09-28). -->
                 <StackPanel x:Name="BusyPanel" Orientation="Horizontal" Margin="20,0,0,0" Visibility="Collapsed">
                     <ProgressBar IsIndeterminate="True" Width="150" Height="12" VerticalAlignment="Center" />

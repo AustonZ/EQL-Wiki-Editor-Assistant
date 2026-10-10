@@ -6,7 +6,8 @@ using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media.Imaging;
 using EQLWikiEditorAssistant.Capture;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Pipeline;
 using EQLWikiEditorAssistant.Wiki.Analysis;
 using EQLWikiEditorAssistant.Wiki.Ledger;
@@ -258,9 +259,9 @@ public partial class MainWindow : Window
         try
         {
             // **Off the UI thread, all of it** (user, 2026-10-07: the window hung, and the progress label never moved
-            // past the screenshot). Both OCR engines do their work synchronously and hand back a finished task, so
-            // awaiting them here ran the whole full-frame pass on this thread: nothing could repaint, and every
-            // progress report queued behind it. The ledger and the pending-lore table are locked for exactly this,
+            // past the screenshot). Finding and reading the windows is synchronous work behind an async signature, so
+            // awaiting it here ran it all on this thread: nothing could repaint, and every progress report queued
+            // behind it. The ledger and the pending-lore table are locked for exactly this,
             // since the review screen's buttons stay live while a capture runs.
             AppServices services = _services;
             ShowBusy("Taking game screenshot…");
@@ -272,8 +273,7 @@ public partial class MainWindow : Window
                 return true;
             }
 
-            // Each stage named as it starts (user, 2026-10-07): finding the windows is the slow full-frame OCR pass,
-            // and folding it into the screenshot's label made taking the screenshot look slow.
+            // Each stage named as it starts (user, 2026-10-07), so no step's time is blamed on another.
             var progress = new Progress<CheckProgress>(p => ShowBusy(p.Stage switch
             {
                 CheckStage.FindingWindows => "Finding item windows in screenshot…",

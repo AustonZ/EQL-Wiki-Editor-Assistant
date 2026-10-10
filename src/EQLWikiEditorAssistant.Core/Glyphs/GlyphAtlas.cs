@@ -1,5 +1,4 @@
 using System.Text;
-using EQLWikiEditorAssistant.Core.Ocr;
 
 namespace EQLWikiEditorAssistant.Core.Glyphs;
 
@@ -69,8 +68,7 @@ public sealed class GlyphAtlas
     });
 
     /// <summary>The atlas shipped inside this assembly. Embedded rather than written beside the executable so it
-    /// cannot go missing at runtime — the RapidOCR models are a loose file dependency and that has already cost a
-    /// real failure once.</summary>
+    /// cannot go missing at runtime — a loose file beside the executable is one more thing an install can lose.</summary>
     public static GlyphAtlas Bundled => Default.Value;
 
     /// <summary>The characters a shape could be, or empty if the atlas has never seen it. Empty is a valid,

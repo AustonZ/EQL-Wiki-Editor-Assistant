@@ -1,6 +1,6 @@
 using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.TestSupport;
 
 namespace EQLWikiEditorAssistant.Tests.Locate;
@@ -130,7 +130,7 @@ public class DescriptionTabFinderTests
         Assert.True(tab.Textured);
         Assert.Equal(UiFont.Arial, tab.Font);
 
-        LocatedWindow window = Assert.Single(await ItemWindowLocator.LocateAsync(image, new GlyphOcrEngine(UiFont.Arial)));
+        LocatedWindow window = Assert.Single(ItemWindowLocator.Locate(image, new GlyphTextReader(UiFont.Arial)));
         Assert.True(window.InOtherSkin);
         Assert.True(window.PossiblyOccluded);
         Assert.Empty(window.Lines);

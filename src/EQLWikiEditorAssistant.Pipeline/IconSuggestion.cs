@@ -1,5 +1,5 @@
 using EQLWikiEditorAssistant.Core.Icons;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 
 namespace EQLWikiEditorAssistant.Pipeline;
 

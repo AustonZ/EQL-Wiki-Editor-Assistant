@@ -1,5 +1,6 @@
 using EQLWikiEditorAssistant.Core.Items;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
+using EQLWikiEditorAssistant.Core.Glyphs;
 
 namespace EQLWikiEditorAssistant.Tests.Items;
 
@@ -14,7 +15,7 @@ namespace EQLWikiEditorAssistant.Tests.Items;
 /// </summary>
 public class TrailingTextTests
 {
-    private static OcrLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
+    private static TextLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
 
     /// <summary>Verbatim from `Black Chain Bridle`: one blank line after the effect, the mount speed, one more blank
     /// line, then the sentence explaining the Placeable flag.</summary>

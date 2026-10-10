@@ -1,4 +1,4 @@
-namespace EQLWikiEditorAssistant.Core.Ocr;
+namespace EQLWikiEditorAssistant.Core.Imaging;
 
 /// <summary>
 /// A portable, integer pixel rectangle. Deliberately not System.Drawing.Rectangle or a WinRT type,

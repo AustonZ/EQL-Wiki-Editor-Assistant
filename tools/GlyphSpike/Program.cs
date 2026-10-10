@@ -1,8 +1,7 @@
 using System.Text.RegularExpressions;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Ocr;
 using EQLWikiEditorAssistant.Core.Glyphs;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.TestSupport.Accuracy;
 using EQLWikiEditorAssistant.TestSupport;
 
@@ -11,7 +10,7 @@ using EQLWikiEditorAssistant.TestSupport;
 // than guessed). Keep using this rather than recreating an ad hoc version.
 //
 //   GlyphSpike dump <image> <x,y,w,h> [--raw]   2D intensity map of a region, so a glyph's actual pixels can be
-//                                               read directly instead of inferred from OCR output
+//                                               read directly instead of inferred from what was read
 //   GlyphSpike segment <image> [x,y,w,h]        text bands / runs / glyph boxes the segmenter finds
 //   GlyphSpike cluster <image> [x,y,w,h]        cluster glyphs by exact equality and render each distinct shape
 //   GlyphSpike atlas <image> [x,y,w,h] --out f  build the labelled atlas from the Notes Window glyph sheet
@@ -332,7 +331,7 @@ static bool IsInkAt(CapturedImage image, int background, int x, int y) =>
     && GlyphRamp.Intensity(image.Pixels, image.Width, image.Height, x, y) > background + GlyphRamp.InkThreshold;
 
 /// <summary>Runs the real <see cref="GlyphReader"/> over a region and prints the lines it produces — the same
-/// output <c>GlyphOcrEngine</c> hands to <c>ItemParser</c>, so this is the eyeball check for the engine itself
+/// output <c>GlyphTextReader</c> hands to <c>ItemParser</c>, so this is the eyeball check for the engine itself
 /// (as against `verify`, which exists to measure atlas coverage).</summary>
 static int ReadRegion(CapturedImage image, Rect region, string[] args)
 {
@@ -344,13 +343,13 @@ static int ReadRegion(CapturedImage image, Rect region, string[] args)
     UiFont font = SampleFonts.For(args[1], args);
 
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-    IReadOnlyList<OcrLine> lines = GlyphReader.Read(image, region, atlas, font);
+    IReadOnlyList<TextLine> lines = GlyphReader.Read(image, region, atlas, font);
     stopwatch.Stop();
 
     Console.WriteLine($"{args[1]} region {region.X},{region.Y} {region.Width}x{region.Height}, read as {UiFonts.DisplayName(font)}");
     Console.WriteLine($"  {lines.Count} line(s) in {stopwatch.ElapsedMilliseconds}ms");
     Console.WriteLine();
-    foreach (OcrLine line in lines)
+    foreach (TextLine line in lines)
         Console.WriteLine($"  [{line.BoundingBox.X,4},{line.BoundingBox.Y,4}] {line.Text}" +
                           (line.DrawnIn is { } drawn ? $"   (drawn in {UiFonts.DisplayName(drawn)})" : ""));
     return 0;
@@ -450,13 +449,12 @@ static async Task<int> Advances(string[] args)
     // Learned inside *located windows*, not whole screenshots. A screenshot's 3D world sits at intensity 150-170,
     // so on a full frame essentially every pixel counts as ink and the reader's ink-anchored search degenerates
     // into a full sweep — measured at minutes per image, hours for the corpus, and full of world-texture noise.
-    using var ocr = new RapidOcrEngine();
     var advances = new Dictionary<string, int>();
     var observations = new List<(string Label, int Distance)>();
     foreach (string file in files)
     {
         CapturedImage sample = await ImageFile.LoadAsync(file);
-        IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(sample, ocr);
+        IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(sample, SampleFonts.Reader(file, []));
         foreach (LocatedWindow window in windows.Where(w => !w.PossiblyOccluded))
             GlyphReader.LearnAdvances(sample, window.Bounds, atlas, advances, observations);
 

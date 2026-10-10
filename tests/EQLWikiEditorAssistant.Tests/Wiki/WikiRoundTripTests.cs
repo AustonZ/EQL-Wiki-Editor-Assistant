@@ -76,7 +76,7 @@ public class WikiRoundTripTests
 
     /// <summary>No fixture line should be unreadable. Measured across 414 live pages the count is 0, so a non-zero
     /// count here is a grammar regression rather than a known gap being re-measured — the same ratchet discipline
-    /// the OCR corpus uses.</summary>
+    /// the screenshot corpus uses.</summary>
     [Theory]
     [MemberData(nameof(Pages))]
     public void NoStatsBlockLineIsUnreadable(string title)

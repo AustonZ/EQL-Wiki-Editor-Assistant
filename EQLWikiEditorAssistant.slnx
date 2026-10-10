@@ -3,7 +3,6 @@
     <Project Path="src/EQLWikiEditorAssistant.App/EQLWikiEditorAssistant.App.csproj" />
     <Project Path="src/EQLWikiEditorAssistant.Capture/EQLWikiEditorAssistant.Capture.csproj" />
     <Project Path="src/EQLWikiEditorAssistant.Core/EQLWikiEditorAssistant.Core.csproj" />
-    <Project Path="src/EQLWikiEditorAssistant.Ocr/EQLWikiEditorAssistant.Ocr.csproj" />
     <Project Path="src/EQLWikiEditorAssistant.Pipeline/EQLWikiEditorAssistant.Pipeline.csproj" />
     <Project Path="src/EQLWikiEditorAssistant.Wiki/EQLWikiEditorAssistant.Wiki.csproj" />
   </Folder>
@@ -16,7 +15,6 @@
     <Project Path="tools/EQLWikiEditorAssistant.TestSupport/EQLWikiEditorAssistant.TestSupport.csproj" />
     <Project Path="tools/GlyphSpike/GlyphSpike.csproj" />
     <Project Path="tools/LocateSpike/LocateSpike.csproj" />
-    <Project Path="tools/OcrSpike/OcrSpike.csproj" />
     <Project Path="tools/ParseSpike/ParseSpike.csproj" />
     <Project Path="tools/WikiSpike/WikiSpike.csproj" />
   </Folder>

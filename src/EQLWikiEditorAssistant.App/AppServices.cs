@@ -5,7 +5,7 @@ using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Core.Locate;
 using EQLWikiEditorAssistant.Core.Icons;
 using EQLWikiEditorAssistant.Core.Input;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.Pipeline;
 using EQLWikiEditorAssistant.Wiki.Ledger;
 using EQLWikiEditorAssistant.Wiki.Mapping;
@@ -48,7 +48,7 @@ public sealed class AppServices : IDisposable
     /// </summary>
     public const string GameWindowTitle = "EverQuest";
 
-    private readonly GlyphOcrEngine _windowReader;
+    private readonly GlyphTextReader _windowReader;
     private readonly HttpClient _http;
     private GlobalHotKey? _hotKey;
 
@@ -101,7 +101,7 @@ public sealed class AppServices : IDisposable
         // the pipeline's wrong-font guard, so they cannot disagree — here, and afterwards only through UseFontAsync,
         // which sets both.
         Settings = AppSettings.Load(AppPaths.SettingsFile);
-        _windowReader = new GlyphOcrEngine(Settings.Font);
+        _windowReader = new GlyphTextReader(Settings.Font);
 
         Wiki = MediaWikiClient.Create(Endpoint, UserAgent);
         // Every edit and upload says which app and version made it — see MediaWikiClient.SummaryTag.
@@ -123,7 +123,7 @@ public sealed class AppServices : IDisposable
         // rebuilds itself when the icon folder changes; the first run after an asset re-export costs about eight
         // seconds. Absent entirely when the folder cannot be found, which simply leaves lucy_img_ID blank — the
         // behaviour that existed before the library did. This runs off the UI thread with the rest of the
-        // composition root, so the cost lands where the OCR models already do.
+        // composition root, so the cost never blocks the window.
         string? iconFolder = AppPaths.IconLibraryDirectory;
         if (iconFolder is not null)
         {

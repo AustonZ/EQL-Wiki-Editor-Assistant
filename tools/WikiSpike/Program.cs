@@ -5,9 +5,8 @@ using EQLWikiEditorAssistant.Wiki.MediaWiki;
 using EQLWikiEditorAssistant.Core.Icons;
 using EQLWikiEditorAssistant.Core.Items;
 using EQLWikiEditorAssistant.Core.Locate;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.Core.Glyphs;
-using EQLWikiEditorAssistant.Ocr;
 using EQLWikiEditorAssistant.TestSupport.Accuracy;
 using EQLWikiEditorAssistant.Wiki.Analysis;
 using EQLWikiEditorAssistant.Wiki.Formatting;
@@ -18,7 +17,7 @@ using EQLWikiEditorAssistant.Wiki.Wikitext;
 using FieldVerdict = EQLWikiEditorAssistant.Wiki.Analysis.FieldVerdict;
 
 // Milestone 3 spike tool: exercise the wiki client and the wikitext layer against the real eqlwiki.com, the same
-// way OcrSpike/LocateSpike/ParseSpike exercise the capture side against real screenshots. Keep using this rather
+// way LocateSpike/ParseSpike exercise the capture side against real screenshots. Keep using this rather
 // than recreating ad hoc versions when tuning the statsblock grammar or debugging the API client.
 //
 // Usage:
@@ -400,9 +399,7 @@ async Task<int> CompareIconsAsync()
     if (args.Length < 2) { Console.Error.WriteLine("usage: WikiSpike icons <screenshot>"); return 1; }
 
     CapturedImage image = await ImageFile.LoadAsync(args[1]);
-    using var rapid = new RapidOcrEngine();
-    IOcrEngine ocr = SampleFonts.Engine(rapid, args[1], args);
-    IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
+    IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(image, SampleFonts.Reader(args[1], args));
 
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
     using var http = new HttpClient();
@@ -501,9 +498,7 @@ async Task<int> DiffIconPixelsAsync()
     if (args.Length < 2) { Console.Error.WriteLine("usage: WikiSpike icondiff <screenshot>"); return 1; }
 
     CapturedImage image = await ImageFile.LoadAsync(args[1]);
-    using var rapid = new RapidOcrEngine();
-    IOcrEngine ocr = SampleFonts.Engine(rapid, args[1], args);
-    IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
+    IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(image, SampleFonts.Reader(args[1], args));
 
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
     using var http = new HttpClient();
@@ -587,9 +582,7 @@ async Task<int> PreviewEditsAsync()
     if (args.Length < 2) { Console.Error.WriteLine("usage: WikiSpike preview <screenshot>"); return 1; }
 
     CapturedImage image = await ImageFile.LoadAsync(args[1]);
-    using var rapid = new RapidOcrEngine();
-    IOcrEngine ocr = SampleFonts.Engine(rapid, args[1], args);
-    IReadOnlyList<LocatedWindow> windows = await ItemWindowLocator.LocateAsync(image, ocr);
+    IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(image, SampleFonts.Reader(args[1], args));
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
 
     // Optional, exactly as it is in the app: without it a generated page simply has a blank lucy_img_ID.
@@ -989,7 +982,6 @@ int ShowPrettified()
 // control pairs high; the gate and the match threshold are then whatever separates them with zero false matches.
 async Task<int> MeasureIconsAcrossCorpusAsync()
 {
-    using var rapid = new RapidOcrEngine();
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
     using var http = new HttpClient();
     http.DefaultRequestHeaders.Add("User-Agent", MediaWikiClient.UserAgent);
@@ -1004,7 +996,7 @@ async Task<int> MeasureIconsAcrossCorpusAsync()
     foreach (string file in Directory.EnumerateFiles(RepoPaths.SamplesDirectory, "*.png").OrderBy(f => f))
     {
         CapturedImage image = await ImageFile.LoadAsync(file);
-        foreach (LocatedWindow window in await ItemWindowLocator.LocateAsync(image, SampleFonts.Engine(rapid, file, args)))
+        foreach (LocatedWindow window in ItemWindowLocator.Locate(image, SampleFonts.Reader(file, args)))
         {
             if (window.PossiblyOccluded || window.ActiveTab != ItemWindowTab.Description) continue;
 
@@ -1149,7 +1141,6 @@ async Task<int> MeasureIconSearchAsync()
     }
     Console.WriteLine($"library: {library.Count} icon(s)");
 
-    using var rapid = new RapidOcrEngine();
     using MediaWikiClient client = MediaWikiClient.Create(endpoint);
 
     // One row per distinct item, with the id its own wiki page claims.
@@ -1159,7 +1150,7 @@ async Task<int> MeasureIconSearchAsync()
     foreach (string file in Directory.EnumerateFiles(RepoPaths.SamplesDirectory, "*.png").OrderBy(f => f))
     {
         CapturedImage image = await ImageFile.LoadAsync(file);
-        foreach (LocatedWindow window in await ItemWindowLocator.LocateAsync(image, SampleFonts.Engine(rapid, file, args)))
+        foreach (LocatedWindow window in ItemWindowLocator.Locate(image, SampleFonts.Reader(file, args)))
         {
             ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
             if (string.IsNullOrWhiteSpace(item.Name) || !seen.Add(item.Name)) continue;

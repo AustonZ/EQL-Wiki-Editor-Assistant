@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using EQLWikiEditorAssistant.Capture;
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Imaging;
 using Windows.Graphics.Imaging;
 using Windows.Storage;
 using Windows.Storage.Streams;
@@ -10,8 +10,8 @@ namespace EQLWikiEditorAssistant.TestSupport;
 /// <summary>
 /// Loads a screenshot file (JPEG/PNG/etc.) from disk into a <see cref="CapturedImage"/>. Dev/test tooling
 /// only — the real capture pipeline (EQLWikiEditorAssistant.Capture) never reads from files, it captures the live
-/// game window. Used by golden-file tests and the OcrSpike tool to feed real sample screenshots (from the
-/// gitignored samples/ folder) through the same OCR engine the app uses.
+/// game window. Used by golden-file tests and the spike tools to feed real sample screenshots (from the
+/// samples/ folder) through the same locator and reader the app uses.
 /// </summary>
 public static class ImageFile
 {

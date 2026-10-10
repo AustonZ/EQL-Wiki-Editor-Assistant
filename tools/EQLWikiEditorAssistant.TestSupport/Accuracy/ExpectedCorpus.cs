@@ -1,4 +1,4 @@
-using EQLWikiEditorAssistant.Core.Ocr;
+using EQLWikiEditorAssistant.Core.Glyphs;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -14,10 +14,10 @@ namespace EQLWikiEditorAssistant.TestSupport.Accuracy;
 /// information risk in <c>samples/</c> is everything *outside* an item window (character and player names, guild
 /// tags, chat, zone), so:
 /// <list type="bullet">
-/// <item>Never serialize raw whole-frame OCR text, or any line the locator did not attribute to a window crop.
+/// <item>Never serialize text read from the whole frame, or any line the locator did not attribute to a window crop.
 /// A convenient "dump everything the engine saw" mode is exactly how chat text ends up in a tracked file.</item>
 /// <item>Never store pixel data or window coordinates.</item>
-/// <item>Store warning <b>counts</b>, not verbatim warning text — warnings quote the offending OCR fragment, and
+/// <item>Store warning <b>counts</b>, not verbatim warning text — warnings quote the offending fragment, and
 /// those strings are both in-scope-but-unnecessary and unstable across tuning, so they would churn every diff.</item>
 /// </list>
 /// </summary>
@@ -29,7 +29,7 @@ public sealed class ExpectedCorpus
 
     public const string FileNote =
         "Ground truth for the gitignored samples/ corpus. Item-window fields only - public game data, the same " +
-        "data this tool publishes to the wiki. Never whole-frame OCR text, never anything outside a window crop, " +
+        "data this tool publishes to the wiki. Never whole-frame text, never anything outside a window crop, " +
         "no coordinates, and warning counts rather than verbatim warning strings. See ExpectedCorpus.cs.";
 
     public int Version { get; set; } = 1;
