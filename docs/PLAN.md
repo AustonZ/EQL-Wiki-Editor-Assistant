@@ -438,10 +438,11 @@ tooltips and bags too, and the "Description" anchor is what has kept tooltips ou
    advances), not cut from a sample. A test proves each matches the real label in a sample pixel for pixel. The search
    is the blend model above. It returns each label's ink box and the font whose template matched, which gives
    `LocatedWindow.DrawnIn` from the label, so the wrong-font refusal keeps working.
-2. **A partly covered label is reported, not lost.** Today the model's fuzzy match (edit distance 3) accepts a label
-   missing a few letters and the window is reported occluded. A whole-word template would drop it silently, so a long
-   run of the label's letters in place also counts, as an occluded window. No corpus sample has one (`06c`'s covered tab
-   is missed by both methods), so this is pinned by a synthetic test.
+2. **A partly covered label is not looked for** (user, 2026-10-09: "That much overlap should be obvious to the user").
+   The model's fuzzy match accepted a label missing up to 3 letters and reported that window occluded; the template
+   needs the whole word, so such a window is simply not found. Not worth the effort, and not free either: the label's
+   last letters, "cription", also occur inside "inscription" in lore or chat. No corpus sample has a partly covered
+   label (`06c`'s covered tab was missed by both methods), so nothing measured changes.
 3. **`ItemWindowLocator` takes its anchors from the finder; nothing after it changes.** `WindowBoundsFinder` uses the
    anchor's centre x and bottom edge, and the ink box's bottom sits a few pixels above the model's padded box. **Every
    window rectangle in the corpus must come out byte-identical**, checked by listing them before and after, not by the
@@ -456,6 +457,12 @@ tooltips and bags too, and the "Description" anchor is what has kept tooltips ou
 6. **Verification**: the accuracy corpus unchanged (2442 correct, 0 in every error count); the rectangles identical;
    every tab in `21*`, `22`, `30*` and `31*` found; capture time and peak memory measured in the app; CLAUDE.md's locate,
    OCR-engine and memory sections rewritten to match.
+
+**Built 2026-10-09, steps 1 and 3-6 as planned** (step 2 dropped, above). Every window rectangle and occlusion verdict
+across the 54 modern-skin samples identical before and after; the corpus unchanged and down from minutes to ~15 s; all
+16 tabs in the other skins reported as an unsupported skin. In the app over 12 captures (user): **peak 294 MB private,
+from 1.6 GB**, resting 197 MB private; one capture in the `default` skin showed the new message. The app now depends on
+WebView2, Velopack and the capture packages only.
 - **Updating without being asked**, in the background on close, if testers want it. Updating on a click is in the alpha
   (above).
 - **Saved captures stay off by default in full releases** (the first tester, 2026-10-09). They are full screenshots that

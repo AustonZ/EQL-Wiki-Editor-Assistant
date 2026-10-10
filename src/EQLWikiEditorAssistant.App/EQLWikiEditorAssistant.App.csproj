@@ -3,17 +3,11 @@
   <ItemGroup>
     <ProjectReference Include="..\EQLWikiEditorAssistant.Core\EQLWikiEditorAssistant.Core.csproj" />
     <ProjectReference Include="..\EQLWikiEditorAssistant.Capture\EQLWikiEditorAssistant.Capture.csproj" />
-    <ProjectReference Include="..\EQLWikiEditorAssistant.Ocr\EQLWikiEditorAssistant.Ocr.csproj" />
     <ProjectReference Include="..\EQLWikiEditorAssistant.Pipeline\EQLWikiEditorAssistant.Pipeline.csproj" />
     <ProjectReference Include="..\EQLWikiEditorAssistant.Wiki\EQLWikiEditorAssistant.Wiki.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Direct, not transitive through EQLWikiEditorAssistant.Ocr. RapidOcrNet's bundled .onnx models only reliably copy
-         to an executable's own output directory when the executable references the package itself — confirmed the
-         hard way twice, most recently by tools/OcrSpike failing at runtime with a missing-model-file error. See
-         CLAUDE.md, which flagged this project as needing the same treatment. -->
-    <PackageReference Include="RapidOcrNet" Version="4.2.0" />
     <!-- The review's Preview and Done pages: the wiki's own rendering, in the Edge runtime Windows 11 ships. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
     <!-- The installer and its uninstall/update hooks. App.Main hands control to it first; see there. -->
@@ -42,16 +36,11 @@
     <Page Include="App.xaml" />
   </ItemGroup>
 
-  <!-- Shipped beside the executable: the licence, the notices for everything the app is built on, and the two
-       components' own notices files that THIRD-PARTY-NOTICES.txt points to. Pinned to the package versions on purpose:
-       when a package moves, the copy fails the build instead of shipping a stale notice. -->
+  <!-- Shipped beside the executable: the licence and the notices for everything the app is built on. The .NET
+       runtime's own notices are added by tools/release.ps1, since only a self-contained build carries the runtime. -->
   <ItemGroup>
     <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(NuGetPackageRoot)microsoft.ml.onnxruntime\1.29.0\ThirdPartyNotices.txt"
-          Link="licenses\onnxruntime-ThirdPartyNotices.txt" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(NuGetPackageRoot)skiasharp.nativeassets.win32\3.119.1\THIRD-PARTY-NOTICES.txt"
-          Link="licenses\skiasharp-THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

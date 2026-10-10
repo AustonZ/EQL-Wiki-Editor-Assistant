@@ -65,7 +65,9 @@ The full design rationale, wiki research findings, and milestone plan live in
 - `src/EQLWikiEditorAssistant.Ocr` (`net10.0-windows10.0.19041.0`) — the general-OCR `IOcrEngine`: **`RapidOcrEngine`
   wrapping `RapidOcrNet`** (PaddleOCR PP-OCRv5 via ONNX, local/offline). See "OCR engine choice" below — this
   wasn't arbitrary: the OS-provided `Windows.Media.Ocr` was tried first and replaced after real testing showed it
-  meaningfully less accurate, then removed outright once it had no remaining use.
+  meaningfully less accurate, then removed outright once it had no remaining use. **The app does not reference this
+  project any more** (2026-10-09): windows are found by template and read by the glyph atlas. The tools and tests keep it
+  for `--rapid` comparisons and `OcrSpike`; whether to drop it entirely is an open decision.
 - `src/EQLWikiEditorAssistant.Wiki` (`net10.0`) — **`MediaWikiClient`/`IMediaWikiClient`** (`Wiki.MediaWiki` — bot-password
   auth, read-only fetch, conflict-guarded edit), **`ICredentialStore`/`WindowsCredentialStore`** (same namespace —
   Windows Credential Manager), **`WikitextScanner`/`TemplateCall`/`ItemPageDocument`/`StatsBlock`**
@@ -95,7 +97,7 @@ The full design rationale, wiki research findings, and milestone plan live in
   test/tool's output directory, and `TestSupport.DebugDraw` for drawing debug rectangle overlays; `OcrSpike`
   iterates on OCR accuracy against real sample screenshots (`--crop`, `--scale`, `--save`, dump recognized
   lines+bounding boxes); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
-  windows, capture one to a PNG, test-fire a hotkey); `LocateSpike` runs whole-screenshot OCR + `ItemWindowLocator`
+  windows, capture one to a PNG, test-fire a hotkey); `LocateSpike` runs `ItemWindowLocator` over a whole screenshot
   and can `--save` a debug overlay (green/red by `PossiblyOccluded`) for eyeballing results, or
   `--probe x,y,dx,dy,count` to dump raw pixel RGB along a ray — that's how the window-chrome colour profile in
   "Locating item windows" was measured, so use it rather than guessing before changing anything in
@@ -112,14 +114,13 @@ The full design rationale, wiki research findings, and milestone plan live in
   **Note**: any executable project that uses `RapidOcrEngine` needs its own direct `PackageReference` to
   `RapidOcrNet`, not just a transitive one via `EQLWikiEditorAssistant.Ocr` — the package's bundled `.onnx` model files
   only reliably copy to an executable's own output directory that way (confirmed the hard way: `tools/OcrSpike`
-  failed at runtime with a missing-model-file error until given its own direct reference). `EQLWikiEditorAssistant.App`
-  has the same direct reference, **verified by a real run** (2026-09-28): the models land in its own output and the
-  app starts.
+  failed at runtime with a missing-model-file error until given its own direct reference). The app no longer uses
+  RapidOCR at all (2026-10-09), so this concerns the tools and the tests only.
   **Keep a clone's path short.** ONNX Runtime's native DLL sits deep in the output
   (`bin\Debug\net10.0-windows10.0.19041.0\runtimes\win-x64\native\`), and once that path passes Windows' 260-character
   limit the load falls back to the much older `onnxruntime.dll` Windows ships in System32: the test host dies with
   `0xC0000005` inside `OnnxRuntime.NativeMethods`, which says nothing about paths (found 2026-10-08, cloning into a deep
-  temp folder: 280 characters crashed, the same commit at 181 passed). An installed app is unaffected; its path is short.
+  temp folder: 280 characters crashed, the same commit at 181 passed). The app does not load ONNX Runtime any more.
 
 Note: WinRT namespaces like `Windows.Media.Ocr` and `Windows.Graphics.Capture` are only projected on a Windows-SDK-
 versioned TFM (`net10.0-windows10.0.19041.0`), not plain `net10.0-windows` — every project that touches them must
@@ -1734,27 +1735,26 @@ a global hotkey is worth having.
 - Icon uploads are still confirmed, as the one write that is not on the Submit page and the one only an admin can undo.
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — the `MediaWikiClient` must
   keep one cookie container for its whole session, and the ledger and icon cache only mean anything shared.
-- **The full-frame reader is the exception: RapidOCR is loaded for each capture and released after it**
-  (`Ocr.OnDemandRapidOcrEngine`; user, 2026-10-09, after the app's working set passed 2 GB). ONNX Runtime's memory
-  pool grows to fit the largest input it has run and never shrinks, and every capture hands it a whole 2560x1440 frame.
-  - **Not a leak, and measured to be sure**: one long-lived engine over 153 real frames reached ~1.75 GB working set and
-    2.5 GB private within two captures and stayed flat, with the .NET heap at 30 MB.
-  - **Loaded per capture**: ~0.25 GB between captures and ~1.1 GB at a capture's peak, at the same speed, for ~140 ms
-    of model loading against a 2.5-4 s recognition. Output byte-identical, boxes included, over 3,336 lines.
-  - **Turning the pool off instead** (`EnableCpuMemArena = false`) keeps ~0.5 GB between captures and makes every
-    capture ~40% slower, so it was not taken. RapidOcrNet accepts `SessionOptions` through `InitModels` if it is ever
-    wanted.
-  - **This retires "construct it once"**, which rested on the models taking seconds to load; they take ~140 ms. The
-    corpus and the spike tools still keep one engine per run, since they recognize many frames and exit.
-  - **.NET hands its share back too: an aggressive collection runs after each capture** (`MainWindow.CaptureAsync`).
-    With the engine freed, the app still settled at 570 MB private, and a heap dump found only 20 MB of live objects:
-    .NET was keeping 238 MB for the freed screenshot buffers, expecting to reuse it. `GCCollectionMode.Aggressive` is
-    the runtime's own way for an app going idle to return that, and it runs after the capture's method has returned,
-    so nothing of it is still referenced.
-  - **Measured in the real app over a session of use, nothing open afterwards** (user, 2026-10-09): ~1.75 GB working
-    set before any of this; 645 MB (570 MB private) with the engine freed; **355 MB (270 MB private, .NET 53 MB
-    committed) with the collection too**. Peak 1.6 GB private during a capture. The review browser's own processes are
-    ~390 MB on top, as any embedded Edge is. No leak at any stage: the live .NET heap is ~20 MB.
+- **The app runs no text-recognition model** (user, 2026-10-09). Windows are found by their Description tab's pixels
+  (see "Locating item windows") and read by the glyph atlas; RapidOCR, ONNX Runtime, SkiaSharp and the models left the
+  app with it. What led there, since it is the reason not to bring a model back for convenience:
+  - **ONNX Runtime keeps what it allocates.** Its memory pool grows to fit the largest input it has run and never
+    shrinks, and every capture handed it a whole 2560x1440 frame. Measured, not a leak: one long-lived engine over 153
+    real frames reached ~1.75 GB working set and 2.5 GB private within two captures and stayed flat, with the .NET heap
+    at 30 MB. alpha.1 shipped like that.
+  - **alpha.2 loaded the model for each capture and released it after**: about 140 ms to load (so "construct it once",
+    which rested on loading taking seconds, was never right), ~0.25 GB between captures. Turning the pool off instead
+    (`EnableCpuMemArena = false`) kept ~0.5 GB and made captures ~40% slower. But a capture's peak was still 1.6-1.9 GB
+    private, "more than the game itself" (user), and that is what removing the model fixed.
+  - **Measured in the real app without it** (user, 12 captures including one in the `default` skin, which reported
+    itself as expected): peak **294 MB private** (372 MB working set) against 1.6 GB; resting with nothing open 197 MB
+    private (281 MB working set) against 270 MB; .NET reserving 19 MB. ONNX Runtime is not loaded in the process.
+- **An aggressive collection runs after each capture** (`MainWindow.CaptureAsync`). With the model released, the app
+  still settled at 570 MB private, and a heap dump found only 20 MB of live objects: .NET was keeping 238 MB for the
+  freed screenshot buffers, expecting to reuse it. `GCCollectionMode.Aggressive` is the runtime's own way for an app going
+  idle to return that, and it runs after the capture's method has returned, so nothing of it is still referenced.
+  Measured in the real app, nothing open afterwards: 355 MB working set (270 MB private, .NET 53 MB committed). The
+  review browser's own processes are ~390 MB on top, as any embedded Edge is.
 - **A capture runs off the UI thread: the screenshot, the whole check, and saving the frame** (bug found by the
   user, 2026-10-07: the window hung and the progress label stuck on "Taking game screenshot"). Both OCR engines are
   synchronous behind an async signature — they return `Task.FromResult` — so awaiting the pipeline from a click
@@ -2058,13 +2058,38 @@ warning rather than silently processed as if complete. Implemented as `ItemWindo
 Parse adds a second, content-level check (reconciling the title-bar name against the content-area name) as
 defence in depth.
 
-**Locating item windows (`ItemWindowLocator` + `WindowBoundsFinder`, `Core.Locate`).** Run OCR on the *whole*
-screenshot (see "Full-frame OCR" below) to find each window's `Description` tab, then trace the window's **own
-content-area outline** — the thin neutral-grey line the game draws around the tab contents — outward from that
-anchor. **Before touching this code, read the plan's milestone 2 section in full**: two earlier designs failed,
-every constant here was measured against real screenshots rather than derived, and re-tuning in isolation without
-retesting `tools/LocateSpike` against the full real-sample set is very likely to reintroduce a bug this history
-already found and fixed.
+**Locating item windows (`ItemWindowLocator` + `WindowBoundsFinder`, `Core.Locate`).** Find each window's
+`Description` tab label by its pixels (`DescriptionTabFinder`, below), then trace the window's **own content-area
+outline** — the thin neutral-grey line the game draws around the tab contents — outward from that anchor. **Before
+touching this code, read the plan's milestone 2 section in full**: two earlier designs failed, every constant here was
+measured against real screenshots rather than derived, and re-tuning in isolation without retesting `tools/LocateSpike`
+against the full real-sample set is very likely to reintroduce a bug this history already found and fixed.
+- **The tab is found by template, not by a text-recognition model** (`DescriptionTabFinder`, user, 2026-10-09). A
+  full-frame RapidOCR pass used to find it, and it was the whole of a capture's memory peak (1.6-1.9 GB) and most of its
+  time (2.5-4 s); the search takes tens of milliseconds. The label is laid out from the glyph atlas, one template per UI
+  font, and `TheTemplateIsTheRealLabelPixelForPixel` proves it is the real label exactly. Which font's template matched
+  is the window's font, so the wrong-font refusal does not need the text read first.
+  - **It matches by the blend model, not exact equality**, because the game's other two skins draw the same glyphs
+    blended over a texture: every fully covered pixel must equal the peak, the uncovered ones give the background's
+    range, and each partly covered pixel must fall in the range its coverage allows, with 4 levels of slack and up to 3
+    of ~380 outside it. **Compared in the green channel**: the selected tab's yellow label has no blue and the light
+    skin's texture is not neutral, so the brightest channel of the background can be one the text never touches.
+    Measured with a prototype: 148 of 148 tabs across the three skins and both fonts, no false matches; exact matching
+    found the 131 in `default_modern` too, but none in the other skins.
+  - **Switching changed no window**: every rectangle and every occlusion verdict across the 54 modern-skin samples was
+    traced from the old anchors and the new and compared, before the switch; all identical. The accuracy corpus is
+    unchanged too. The label's ink box sits a few pixels above the model's padded line box, which is why the rectangles
+    were compared directly rather than trusted to the counts.
+  - **Only the whole label is looked for** (user, 2026-10-09). The model's fuzzy match accepted a label missing up to 3
+    letters, which reported a window covered that far as occluded; now it is simply not found. "That much overlap should
+    be obvious to the user," and a partial template would also match "inscription" in lore or chat. No sample has one.
+  - **A label on a texture is a window in another skin**, which is found but cannot be read: the bounds tracing, the
+    glyph reader and the icon check all assume `default_modern`'s flat background. The background pixels inside the
+    label span **exactly 0 on all 131 modern-skin tabs and 40-73 on all 16 in the other skins**, so
+    `DescriptionTabFinder.TexturedSpread` (20) sits between with room on both sides. The window is reported as
+    `ItemCheckStatus.UnsupportedSkin`, with no ledger row, naming `default_modern` as the fix. It is also marked
+    `PossiblyOccluded`, so everything that skips an unreadable window skips it; the pipeline asks about the skin first.
+    See the plan for what supporting the other skins would take.
 - **Trace the grey outline, not a brightness transition.** Two superseded designs: (1) clustering OCR lines by
   text proximity, which can't tell a window's own content from an adjacent window's; (2) tracing the edge of the
   near-black interior — "scan outward until it stops being dark" — which silently assumed whatever is *outside*
@@ -2533,8 +2558,11 @@ invisible that way by definition.
 - Compare configurations **lexicographically**, not by a weighted score: a weighted total lets a tuner buy five
   recovered digits with one corrupted value, which is exactly the trade this project must never make.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
-  corpus pass is about a minute; in the default `dotnet test` path it would get muted within a week. The pure comparer
-  tests run always and need no samples.
+  corpus pass is about 15 seconds since the windows are found without a model (it was minutes); in the default
+  `dotnet test` path it would get muted within a week. The pure comparer tests run always and need no samples.
+  - **Its font check covers only samples with ground truth.** A sample without any is read in `SampleFonts`' guess,
+    which is wrong whenever it was captured in the other font (three frames set aside on 2026-10-09 were Arial, read as
+    EQL Wiki Editor Assistant), and nothing is scored against it anyway. `AccuracySpike` still marks such a sample.
 - **The corpus runs several samples at once** (`CorpusRunner.RunAllAsync`, user, 2026-10-09), each worker with its own
   RapidOCR engine, since one is not safe to share between threads; results come back in file order, so a report is
   identical at any worker count — checked at 1, 2, 4, 8 and 16 on all 52 samples. **Each engine is told its share of
@@ -2542,7 +2570,8 @@ invisible that way by definition.
   to size itself, every engine took the whole machine, and 4 or 8 workers were no faster than one (243 s and 246 s
   against 245 s). With the share, on 32 logical cores: 1 worker 271 s, 2 141 s, 4 81 s, 8 **56 s**, 16 52 s. The
   default (`CorpusRunner.DefaultWorkers`) is a quarter of the logical cores, at most 8, which takes nearly all of the
-  gain at half the memory of 16; `AccuracySpike --workers <n>` overrides it. The app's single engine is untouched.
+  gain at half the memory of 16; `AccuracySpike --workers <n>` overrides it. These timings are from when RapidOCR found
+  the windows; now that the tab template does, the whole corpus takes ~15 s, and the engines matter only to `--rapid`.
 - Baseline (2026-10-07): **52 samples — 48 in Arial, 4 in EQL Wiki Editor Assistant — 120 windows located (1 correctly
   occluded), 2442 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
   extra. Parser warnings are 2, not 0**: both are
@@ -2574,7 +2603,8 @@ invisible that way by definition.
   Fixing one word moved `silent-wrong` from 12 to 13. When a ground-truth value looks like a known OCR
   corruption, check it against the image (`OcrSpike --crop ... --scale 6 --save`) rather than trusting the review.
 
-**Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.**
+**Full-frame OCR needs `ImgResize` raised, or the detector finds almost nothing.** This and the next note now apply
+only to the tools that still run RapidOCR (`--rapid`, `OcrSpike`); the app finds windows without it (2026-10-09).
 `RapidOcrOptions.Default.ImgResize` (1024) downsamples any larger image before detection; at a real 2560x1440
 screenshot that shrinks our ~9-11px UI text below a usable threshold (confirmed: default settings found 33
 garbled lines and zero `Description` tokens on a real screenshot with 3 real item windows). Fixed inside
@@ -2642,9 +2672,9 @@ correction covering just the handful of known field labels handles it. Also keep
 — cheap insurance, and an isolated dropped digit was seen even with the better engine; and "a field the parser
 expects but doesn't find is 'OCR uncertain,' not 'absent from the game'" — ask the user rather than assume. Drop:
 the mandatory upscale-before-recognition step and any multi-scale-pass plan — not needed for `RapidOcrEngine`, and
-upscaling measurably hurt it in testing. In the app, load `RapidOcrEngine` per capture and release it
-(`OnDemandRapidOcrEngine`): loading its three models takes ~140 ms, and a long-lived engine keeps ~2 GB of ONNX Runtime
-memory for good (see "The review UI").
+upscaling measurably hurt it in testing. The app no longer runs `RapidOcrEngine` at all (2026-10-09; see "The review
+UI" for the memory that cost and "Locating item windows" for what replaced it), so this paragraph now describes the
+tools' `--rapid` configuration.
 
 A broader census across 6 real windows (~100+ recognized lines: weapons, armor, ammo, a charge item, a consumable,
 a quest token) found the `orn`->`om`-ish cluster to be the **only** recurring substantive error — digits (incl.
@@ -2800,7 +2830,7 @@ dotnet run --project tools/AccuracySpike                 # summary
 dotnet run --project tools/AccuracySpike -- --diff       # plus every differing field
 dotnet run --project tools/AccuracySpike -- --bootstrap  # regenerate ground truth after a new capture batch
 
-# The corpus regression test (about a minute, opt-in so it can't get muted):
+# The corpus regression test (about 15 seconds, opt-in so it can't get muted):
 $env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracyTests"
 
 # Glyph matching: read a region's raw pixel intensities (the --probe of this work; measure before tuning),

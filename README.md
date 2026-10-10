@@ -24,8 +24,9 @@ an item the wiki has no page for, it proposes the whole page.
 
 - Windows 10 (version 2004 or later) or Windows 11.
 - EverQuest Legends in **windowed or borderless windowed** mode.
-- The game's **default UI font (Arial), default skin and 100% UI scale.** The Assistant reads item windows by their exact
-  pixels, and other settings are not supported yet. Developed at 2560x1440; other resolutions should work but are
+- The game's **default UI font (Arial), the `default_modern` UI skin and 100% UI scale.** The Assistant reads item
+  windows by their exact pixels, and other settings are not supported yet. In the `default` and `default_light` skins it
+  finds the windows but cannot read them, and says so. Developed at 2560x1440; other resolutions should work but are
   untested.
 
 ## Getting started
@@ -110,7 +111,7 @@ The Assistant's own code is [MIT licensed](LICENSE). **Four things in this repos
 - a word list taken from ENABLE, which its compilers released into the public domain.
 
 Licensing is recorded machine-readably in [REUSE.toml](REUSE.toml). The components the Assistant is built on, such as
-RapidOCR and the PaddleOCR models it uses, are listed with their licences in
+the .NET runtime and the Velopack installer, are listed with their licences in
 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 EverQuest is a registered trademark of Daybreak Game Company LLC. This project is not affiliated with or endorsed by

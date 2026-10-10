@@ -118,9 +118,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            // Most likely the RapidOCR models did not make it next to the executable — the documented packaging
-            // trap. Fatal (user, 2026-10-07): nothing in the window works without the services, so it says why in a
-            // dialog and exits rather than sitting there in a state that only looks usable.
+            // Fatal (user, 2026-10-07): nothing in the window works without the services, so it says why in a dialog
+            // and exits rather than sitting there in a state that only looks usable.
             App.Record(ex);
             await Dialog.TellAsync(
                 "Could not start", $"{ex.Message}\n\nThe details are in:\n{App.ErrorLogFile}", DialogTone.Error);

@@ -6,7 +6,6 @@ using EQLWikiEditorAssistant.Core.Locate;
 using EQLWikiEditorAssistant.Core.Icons;
 using EQLWikiEditorAssistant.Core.Input;
 using EQLWikiEditorAssistant.Core.Ocr;
-using EQLWikiEditorAssistant.Ocr;
 using EQLWikiEditorAssistant.Pipeline;
 using EQLWikiEditorAssistant.Wiki.Ledger;
 using EQLWikiEditorAssistant.Wiki.Mapping;
@@ -19,8 +18,7 @@ namespace EQLWikiEditorAssistant.App;
 ///
 /// **Built once quite deliberately.** The ledger and the icon cache are the app's state and only mean anything shared,
 /// and the <see cref="MediaWikiClient"/> must keep one cookie container for its whole session, since MediaWiki ties
-/// the login token, the session and the CSRF token together through cookies. The one exception is the full-frame
-/// reader, which is loaded for each capture and released after it: see <see cref="OnDemandRapidOcrEngine"/>.
+/// the login token, the session and the CSRF token together through cookies.
 ///
 /// This is a plain composition root rather than a DI container: there is one graph, built in one place, and nothing
 /// resolves anything at runtime.
@@ -98,13 +96,12 @@ public sealed class AppServices : IDisposable
     {
         AppPaths.EnsureExists();
 
-        // The full-frame pass keeps RapidOCR (it scans 3D world content and finds the Description anchors); window
-        // crops go through exact glyph matching. See CLAUDE.md — this split is the whole extraction-accuracy story.
-        // The UI font is one value given to both the reader and the pipeline's wrong-font guard, so they cannot
-        // disagree — here, and afterwards only through UseFontAsync, which sets both.
+        // Windows are found by their Description tab's pixels and read by exact glyph matching; no text-recognition
+        // model is involved (user, 2026-10-09). See CLAUDE.md. The UI font is one value given to both the reader and
+        // the pipeline's wrong-font guard, so they cannot disagree — here, and afterwards only through UseFontAsync,
+        // which sets both.
         Settings = AppSettings.Load(AppPaths.SettingsFile);
         _windowReader = new GlyphOcrEngine(Settings.Font);
-        IOcrEngine ocr = new RoutingOcrEngine(fullFrame: new OnDemandRapidOcrEngine(), windowCrop: _windowReader);
 
         Wiki = MediaWikiClient.Create(Endpoint, UserAgent);
         // Every edit and upload says which app and version made it — see MediaWikiClient.SummaryTag.
@@ -146,7 +143,7 @@ public sealed class AppServices : IDisposable
 
         Pipeline = new ItemCheckPipeline(
             Wiki,
-            new BorderTracingWindowLocator(ocr),
+            new BorderTracingWindowLocator(_windowReader),
             Ledger,
             Mapping,
             Icons,
