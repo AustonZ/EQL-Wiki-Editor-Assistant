@@ -82,9 +82,9 @@ public class DescriptionTabFinderTests
 
     /// <summary>
     /// **The label is found on a texture, and the texture is noticed** — what the game's other two skins do, drawing the
-    /// same glyphs blended over a textured background. Synthetic, since frames in those skins are not committed: the
-    /// label laid out as the blend model describes over seeded noise in the measured `default` range, and over a flat
-    /// background as the control. Both are found; only the textured one says so.
+    /// same glyphs blended over a textured background. Synthetic, so the model itself is pinned apart from any one
+    /// texture: the label laid out as the blend model describes over seeded noise in the measured `default` range, and
+    /// over a flat background as the control. Both are found; only the textured one says so.
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -114,7 +114,29 @@ public class DescriptionTabFinderTests
         Assert.Equal(textured, tab.Textured);
     }
 
-    /// <summary>Every tab in the committed samples is `default_modern`, so none is textured — the measured side of
+    /// <summary>
+    /// **The real thing**: one window in each of the game's other two skins (audited by the user, 2026-10-09). Its tab
+    /// is found on the skin's actual texture and marked textured, and the locator reports the window as in another
+    /// skin — found, so the user is told, but not traced or read. Pins what the synthetic test above can only model.
+    /// </summary>
+    [Theory]
+    [InlineData("30a-skin-default.png")]
+    [InlineData("31a-skin-default-light.png")]
+    public async Task AWindowInAnotherSkinIsFoundAndReportedAsSuch(string sample)
+    {
+        CapturedImage image = await Sample(sample);
+
+        DescriptionTab tab = Assert.Single(Tabs(image));
+        Assert.True(tab.Textured);
+        Assert.Equal(UiFont.Arial, tab.Font);
+
+        LocatedWindow window = Assert.Single(await ItemWindowLocator.LocateAsync(image, new GlyphOcrEngine(UiFont.Arial)));
+        Assert.True(window.InOtherSkin);
+        Assert.True(window.PossiblyOccluded);
+        Assert.Empty(window.Lines);
+    }
+
+    /// <summary>Every tab in the modern-skin samples is flat, so none is textured — the measured side of
     /// <see cref="DescriptionTabFinder.TexturedSpread"/> that real frames can pin.</summary>
     [Theory]
     [InlineData("07-three-distinct-items.png")]

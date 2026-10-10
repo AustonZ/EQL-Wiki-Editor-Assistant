@@ -7961,6 +7961,44 @@
       ]
     },
     {
+      "file": "30a-skin-default.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "31a-skin-default-light.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "notepad-with-all-glyphs.png",
       "verified": true,
       "windows": []

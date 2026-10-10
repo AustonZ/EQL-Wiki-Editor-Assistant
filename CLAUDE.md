@@ -2578,7 +2578,9 @@ invisible that way by definition.
   `Convert to Guise of the Deceiver`, which is the trailing-region rule working exactly as designed (see "The item
   window's trailing region" — an unknown line reaching the user is the right outcome). The corpus test gates
   structural, silent-wrong, wrong and missing, never warnings. Those ratchets in `CorpusAccuracyTests` are all 0 and
-  must stay there; a regression is a real defect rather than a known gap being re-measured. Under the previous
+  must stay there; a regression is a real defect rather than a known gap being re-measured. **54 samples since
+  2026-10-09**: `30a` and `31a`, one window each in the game's other two skins, expected unreadable, take the correct
+  count to 2444 and nothing else. Under the previous
   configuration (RapidOCR reading window crops) the same
   corpus and the same ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them
   a glyph-level failure that exact template matching removed outright. `AccuracySpike --rapid` still scores the old
@@ -2927,7 +2929,8 @@ Arrange the game, alt-tab to a terminal, then capture — Graphics Capture reads
 are named `NN-description.png` (with a sub-letter for variants of one scenario, e.g. `06a`/`06b`), and the golden
 tests reference those names directly, so renaming one means updating the tests. Current coverage is the geometry
 and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*`), one race-restricted item
-(`14`) and the custom UI font (`15*`, each named in its ground truth as `"font": "EqlWikiEditorAssistant"`). Exaltations are
+(`14`), the custom UI font (`15*`, each named in its ground truth as `"font": "EqlWikiEditorAssistant"`) and one window
+in each of the game's other two skins (`30a` `default`, `31a` `default_light`, reported as unsupported). Exaltations are
 covered already, though no sample was taken for them: 57 levelled windows carry 11 native and 27 foreign filled slots,
 and `ItemEligibilityTests.EveryRealWindowIsJudgedAsItsGroundTruthSays` judges every one. A foreign exaltation on a
 `+0` item cannot exist in game (an exaltation can only be added to a levelled item), and no sample has a filled
