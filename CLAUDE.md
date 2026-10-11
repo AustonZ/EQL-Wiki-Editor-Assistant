@@ -1354,6 +1354,12 @@ usually read: match the captured sprite against the library, and the matching fi
     nothing at all on the case they reported. It uploads first when the wiki lacks the file (93% of the library) and
     then sets the id; only the upload is confirmed, because only the upload is permanent. **A failed upload stops
     before the id is written** — pointing a page at a file that is not there trades a wrong picture for no picture.
+  - **The suggestion is a call to action, and is drawn as one** (tester feedback, 2026-10-11: "it wasn't immediately
+    clear what I needed to do"). The suggested tile has a 3px border in a bright green (`SuggestionBrush`, brighter than
+    the "done" green) and is captioned "Suggested" on an existing page; the button is green to match
+    (`SuggestionButton`); a plain line above it says the button puts the icon in this edit and that it is saved with
+    the rest; and once pressed, the panel says to press Next, then "Save to the wiki". Before, the button just
+    disappeared. Checked by rendering the panel with the real theme, since no item with a wrong icon was to hand.
   - **Applying rebuilds the diff and amends the summary.** The diff is computed once from the tool's own proposal, so
     leaving it would show a diff that no longer describes what Save would write — the one property this screen cannot
     give up. The summary gains `updated lucy_img_ID` for the same reason: a revision whose summary omits a change it

@@ -34,6 +34,9 @@ internal static class Palette
     /// <summary>An edit is proposed, or the page does not exist yet — real work, but nothing is wrong.</summary>
     public static Brush Warning => Named("WarningBrush");
 
+    /// <summary>Something the user can press to fix what was found: the icon suggestion and its button.</summary>
+    public static Brush Suggestion => Named("SuggestionBrush");
+
     /// <summary>No verdict either way: skipped, or a comparison the tool declined to make.</summary>
     public static Brush Neutral => Named("NeutralBrush");
 

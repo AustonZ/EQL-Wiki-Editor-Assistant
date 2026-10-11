@@ -444,7 +444,9 @@
                                             Visibility="{Binding ShowMatchedIcon, Converter={StaticResource BoolToVis}}">
                                     <TextBlock Text="{Binding MatchedIconCaption}" FontSize="11"
                                                Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <Border BorderBrush="{Binding MatchedIconBorderBrush}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                    <!-- 3px, not the other tiles' 1px: this is the one tile that asks for something. Its
+                                         image keeps the others' size, so the tile is 4px wider than they are. -->
+                                    <Border BorderBrush="{Binding MatchedIconBorderBrush}" BorderThickness="3" Background="{StaticResource GameBackdropBrush}"
                                             Visibility="{Binding HasMatchedIcon, Converter={StaticResource BoolToVis}}">
                                         <Image x:Name="MatchedIconImage" Stretch="Uniform" Margin="4"
                                                Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
@@ -459,16 +461,17 @@
                                  does for 93% of the library. Both say what they will do before they do it. -->
                             <StackPanel Margin="0,8,0,0" MaxWidth="380" HorizontalAlignment="Left"
                                         Visibility="{Binding CanActOnIcon, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="{Binding IconActionPrompt}" TextWrapping="Wrap"
-                                           Foreground="{StaticResource AttentionBrush}" Margin="0,0,0,4"
+                                <TextBlock Text="{Binding IconActionPrompt}" TextWrapping="Wrap" Margin="0,0,0,6"
                                            Visibility="{Binding HasIconActionPrompt, Converter={StaticResource BoolToVis}}" />
                                 <!-- The label is a TextBlock rather than string Content because **a Button eats an
                                      underscore**: WPF reads it as an access-key prefix, so binding the file name
                                      directly rendered "Upload Item3327.png" for a file actually called
                                      Item_3327.png — a wrong file name on the one button whose whole job is to say
                                      which file it publishes. Caught by rendering it; invisible in the XAML. -->
-                                <Button Click="OnIconActionClick" HorizontalAlignment="Left" Padding="10,4"
-                                        IsEnabled="{Binding IsNotBusy}">
+                                <!-- Green like the suggested tile above it, so the two read as one call to action
+                                     (tester feedback, 2026-10-11). -->
+                                <Button Style="{StaticResource SuggestionButton}" Click="OnIconActionClick"
+                                        HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}">
                                     <TextBlock Text="{Binding IconActionButtonText}" />
                                 </Button>
                             </StackPanel>

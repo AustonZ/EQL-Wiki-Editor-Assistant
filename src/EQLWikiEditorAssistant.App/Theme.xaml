@@ -225,6 +225,46 @@
         </Setter>
     </Style>
 
+    <!-- The icon the library suggests, and the button that puts it into the edit, in one bright green so they read as
+         one call to action (feedback from a tester, 2026-10-11: with a 1px border and an ordinary button it was not
+         clear what to do). Brighter than DoneBrush, which colours a finished state rather than something to press.
+         White on #1F6B42 measures 6.2. -->
+    <SolidColorBrush x:Key="SuggestionBrush" Color="#57E89C" />
+    <Style x:Key="SuggestionButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="#1F6B42" />
+        <Setter Property="BorderBrush" Value="{StaticResource SuggestionBrush}" />
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="14,6" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="3"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#268050" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#18563A" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Background" Value="#28282B" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#333337" />
+                            <Setter Property="Foreground" Value="#6A6A6E" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- The list's per-item close button is deliberately borderless; the shared style would give it a box. -->
     <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Background" Value="Transparent" />

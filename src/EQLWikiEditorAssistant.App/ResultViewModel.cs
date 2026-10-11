@@ -408,17 +408,21 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// Names the id, because the id is the thing being written into the page — and says plainly when the tool is not
     /// sure, since an unsure match leaves <c>lucy_img_ID</c> blank and becomes the user's job.
     /// </summary>
+    /// <remarks>"Suggested" on an existing page, where the tile is an offer the user acts on rather than an id already
+    /// written (tester feedback, 2026-10-11).</remarks>
     public string MatchedIconCaption => Result.IconSuggestion switch
     {
+        { IsConfident: true } s when !IsCreation => $"Suggested (ID: {s.IconId})",
         { IsConfident: true } s => $"Matched (ID: {s.IconId})",
         { } s => $"Best Guess (ID: {s.IconId})",
         _ => "",
     };
 
-    /// <summary>Green for a match written into the page, amber for one the user has to settle — the same two-state
-    /// reading the rest of the panel uses.</summary>
+    /// <summary>Bright green for a match the user can act on, amber for one they have to settle. The green is the
+    /// suggestion button's own, not the panel's "done" green, so the tile and the button read as one call to action
+    /// (tester feedback, 2026-10-11).</summary>
     public Brush MatchedIconBorderBrush =>
-        Result.IconSuggestion is { IsConfident: true } ? Palette.Done : Palette.Warning;
+        Result.IconSuggestion is { IsConfident: true } ? Palette.Suggestion : Palette.Warning;
 
     /// <summary>
     /// Whether to offer the icon action, which is a different question on each path.
@@ -433,11 +437,21 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         Result.IconSuggestion is { } s &&
         (IsCreation ? s.CanUpload : s.CanApplyToPage && Result.Edit is not null);
 
-    /// <summary>What pressing it will do, said before it is pressed — the upload is the part that cannot be taken
-    /// back, so it is named rather than implied.</summary>
+    /// <summary>
+    /// What pressing it will do, said before it is pressed — the upload is the part that cannot be taken back, so it
+    /// is named rather than implied.
+    ///
+    /// **On an existing page it also says the button is the fix and when it is saved** (tester feedback, 2026-10-11:
+    /// "it wasn't immediately clear what I needed to do"). The verdict above only said the page's icon may be wrong.
+    /// </summary>
     public string IconActionPrompt => (IsCreation, Result.IconSuggestion) switch
     {
-        (_, { NeedsUpload: true } s) => $"Icon #{s.IconId} is missing on the wiki.",
+        (true, { NeedsUpload: true } s) => $"Icon #{s.IconId} is missing on the wiki.",
+        (false, { NeedsUpload: true } s) =>
+            $"The wiki doesn't have icon #{s.IconId} yet. Press the button below to upload it and put it in this " +
+            "edit, which is saved with the rest of the edit.",
+        (false, { } s) =>
+            $"Press the button below to put icon #{s.IconId} in this edit. It is saved with the rest of the edit.",
         _ => "",
     };
 
@@ -516,7 +530,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         Replace(Warnings, BuildWarnings());
 
         _iconUploadFailed = false;
-        string next = IsCreation ? "" : " — review the diff, then Save";
+        string next = IsCreation ? "" : $" in this edit. To save it, press Next, then \"{SaveButtonText}\"";
         _iconUploadOutcome = _iconUploadOutcome is { } uploaded
             ? $"{uploaded} lucy_img_ID set to {iconId}{next}."
             : $"lucy_img_ID set to {iconId}{next}.";
