@@ -60,6 +60,9 @@ public partial class SettingsWindow : Window
         ShowHotKey();
         if (services.HotKeyProblem is { } problem) ShowHotKeyStatus(problem, Palette.Attention);
 
+        MinimizeToTrayBox.IsChecked = services.Settings.MinimizeToTray;
+        MinimizeWhenDoneBox.IsChecked = services.Settings.MinimizeWhenDone;
+
         KeepCapturesBox.IsChecked = services.Settings.KeepCaptures;
         CapturesFolderText.Text = CaptureArchive.Directory;
 
@@ -80,7 +83,7 @@ public partial class SettingsWindow : Window
 
         if (_recording) StopRecording();
 
-        ScrollViewer[] pages = [FontPage, HotKeyPage, CapturesPage, IconCachePage, AccountPage, MappingPage];
+        ScrollViewer[] pages = [FontPage, HotKeyPage, WindowPage, CapturesPage, IconCachePage, AccountPage, MappingPage];
         for (int i = 0; i < pages.Length; i++)
             pages[i].Visibility = PageList.SelectedIndex == i ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -124,6 +127,27 @@ public partial class SettingsWindow : Window
             "and from a dictionary where the word alone cannot say: \"Iron\" and \"lost\" both read correctly. A " +
             "rare word or a name the dictionary does not know can still come out with the wrong one.",
     };
+
+    // ============================ Window ============================
+
+    private async void OnWindowOptionChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+
+        WindowSavedText.Text = "";
+        try
+        {
+            await _services.UseWindowOptionsAsync(MinimizeToTrayBox.IsChecked == true, MinimizeWhenDoneBox.IsChecked == true);
+            WindowSavedText.Foreground = Palette.Done;
+            WindowSavedText.Text = "Saved.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Already in effect for this session; only remembering it failed.
+            WindowSavedText.Foreground = Palette.Attention;
+            WindowSavedText.Text = $"In use now, but could not be saved: {ex.Message}";
+        }
+    }
 
     // ============================ Saved captures ============================
 
@@ -672,6 +696,7 @@ public enum SettingsPage
 {
     Font,
     HotKey,
+    Window,
     Captures,
     IconCache,
     Account,

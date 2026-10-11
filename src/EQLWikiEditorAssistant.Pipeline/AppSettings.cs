@@ -6,8 +6,8 @@ using EQLWikiEditorAssistant.Core.Glyphs;
 namespace EQLWikiEditorAssistant.Pipeline;
 
 /// <summary>
-/// What the user has chosen in the settings window: the UI font the game draws in, the capture hotkey, and whether
-/// captured frames are kept on disk.
+/// What the user has chosen in the settings window: the UI font the game draws in, the capture hotkey, whether
+/// captured frames are kept on disk, and how the main window gets out of the way.
 ///
 /// **A file that cannot be read loads as the defaults rather than throwing**, the same rule the ledger follows and
 /// for a stronger reason: there is nothing here that cannot be chosen again in a few seconds, so refusing to start
@@ -28,6 +28,14 @@ public sealed record AppSettings
     /// <summary>Whether each captured frame is kept in app-data. **Off unless chosen**: a frame is a full screenshot,
     /// with other players' names and chat in it, and otherwise never touches the disk.</summary>
     public bool KeepCaptures { get; init; }
+
+    /// <summary>Whether minimizing the main window hides it to an icon in the notification area instead of the
+    /// taskbar (the first tester, 2026-10-10). Off unless chosen.</summary>
+    public bool MinimizeToTray { get; init; }
+
+    /// <summary>Whether pressing Done on the last item that still wants work minimizes the main window (the first
+    /// tester, 2026-10-10), so the next capture from the game finds it out of the way. Off unless chosen.</summary>
+    public bool MinimizeWhenDone { get; init; }
 
     public static AppSettings Load(string path)
     {

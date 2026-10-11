@@ -301,6 +301,14 @@ public sealed class AppServices : IDisposable
         await Settings.SaveAsync(AppPaths.SettingsFile);
     }
 
+    /// <summary>The two window options. Both are read when they apply — at the next minimize, at the next Done — so
+    /// nothing else has to change when they do.</summary>
+    public async Task UseWindowOptionsAsync(bool minimizeToTray, bool minimizeWhenDone)
+    {
+        Settings = Settings with { MinimizeToTray = minimizeToTray, MinimizeWhenDone = minimizeWhenDone };
+        await Settings.SaveAsync(AppPaths.SettingsFile);
+    }
+
     /// <summary>
     /// Asks the wiki what a bot password may do, **without writing anything** — the in-app form of
     /// <c>WikiSpike whoami</c>. A throwaway session does the asking, so the app's own session is never touched by a

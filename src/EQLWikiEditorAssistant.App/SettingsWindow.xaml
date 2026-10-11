@@ -84,6 +84,7 @@
                  SelectionChanged="OnPageSelected">
             <ListBoxItem Content="UI font" Padding="12,6" />
             <ListBoxItem Content="Capture hotkey" Padding="12,6" />
+            <ListBoxItem Content="Window" Padding="12,6" />
             <ListBoxItem Content="Saved captures" Padding="12,6" />
             <ListBoxItem Content="Icon cache" Padding="12,6" />
             <ListBoxItem Content="Wiki account" Padding="12,6" />
@@ -137,6 +138,27 @@
                     <TextBlock Text="Which combinations work" Style="{StaticResource SectionHeading}" />
                     <TextBlock Style="{StaticResource Prose}"
                                Text="It needs Ctrl, Alt or Win, so it can never fire while you type in chat. If another program already uses the combination, Windows refuses it and your current hotkey keeps working. The Capture now button works whatever happens here." />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ============================ Window ============================ -->
+            <ScrollViewer x:Name="WindowPage" VerticalScrollBarVisibility="Auto" Padding="24,18" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Window" Style="{StaticResource PageHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="How this app gets out of the way while you play. Capturing from the game brings it back either way." />
+
+                    <CheckBox x:Name="MinimizeToTrayBox" Content="Minimize to the notification area instead of the taskbar"
+                              Margin="0,16,0,0" Checked="OnWindowOptionChanged" Unchecked="OnWindowOptionChanged" />
+                    <TextBlock Style="{StaticResource Prose}" Margin="28,4,0,0"
+                               Text="Its icon sits beside the clock. Click it to bring the window back, or right-click it to quit." />
+
+                    <CheckBox x:Name="MinimizeWhenDoneBox" Content="Minimize when Done finishes the last item"
+                              Margin="0,16,0,0" Checked="OnWindowOptionChanged" Unchecked="OnWindowOptionChanged" />
+                    <TextBlock Style="{StaticResource Prose}" Margin="28,4,0,0"
+                               Text="Only when every item left in the list is finished. An item still waiting for an edit, a capture or a decision keeps the window open." />
+
+                    <TextBlock x:Name="WindowSavedText" Margin="0,14,0,0" Foreground="{StaticResource DoneBrush}" />
                 </StackPanel>
             </ScrollViewer>
 

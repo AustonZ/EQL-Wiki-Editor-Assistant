@@ -36,10 +36,24 @@ public partial class MainWindow : Window
     private bool _dialogOpen;
     private bool _capturing;
 
+    /// <summary>The notification-area icon, shown only while the window is minimized there. Null until the window
+    /// has a handle.</summary>
+    private TrayIcon? _tray;
+
+    /// <summary>What a restore returns to: the state before the last minimize, so a maximized window comes back
+    /// maximized.</summary>
+    private WindowState _restoreTo = WindowState.Normal;
+
     public MainWindow()
     {
         InitializeComponent();
         DarkTitleBar.Apply(this);
+        SourceInitialized += (_, _) =>
+        {
+            _tray = new TrayIcon(this);
+            _tray.OpenRequested += (_, _) => ComeToTheFront();
+            _tray.ExitRequested += (_, _) => Close();
+        };
         ResultsList.ItemsSource = _results;
         Dialog.Opened += (_, _) => UpdateBrowserVisibility();
         Dialog.Closed += (_, _) => UpdateBrowserVisibility();
@@ -372,7 +386,12 @@ public partial class MainWindow : Window
     /// </summary>
     private void ComeToTheFront()
     {
-        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        if (!IsVisible)
+        {
+            Show();
+            _tray?.Hide();
+        }
+        if (WindowState == WindowState.Minimized) WindowState = _restoreTo;
 
         Activate();
         Topmost = true;
@@ -952,6 +971,13 @@ public partial class MainWindow : Window
     {
         if (ResultsList.SelectedItem is not ResultViewModel view) return;
         CloseItem(view);
+
+        // Settings > Window (the first tester, 2026-10-10): with nothing left that wants work, the window gets out of
+        // the way, and the next capture from the game brings it back. "Wants work" is the list's own rule — an item
+        // is finished when it shows as done — so an item still waiting for an edit, a capture or a decision keeps
+        // the window up, and nothing here is a second judgement of it.
+        if (_services?.Settings.MinimizeWhenDone == true && _results.All(r => r.IsDone))
+            WindowState = WindowState.Minimized;
     }
 
     private void CloseItem(ResultViewModel view)
@@ -1326,8 +1352,29 @@ public partial class MainWindow : Window
         AttentionRun.Text = summary is { NeedsAttention: > 0 } ? $"{summary.NeedsAttention} need attention" : "";
     }
 
+    /// <summary>
+    /// Minimizing hides the window to the notification area when Settings > Window says so (the first tester,
+    /// 2026-10-10). Read at each minimize, so the setting needs nothing else to take effect. The window is hidden
+    /// rather than closed: the review in progress lives only in memory.
+    /// </summary>
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        if (WindowState != WindowState.Minimized)
+        {
+            _restoreTo = WindowState;
+            return;
+        }
+        if (_services?.Settings.MinimizeToTray == true && _tray is not null)
+        {
+            _tray.Show();
+            Hide();
+        }
+    }
+
     protected override void OnClosed(EventArgs e)
     {
+        _tray?.Dispose();
         _services?.Dispose();
         base.OnClosed(e);
     }

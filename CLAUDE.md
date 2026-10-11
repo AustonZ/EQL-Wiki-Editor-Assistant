@@ -1799,8 +1799,8 @@ a global hotkey is worth having.
 - **Logging in is entered in the app** (Settings > Wiki account) as of 2026-10-05; `WikiSpike login` still works and
   writes the same Credential Manager entry.
 
-**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Six pages: the UI font, the capture hotkey,
-whether captures are kept (see the archive bullet under "The review UI"), the wiki icon cache, the wiki login, and the
+**The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Seven pages: the UI font, the capture hotkey,
+how the window gets out of the way, whether captures are kept (see the archive bullet under "The review UI"), the wiki icon cache, the wiki login, and the
 wiki mapping. Modal
 and disabled during a capture, like the ledger window — and here for a reason of its own: the capture in progress is
 reading with the configured font.
@@ -1834,6 +1834,20 @@ reading with the configured font.
     2026-10-07: Win+Ctrl+R recorded as Ctrl+R). WPF only knows keys delivered to its window, and the shell keeps the
     Win key's own press. Some Win combinations never arrive at all (Win+Alt+W did not) — Windows owns those, no
     program can register them, and the page says so rather than pretending to wait.
+- **Window: minimize to the notification area, and minimize when Done finishes the last item** (the first tester,
+  2026-10-10). Both off unless chosen, both read when they apply, so neither needs anything else to take effect.
+  - **The tray icon is `Shell_NotifyIcon` directly (`App.TrayIcon`)**: WPF has none, and Windows Forms' would bring a
+    second UI framework whose names collide with WPF's across the project. It listens on the main window's own handle,
+    not a message-only window, because Explorer announces a restart by broadcasting `TaskbarCreated` to top-level
+    windows only, and an icon not re-added then is gone with the window hidden and nothing on the taskbar to click.
+    Its right-click menu is a WPF `ContextMenu`, so Theme.xaml now styles `ContextMenu` and `MenuItem` — which darkens
+    a text box's own Cut/Copy/Paste menu too.
+  - **Minimizing hides the window rather than closing it**: the review in progress lives only in memory. A click on
+    the icon, Open in its menu, or the capture hotkey brings it back, to the state it had before (maximized stays
+    maximized).
+  - **"Finished" is the item list's own rule** (`ResultViewModel.IsDone`, shown green), so an item waiting on an edit,
+    a capture or a decision keeps the window up, and nothing judges it a second time. The status bar's "N need
+    attention" is the ledger's count across all time and would almost never be zero, so it is not the rule here.
 - **The font is saved in `settings.json` (`Pipeline.AppSettings`) and switches without a restart.**
   `AppServices.UseFontAsync` is the one place after start-up that the font changes, and it sets the reader and the
   pipeline's wrong-font guard together; apart, a window would be read in one font and checked against the other. A

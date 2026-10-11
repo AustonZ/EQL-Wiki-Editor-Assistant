@@ -77,6 +77,24 @@ public class AppSettingsTests : IDisposable
         Assert.Equal(UiFont.Arial, loaded.Font);
     }
 
+    /// <summary>Both window options are off unless chosen, a file from before they existed included, and each
+    /// survives a save on its own.</summary>
+    [Fact]
+    public async Task TheWindowOptionsAreOffUnlessChosenAndRoundTrip()
+    {
+        File.WriteAllText(_path, """{ "font": "Arial" }""");
+        Assert.False(AppSettings.Load(_path).MinimizeToTray);
+        Assert.False(AppSettings.Load(_path).MinimizeWhenDone);
+
+        await new AppSettings { MinimizeToTray = true }.SaveAsync(_path);
+        Assert.True(AppSettings.Load(_path).MinimizeToTray);
+        Assert.False(AppSettings.Load(_path).MinimizeWhenDone);
+
+        await new AppSettings { MinimizeWhenDone = true }.SaveAsync(_path);
+        Assert.False(AppSettings.Load(_path).MinimizeToTray);
+        Assert.True(AppSettings.Load(_path).MinimizeWhenDone);
+    }
+
     /// <summary>The acceptability rule is derived, so it is not saved — and a file from the build that did save it
     /// (the user's own, 2026-10-07, reproduced verbatim) still loads.</summary>
     [Fact]

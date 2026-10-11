@@ -59,6 +59,9 @@ an item the wiki has no page for, it proposes the whole page.
 History lists every item checked and what is still waiting for you. An item that hasn't changed since it was settled is
 not looked up again.
 
+To keep the Assistant out of the way while you play, Settings > Window can minimize it to the notification area
+instead of the taskbar, and minimize it when Done finishes the last item. The capture hotkey brings it back either way.
+
 ### Not handled yet
 
 - Levelled items (`+1` and up) and items carrying another item's exaltation are reported and skipped: their stats are not
