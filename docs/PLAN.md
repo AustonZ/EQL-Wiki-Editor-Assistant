@@ -408,6 +408,23 @@ Published by the user and tested from the installed release build. What it carri
 - The parser and locator match text exactly, the text-recognition model's tolerances gone.
 - Arial is the default everywhere in the repository; a capture in another font is marked `[font <name>]`.
 
+### 1.0.0-alpha.5 and alpha.6 — released 2026-10-11
+- **alpha.5**: damage bonus removed from pages rather than written (the wiki calculates it for the reader's level);
+  `Range` on its own line, after the blueprint added one.
+- **alpha.6**: categories sorted into the blueprint's order; the icon suggestion drawn as a call to action (tester
+  feedback); fire, disease and cold damage placed on the damage line.
+
+### Requested 2026-10-11, for next
+- **Always show "Refresh wiki data" on every item** (user). Today it appears only for an item the ledger let skip the
+  wiki and where the wiki stopped the comparison (not an item page, no page, a failed lookup), and only with a
+  readable capture (`ResultViewModel.CanReCheck`). To settle when building it: what it does for an item that was never
+  compared — levelled, covered, wrong font or skin, a Lore-only capture — and whether it asks first on an item with
+  edits in progress, which a refresh would replace.
+- **Always show "Open wiki page" on every item** (user). Today it appears only when a page title is known, from the
+  lookup or the ledger (`ResultViewModel.HasPage`), so an item with no page or one never looked up has none. To
+  settle: where it goes when there is no page (the would-be page, which offers to create it, or a search) and, for an
+  item never looked up, whether the in-game name is a good enough title.
+
 ### To investigate
 - **Fixed 2026-10-10: a false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Its title bar sat flush
   under a Storage Trunk's across the whole width, which the old top-edge rule refused; the top is now a fixed 16 rows
