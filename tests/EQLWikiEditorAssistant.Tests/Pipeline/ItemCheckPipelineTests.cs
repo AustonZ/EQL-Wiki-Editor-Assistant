@@ -876,6 +876,25 @@ public class ItemCheckPipelineTests
         Assert.Equal(CheckOutcome.Flagged, ledger.Find("Earring of Bashing")!.Outcome);
     }
 
+    /// <summary>The remedy for a page that is not an item page is to fix it on the wiki, so the result has to be one
+    /// that can be compared again afterwards, without a fresh capture (bug found by the user, 2026-10-10, on
+    /// `Large Groove Nocks`, whose `onlyinclude` wraps an Itembox rather than the Itempage call).</summary>
+    [Fact]
+    public async Task APageFixedAfterBeingFoundNotAnItemPageIsComparedOnRefresh()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) =
+            Build(Window(EarringLines), "A redirect-ish page with no template at all.");
+        IReadOnlyList<ItemCheckResult> first = await pipeline.CheckAsync(BlankFrame());
+        Assert.Equal(ItemCheckStatus.NotAnItemPage, first[0].Status);
+
+        wiki.Pages["Earring of Bashing"] =
+            new WikiPage("Earring of Bashing", EarringPage(), 101, DateTimeOffset.UnixEpoch);
+        ItemCheckResult refreshed = await pipeline.ReanalyzeAsync(first[0], refreshVerification: true);
+
+        Assert.True(refreshed.Status is ItemCheckStatus.AlreadyCorrect or ItemCheckStatus.EditProposed,
+            $"Expected a comparison, got {refreshed.Status}.");
+    }
+
     /// <summary>
     /// **An unreachable wiki aborts the whole frame** (user, 2026-09-29). This tool exists to compare captures
     /// against the wiki, so without it there is nothing for the remaining windows to be checked against — and

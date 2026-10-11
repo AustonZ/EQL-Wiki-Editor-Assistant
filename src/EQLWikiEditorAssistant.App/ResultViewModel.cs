@@ -922,10 +922,21 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>Whether to offer Re-check: only where the ledger let this capture skip the wiki, which is the one
-    /// result that was never compared (user, 2026-10-07). Every other result already reflects the wiki as it stood.</summary>
+    /// <summary>
+    /// Whether to offer "Refresh wiki data": where the ledger let this capture skip the wiki, so it was never compared
+    /// (user, 2026-10-07), and wherever the wiki is what stopped the comparison and fixing it there is the remedy — a
+    /// page that is not an item page, no page at all, or a lookup that failed (user, 2026-10-10, on `Large Groove
+    /// Nocks`, fixed on the wiki with nothing in the app to compare it again). A result that was compared already
+    /// reflects the wiki as it stood, and its review has "Edit again" for after a save.
+    /// </summary>
     public bool CanReCheck =>
-        !IsBusy && Result is { Status: ItemCheckStatus.AlreadyChecked, Item: not null, WindowImage: not null };
+        !IsBusy && Result is
+        {
+            Status: ItemCheckStatus.AlreadyChecked or ItemCheckStatus.NotAnItemPage or ItemCheckStatus.NotOnWiki
+                or ItemCheckStatus.Failed,
+            Item: not null,
+            WindowImage: not null,
+        };
 
     /// <summary>The captured icon, small, for the item list.</summary>
     public System.Windows.Media.ImageSource? TabIcon =>

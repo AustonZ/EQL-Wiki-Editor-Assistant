@@ -1629,7 +1629,10 @@ a global hotkey is worth having.
   wiki stays a clear button. History is a link and Settings a cog in the header's right corner; the hotkey hint beside Capture is a link
   to Settings > Capture hotkey; in History, the item name is the page link and Forget is an ✕.
 - **Re-check is per item, and only where the ledger let a capture skip the wiki** (user, 2026-10-07), replacing the
-  global "Re-check anyway" checkbox. It runs `ReanalyzeAsync`, so the ledger ends up where a fresh check would leave
+  global "Re-check anyway" checkbox. **Also wherever the wiki stopped the comparison** (user, 2026-10-10, on `Large
+  Groove Nocks`, whose page wraps an Itembox in `onlyinclude`): a page that is not an item page, no page at all, or a
+  failed lookup, since fixing the wiki is the remedy and there was then no way to compare again but a new capture.
+  The link reads "Refresh wiki data". It runs `ReanalyzeAsync`, so the ledger ends up where a fresh check would leave
   it. **That made the `AlreadyChecked` result carry its captured icon**, which it had not: the re-check fingerprints
   whatever icon the result holds, and a row fingerprinted without one never matches the next capture — the
   2026-09-29 ledger bug, reached by a new route. `ReCheckingAnAlreadyCheckedItemKeepsItSettled` fails without it.

@@ -244,7 +244,7 @@
                                 </TextBlock>
                                 <TextBlock Visibility="{Binding CanReCheck, Converter={StaticResource BoolToVis}}">
                                     <Hyperlink Click="OnReCheckClick"
-                                               ToolTip="Compare it against the wiki now, even though nothing has changed since it was checked"><Run
+                                               ToolTip="Compare it against the wiki as it is now"><Run
                                         Text="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BaselineAlignment="Center" /><Run
                                         Text=" Refresh wiki data" /></Hyperlink>
                                 </TextBlock>
