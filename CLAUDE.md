@@ -2607,6 +2607,15 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
   to that commit, and uploads through `gh`, because `vpk upload` takes the GitHub token only on its command line.
   Raising `<Version>` in the app's project file is the whole of "making a new version"; the script refuses a tag
   GitHub already has.
+- **`<Version>` is the last release; every other build carries a development version after it** (user, 2026-10-11):
+  `1.0.0-alpha.4.dev.170`, the number being `git rev-list --count HEAD`, which rises with every commit on this linear
+  history. `install.ps1` and `release.ps1` without `-Draft` build it; `-Draft` builds the plain `<Version>`. It sorts
+  after the release and before the next (`alpha.4` < `alpha.4.dev.170` < `alpha.5`), which is what Velopack needs:
+  it refused to package a local build at `alpha.4` beside the downloaded `alpha.4` it makes a delta from, and a local
+  install is still offered the next real release. Appending to the *next* version would not work — `alpha.5.dev.N`
+  sorts after `alpha.5`. After a stable version the next patch is used (`1.0.0` gives `1.0.1-dev.N`), since nothing
+  appended to a stable version sorts after it. One home for the rule, `tools/build-version.ps1`, so the two scripts
+  agree. Edits a dev build saves are tagged with its dev version, which makes them easy to find in page histories.
 - **An installed copy updates itself on a click** (`App.AppUpdater`, user, 2026-10-09, brought forward from the 1.0.0
   backlog because an updater only helps from the release *after* the one that ships it). Once per start Velopack checks
   GitHub; the header then reads "Version X is available — Update · What's new". Update asks once — saying that the items
@@ -2706,12 +2715,13 @@ dotnet run --project src/EQLWikiEditorAssistant.App
 # review browser's cache lives in it and survives reinstalls), with the icon library beside it and a Start
 # menu shortcut ("(dev build)"), so the app you use never locks the build you are working on. Run again to update; it
 # refuses while the installed copy is running. Each run copies the release's data (if any) over the dev data folder,
-# which this copy and `dotnet run` share. The build carries the commit
-# it came from in its product version (1.0.0-alpha.1+<commit>, with -modified for uncommitted changes).
+# which this copy and `dotnet run` share. The build carries a development version and the commit it came from
+# (1.0.0-alpha.4.dev.170+<commit>, with -modified for uncommitted changes; see "Releases").
 powershell -ExecutionPolicy Bypass -File tools/install.ps1
 
-# Build the testers' installer into artifacts\releases (see "Releases" above). -Draft also creates the draft GitHub
-# release for v<Version>, from a clean, pushed commit; read it over and publish it on GitHub.
+# Build the testers' installer into artifacts\releases (see "Releases" above), at a development version. -Draft
+# builds <Version> itself and also creates the draft GitHub release for v<Version>, from a clean, pushed commit; read
+# it over and publish it on GitHub.
 powershell -ExecutionPolicy Bypass -File tools/release.ps1 [-Draft]
 
 # Locate tuning against a real full screenshot:

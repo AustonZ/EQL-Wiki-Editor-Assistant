@@ -12,9 +12,14 @@ The build is self-contained, so a tester needs no .NET install, and Setup instal
 it. It installs per user, with no administrator prompt, to %LOCALAPPDATA%\EQLWikiEditorAssistant. The app's own state
 stays in %APPDATA%\EQLWikiEditorAssistant, so uninstalling or reinstalling never touches a tester's history or settings.
 
-With -Draft it also creates a draft GitHub release, tagged v<version>, carrying those files, for a person to read over
-and publish. A draft needs a clean working tree, so what is released is exactly a commit. Uploading goes through the
-GitHub CLI, which keeps its own credential: vpk's own upload would need the token on the command line.
+Without -Draft the build is never published, so it carries a development version that sorts after the last release
+and before the next (see build-version.ps1): Velopack refuses to package a version no newer than the release it
+downloads to build a delta from, and a local build installed from it is still offered the next real release.
+
+With -Draft it is built at exactly the project file's <Version> and also creates a draft GitHub release, tagged
+v<version>, carrying those files, for a person to read over and publish. A draft needs a clean working tree, so what
+is released is exactly a commit. Uploading goes through the GitHub CLI, which keeps its own credential: vpk's own upload
+would need the token on the command line.
 
 .PARAMETER Draft
 Also create the draft GitHub release.
@@ -28,6 +33,7 @@ $repoUrl = 'https://github.com/AustonZ/EQL-Wiki-Editor-Assistant'
 $packId = 'EQLWikiEditorAssistant'
 $publish = Join-Path $repo 'artifacts\publish'
 $releases = Join-Path $repo 'artifacts\releases'
+. (Join-Path $PSScriptRoot 'build-version.ps1')
 
 # Windows PowerShell makes a native command's stderr an error, and under 'Stop' that ends the script even when the
 # stderr is redirected. For a command whose failure is an answer ("no such release") rather than a fault, the exit code
@@ -38,14 +44,14 @@ function Get-ExitCode([scriptblock]$Command) {
     $LASTEXITCODE
 }
 
-$version = (dotnet msbuild $project -getProperty:Version -nologo).Trim()
+$released = Get-ReleasedVersion $project
+$version = if ($Draft) { $released } else { Get-DevelopmentVersion $repo $released }
 $product = (dotnet msbuild $project -getProperty:Product -nologo).Trim()
 $tag = "v$version"
 
-$revision = (git -C $repo rev-parse --short HEAD).Trim()
-if (git -C $repo status --porcelain) {
+$revision = Get-SourceRevision $repo
+if ($revision.EndsWith('-modified')) {
     if ($Draft) { throw 'Commit first: a release is built from a clean working tree, so it is exactly one commit.' }
-    $revision += '-modified'
     Write-Host 'Note: the working tree has uncommitted changes, and they are included in this build.' -ForegroundColor Yellow
 }
 if ($Draft) {
@@ -61,7 +67,8 @@ foreach ($dir in $publish, $releases) {
 }
 
 Write-Host "Building $product $version ($revision), self-contained..."
-dotnet publish $project -c Release -r win-x64 --self-contained -o $publish --nologo -v q "-p:SourceRevisionId=$revision"
+dotnet publish $project -c Release -r win-x64 --self-contained -o $publish --nologo -v q `
+    "-p:Version=$version" "-p:SourceRevisionId=$revision"
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed (exit code $LASTEXITCODE)." }
 
 # A self-contained build ships the .NET runtime and WPF, so their licence and notices ship too. Found through the

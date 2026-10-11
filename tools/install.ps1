@@ -27,6 +27,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
+$project = Join-Path $repo 'src\EQLWikiEditorAssistant.App'
+. (Join-Path $PSScriptRoot 'build-version.ps1')
 $exe = Join-Path $Destination 'EQLWikiEditorAssistant.App.exe'
 
 $running = Get-Process -Name 'EQLWikiEditorAssistant.App' -ErrorAction SilentlyContinue |
@@ -36,18 +38,18 @@ if ($running) {
     exit 1
 }
 
-# Stamped into the build's informational version, so an installed copy can be traced to the commit it came from.
-$revision = (git -C $repo rev-parse --short HEAD).Trim()
-if (git -C $repo status --porcelain) {
-    $revision += '-modified'
+# A development version, after the last release and before the next (see build-version.ps1), with the commit after
+# the + so an installed copy can be traced to it.
+$version = Get-DevelopmentVersion $repo (Get-ReleasedVersion $project)
+$revision = Get-SourceRevision $repo
+if ($revision.EndsWith('-modified')) {
     Write-Host "Note: the working tree has uncommitted changes, and they are included in this build." -ForegroundColor Yellow
 }
 
 $staging = Join-Path ([IO.Path]::GetTempPath()) ("EQLWikiEditorAssistant-publish-" + [guid]::NewGuid().ToString('N'))
 try {
-    Write-Host "Building $revision in Release..."
-    dotnet publish (Join-Path $repo 'src\EQLWikiEditorAssistant.App') -c Release -o $staging --nologo -v q `
-        "-p:SourceRevisionId=$revision"
+    Write-Host "Building $version ($revision) in Release..."
+    dotnet publish $project -c Release -o $staging --nologo -v q "-p:Version=$version" "-p:SourceRevisionId=$revision"
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed (exit code $LASTEXITCODE)." }
 
     # /MIR removes files a newer build no longer has. The icon library is excluded here, which also keeps /MIR from
@@ -92,6 +94,6 @@ $shortcut.WorkingDirectory = $Destination
 $shortcut.Description = 'Checks EverQuest Legends item windows against eqlwiki.com'
 $shortcut.Save()
 
-Write-Host "Installed $revision. Start it from the Start menu (EQL Wiki Editor Assistant (dev build)) or run:" -ForegroundColor Green
+Write-Host "Installed $version ($revision). Start it from the Start menu (EQL Wiki Editor Assistant (dev build)) or run:" -ForegroundColor Green
 Write-Host "  $exe"
 exit 0
