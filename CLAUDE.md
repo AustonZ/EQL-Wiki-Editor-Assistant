@@ -528,7 +528,8 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   label no entry names is not dropped — it keeps its own line before `Class:` and is
   reported.
 - **The blueprint and the game have gaps in both directions**, all on the user's TODO: it lists labels no capture
-  has produced (`Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`) and
+  has produced (`Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, and the five elemental damage types
+  `Fire DMG`, `Disease DMG`, `Cold DMG`, `Magic DMG`, `Poison DMG`) and
   omits several the game does (`Accuracy`, `Type`, `Items`), plus `Worn` and `Can Equip` in the effect
   parenthetical. `Range` was on that list until the 2026-10-11 revision below.
 - **`Skill Mod` was on that first list until a capture produced one** (user, 2026-10-02, on `Collapsible Fishing
@@ -617,12 +618,22 @@ any written value is suspect as well as unnecessary.
   out where it stands (`StatsBlockLine.RemoveField`): `DMG: 10  DMG Bonus: 11 @ lvl 50  AC: 6` becomes
   `DMG: 10  AC: 6`, a last field takes the spacing before it, and a line holding nothing else goes. It is a data
   change, not formatting — the formatter's licence is that it never removes content.
-- **The blueprint still lists `DMG Bonus: ?`** on the damage line; `StatsBlockLineOrder` leaves it out, so a page the
-  user kept one on is reported rather than given a place.
+- **The blueprint dropped `DMG Bonus: ?` the same day** (oldid 193231, below), with a note that the wiki calculates
+  it; `StatsBlockLineOrder` leaves it out too, so a page the user kept one on is reported rather than given a place.
 - Measured on the live wiki that day: about 36 pages write `DMG Bonus`, often annotated (`11 @ lvl 50`), and 24 write
   `Dmg Bon`. Only 2 of the 1,183 cached pages have either, so the cache says little here; the formatter census is
   unchanged (0 refused, 0 unsettled). `CurrentVersion` 11: a weapon settled as `Matched` would otherwise keep its
   value.
+
+**The blueprint's 2026-10-11 revision (oldid 193231, by the user), reconciled the same day.** Three changes.
+- **`Skill: Piercing` became `1H Piercing`**, matching the game. No change here: the skill is copied from the window,
+  which says `1H Piercing`, so the Assistant already wrote it and corrects the 21 cached pages that say `Piercing`.
+- **`DMG Bonus` was removed**, which is the rule above.
+- **`Fire DMG`, `Disease DMG` and `Cold DMG` joined the damage line**, in that order before `Magic DMG` and
+  `Poison DMG`. `StatsBlockLineOrder` follows. Only the formatter is affected: none of the five has ever been captured,
+  so none has a `StatMapping`, and the game's label for them is unknown. The first capture of one will report it as a
+  stat with no mapping, which is the moment to map it — the `Skill Mod` precedent. Census: 1 of 744 cached item pages
+  (`Mithril Champion Arrows`, `Fire DMG: 3`) loses its "no place" note, nothing else moves. `CurrentVersion` 12.
 
 **The item window's trailing region.** Below the effects the game mixes real fields with developer help text,
 because there was nowhere else to put either. **Handled by rules on what a line *says*, never on where it sits.**
@@ -1230,7 +1241,7 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
 - **The statsblock always starts on its own line**, even when currently one line long, or it would jump onto its own
   the moment the data pass added a second — churn the formatting commit exists to prevent.
 - **A label the blueprint has no place for is kept, on its own line before `Class:`, and reported.** Led by `Deity`
-  (25 pages), then `Mana Cost`, `Mount Speed`, `Wind Resonance`, `String Resonance`, `Fire DMG`, and
+  (25 pages), then `Mana Cost`, `Mount Speed`, `Wind Resonance`, `String Resonance`, and
   the likely typos `SV.Magic`, `Dieties`, `Dmg Bon` — and `DMG Bonus` itself since 2026-10-11, which the data pass
   removes, so the formatter only meets one the user chose to keep. Dropping one would lose real data; guessing a slot would invent
   a convention the editors have not agreed.

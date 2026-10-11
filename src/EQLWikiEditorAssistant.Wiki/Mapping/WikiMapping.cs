@@ -226,8 +226,11 @@ public sealed class WikiMapping
     /// **11** (2026-10-11): damage bonus is never written and is removed from a page that has it — see
     /// <see cref="RemovedStatLabels"/>. A data change this time: a weapon whose page agreed apart from a damage bonus
     /// was settled as `Matched`, and without the bump would keep its value forever.
+    /// **12** (2026-10-11): `Fire DMG`, `Disease DMG` and `Cold DMG` have a place on the damage line, which the blueprint
+    /// added the same day (oldid 193231). Formatting only, so 9's reasoning: 1 of 744 cached item pages carries a
+    /// `Fire DMG` the formatter used to leave before `Class:`.
     /// </summary>
-    public const int CurrentVersion = 11;
+    public const int CurrentVersion = 12;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -591,9 +594,9 @@ public sealed class WikiMapping
                 // the blueprint omits both, and the user is having them added to the template's vocabulary.
                 ["Slot", "Type"],
                 ["Skill", "Atk Delay"],
-                // The blueprint still lists `DMG Bonus` after `DMG`; it is left out because the data pass removes it
-                // (see RemovedStatLabels), so a page that kept one is reported rather than given a place.
-                ["DMG", "AC", "BACKSTAB", "Magic DMG", "Poison DMG"],
+                // The blueprint's 2026-10-11 revision (oldid 193231) dropped `DMG Bonus`, which the data pass removes
+                // (see RemovedStatLabels), and added the fire, disease and cold damage the line lacked.
+                ["DMG", "AC", "BACKSTAB", "Fire DMG", "Disease DMG", "Cold DMG", "Magic DMG", "Poison DMG"],
                 // Added to the blueprint on 2026-10-11 (oldid 193216), on a line of its own. Until then it was the
                 // second-commonest label with no place, kept before `Class:` and reported.
                 ["Range"],

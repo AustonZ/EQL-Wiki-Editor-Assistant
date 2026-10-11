@@ -139,6 +139,23 @@ public class WikiMappingBlueprintTests
         Assert.DoesNotContain(result.Notes, n => n.Contains("Range", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The blueprint's revision of the same day (oldid 193231) added fire, disease and cold damage to the damage line,
+    /// in that order before magic and poison. A page writing them on their own lines gets them joined onto it.
+    /// </summary>
+    [Fact]
+    public void ElementalDamageSitsOnTheDamageLineInTheBlueprintsOrder()
+    {
+        const string page =
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = Poison DMG: 1<br>\nCold DMG: 2<br>\n" +
+            "Fire DMG: 3<br>\nDMG: 6  AC: 2<br>\nDisease DMG: 4<br>\nClass: ALL<br>\nRace: ALL<br>\n}}</onlyinclude>";
+
+        PrettifyResult result = ItemPagePrettifier.Format(page);
+
+        Assert.Contains("DMG: 6  AC: 2  Fire DMG: 3  Disease DMG: 4  Cold DMG: 2  Poison DMG: 1<br>", result.Formatted);
+        Assert.DoesNotContain(result.Notes, n => n.Contains("DMG", StringComparison.Ordinal));
+    }
+
     // ---- Skill Mod ----
 
     /// <summary>
