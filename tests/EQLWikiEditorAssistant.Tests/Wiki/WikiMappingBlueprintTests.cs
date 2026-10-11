@@ -103,20 +103,40 @@ public class WikiMappingBlueprintTests
     [Fact]
     public void AnUnnamedLabelStillHasAHome()
     {
-        // `Range` is a live example — real game data the blueprint has never had a place for.
+        // `Deity` is a live example — on 25 real pages, and the blueprint has never had a place for it.
         Assert.DoesNotContain(
-            "Range",
+            "Deity",
             WikiMapping.Default.StatsBlockLineOrder.SelectMany(line => line),
             StringComparer.OrdinalIgnoreCase);
 
         const string page =
-            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = Range: 50<br>\nClass: ALL<br>\n" +
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = Deity: Tunare<br>\nClass: ALL<br>\n" +
             "Race: ALL<br>\n}}</onlyinclude>";
 
         PrettifyResult result = ItemPagePrettifier.Format(page);
 
-        Assert.Contains("Range: 50", result.Formatted);
-        Assert.Contains(result.Notes, n => n.Contains("Range", StringComparison.Ordinal));
+        Assert.Contains("Deity: Tunare", result.Formatted);
+        Assert.Contains(result.Notes, n => n.Contains("Deity", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The blueprint's 2026-10-11 revision (oldid 193216) gave `Range` a line of its own, between the damage line and
+    /// `Skill Mod`. Before that it was kept before `Class:` and reported as having no place.
+    /// </summary>
+    [Fact]
+    public void RangeHasItsOwnLineBetweenTheDamageLineAndSkillMod()
+    {
+        const string page =
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = Skill Mod: Fishing +5%<br>\nRange: 50<br>\n" +
+            "DMG: 6  AC: 2<br>\nClass: ALL<br>\nRace: ALL<br>\n}}</onlyinclude>";
+
+        PrettifyResult result = ItemPagePrettifier.Format(page);
+
+        int damage = result.Formatted.IndexOf("DMG: 6", StringComparison.Ordinal);
+        int range = result.Formatted.IndexOf("Range: 50<br>", StringComparison.Ordinal);
+        int skillMod = result.Formatted.IndexOf("Skill Mod:", StringComparison.Ordinal);
+        Assert.True(damage >= 0 && damage < range && range < skillMod, result.Formatted);
+        Assert.DoesNotContain(result.Notes, n => n.Contains("Range", StringComparison.Ordinal));
     }
 
     // ---- Skill Mod ----

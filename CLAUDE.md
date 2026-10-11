@@ -528,8 +528,8 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   reported.
 - **The blueprint and the game have gaps in both directions**, all on the user's TODO: it lists labels no capture
   has produced (`Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, `Magic DMG`, `Poison DMG`) and
-  omits several the game does (`Range`, `Accuracy`, `Type`, `Items`), plus `Worn` and `Can Equip` in the effect
-  parenthetical.
+  omits several the game does (`Accuracy`, `Type`, `Items`), plus `Worn` and `Can Equip` in the effect
+  parenthetical. `Range` was on that list until the 2026-10-11 revision below.
 - **`Skill Mod` was on that first list until a capture produced one** (user, 2026-10-02, on `Collapsible Fishing
   Pole`): the tool reported *"a stat this tool has no mapping for at all — possibly new"* about a field the template
   documents. Being in `StatsBlockLineOrder` and in no other structure is exactly how that happens — the order knows
@@ -599,6 +599,12 @@ changed since 2026-09-02.
   new clicky type of Can Equip". The tool writes `(Clicky, Can Equip, Casting Time: 5.0, Cooldown: 180 seconds)`. Open:
   whether `Can Equip`/`Must Equip` replace `Clicky` rather than follow it, and whether `Seconds` is meant capitalised
   (the game and the one real page with a cooldown both write `seconds`). Either would be a `CurrentVersion` bump.
+
+**The blueprint's 2026-10-11 revision (oldid 193216), reconciled the same day.** One line added: `Range: ?<br>`, on
+its own between the `DMG` line and `Skill Mod`. `Range` was already mapped, so the data pass wrote it all along — as a
+new line before `Class:`, which the formatter then kept there and reported as having no place. It now has an entry in
+`StatsBlockLineOrder`. Measured with `WikiSpike prettify --cached`: 12 of 744 cached item pages lose that note, and
+nothing else in the census moves (0 refused, 0 unsettled). `CurrentVersion` 10, on 9's reasoning.
 
 **The item window's trailing region.** Below the effects the game mixes real fields with developer help text,
 because there was nowhere else to put either. **Handled by rules on what a line *says*, never on where it sits.**
@@ -1206,7 +1212,7 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
 - **The statsblock always starts on its own line**, even when currently one line long, or it would jump onto its own
   the moment the data pass added a second — churn the formatting commit exists to prevent.
 - **A label the blueprint has no place for is kept, on its own line before `Class:`, and reported.** Led by `Deity`
-  (25 pages) and `Range` (15), then `Mana Cost`, `Mount Speed`, `Wind Resonance`, `String Resonance`, `Fire DMG`, and
+  (25 pages), then `Mana Cost`, `Mount Speed`, `Wind Resonance`, `String Resonance`, `Fire DMG`, and
   the likely typos `SV.Magic`, `Dieties`, `Dmg Bon`. Dropping one would lose real data; guessing a slot would invent
   a convention the editors have not agreed.
 - **It runs automatically after a data commit, as a prompt, never as a second automatic write.**

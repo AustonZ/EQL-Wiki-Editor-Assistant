@@ -220,8 +220,11 @@ public sealed class WikiMapping
     /// Formatting only — the data pass compares fields wherever they sit — so the bump is 4's reasoning again: a
     /// settled row skips the wiki and its page would never be offered the reorder. At most 97 of 744 cached item pages
     /// carry an attribute pair whose order flips.
+    /// **10** (2026-10-11): `Range` has its own line, between the damage line and `Skill Mod`, since the blueprint added
+    /// one (oldid 193216). Formatting only, so 9's reasoning: 12 of 744 cached item pages carry a `Range` line the
+    /// formatter used to leave before `Class:`, and a settled row would never be offered the move.
     /// </summary>
-    public const int CurrentVersion = 9;
+    public const int CurrentVersion = 10;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -561,6 +564,9 @@ public sealed class WikiMapping
                 ["Slot", "Type"],
                 ["Skill", "Atk Delay"],
                 ["DMG", "DMG Bonus", "AC", "BACKSTAB", "Magic DMG", "Poison DMG"],
+                // Added to the blueprint on 2026-10-11 (oldid 193216), on a line of its own. Until then it was the
+                // second-commonest label with no place, kept before `Class:` and reported.
+                ["Range"],
                 ["Skill Mod"],
                 // The game's own order, which the blueprint adopted on 2026-10-06 (oldid 181237); it used to read
                 // STR DEX STA CHA WIS INT AGI. Every attribute sequence in the captured corpus fits this one.
