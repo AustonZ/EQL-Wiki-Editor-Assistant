@@ -223,8 +223,11 @@ public sealed class WikiMapping
     /// **10** (2026-10-11): `Range` has its own line, between the damage line and `Skill Mod`, since the blueprint added
     /// one (oldid 193216). Formatting only, so 9's reasoning: 12 of 744 cached item pages carry a `Range` line the
     /// formatter used to leave before `Class:`, and a settled row would never be offered the move.
+    /// **11** (2026-10-11): damage bonus is never written and is removed from a page that has it — see
+    /// <see cref="RemovedStatLabels"/>. A data change this time: a weapon whose page agreed apart from a damage bonus
+    /// was settled as `Matched`, and without the bump would keep its value forever.
     /// </summary>
-    public const int CurrentVersion = 10;
+    public const int CurrentVersion = 11;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -264,6 +267,27 @@ public sealed class WikiMapping
     /// `Type`, `Items`) have all been resolved by the user. Kept because the next game patch will refill it.
     /// </summary>
     public IReadOnlyList<string> UnmappedGameLabels { get; init; } = [];
+
+    /// <summary>
+    /// Statsblock labels a page must not carry: the data pass removes any field written under one, whatever the
+    /// capture says, and never writes one.
+    ///
+    /// **Damage bonus is the only one** (user, 2026-10-11). The `Itempage` template now calculates it in the reader's
+    /// browser for the reader's own level, and a value written on the page overrides that calculation. The game shows
+    /// the bonus at the capturing character's level, which the Assistant does not know, and the editors who write it
+    /// by hand get it wrong too — so any written value is suspect as well as unnecessary. Measured on the live wiki the
+    /// same day: about 36 pages write `DMG Bonus` (often annotated, `11 @ lvl 50`) and 24 `Dmg Bon`, the game's own
+    /// spelling. The comparison is case-insensitive, so `Dmg Bonus` is covered too.
+    /// </summary>
+    public IReadOnlySet<string> RemovedStatLabels { get; init; } =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether a page's statsblock label is one the data pass removes.</summary>
+    public bool IsRemovedStatLabel(string wikiLabel)
+    {
+        ArgumentNullException.ThrowIfNull(wikiLabel);
+        return RemovedStatLabels.Contains(wikiLabel.Trim());
+    }
 
     /// <summary>
     /// Game slot name -> wiki slot name, for the ones that are not simply the game's name upper-cased.
@@ -476,7 +500,6 @@ public sealed class WikiMapping
             ("SV. Poison", "SV Poison"),
             ("SV. Void", "SV Void"),
             ("Base Dmg", "DMG"),
-            ("Dmg Bon", "DMG Bonus"),
             ("Backstab Dmg", "BACKSTAB"),
             ("Delay", "Atk Delay"),
             ("Skill", "Skill"),
@@ -518,6 +541,10 @@ public sealed class WikiMapping
             "Whether the bag is open or closed. Already implied by the other container fields the wiki does store " +
             "(Capacity, Size Capacity), so it adds nothing (user, 2026-09-25).");
 
+        map["Dmg Bon"] = new StatMapping("Dmg Bon", null, StatDisposition.NotStored, Note:
+            "The game shows it for the capturing character's level. The wiki calculates it for the reader's level, " +
+            "and a value on the page overrides that, so a page that has one has it removed (user, 2026-10-11).");
+
         // The game encodes this as a bare `Effect: Pet Illusion: <appearance> (Casting Time: N)` line, which
         // `ItemParser` normalizes to a plain field before anything here sees it — the odd spelling is the game's,
         // not the wiki's. The wiki records just the appearance; the casting time is not part of the value
@@ -544,6 +571,7 @@ public sealed class WikiMapping
         {
             Stats = map,
             UnmappedGameLabels = [],
+            RemovedStatLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "DMG Bonus", "Dmg Bon" },
             Slots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Fingers"] = "FINGER" },
             EffectKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -563,7 +591,9 @@ public sealed class WikiMapping
                 // the blueprint omits both, and the user is having them added to the template's vocabulary.
                 ["Slot", "Type"],
                 ["Skill", "Atk Delay"],
-                ["DMG", "DMG Bonus", "AC", "BACKSTAB", "Magic DMG", "Poison DMG"],
+                // The blueprint still lists `DMG Bonus` after `DMG`; it is left out because the data pass removes it
+                // (see RemovedStatLabels), so a page that kept one is reported rather than given a place.
+                ["DMG", "AC", "BACKSTAB", "Magic DMG", "Poison DMG"],
                 // Added to the blueprint on 2026-10-11 (oldid 193216), on a line of its own. Until then it was the
                 // second-commonest label with no place, kept before `Class:` and reported.
                 ["Range"],

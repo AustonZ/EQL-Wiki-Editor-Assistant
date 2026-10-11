@@ -514,7 +514,8 @@ window") — the plan's mapping layer arriving
 with milestone 4 as it predicted, covering the subset the diff needs. Built by censusing both sides: 37 distinct
 stat labels across the 101 verified windows against 49 across 744 real pages.
 - The bulk is straightforward renaming (`Weight`→`WT`, `Strength`→`STR`, `SV. Fire`→`SV Fire`, `Base Dmg`→`DMG`,
-  `Delay`→`Atk Delay`, `Dmg Bon`→`DMG Bonus`, `Size Cap`→`Size Capacity`).
+  `Delay`→`Atk Delay`, `Size Cap`→`Size Capacity`). `Dmg Bon` was renamed to `DMG Bonus` until 2026-10-11; see
+  "Damage bonus is removed" below.
 - **Canonical labels come from the Item Page Blueprint on `Help:Contents`, not from what existing pages do most.**
   This reverses an earlier choice here: `SV FIRE` appears on 31 pages against `SV Fire` on 3, and the frequency
   argument lost anyway, because the blueprint is the template the user's compliance routine follows and frequency
@@ -605,6 +606,23 @@ its own between the `DMG` line and `Skill Mod`. `Range` was already mapped, so t
 new line before `Class:`, which the formatter then kept there and reported as having no place. It now has an entry in
 `StatsBlockLineOrder`. Measured with `WikiSpike prettify --cached`: 12 of 744 cached item pages lose that note, and
 nothing else in the census moves (0 refused, 0 unsettled). `CurrentVersion` 10, on 9's reasoning.
+
+**Damage bonus is removed, not written** (user, 2026-10-11). `Template:Itempage` now calculates it in the reader's
+browser for the reader's level, and a value in the wikitext overrides the calculation. The game shows it at the
+capturing character's level, which the Assistant does not know, and editors writing it by hand get it wrong too, so
+any written value is suspect as well as unnecessary.
+- **The game's `Dmg Bon` is `NotStored`**, so it is never written, a created page included.
+- **`WikiMapping.RemovedStatLabels` (`DMG Bonus`, `Dmg Bon`, case-insensitive) is removed from any page, whatever the
+  capture says.** The analyzer reports each such field as `Differs` with no captured value, and the editor takes it
+  out where it stands (`StatsBlockLine.RemoveField`): `DMG: 10  DMG Bonus: 11 @ lvl 50  AC: 6` becomes
+  `DMG: 10  AC: 6`, a last field takes the spacing before it, and a line holding nothing else goes. It is a data
+  change, not formatting — the formatter's licence is that it never removes content.
+- **The blueprint still lists `DMG Bonus: ?`** on the damage line; `StatsBlockLineOrder` leaves it out, so a page the
+  user kept one on is reported rather than given a place.
+- Measured on the live wiki that day: about 36 pages write `DMG Bonus`, often annotated (`11 @ lvl 50`), and 24 write
+  `Dmg Bon`. Only 2 of the 1,183 cached pages have either, so the cache says little here; the formatter census is
+  unchanged (0 refused, 0 unsettled). `CurrentVersion` 11: a weapon settled as `Matched` would otherwise keep its
+  value.
 
 **The item window's trailing region.** Below the effects the game mixes real fields with developer help text,
 because there was nowhere else to put either. **Handled by rules on what a line *says*, never on where it sits.**
@@ -1213,7 +1231,8 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
   the moment the data pass added a second — churn the formatting commit exists to prevent.
 - **A label the blueprint has no place for is kept, on its own line before `Class:`, and reported.** Led by `Deity`
   (25 pages), then `Mana Cost`, `Mount Speed`, `Wind Resonance`, `String Resonance`, `Fire DMG`, and
-  the likely typos `SV.Magic`, `Dieties`, `Dmg Bon`. Dropping one would lose real data; guessing a slot would invent
+  the likely typos `SV.Magic`, `Dieties`, `Dmg Bon` — and `DMG Bonus` itself since 2026-10-11, which the data pass
+  removes, so the formatter only meets one the user chose to keep. Dropping one would lose real data; guessing a slot would invent
   a convention the editors have not agreed.
 - **It runs automatically after a data commit, as a prompt, never as a second automatic write.**
   `ItemCheckPipeline.CommitAsync` hands back a `FormattingProposal`; `CommitFormattingAsync` writes it under its own
@@ -1533,7 +1552,8 @@ testable) and that it includes the two steps preview skipped, the ledger and the
 - **`RecordCheckedByHand` is offered alongside a proposed edit too, not only for a flagged item** (user, 2026-09-29,
   on `Eyerazzia`). Requiring `NeedsAttention` quietly assumed the tool's proposal is always the one to take. It is
   not: that page's damage bonus was deliberately annotated with the character level it applies at — damage bonus
-  varies by level, which the tool is oblivious to by design — so the user wants to **keep the wiki's value**. Without
+  varies by level, which the tool is oblivious to by design — so the user wants to **keep the wiki's value**. (Damage
+  bonus itself has since been removed from every page, see "Damage bonus is removed"; the rule stands.) Without
   this the only choices were to overwrite their annotation or to skip, and `Skipped` never settles, so the item would
   return on every capture forever.
 - **`RecordCheckedByHand` is the only way a flagged item becomes done**, and it has to exist: otherwise an item whose

@@ -229,6 +229,12 @@ public static class ItemPageEditor
         {
             foreach (FieldFinding finding in analysis.Findings.Where(f => f.IsChange))
             {
+                if (finding.Captured is null && mapping.IsRemovedStatLabel(finding.Field))
+                {
+                    block = RemoveField(block, finding.Field, changes);
+                    continue;
+                }
+
                 if (finding.Captured is not { } wanted) continue;
                 if (finding.Field is ItemPageAnalyzer.MerchantValueField or ItemPageAnalyzer.PageTitleField
                     or ItemPageAnalyzer.ItemNameField or ItemPageAnalyzer.FlagProseField
@@ -273,6 +279,25 @@ public static class ItemPageEditor
             // The prettifier is a v1 follow-up step, and this is what tells it (and the user) there is something to
             // do. The tool knows, because it knows when it added a line it did not position.
             NeedsReformatting: addedUnformattedLine);
+    }
+
+    /// <summary>A field the page must not carry, taken out where it stands; a line holding nothing else goes with
+    /// it, rather than being left as a bare <c>&lt;br&gt;</c>.</summary>
+    private static StatsBlock RemoveField(StatsBlock block, string label, List<EditChange> changes)
+    {
+        int index = block.IndexOfField(label);
+        if (index < 0) return block;
+
+        StatsBlockLine line = block.Lines[index];
+        if (line.RemoveField(label) is { } rewritten)
+            block = block.ReplaceLine(index, rewritten);
+        else if (line.Fields.Count == 1 && line.Flags.Count == 0)
+            block = block.RemoveLine(index);
+        else
+            return block;
+
+        changes.Add(new EditChange(EditChangeKind.Removed, label));
+        return block;
     }
 
     private static EditChangeKind Kind(bool creating) =>

@@ -36,7 +36,7 @@ public class WikiMappingBlueprintTests
     private static readonly string[] BlueprintLeavesThesePlain =
     [
         "HP Regen", "Mana Regen", "End Regen", "Haste",
-        "AC", "Weight", "Base Dmg", "Dmg Bon", "Backstab Dmg", "Delay", "Range", "Capacity", "Weight Red",
+        "AC", "Weight", "Base Dmg", "Backstab Dmg", "Delay", "Range", "Capacity", "Weight Red",
     ];
 
     [Fact]

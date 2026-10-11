@@ -61,7 +61,8 @@ internal static class StatsBlockGrammar
                 labels[i].Label,
                 text[trimmedStart..trimmedEnd],
                 trimmedStart,
-                trimmedEnd - trimmedStart));
+                trimmedEnd - trimmedStart,
+                labels[i].Start));
         }
 
         return fields;

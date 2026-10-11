@@ -115,6 +115,7 @@ public static class ItemPageAnalyzer
         // Slots go through the mapping: the wiki writes them in caps, and its `FINGER` is the game's `Fingers`.
         AddListFinding(findings, SlotsField, [.. captured.Slots.Select(mapping.ToWikiSlot)], block);
         AddStatFindings(findings, captured, block, mapping);
+        AddRemovedStatFindings(findings, block, mapping);
         AddCategoryFindings(findings, captured, page, mapping);
         AddEffectFindings(findings, captured, page, block, mapping, effectLinkTargets);
         NormalizeSignsIfTheEditWouldBeInconsistent(findings);
@@ -498,6 +499,25 @@ public static class ItemPageAnalyzer
                 findings.Add(new FieldFinding(wikiLabel, FieldVerdict.Differs, wanted, onWiki, SignedStat: signed));
         }
     }
+
+    /// <summary>
+    /// A field the page must not carry — damage bonus, see <see cref="WikiMapping.RemovedStatLabels"/> — is a change
+    /// whatever the capture says: <see cref="FieldFinding.Captured"/> is null, which is what tells the editor to
+    /// remove it. One finding per field, so a page writing it twice loses both.
+    /// </summary>
+    private static void AddRemovedStatFindings(List<FieldFinding> findings, StatsBlock? block, WikiMapping mapping)
+    {
+        if (block is null) return;
+
+        foreach (StatsField field in block.AllFields())
+            if (mapping.IsRemovedStatLabel(field.Label))
+                findings.Add(new FieldFinding(
+                    field.Label, FieldVerdict.Differs, null, field.Value, RemovedStatExplanation));
+    }
+
+    internal const string RemovedStatExplanation =
+        "The wiki calculates damage bonus for the reader's level, and a value written on the page overrides that, " +
+        "so it is removed.";
 
     /// <summary>
     /// Whether a captured stat value and the wiki's agree.

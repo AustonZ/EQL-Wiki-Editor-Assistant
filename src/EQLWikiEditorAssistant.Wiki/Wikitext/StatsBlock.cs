@@ -12,9 +12,10 @@ namespace EQLWikiEditorAssistant.Wiki.Wikitext;
 /// <see cref="StatsBlockLine.Text"/>, which is what makes an *in-place* edit possible. The minimal-edit rule says a
 /// value that already exists is changed where it stands and nothing else on the line moves — without offsets the
 /// only way to change one field would be to rewrite the whole line, which is precisely the incidental reformatting
-/// the data edit is not allowed to do.
+/// the data edit is not allowed to do. <see cref="LabelStart"/> does the same for removing a field outright; it can
+/// point at whitespace just before the label.
 /// </summary>
-public sealed record StatsField(string Label, string Value, int ValueStart = -1, int ValueLength = 0);
+public sealed record StatsField(string Label, string Value, int ValueStart = -1, int ValueLength = 0, int LabelStart = -1);
 
 /// <summary>What <see cref="StatsBlockLine"/> made of a line. <see cref="Unparsed"/> is a first-class outcome, not
 /// an error: per the repo's untrusted-wiki-data constraint, a line this grammar does not recognize must be
@@ -98,6 +99,48 @@ public sealed record StatsBlockLine(string Raw)
         if (start + field.ValueLength > Raw.Length) return null;
 
         return string.Concat(Raw.AsSpan(0, start), newValue, Raw.AsSpan(start + field.ValueLength));
+    }
+
+    /// <summary>
+    /// Removes one field — label, value and the spacing that separated it from the next — leaving every other byte of
+    /// the line as the page wrote it: <c>DMG: 10  DMG Bonus: 11 @ lvl 50  AC: 6</c> becomes <c>DMG: 10  AC: 6</c>.
+    /// The last field on a line takes the spacing *before* it instead, so no trailing gap is left before the break.
+    ///
+    /// Returns null when the field is not on this line, when the line cannot be edited by offset, or when the field
+    /// is all the line holds — the caller removes the whole line then, since an empty one would leave a bare
+    /// <c>&lt;br&gt;</c> behind.
+    /// </summary>
+    public string? RemoveField(string label)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+
+        int index = Fields.ToList().FindIndex(f => string.Equals(f.Label, label, StringComparison.OrdinalIgnoreCase));
+        if (index < 0 || TextStartInRaw < 0) return null;
+
+        StatsField field = Fields[index];
+        if (field.LabelStart < 0 || field.ValueStart < 0) return null;
+
+        int labelStart = field.LabelStart;
+        while (labelStart < Text.Length && char.IsWhiteSpace(Text[labelStart])) labelStart++;
+
+        int start, end;
+        if (index + 1 < Fields.Count && Fields[index + 1].LabelStart >= 0)
+        {
+            start = labelStart;
+            end = Fields[index + 1].LabelStart;
+            while (end < Text.Length && char.IsWhiteSpace(Text[end])) end++;
+        }
+        else
+        {
+            start = labelStart;
+            while (start > 0 && char.IsWhiteSpace(Text[start - 1])) start--;
+            end = field.ValueStart + field.ValueLength;
+        }
+
+        if (start == 0 && end >= Text.Length) return null;
+
+        int offset = TextStartInRaw;
+        return string.Concat(Raw.AsSpan(0, offset + start), Raw.AsSpan(offset + end));
     }
 
     /// <summary>Replaces the line's whole content, keeping its break tag and surrounding whitespace. Used where an
