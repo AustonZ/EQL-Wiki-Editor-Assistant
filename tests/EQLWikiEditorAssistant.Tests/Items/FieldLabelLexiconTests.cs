@@ -2,70 +2,53 @@ using EQLWikiEditorAssistant.Core.Items;
 
 namespace EQLWikiEditorAssistant.Tests.Items;
 
+/// <summary>Labels are matched exactly (2026-10-10): the glyph reader reads the game's text exactly, so a near miss
+/// is a label the lexicon lacks, not a misread to bend into a known one.</summary>
 public class FieldLabelLexiconTests
 {
     [Theory]
-    [InlineData("Omamentation", "Ornamentation")] // the "rn"->"m" misread
-    [InlineData("Wom Exaltation", "Worn Exaltation")] // "Worn" only ever appears as "Worn Exaltation" in-game
-    [InlineData("Womn Exaltation", "Worn Exaltation")]
-    [InlineData("Ornamentation", "Ornamentation")] // already correct
-    public void Correct_KnownConfusions_FixesToCanonicalLabel(string label, string expected) =>
-        Assert.Equal(expected, FieldLabelLexicon.Correct(label));
+    [InlineData("Ornamentation", true)]
+    [InlineData("SV. Magic", true)]
+    [InlineData(" AC ", true)]
+    [InlineData("Omamentation", false)]  // the old recognizer's "rn"->"m" misread, once corrected silently
+    [InlineData("ac", false)]
+    [InlineData("Some Unrelated Field", false)]
+    public void OnlyAnExactLabelIsKnown(string text, bool known) =>
+        Assert.Equal(known, FieldLabelLexicon.IsKnownLabel(text));
 
     [Fact]
-    public void Correct_UnrecognizedText_ReturnsInputUnchanged()
+    public void APrefixLabelIsStrippedWithItsSeparator()
     {
-        // Something with no close match to any known label shouldn't be forced onto the nearest one — an
-        // unrecognized label may just be a field this lexicon hasn't catalogued yet, not a misread.
-        Assert.Equal("Some Unrelated Field", FieldLabelLexicon.Correct("Some Unrelated Field"));
+        Assert.True(FieldLabelLexicon.TryMatchPrefixLabel(
+            "Class: WAR PAL RNG", ["Class", "Race"], out string label, out string remainder));
+        Assert.Equal("Class", label);
+        Assert.Equal("WAR PAL RNG", remainder);
     }
 
+    /// <summary>The game writes some labels with no colon at all.</summary>
     [Fact]
-    public void Correct_ShortExactLabel_DoesNotOverCorrect()
+    public void ALabelNeedsNoColon()
     {
-        Assert.Equal("AC", FieldLabelLexicon.Correct("AC"));
-        Assert.Equal("HP", FieldLabelLexicon.Correct("HP"));
-    }
-
-    [Theory]
-    [InlineData("Class: WAR CLR", "Class", true)]
-    [InlineData("Classs: WAR", "Class", true)] // one extra char, still close
-    [InlineData("Race: ALL", "Class", false)]
-    public void StartsWithLabel_MatchesFuzzyPrefix(string text, string label, bool expected) =>
-        Assert.Equal(expected, FieldLabelLexicon.StartsWithLabel(text, label));
-
-    [Fact]
-    public void TryMatchPrefixLabel_StripsLabelAndDelimiter()
-    {
-        bool matched = FieldLabelLexicon.TryMatchPrefixLabel(
-            "Focus Effect Reagent Conservation II", ["Focus Effect", "Click Effect"], out string label, out string remainder);
-
-        Assert.True(matched);
+        Assert.True(FieldLabelLexicon.TryMatchPrefixLabel(
+            "Focus Effect Reagent Conservation II", ["Focus Effect", "Click Effect"], out string label, out string remainder));
         Assert.Equal("Focus Effect", label);
         Assert.Equal("Reagent Conservation II", remainder);
     }
 
+    [Theory]
+    [InlineData("Classs: WAR")]          // a near miss is not the label
+    [InlineData(".Class: WAR")]          // nor is the label after something else
+    [InlineData("Classic Era")]          // and a label must end where a word does
+    [InlineData("Totally unrelated text")]
+    public void ANearMissIsNotALabel(string text) =>
+        Assert.False(FieldLabelLexicon.TryMatchPrefixLabel(text, ["Class"], out _, out _));
+
     [Fact]
-    public void TryMatchPrefixLabel_NoCandidateCloseEnough_ReturnsFalse()
+    public void TheLongestLabelWins()
     {
-        bool matched = FieldLabelLexicon.TryMatchPrefixLabel(
-            "Totally unrelated text", ["Focus Effect", "Click Effect"], out _, out _);
-
-        Assert.False(matched);
-    }
-
-    [Fact]
-    public void TryMatchPrefixLabel_LeadingJunkBeforeLabel_DoesNotCorruptRemainder()
-    {
-        // Regression: a real capture once read with a stray leading '.' before "Class:" (".Class: WAR PAL RNG SHD
-        // ROG"). The fuzzy prefix match still succeeds (within edit-distance tolerance), but slicing the
-        // remainder at a fixed `label.Length` offset then landed mid-label, leaving "s: WAR PAL..." instead of
-        // "WAR PAL...". Must find the real separator instead of trusting a fixed-length cut.
-        bool matched = FieldLabelLexicon.TryMatchPrefixLabel(
-            ".Class: WAR PAL RNG SHD ROG", ["Class"], out string label, out string remainder);
-
-        Assert.True(matched);
-        Assert.Equal("Class", label);
-        Assert.Equal("WAR PAL RNG SHD ROG", remainder);
+        Assert.True(FieldLabelLexicon.TryMatchPrefixLabel(
+            "Cooldown Group: 12", ["Cooldown", "Cooldown Group"], out string label, out string remainder));
+        Assert.Equal("Cooldown Group", label);
+        Assert.Equal("12", remainder);
     }
 }

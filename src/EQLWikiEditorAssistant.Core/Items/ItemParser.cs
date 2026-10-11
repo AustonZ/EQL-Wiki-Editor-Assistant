@@ -1,7 +1,6 @@
 using System.Text.RegularExpressions;
 using EQLWikiEditorAssistant.Core.Locate;
 using EQLWikiEditorAssistant.Core.Glyphs;
-using EQLWikiEditorAssistant.Core.Text;
 
 namespace EQLWikiEditorAssistant.Core.Items;
 
@@ -233,16 +232,12 @@ public static class ItemParser
             }
         }
 
-        // An effect's trailing parenthetical can arrive as its own fragment, leaving the open paren behind with
-        // the name ("Click Effect Careless Lightning (" + "(Can Equip)"). The peel above consumes the
-        // real parenthetical and can't match this orphan, so drop it — no real effect name ends in an open paren.
-        return new EffectEntry(kind, text.TrimEnd(' ', '('), conditions, modifiers);
+        return new EffectEntry(kind, text, conditions, modifiers);
     }
 
     /// <summary>True if a filled exaltation slot's name does NOT match the item's own base name — a foreign
     /// exaltation, per the plan's Augmentations section, making the item ineligible for automated processing.
-    /// Fuzzy, not exact, so a single misread character in either name cannot turn the item's own exaltation into a
-    /// foreign one and refuse it.</summary>
+    /// Compared exactly: the glyph reader reads both names exactly, so any difference is a different name.</summary>
     public static bool IsForeignExaltation(ExaltationSlot slot, string itemBaseName)
     {
         if (slot.Name is null) return false;
@@ -254,8 +249,7 @@ public static class ItemParser
         // would slip through as "native", and this is the one slot where that inference is knowably wrong.
         if (slot.Kind == ExaltationKind.Ornamentation) return true;
 
-        int threshold = Math.Max(2, itemBaseName.Length / 6);
-        return !EditDistance.IsCloseMatch(slot.Name, itemBaseName, threshold);
+        return slot.Name != itemBaseName;
     }
 
     /// <summary>
@@ -388,43 +382,17 @@ public static class ItemParser
 
     private static bool RowLooksLikeTabLabels(List<TextLine> row) =>
         row.Count > 0 && row.All(l =>
-            EditDistance.IsCloseMatch(l.Text.Trim(), "Description", maxDistance: 3) ||
-            EditDistance.IsCloseMatch(l.Text.Trim(), "Lore", maxDistance: 1));
+            l.Text.Trim() is "Description" or "Lore");
 
-    /// <summary>Finds one of <paramref name="candidateLabels"/> anywhere in a row and returns the text following
-    /// it, tolerating the ways a row that is visually one line can arrive in several fragments.
-    ///
-    /// Matching only a single-fragment row (what this used to do) missed three shapes that are all real, and each
-    /// one fell through to the generic stat pairing — which recorded an exaltation or an effect as an ordinary
-    /// *stat* and dropped it from its own list entirely:
-    /// <list type="bullet">
-    /// <item>a label split from its value, with the separator duplicated across the break:
-    /// <c>"Click Exaltation:"</c> + <c>": Earthshaker's Mantle (Exaltation)"</c>;</item>
-    /// <item>an effect's trailing parenthetical detected as its own fragment, leaving a dangling open paren
-    /// behind: <c>"Click Effect Careless Lightning ("</c> + <c>"(Can Equip)"</c>;</item>
-    /// <item>the exaltation slot's own icon recognized as a stray fragment *before* the label:
-    /// <c>"0"</c> + <c>"Click Exaltation: Bladestopper (Exaltation)"</c>.</item>
-    /// </list>
-    /// Scanning from each fragment in turn covers leading junk and rejoins a split label with its value without
-    /// assuming either shape. These labels are long and specific, so a stat value is not going to fuzzy-match one.
+    /// <summary>Matches a row that starts with one of <paramref name="candidateLabels"/> and returns the text
+    /// following it. The whole row is joined first, since the reader splits a row only at the stat block's column
+    /// gap. (A text-recognition model used to break these rows in odd places, and this once scanned past leading
+    /// fragments and doubled separators for it; the glyph reader never produced either, measured 2026-10-10.)
     /// </summary>
     private static bool TryMatchRowLabel(
         List<TextLine> row, IReadOnlyList<string> candidateLabels, out string label, out string value)
     {
-        for (int k = 0; k < row.Count; k++)
-        {
-            string text = JoinRow(row.GetRange(k, row.Count - k));
-            if (!FieldLabelLexicon.TryMatchPrefixLabel(text, candidateLabels, out label, out value)) continue;
-
-            // The lexicon strips one separator after the label; a value carried on its own fragment can start
-            // with a second one (the "Click Exaltation:" + ": Earthshaker's..." case above).
-            value = value.TrimStart(':', '.', ' ');
-            return true;
-        }
-
-        label = "";
-        value = "";
-        return false;
+        return FieldLabelLexicon.TryMatchPrefixLabel(JoinRow(row), candidateLabels, out label, out value);
     }
 
     private static bool RowStartsWithLabel(List<TextLine> row, string label) =>
@@ -450,32 +418,18 @@ public static class ItemParser
     private static IEnumerable<string> SplitList(string text, char separator = ',') =>
         text.Split(separator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-    /// <summary>Extracts the name and "+X" level, tolerant of trailing noise from a nearby title-bar
-    /// checkbox/close icon — reading as "? x" (or similar) after the name,
-    /// with or without a "+X"/"(Augmented)" present to anchor on (a plain, non-augmented level-0 item's title has
-    /// neither, so the noise strip can't only run relative to those). Stripped unconditionally before the level
-    /// search, so trailing junk never corrupts the name or hides the level.</summary>
+    /// <summary>Extracts the name and "+X" level, after removing an "(Augmented)" suffix.</summary>
     private static (string Name, int Level) ExtractNameLevel(string raw)
     {
-        string s = StripTrailingIconNoise(StripParentheticalSuffix(raw.Trim(), "Augmented"));
+        string s = StripParentheticalSuffix(raw.Trim(), "Augmented");
         Match m = Regex.Match(s, @"\+(?<level>\d+)\b");
         if (m.Success && int.TryParse(m.Groups["level"].Value, out int lvl))
-            return (StripTrailingIconNoise(s[..m.Index]).Trim(), lvl);
+            return (s[..m.Index].Trim(), lvl);
         return (s.Trim(), 0);
     }
 
-    /// <summary>Strips a trailing title-bar checkbox/close-icon artifact that is never part of the actual
-    /// name — seen as "?" followed by a close-button glyph, which once read as the Unicode multiplication
-    /// sign "×" (U+00D7), not the ASCII letter 'x' — easy to conflate by eye in a terminal, which is exactly what
-    /// broke an earlier version of this pattern.</summary>
-    private static string StripTrailingIconNoise(string s) =>
-        Regex.Replace(s, @"\s*\?+\s*[x×]?\s*$", "", RegexOptions.IgnoreCase).TrimEnd();
-
-    /// <summary>Strips a "(Word)" span if the parenthesized text closely matches <paramref name="word"/> — used
-    /// for both "(Augmented)" on titles and "(Exaltation)" on exaltation slot values, tolerant of noise
-    /// around the parens/word itself. Finds the matching ')' rather than assuming the parenthetical runs to the
-    /// end of the string, so trailing noise after it (see <see cref="ExtractNameLevel"/>) doesn't prevent the
-    /// match or get silently absorbed into the returned text.</summary>
+    /// <summary>Strips a "(Word)" span — "(Augmented)" on titles, "(Exaltation)" on exaltation slot values. Finds
+    /// the matching ')' rather than assuming the parenthetical ends the string.</summary>
     private static string StripParentheticalSuffix(string s, string word)
     {
         int openIdx = s.LastIndexOf('(');
@@ -484,19 +438,18 @@ public static class ItemParser
         if (closeIdx < 0) return s;
 
         string inner = s[(openIdx + 1)..closeIdx].Trim();
-        if (!EditDistance.IsCloseMatch(inner, word, maxDistance: 2)) return s;
+        if (inner != word) return s;
 
         return (s[..openIdx] + s[(closeIdx + 1)..]).Trim();
     }
 
-    /// <summary>Fuzzy-compares the title-bar name against the content-area name. Threshold is generous enough to
-    /// absorb a single misread character, but a partial-title-occlusion truncation (missing a whole
-    /// leading word or more) reliably exceeds it — that's the point; see the class-level doc comment.</summary>
+    /// <summary>Compares the title-bar name against the content-area name, exactly: the two are drawn from the same
+    /// glyphs, so a partial-title-occlusion truncation, or anything else, is a difference. See the class-level doc
+    /// comment.</summary>
     private static bool NamesReconcile(string titleName, string contentName)
     {
         if (titleName.Length == 0 || contentName.Length == 0) return false;
-        int threshold = Math.Max(3, contentName.Length / 4);
-        return EditDistance.IsCloseMatch(titleName, contentName, threshold);
+        return titleName == contentName;
     }
 
     /// <summary>True if a row is an unlabeled continuation of the `Class:`/`Race:` list above it. A long class
@@ -525,15 +478,15 @@ public static class ItemParser
         if (IsChromeRow(row, text)) return false;
         if (FieldLabelLexicon.TryMatchPrefixLabel(text, ExaltationLabels, out _, out _)) return false;
         if (FieldLabelLexicon.TryMatchPrefixLabel(text, EffectLabels, out _, out _)) return false;
-        if (FieldLabelLexicon.StartsWithLabel(text, "Value")) return false;
+        if (FieldLabelLexicon.TryMatchPrefixLabel(text, ["Value"], out _, out _)) return false;
         return true;
     }
 
     private static bool IsChromeRow(List<TextLine> row, string joined)
     {
-        if (row.Count > 0 && EditDistance.IsCloseMatch(row[0].Text.Trim(), "Merge", maxDistance: 1)) return true;
-        if (row.Count > 0 && EditDistance.IsCloseMatch(row[0].Text.Trim(), "Item", maxDistance: 1)) return true;
-        if (row.Count > 0 && EditDistance.IsCloseMatch(row[0].Text.Trim(), "Modified", maxDistance: 2)) return true;
+        // The window's own buttons, and the row naming the item a third time: "Unmodified Tarnished Sheer Blade", or
+        // "Modified ..." once something is applied to it.
+        if (row.Count > 0 && row[0].Text.Trim() is "Merge" or "Item" or "Unmodified" or "Modified") return true;
         if (FieldLabelLexicon.TryMatchPrefixLabel(joined, ["Tier"], out _, out _)) return true;
         if (FieldLabelLexicon.TryMatchPrefixLabel(joined, ["This item"], out _, out _)) return true;
         return false;
@@ -546,24 +499,9 @@ public static class ItemParser
         int colonIdx = text.IndexOf(':');
         if (colonIdx > 0 && colonIdx < text.Length - 1)
         {
-            label = FieldLabelLexicon.Correct(text[..colonIdx].Trim());
+            label = text[..colonIdx].Trim();
             value = text[(colonIdx + 1)..].Trim();
             return true;
-        }
-
-        // A label can also be followed by '.' rather than ':' ("Container. CLOSED."). Splitting on '.'
-        // unconditionally would cut decimals in half, so this only applies when the text before the dot is a label
-        // the lexicon actually knows.
-        int dotIdx = text.IndexOf('.');
-        if (dotIdx > 0 && dotIdx < text.Length - 1)
-        {
-            string candidate = text[..dotIdx].Trim();
-            if (FieldLabelLexicon.IsKnownLabel(candidate))
-            {
-                label = FieldLabelLexicon.Correct(candidate);
-                value = text[(dotIdx + 1)..].Trim();
-                return true;
-            }
         }
 
         label = "";
@@ -584,7 +522,7 @@ public static class ItemParser
         };
 
         string v = value.Trim();
-        if (v.Length == 0 || EditDistance.IsCloseMatch(v, "empty", maxDistance: 1))
+        if (v.Length == 0 || v == "empty")
             return new ExaltationSlot(kind, null);
 
         return new ExaltationSlot(kind, StripParentheticalSuffix(v, "Exaltation"));
@@ -607,21 +545,19 @@ public static class ItemParser
                 continue;
             }
 
-            // A label fragment normally keeps its ':' (or a '.'), but one without would otherwise strand the label
-            // and its value as two unparsed fragments — so a fragment that corrects to a known field label counts
-            // as a label either way.
-            string labelText = text.TrimEnd(':', '.').Trim();
-            bool bareLabel = text.EndsWith(':') || text.EndsWith('.') || FieldLabelLexicon.IsKnownLabel(labelText);
+            // A label on its own fragment, its value on the next: the two-column stat block's shape.
+            string labelText = text.TrimEnd(':').Trim();
+            bool bareLabel = text.EndsWith(':');
             if (bareLabel && i + 1 < row.Count)
             {
                 string nextText = row[i + 1].Text.Trim();
                 // The next fragment must actually look like a value, not another bare label — if a value
                 // fragment is missing, the next surviving fragment is the *next label*, and pairing them would silently
                 // produce nonsense like "Strength: SV. Magic:". Flag the orphaned label instead.
-                bool nextLooksLikeValue = nextText.Length > 0 && !nextText.EndsWith(':') && !nextText.EndsWith('.');
+                bool nextLooksLikeValue = nextText.Length > 0 && !nextText.EndsWith(':');
                 if (nextLooksLikeValue)
                 {
-                    stats.Add(new KeyValuePair<string, string>(FieldLabelLexicon.Correct(labelText), nextText));
+                    stats.Add(new KeyValuePair<string, string>(labelText, nextText));
                     i += 2;
                     continue;
                 }

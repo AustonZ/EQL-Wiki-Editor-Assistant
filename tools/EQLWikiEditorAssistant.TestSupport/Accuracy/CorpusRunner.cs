@@ -170,7 +170,7 @@ public static class CorpusRunner
     /// <summary>Extracts the label out of an orphaned-label warning — i.e. a field whose value was not read.
     ///
     /// Only fragments that actually look like a field label qualify: one the lexicon knows, or one carrying the
-    /// bare-label shape (a trailing ':' or '.'). The stat block also strands genuine junk — a stray "0", a
+    /// bare-label shape (a trailing ':'). The stat block also strands genuine junk — a stray "0", a
     /// wrapped "(Can Equip)" — and emitting those as TODO fields would hand the reviewer rows to *delete* rather
     /// than values to *read*, which is friction that invites mistakes in exactly the file that has to be right.</summary>
     private static IEnumerable<string> OrphanedLabels(ParsedItem item)
@@ -186,10 +186,10 @@ public static class CorpusRunner
             if (end < 0) continue;
 
             string raw = warning[from..end];
-            string label = raw.TrimEnd(':', '.', ' ');
+            string label = raw.TrimEnd(':', ' ');
             if (label.Length == 0) continue;
 
-            bool looksLikeLabel = raw.EndsWith(':') || raw.EndsWith('.') || FieldLabelLexicon.IsKnownLabel(label);
+            bool looksLikeLabel = raw.EndsWith(':') || FieldLabelLexicon.IsKnownLabel(label);
             if (looksLikeLabel) yield return label;
         }
     }

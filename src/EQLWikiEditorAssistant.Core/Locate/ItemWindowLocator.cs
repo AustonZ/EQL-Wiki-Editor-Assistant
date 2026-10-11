@@ -1,6 +1,5 @@
 using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.Core.Glyphs;
-using EQLWikiEditorAssistant.Core.Text;
 
 namespace EQLWikiEditorAssistant.Core.Locate;
 
@@ -78,11 +77,9 @@ public static class ItemWindowLocator
         return seen.Count == 1 ? seen[0] : null;
     }
 
-    /// <summary>"Lore" tab label — short, so a tight edit-distance budget. Only ever matches a line whose
-    /// *entire* text is close to "Lore" (e.g. the tab label itself), not a substring — so it doesn't false-hit
-    /// on flag text like "Lore Equipped, No Trade".</summary>
-    private static bool IsLoreTabLabel(string text) =>
-        EditDistance.IsCloseMatch(text.Trim(), "Lore", maxDistance: 1);
+    /// <summary>"Lore" tab label. Only ever matches a line whose *entire* text is "Lore" (the tab label itself), not
+    /// a substring — so it doesn't false-hit on flag text like "Lore Equipped, No Trade".</summary>
+    private static bool IsLoreTabLabel(string text) => text.Trim() == "Lore";
 
     /// <summary>True if a tab label is drawn in the active-tab colour. The game renders the selected tab's text
     /// yellow (measured: 191,191,4 / 159,159,6 / 255,255,0 — red≈green with blue near zero) and unselected tabs

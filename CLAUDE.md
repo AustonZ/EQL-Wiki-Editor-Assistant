@@ -52,9 +52,7 @@ The full design rationale, wiki research findings, and milestone plan live in
   below), **`ItemWindowLocator`/`WindowBoundsFinder`** (`Core.Locate` — finds each item window's Description tab by
   its pixels and its real bounds by tracing its border; see "Locating item windows" below),
   **`ItemParser`/`ParsedItem`** and `FieldLabelLexicon` (`Core.Items` — turns a located window's lines into item
-  data; see "Parsing item windows" below), and `EditDistance` (`Core.Text` —
-  fuzzy string matching, used by locate, the field-label lexicon, and the exaltation name/title-reconciliation
-  checks). Anything here must stay portable and free of MediaWiki syntax knowledge — see "Wiki mapping layer"
+  data; see "Parsing item windows" below). Anything here must stay portable and free of MediaWiki syntax knowledge — see "Wiki mapping layer"
   below. Interfaces the pipeline depends on live here even though their real implementations are Windows-only,
   since `Core` can't reference the Windows-only projects.
 - `src/EQLWikiEditorAssistant.Capture` (`net10.0-windows10.0.19041.0`) — `GlobalHotKey` (Win32 `RegisterHotKey`, its own
@@ -2226,43 +2224,37 @@ item's own name again for others.
 - `HasLoreTab` (the window *offers* a Lore tab — drives the two-capture flow) and `ActiveTab` (which one is on
   screen) are different things; both captures of a lore-bearing item have `HasLoreTab = true`.
 - Lore wrapped across rows is joined with spaces — the game breaks it purely to fit the window.
-- **A label followed by `.` instead of `:` is still a label** (`Container. CLOSED.`). Splitting on `.`
-  unconditionally would cut decimal values in half, so it only applies when the text before the dot is a label the
-  lexicon knows.
 - **`FieldLabelLexicon`** is a small, fixed vocabulary of the labels as they actually appear in-game (e.g.
-  `"Worn Exaltation"`, not a bare `"Worn"` — there's no bare "Worn" field), matched with a small edit-distance
-  tolerance, so don't add bare-word entries without a real line that needs one.
-  - **The parser's tolerances predate the glyph reader**, which reads exactly: the fuzzy label match, the `.`
-    separator, the split-row shapes below, the title-bar noise strip. They were built for a text-recognition model's
-    misreads (`Omamentation`, a dropped colon, a dropped value), cost nothing on exact text, and were kept when the
-    model went. Tightening them to exact matching is a possible change of its own, to be judged on the corpus.
-- **Occlusion safety net (defence in depth).** `ParsedItem.TitleContentNameMismatch` fuzzy-compares the
-  title-bar name against the content-area name (threshold scaled to name length: tight enough that a truncated
-  title trips it, loose enough that a single misread character doesn't). A caller must treat a set flag
+  `"Worn Exaltation"`, not a bare `"Worn"` — there's no bare "Worn" field), so don't add bare-word entries without a
+  real line that needs one.
+- **The parser matches exactly** (2026-10-10): labels, the tab row, the chrome rows, `empty`, `(Augmented)`, the
+  title against the content name, and an exaltation's name against the item's. A label ends at its colon. Until then it
+  carried tolerances for the text-recognition model the glyph reader replaced — an edit-distance label match
+  (`Omamentation`), `.` accepted for `:`, a label with no colon, a title-bar noise strip, and rows broken in odd places
+  (a doubled separator, a dangling `(`, the exaltation icon read as `0` before the label). **Measured before removing
+  them**: every sample's full ParseSpike and LocateSpike output is byte-identical with them gone, and the accuracy
+  report too. One of them was hiding something: the chrome row naming the item a third time reads `Unmodified` (or
+  `Modified`), which had only ever matched `Modified` at two edits; it is now listed exactly.
+  - **Why exact is the safer rule, not just the tidier one**: a near miss used to be bent into the nearest known word
+    without a trace; now it is an unparsed line, which reaches the user as a warning. A fuzzy name comparison also
+    let a one-letter difference between the title and the content name, or between an exaltation and the item, pass
+    as the same name.
+- **Occlusion safety net (defence in depth).** `ParsedItem.TitleContentNameMismatch` compares the
+  title-bar name against the content-area name, exactly — both are drawn from the same glyphs. A caller must treat a set flag
   as "don't trust this capture", not as advisory. It no longer covers a known geometry hole — the sample that
   supposedly proved one turned out to be a bounds bug, now fixed (see "Locating item windows") — but it still
   earned its place: on the 4-window sample it rejected a Bank/Tradeskill panel whose text read as a literal
   "Description" and got picked up as a false-positive window, catching it via a title/content name mismatch plus
   a pile of "expected row not found" warnings.
-- **Native-vs-foreign exaltation check** (`ItemParser.IsForeignExaltation`, fuzzy `EditDistance` against the
-  item's own parsed base name) is verified against real data, not just a plausible design: on the real 3-window
+- **Native-vs-foreign exaltation check** (`ItemParser.IsForeignExaltation`, exact against the item's own parsed
+  base name) is verified against real data, not just a plausible design: on the real 3-window
   sample, Bloodmoon's own `Focus Exaltation: Bloodmoon (Exaltation)` is correctly identified as native (the
   "removable native exaltation" case from the Augmentations section above), while its Click/Proc exaltations
   (different items) and Lustrous Russet Bracer's Focus exaltation are all correctly flagged foreign.
 - **An exaltation or effect row is matched across a whole row, not only a single-fragment one.** Requiring
-  `row.Count == 1` (what this used to do) silently demoted the row to an ordinary *stat* whenever the row arrived
-  fragmented, which dropped the exaltation or effect from its own list entirely. Three shapes were seen in real
-  captures:
-  - the label split from its value, with the separator duplicated across the break — `"Click Exaltation:"` +
-    `": Earthshaker's Mantle (Exaltation)"` (so a second leading `:` has to be trimmed off the value);
-  - the effect's trailing parenthetical detected as its own fragment, leaving a dangling open paren behind —
-    `"Click Effect Careless Lightning ("` + `"(Can Equip)"` (so `BuildEffect` trims a trailing `(` after peeling
-    the real parenthetical);
-  - the exaltation slot's own **icon** read as a stray fragment *before* the label — `"0"` +
-    `"Click Exaltation: Bladestopper (Exaltation)"`.
-  `TryMatchRowLabel` scans from each fragment in turn, which covers leading junk and rejoins a split label with
-  its value without assuming either shape. Safe because these labels are long and specific — a stat value won't
-  fuzzy-match "Focus Exaltation".
+  `row.Count == 1` (what this used to do) silently demoted the row to an ordinary *stat* whenever the row arrived in
+  several fragments, which dropped the exaltation or effect from its own list entirely. The row is joined and matched
+  from its start.
 - **A punctuation-only junk row shifts the whole positional header.** The window's own chrome occasionally reads
   as text — a real capture had the tab-bar corner, clipped at the crop's left edge, read as `()` on its own
   row between the tab row and the content-area name, which made the name parse as `()` and pushed the real name
@@ -2468,8 +2460,7 @@ way by definition.
   parser flagged is emitted as `?TODO` rather than as its absent value — that's what turns the known misses into
   ground truth a human must supply, instead of freezing today's bugs in as "correct". `verified: false` until a
   human has checked an entry against the screenshot.
-- **Scoring is exact string match, never fuzzy.** Fuzzy is right at *runtime* (`EditDistance`, for wiki page-title
-  lookup) and wrong for *measurement* — a tolerant comparer would score `Tarnished`->`Tamished` as a pass and hide
+- **Scoring is exact string match, never fuzzy.** A tolerant comparer would score `Tarnished`->`Tamished` as a pass and hide
   an entire error class.
 - Verdicts are cross-tabbed by *did the parser flag it?* The two hard gates are **`structural`** (window count
   mismatch — a lost or invented window, reported as one loud failure rather than a cascade of field errors) and

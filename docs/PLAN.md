@@ -915,8 +915,9 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
 
    **`Core.Items.FieldLabelLexicon`** (small, fixed vocabulary + edit-distance correction) absorbed the one
    recurring misread the recognizer of the day made (`Ornamentation`->`Omamentation`, `Worn Exaltation`->
-   `Wom`/`Womn Exaltation`) before a label is matched to a field or an exaltation/effect kind. The glyph reader reads
-   labels exactly; the tolerance stays because it costs nothing.
+   `Wom`/`Womn Exaltation`) before a label is matched to a field or an exaltation/effect kind. **Removed 2026-10-10**:
+   the glyph reader reads labels exactly, and the parser now matches them exactly (see CLAUDE.md, "Parsing item
+   windows").
 
    **Required title-vs-content name reconciliation — implemented and verified closing the real gap.**
    `ParsedItem.TitleContentNameMismatch` compares the title-bar name against the content-area name (fuzzy,

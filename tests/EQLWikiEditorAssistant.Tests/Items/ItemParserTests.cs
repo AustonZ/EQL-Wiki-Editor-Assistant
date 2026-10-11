@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace EQLWikiEditorAssistant.Tests.Items;
 
 /// <summary>
-/// Deterministic unit tests build an TextLine list by hand from a real, verbatim <c>LocateSpike</c> capture (a
+/// Deterministic unit tests build an TextLine list by hand from a real <c>LocateSpike</c> capture (a
 /// "Lustrous Russet Bracer +6" window — see the plan's milestone 2 writeup for the full dump) so the parser's
 /// logic is covered without needing samples/ present. Golden tests below additionally run the real pipeline
 /// end-to-end against real screenshots, same pattern as ItemWindowLocatorTests.
@@ -20,8 +20,9 @@ public class ItemParserTests
 
     private static TextLine L(string text, int x, int y) => new(text, new Rect(x, y, 10, 10), []);
 
-    // Verbatim real capture of "Lustrous Russet Bracer +6", a native (removable) Focus Exaltation, and the
-    // misreads "Omamentation" (Ornamentation) and "Wom Exaltation" (Worn Exaltation), which the label lexicon absorbs.
+    // A real capture of "Lustrous Russet Bracer +6", with a foreign Focus Exaltation. First recorded through the
+    // text-recognition model the glyph reader replaced; its misreads ("Omamentation", "Weight.") are corrected to
+    // what the game draws, since the parser now matches labels exactly.
     private static readonly TextLine[] LustrousBracerLines =
     [
         L("Lustrous Russet Bracer +6 (Augmented)", 96, 0),
@@ -41,13 +42,13 @@ public class ItemParserTests
         L("SMALL", 82, 191),
         L("AC:", 141, 193),
         L("15", 228, 193),
-        L("Weight.", 10, 206),
+        L("Weight:", 10, 206),
         L("1.2", 105, 209),
         L("Strength:", 12, 241),
         L("9", 95, 242),
         L("SV. Magic:", 141, 239),
         L("13", 229, 241),
-        L("Dexterity.", 13, 256),
+        L("Dexterity:", 13, 256),
         L("9", 95, 257),
         L("SV. Fire:", 142, 256),
         L("13", 230, 257),
@@ -57,10 +58,10 @@ public class ItemParserTests
         L("6", 234, 289),
         L("Modified", 37, 322),
         L("Lustrous Russet Bracer +6", 129, 322),
-        L("Omamentation: empty", 42, 351),
+        L("Ornamentation: empty", 42, 351),
         L("Focus Exaltation: Runed Mithril Bracer (Exaltation)", 40, 372),
         L("Click Exaltation: empty", 40, 397),
-        L("Wom Exaltation: empty", 40, 419),
+        L("Worn Exaltation: empty", 40, 419),
         L("Proc Exaltation: empty", 39, 442),
         L("Focus Effect Reagent Conservation II", 12, 469),
     ];
@@ -142,14 +143,14 @@ public class ItemParserTests
 
         Assert.Equal("SMALL", stats["Size"]);
         Assert.Equal("15", stats["AC"]);
-        Assert.Equal("1.2", stats["Weight"]); // "Weight." period, not colon — still corrected
+        Assert.Equal("1.2", stats["Weight"]);
         Assert.Equal("9", stats["Strength"]);
         Assert.Equal("13", stats["SV. Magic"]);
-        Assert.Equal("9", stats["Dexterity"]); // "Dexterity." period, not colon
+        Assert.Equal("9", stats["Dexterity"]);
     }
 
     [Fact]
-    public void Parse_RealBracerCapture_CorrectsKnownExaltationLabelCorruptions()
+    public void Parse_RealBracerCapture_ReadsEveryExaltationSlot()
     {
         ParsedItem item = ItemParser.Parse(LustrousBracerLines);
 
@@ -180,20 +181,17 @@ public class ItemParserTests
         Assert.Empty(effect.Conditions);
     }
 
-    // Verbatim real capture of "Bladestopper +7" — two effects (Focus, Click), where Cast Time/Required
+    // A real capture of "Bladestopper +7" — two effects (Focus, Click), where Cast Time/Required
     // Level/Cooldown belong specifically to the Click Effect (they follow it, not the Focus Effect above it).
-    // Also has "SV. Void:" with no adjacent value at all (a dropped value, not a grouping bug) and
-    // noise "? ×" trailing the title's "(Augmented)" from a nearby checkbox/close icon — confirmed real as the
-    // Unicode multiplication sign U+00D7, NOT the ASCII letter 'x' (they're easy to conflate by eye; an earlier
-    // version of this fixture used ASCII 'x' and so didn't actually exercise the real bug).
+    // Also has "SV. Void:" with no adjacent value at all. Recorded through the text-recognition model the glyph
+    // reader replaced, with its misreads corrected to what the game draws.
     private static readonly TextLine[] BladestopperLines =
     [
         L("Bladestopper +7 (Augmented)", 125, 0),
-        L("? ×", 378, 0),
         L("Description", 170, 18),
         L("Bladestopper +7", 61, 48),
         L("Lore Equipped, No Trade, Placeable", 62, 66),
-        L("ClasS: WAR CLR PAL RNG SHD BRD ROG SHM", 63, 82),
+        L("Class: WAR CLR PAL RNG SHD BRD ROG SHM", 63, 82),
         L("Race: ALL", 63, 97),
         L("Secondary", 62, 113),
         L("Merge", 20, 143),
@@ -207,7 +205,7 @@ public class ItemParserTests
         L("MEDIUM", 74, 193),
         L("AC:", 141, 193),
         L("43", 227, 192),
-        L("Weight.", 12, 208),
+        L("Weight:", 12, 208),
         L("2.4", 105, 209),
         L("HP:", 140, 208),
         L("87", 228, 209),
@@ -218,10 +216,10 @@ public class ItemParserTests
         L("SV. Void:", 141, 257),
         L("Modified", 37, 290),
         L("Bladestopper +7", 129, 290),
-        L("Omamentation: empty", 41, 320),
+        L("Ornamentation: empty", 41, 320),
         L("Focus Exaltation: Idol of the Underking (Exaltation)", 41, 342),
         L("Click Exaltation: Bladestopper (Exaltation)", 41, 365),
-        L("Womn Exaltation: empty", 40, 387),
+        L("Worn Exaltation: empty", 40, 387),
         L("Proc Exaltation: empty", 40, 411),
         L("Focus Effect Improved Healing III", 12, 437),
         L("Click Effect: Rune IV (Must Equip)", 13, 449),
@@ -231,39 +229,12 @@ public class ItemParserTests
     ];
 
     [Fact]
-    public void Parse_RealBladestopperCapture_TitleTrailingOcrNoiseDoesNotCorruptNameOrLevel()
+    public void Parse_RealBladestopperCapture_NameAndLevelComeFromAnAugmentedTitle()
     {
-        // Regression: an earlier version required "+X" to be the literal end of the title string, so the real
-        // "? ×" noise after "(Augmented)" corrupted the whole name and hid the level (came back as +0).
         ParsedItem item = ItemParser.Parse(BladestopperLines);
 
         Assert.Equal("Bladestopper", item.Name);
         Assert.Equal(7, item.Level);
-        Assert.False(item.TitleContentNameMismatch);
-    }
-
-    [Fact]
-    public void Parse_RealCapture_TitleNoiseWithNoLevelOrAugmentedAnchor_StillStripped()
-    {
-        // Regression: verbatim real capture of "Drake-Hide Mask" (a +0, non-augmented item — no "+X" and no
-        // "(Augmented)" for the noise-strip to anchor on). An earlier version only stripped this trailing
-        // checkbox/close-icon noise relative to those tokens, so a plain level-0 title like this one passed
-        // through with the junk still attached, corrupting the name and wrongly flagging a name mismatch against
-        // the (clean) content-area name.
-        TextLine[] lines =
-        [
-            L("Drake-Hide Mask", 211, 0),
-            L("? ×", 428, 0),
-            L("Description", 221, 19),
-            L("Drake-Hide Mask", 114, 51),
-            L("Lore Equipped, No Trade", 113, 67),
-            L("Class: DRU", 113, 80),
-            L("Race: ALL", 113, 96),
-        ];
-
-        ParsedItem item = ItemParser.Parse(lines);
-        Assert.Equal("Drake-Hide Mask", item.Name);
-        Assert.Equal(0, item.Level);
         Assert.False(item.TitleContentNameMismatch);
     }
 
@@ -466,12 +437,11 @@ public class ItemParserTests
         Assert.Contains(combat.Modifiers, m => m.Key == "Required Level" && m.Value == "37");
     }
 
+    /// <summary>A label ends at its colon; a dot inside the label or the value is text. `Container: CLOSED.` is what
+    /// the game draws, period included.</summary>
     [Fact]
-    public void Parse_LabelSeparatedByDotInsteadOfColon_IsStillPaired()
+    public void Parse_ADotInALabelOrAValueIsKeptAsText()
     {
-        // A label can be followed by '.' rather than ':' ("Accuracy. +13.6%", "Container. CLOSED."). Splitting on '.' unconditionally would cut decimal values in half, so it only
-        // applies when the text before the dot is a label the lexicon knows — asserted by the Ratio case below,
-        // where the value itself contains a dot.
         TextLine[] lines =
         [
             L("Some Item", 100, 0),
@@ -480,15 +450,16 @@ public class ItemParserTests
             L("No Trade", 60, 65),
             L("Class: ALL", 60, 80),
             L("Race: ALL", 60, 96),
-            L("Accuracy. +13.6%", 135, 159),
-            L("Container. CLOSED.", 10, 180),
+            L("SV. Magic:", 135, 159),
+            L("13", 229, 159),
+            L("Container: CLOSED.", 10, 180),
             L("Ratio: 0.542", 255, 200),
         ];
 
         var stats = ItemParser.Parse(lines).Stats.ToDictionary(kv => kv.Key, kv => kv.Value);
-        Assert.Equal("+13.6%", stats["Accuracy"]);
+        Assert.Equal("13", stats["SV. Magic"]);
         Assert.Equal("CLOSED.", stats["Container"]);
-        Assert.Equal("0.542", stats["Ratio"]); // the decimal survives, not cut at its own dot
+        Assert.Equal("0.542", stats["Ratio"]);
     }
 
     [Fact]
@@ -506,11 +477,12 @@ public class ItemParserTests
     }
 
     [Fact]
-    public void Parse_TitleAndContentNamesReconcileWithMinorOcrNoise_NoMismatchFlagged()
+    public void Parse_TitleAndContentNamesDifferingByOneCharacter_MismatchFlagged()
     {
+        // The two are drawn from the same glyphs and read exactly, so any difference is a real one.
         TextLine[] lines =
         [
-            L("Watar Flask", 171, 0), // one misread character, in the title only
+            L("Watar Flask", 171, 0),
             L("Description", 164, 17),
             L("Water Flask", 62, 48),
             L("Quest", 63, 64),
@@ -519,8 +491,7 @@ public class ItemParserTests
         ];
 
         ParsedItem item = ItemParser.Parse(lines);
-        Assert.False(item.TitleContentNameMismatch);
-        Assert.Equal("Water Flask", item.Name);
+        Assert.True(item.TitleContentNameMismatch);
     }
 
     [Fact]

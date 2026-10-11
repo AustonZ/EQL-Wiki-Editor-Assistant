@@ -25,10 +25,9 @@ public sealed record FieldResult(string Field, FieldVerdict Verdict, string? Exp
 /// <summary>
 /// Field-level diff of a parsed window against its ground truth.
 ///
-/// **Comparison is exact** (after <c>Trim()</c>), never fuzzy. Fuzzy matching is right at *runtime* — see
-/// <c>EditDistance</c>, used for labels and exaltation names, where a stray character must be tolerated —
-/// and wrong for *measurement*: an edit-distance-tolerant comparer would score "Tarnished" -> "Tamished" as a
-/// pass and make an entire error class invisible, which is the opposite of what a harness is for.
+/// **Comparison is exact** (after <c>Trim()</c>), never fuzzy: an edit-distance-tolerant comparer would score
+/// "Tarnished" -> "Tamished" as a pass and make an entire error class invisible, which is the opposite of what a
+/// harness is for.
 /// </summary>
 public static class ItemComparer
 {
