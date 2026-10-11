@@ -374,9 +374,9 @@ font default changes.
 
 ### Feedback after alpha.3 (2026-10-10)
 From the first tester (via the user):
-- **Built 2026-10-10: minimize to the system tray instead of the taskbar**, as an option (Settings > Window). The
+- **Shipped in alpha.4: minimize to the system tray instead of the taskbar**, as an option (Settings > Window). The
   icon is there whenever the option is on, as in most apps.
-- **Built 2026-10-10: minimize automatically**, as an option. Asked for as "when Done is pressed and nothing else needs
+- **Shipped in alpha.4: minimize automatically**, as an option. Asked for as "when Done is pressed and nothing else needs
   attention"; built first that way, then simplified by the user after testing to "closing the last open item
   minimizes", the only rule a user can predict. See CLAUDE.md, "The settings window".
 - **Combine the edit and formatting steps into one** (decided by the user, 2026-10-10, reversing the 2026-09-25 rule
@@ -393,6 +393,18 @@ From the user:
   (`ItemPageDocument.WithCategory`), and the formatter never touches categories, so an added `Beastlord Equipment` lands
   after whatever was last. They should be sorted the way the blueprint lists them. Likely the formatter's job, since an
   order is layout — and with the steps combined it reaches the page in the same save.
+
+### 1.0.0-alpha.4 — released 2026-10-10
+Published by the user and tested from the installed release build. What it carried:
+- Settings > Window: minimize to the system tray, and minimize automatically on closing the last open item.
+- "Refresh wiki data" wherever the wiki stopped the comparison (not an item page, no page, a failed lookup), found on
+  `Large Groove Nocks`.
+- The icon check compares the whole fixed 44x44 cell, judged against the best match in the game's library, and says
+  when the wiki's file for a right id is different artwork. `WikiSpike iconaudit` checked every wiki icon file.
+- A window's top is a fixed 16 rows above its title bar's bottom, which ended the false occlusion on `Speckled Molded
+  Mushroom`.
+- The parser and locator match text exactly, the text-recognition model's tolerances gone.
+- Arial is the default everywhere in the repository; a capture in another font is marked `[font <name>]`.
 
 ### To investigate
 - **Fixed 2026-10-10: a false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Its title bar sat flush
