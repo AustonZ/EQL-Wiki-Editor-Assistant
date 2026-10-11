@@ -370,22 +370,23 @@
                         <!-- **No MaxWidth on this panel**: the two tiles are 380px wide together at 4x (a 45x52
                              captured strip and a 40x40 wiki file, plus borders and the gap), so any bound below
                              that silently clips the wiki icon rather than wrapping it — which a 320 here did, at
-                             about two thirds of the second tile (user, 2026-10-01). The icons set the column's
-                             width; only the prose below is bounded, and at the same 380 so the column reads
-                             straight. -->
-                        <StackPanel Margin="0,2,0,0"
+                             about two thirds of the second tile (user, 2026-10-01). The icon row sets the column's
+                             width and the prose wraps to it (SizedColumn, user, 2026-10-11): two tiles or three,
+                             and narrower again when a narrow window wraps the row, which no fixed width could
+                             follow — the 380 it replaced was two tiles' width, and wrapped too soon beside three. -->
+                        <local:SizedColumn Margin="0,2,0,0"
                                     Visibility="{Binding HasIcons, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="Icon" Style="{StaticResource SectionHeading}" Margin="0,10,0,4" />
                             <TextBlock Text="{Binding IconVerdict}" Foreground="{Binding IconVerdictBrush}"
-                                       TextWrapping="Wrap" Margin="0,0,0,6" MaxWidth="380" HorizontalAlignment="Left"
+                                       TextWrapping="Wrap" Margin="0,0,0,6" HorizontalAlignment="Left"
                                        Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}" />
                             <TextBlock Text="{Binding IconColumnHint}" TextWrapping="Wrap"
                                        Foreground="{Binding IconColumnHintBrush}" Margin="0,0,0,6"
-                                       MaxWidth="380" HorizontalAlignment="Left"
+                                       HorizontalAlignment="Left"
                                        Visibility="{Binding HasIconColumnHint, Converter={StaticResource BoolToVis}}" />
                             <!-- Wraps rather than clips: three tiles need ~560px, more than the content column has at the minimum
                                  window width (rendered, 2026-10-07). -->
-                            <WrapPanel Orientation="Horizontal">
+                            <WrapPanel Orientation="Horizontal" local:SizedColumn.SetsWidth="True">
                                 <StackPanel Margin="0,0,20,8">
                                     <TextBlock Text="In game" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
                                     <!-- Collapsed when there is no image, rather than left as an empty Border: its
@@ -459,7 +460,7 @@
                                  names; on an existing page whose icon is wrong it does whatever is needed to point
                                  the page at the right one — uploading first when the wiki lacks the file, which it
                                  does for 93% of the library. Both say what they will do before they do it. -->
-                            <StackPanel Margin="0,8,0,0" MaxWidth="380" HorizontalAlignment="Left"
+                            <StackPanel Margin="0,8,0,0" HorizontalAlignment="Left"
                                         Visibility="{Binding CanActOnIcon, Converter={StaticResource BoolToVis}}">
                                 <TextBlock Text="{Binding IconActionPrompt}" TextWrapping="Wrap" Margin="0,0,0,6"
                                            Visibility="{Binding HasIconActionPrompt, Converter={StaticResource BoolToVis}}" />
@@ -476,10 +477,10 @@
                                 </Button>
                             </StackPanel>
                             <TextBlock Text="{Binding IconUploadOutcome}" TextWrapping="Wrap" Margin="0,6,0,0"
-                                       MaxWidth="380" HorizontalAlignment="Left"
+                                       HorizontalAlignment="Left"
                                        Foreground="{Binding IconUploadOutcomeBrush}"
                                        Visibility="{Binding HasIconUploadOutcome, Converter={StaticResource BoolToVis}}" />
-                        </StackPanel>
+                        </local:SizedColumn>
                     </WrapPanel>
 
                     <!-- Warnings first and unmissable. A flagged gap is the product here; silently-wrong data on a

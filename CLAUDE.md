@@ -2003,7 +2003,8 @@ user asked for the colours changed, not for a setting. Pulled ahead of milestone
   - **The icon column carries no `MaxWidth`, because the tiles set its width and anything narrower clips them
     silently** (bug found by the user, 2026-10-01). At 4x the two tiles need **380px** together — a 45x52 captured
     strip is 180 wide with its border and margin, the 40x40 wiki file is 170, and the gap is 20 — so a `MaxWidth`
-    of 320 cut the wiki icon off about two thirds across. Only the prose below is bounded, at the same 380.
+    of 320 cut the wiki icon off about two thirds across. The prose wraps to the icon row's width (`SizedColumn`,
+    2026-10-11), which a fixed 380 could not follow once a third tile arrived.
   - **Looking at a render is not the same as measuring one, and this is what that costs.** The clip was present in
     the screenshots taken when the layout was rearranged and was read straight past; the user found it in use. The
     harness now walks each icon's ancestors and reports any whose right edge falls outside one, which reproduces
