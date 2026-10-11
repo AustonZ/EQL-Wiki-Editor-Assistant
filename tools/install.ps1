@@ -18,10 +18,11 @@ settings and caches are copied over whatever the dev folder held, so work done o
 next install. Its own errors.log and saved screenshots are left alone and none of the release's are copied.
 
 .PARAMETER Destination
-Where to install. Defaults to %LOCALAPPDATA%\Programs\EQLWikiEditorAssistant, where per-user programs go.
+Where to install. Defaults to %LOCALAPPDATA%\EQLWikiEditorAssistant-dev, beside the release, which Velopack installs to
+%LOCALAPPDATA%\EQLWikiEditorAssistant. The review browser's cache lives in it too, and survives each install.
 #>
 param(
-    [string]$Destination = (Join-Path $env:LOCALAPPDATA 'Programs\EQLWikiEditorAssistant')
+    [string]$Destination = (Join-Path $env:LOCALAPPDATA 'EQLWikiEditorAssistant-dev')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,9 +51,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed (exit code $LASTEXITCODE)." }
 
     # /MIR removes files a newer build no longer has. The icon library is excluded here, which also keeps /MIR from
-    # deleting it, and mirrored separately below.
+    # deleting it, and mirrored separately below. WebView2 is the review browser's cache (AppPaths.BrowserDataDirectory),
+    # which no build contains and /MIR would otherwise delete on every install.
     Write-Host "Installing to $Destination..."
-    robocopy $staging $Destination /MIR /XD game_assets /NFL /NDL /NJH /NJS /NP | Out-Null
+    robocopy $staging $Destination /MIR /XD game_assets WebView2 /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "Copying the build failed (robocopy exit code $LASTEXITCODE)." }
 }
 finally {

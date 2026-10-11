@@ -22,9 +22,10 @@ public static class AppPaths
     public static string Root { get; private set; } = RoamingFolder(DevelopmentFolderName);
 
     /// <summary>
-    /// Where the review browser (WebView2) keeps its cache: local rather than roaming, being a cache. A release's is
-    /// inside its install folder, so uninstalling removes it; a developer's build has a folder of its own, since two
-    /// copies running at once cannot share one.
+    /// Where the review browser (WebView2) keeps its cache: local rather than roaming, being a cache. Each copy's is
+    /// inside its own install folder — a release's under <c>EQLWikiEditorAssistant</c>, so uninstalling removes it, and
+    /// <c>tools/install.ps1</c>'s under <c>EQLWikiEditorAssistant-dev</c> beside it — since two copies running at once
+    /// cannot share one.
     /// </summary>
     public static string BrowserDataDirectory { get; private set; } =
         Path.Combine(LocalFolder(DevelopmentFolderName), "WebView2");

@@ -1727,7 +1727,7 @@ a global hotkey is worth having.
     user's own browser instead of navigating the review away.
   - **The browser is a native window WPF cannot draw over**, so it is hidden while a dialog is up or a page is sliding,
     and shown once its page has loaded. Its data lives in `AppPaths.BrowserDataDirectory` (a release's in its install
-    folder, a developer's build's in `%LOCALAPPDATA%\EQLWikiEditorAssistant-dev`); it is created
+    folder, `install.ps1`'s in its own, `%LOCALAPPDATA%\EQLWikiEditorAssistant-dev`); it is created
     the first time a page needs it, not at launch.
 - **Dialogs are drawn in the window, not by Windows** (`OverlayDialog`, user, 2026-10-07): a dimmed backdrop over the
   window's content, in the palette, one at a time, awaited by the caller. Every window carries one; the only Windows
@@ -2702,7 +2702,8 @@ dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test c
 # %APPDATA%\EQLWikiEditorAssistant; see Pipeline.AppPaths.
 dotnet run --project src/EQLWikiEditorAssistant.App
 
-# Or install a Release build to %LOCALAPPDATA%\Programs\EQLWikiEditorAssistant, with the icon library beside it and a Start
+# Or install a Release build to %LOCALAPPDATA%\EQLWikiEditorAssistant-dev, beside the release's own install folder (the
+# review browser's cache lives in it and survives reinstalls), with the icon library beside it and a Start
 # menu shortcut ("(dev build)"), so the app you use never locks the build you are working on. Run again to update; it
 # refuses while the installed copy is running. Each run copies the release's data (if any) over the dev data folder,
 # which this copy and `dotnet run` share. The build carries the commit
