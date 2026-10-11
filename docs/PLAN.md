@@ -396,28 +396,22 @@ From the user:
 - **Fixed 2026-10-10: a false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Its title bar sat flush
   under a Storage Trunk's across the whole width, which the old top-edge rule refused; the top is now a fixed 16 rows
   above the bar's bottom (see CLAUDE.md, "Locating item windows"). Fully visible, reported as partly covered.
-  Two frames, `samples/21a-...-description.png` and `21b-...-lore.png`, the same five item windows with this one bottom
-  middle over a storage trunk, on its Description tab and then its Lore tab. Both were reported occluded, so probably
-  one cause; check both when it is fixed. Not audited yet (they show chat), so they stay out of git until they are.
+  Frames `samples/21a-...-description.png` and `21b-...-lore.png` (both tabs, both now trace correctly), not audited
+  yet (they show chat), so they stay out of git until they are.
 - **Fixed 2026-10-10: the icon check called `Spiderling Silk`'s icon a mismatch although it is plainly right** (user,
   2026-10-09). A cropping bug, not a limit: the old strip clipped the last column of an icon that uses its full width.
   Now fixed by comparing the whole fixed 44x44 cell against the best icon in the library (see CLAUDE.md, "Icon
-  comparison").
-  Suspected: the game's ~1.1x resampling blurs this sprite past `SameIconThreshold` (0.13), the known limit recorded
-  under "Icon comparison" in CLAUDE.md, where `Black Chain Bridle` matches its own artwork worse than some unrelated
-  pairs. Frame: `samples/22-spiderling-silk-icon-false-mismatch.png`, not audited yet. Start with `WikiSpike icons` on
-  it for the actual distance.
-
-### Revisit before beta
-- **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
-  tester can have it, since it is never distributed, so choosing it only gets every capture refused. Options then: show
-  it only when it is already the saved choice, or publish the build instructions so anyone can make it.
+  comparison"). Frame: `samples/22-spiderling-silk-icon-false-mismatch.png`, not audited yet.
 
 ### 1.0.0 (full release)
 - **The Assistant adapts to each player's setup** — priority for 1.0.0 (user, 2026-10-08). Resolution should not matter
   (everything is measured relative to the window); UI scale and skin do, since every edge-finding constant and the glyph
   atlas belong to one scale and skin. Likely shape: a one-time calibration on a known window that measures the frame and
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
+- **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
+  tester can have it, since it is never distributed, so choosing it only gets every capture refused. Options: show it
+  only when it is already the saved choice, or publish the build instructions so anyone can make it. **Decided after
+  the UI-scale work** (user, 2026-10-10), since what calibration learns about fonts may settle it.
 - **The game's skins: `default_modern` is required, and the Assistant says so** (user, 2026-10-09, after a spike). The
   game ships three: `default`, `default_light` and `default_modern`. Everything so far was built on `default_modern`.
   Measured on five frames of each other skin (`samples/30*`, `31*`, gitignored and not yet audited):
@@ -485,8 +479,6 @@ across the 54 modern-skin samples identical before and after; the corpus unchang
 16 tabs in the other skins reported as an unsupported skin. In the app over 12 captures (user): **peak 294 MB private,
 from 1.6 GB**, resting 197 MB private; one capture in the `default` skin showed the new message. The app now depends on
 WebView2, Velopack and the capture packages only.
-- **Updating without being asked**, in the background on close, if testers want it. Updating on a click is in the alpha
-  (above).
 - **Saved captures stay off by default in full releases** (the first tester, 2026-10-09). They are full screenshots that
   can show character names, other players and chat. They are already off by default in every build
   (`AppSettings.KeepCaptures`, pinned by `AppSettingsTests`), alpha included. So this is a rule to keep, not a change to
