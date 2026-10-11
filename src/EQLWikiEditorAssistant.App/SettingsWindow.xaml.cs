@@ -61,7 +61,7 @@ public partial class SettingsWindow : Window
         if (services.HotKeyProblem is { } problem) ShowHotKeyStatus(problem, Palette.Attention);
 
         MinimizeToTrayBox.IsChecked = services.Settings.MinimizeToTray;
-        MinimizeWhenDoneBox.IsChecked = services.Settings.MinimizeWhenDone;
+        AutoMinimizeBox.IsChecked = services.Settings.AutoMinimize;
 
         KeepCapturesBox.IsChecked = services.Settings.KeepCaptures;
         CapturesFolderText.Text = CaptureArchive.Directory;
@@ -137,7 +137,7 @@ public partial class SettingsWindow : Window
         WindowSavedText.Text = "";
         try
         {
-            await _services.UseWindowOptionsAsync(MinimizeToTrayBox.IsChecked == true, MinimizeWhenDoneBox.IsChecked == true);
+            await _services.UseWindowOptionsAsync(MinimizeToTrayBox.IsChecked == true, AutoMinimizeBox.IsChecked == true);
             WindowSavedText.Foreground = Palette.Done;
             WindowSavedText.Text = "Saved.";
         }

@@ -59,8 +59,9 @@ an item the wiki has no page for, it proposes the whole page.
 History lists every item checked and what is still waiting for you. An item that hasn't changed since it was settled is
 not looked up again.
 
-To keep the Assistant out of the way while you play, Settings > Window can minimize it to the notification area
-instead of the taskbar, and minimize it when Done finishes the last item. The capture hotkey brings it back either way.
+To keep the Assistant out of the way while you play, Settings > Window can minimize it to the system tray instead of
+the taskbar, and minimize it automatically once you close the last open item. The capture hotkey brings it back either
+way.
 
 ### Not handled yet
 

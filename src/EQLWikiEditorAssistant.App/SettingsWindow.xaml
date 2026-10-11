@@ -148,15 +148,13 @@
                     <TextBlock Style="{StaticResource Prose}"
                                Text="How this app gets out of the way while you play. Capturing from the game brings it back either way." />
 
-                    <CheckBox x:Name="MinimizeToTrayBox" Content="Minimize to the notification area instead of the taskbar"
+                    <CheckBox x:Name="MinimizeToTrayBox" Content="Minimize to system tray"
                               Margin="0,16,0,0" Checked="OnWindowOptionChanged" Unchecked="OnWindowOptionChanged" />
-                    <TextBlock Style="{StaticResource Prose}" Margin="28,4,0,0"
-                               Text="Its icon sits beside the clock. Click it to bring the window back, or right-click it to quit." />
 
-                    <CheckBox x:Name="MinimizeWhenDoneBox" Content="Minimize when Done finishes the last item"
+                    <CheckBox x:Name="AutoMinimizeBox" Content="Automatically minimize"
                               Margin="0,16,0,0" Checked="OnWindowOptionChanged" Unchecked="OnWindowOptionChanged" />
                     <TextBlock Style="{StaticResource Prose}" Margin="28,4,0,0"
-                               Text="Only when every item left in the list is finished. An item still waiting for an edit, a capture or a decision keeps the window open." />
+                               Text="Automatically minimizes the app after all open items are closed so you can get back to the game." />
 
                     <TextBlock x:Name="WindowSavedText" Margin="0,14,0,0" Foreground="{StaticResource DoneBrush}" />
                 </StackPanel>

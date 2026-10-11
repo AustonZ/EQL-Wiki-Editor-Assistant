@@ -374,10 +374,11 @@ font default changes.
 
 ### Feedback after alpha.3 (2026-10-10)
 From the first tester (via the user):
-- **Built 2026-10-10: minimize to the system tray instead of the taskbar**, as an option (Settings > Window).
-- **Built 2026-10-10: minimize automatically when Done is pressed and nothing else needs attention**, as an option.
-  "Needs attention" is the item list's rule (an item not shown as done), not the status bar's ledger count, which
-  covers every item ever checked and would almost never be zero. See CLAUDE.md, "The settings window".
+- **Built 2026-10-10: minimize to the system tray instead of the taskbar**, as an option (Settings > Window). The
+  icon is there whenever the option is on, as in most apps.
+- **Built 2026-10-10: minimize automatically**, as an option. Asked for as "when Done is pressed and nothing else needs
+  attention"; built first that way, then simplified by the user after testing to "closing the last open item
+  minimizes", the only rule a user can predict. See CLAUDE.md, "The settings window".
 - **Combine the edit and formatting steps into one** (decided by the user, 2026-10-10, reversing the 2026-09-25 rule
   that formatting is always its own edit). The tester's case, which the user accepted: for this project the review value
   of a separate "reformatted, no data changes" revision is not worth its cost — a second step for the user on every item

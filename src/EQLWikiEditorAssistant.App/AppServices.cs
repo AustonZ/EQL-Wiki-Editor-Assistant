@@ -301,11 +301,11 @@ public sealed class AppServices : IDisposable
         await Settings.SaveAsync(AppPaths.SettingsFile);
     }
 
-    /// <summary>The two window options. Both are read when they apply — at the next minimize, at the next Done — so
-    /// nothing else has to change when they do.</summary>
-    public async Task UseWindowOptionsAsync(bool minimizeToTray, bool minimizeWhenDone)
+    /// <summary>The two window options. The main window shows or hides its tray icon when the settings window
+    /// closes; otherwise both are read when they apply.</summary>
+    public async Task UseWindowOptionsAsync(bool minimizeToTray, bool autoMinimize)
     {
-        Settings = Settings with { MinimizeToTray = minimizeToTray, MinimizeWhenDone = minimizeWhenDone };
+        Settings = Settings with { MinimizeToTray = minimizeToTray, AutoMinimize = autoMinimize };
         await Settings.SaveAsync(AppPaths.SettingsFile);
     }
 

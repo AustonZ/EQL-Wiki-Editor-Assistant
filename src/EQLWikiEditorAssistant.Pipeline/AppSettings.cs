@@ -29,13 +29,13 @@ public sealed record AppSettings
     /// with other players' names and chat in it, and otherwise never touches the disk.</summary>
     public bool KeepCaptures { get; init; }
 
-    /// <summary>Whether minimizing the main window hides it to an icon in the notification area instead of the
-    /// taskbar (the first tester, 2026-10-10). Off unless chosen.</summary>
+    /// <summary>Whether the app keeps an icon in the notification area and minimizes there instead of to the taskbar
+    /// (the first tester, 2026-10-10). Off unless chosen.</summary>
     public bool MinimizeToTray { get; init; }
 
-    /// <summary>Whether pressing Done on the last item that still wants work minimizes the main window (the first
-    /// tester, 2026-10-10), so the next capture from the game finds it out of the way. Off unless chosen.</summary>
-    public bool MinimizeWhenDone { get; init; }
+    /// <summary>Whether closing the last open item minimizes the main window (the first tester, 2026-10-10), so the
+    /// player is back in the game. Off unless chosen.</summary>
+    public bool AutoMinimize { get; init; }
 
     public static AppSettings Load(string path)
     {

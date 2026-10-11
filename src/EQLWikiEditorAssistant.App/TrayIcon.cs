@@ -6,8 +6,8 @@ using System.Windows.Interop;
 namespace EQLWikiEditorAssistant.App;
 
 /// <summary>
-/// The app's icon in the notification area, shown while the main window is minimized there (Settings > Window, the
-/// first tester, 2026-10-10). A click brings the window back; a right-click offers the same and Exit.
+/// The app's icon in the notification area, shown whenever Settings > Window > Minimize to system tray is on (the
+/// first tester, 2026-10-10). A click brings the window forward; a right-click offers the same and Exit.
 ///
 /// **WPF has no notification-area icon**, so this is <c>Shell_NotifyIcon</c> directly. Windows Forms has one, but
 /// referencing it brings a second UI framework whose names collide with WPF's across the whole project, for a single
@@ -127,9 +127,21 @@ internal sealed class TrayIcon : IDisposable
         };
         // A menu opened by an app that is not in the foreground never hears the click elsewhere that should close it,
         // the long-standing rule for notification-area menus. Bringing the menu's own window forward fixes that.
+        //
+        // **And then the menu takes keyboard focus** (bug found by the user, 2026-10-10: Escape closed the menu only
+        // with the pointer over it). WPF focuses a menu as it opens, which fails while its window is still in the
+        // background; hovering focused an item, which is why that case worked. Escape is also handled here directly,
+        // so the menu closes whatever inside it ends up with focus.
         menu.Opened += (_, _) =>
         {
             if (PresentationSource.FromVisual(menu) is HwndSource popup) SetForegroundWindow(popup.Handle);
+            menu.Focus();
+        };
+        menu.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != System.Windows.Input.Key.Escape) return;
+            menu.IsOpen = false;
+            e.Handled = true;
         };
         menu.IsOpen = true;
     }

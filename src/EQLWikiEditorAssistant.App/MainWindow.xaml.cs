@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Net.Http;
 using Velopack;
@@ -36,8 +37,8 @@ public partial class MainWindow : Window
     private bool _dialogOpen;
     private bool _capturing;
 
-    /// <summary>The notification-area icon, shown only while the window is minimized there. Null until the window
-    /// has a handle.</summary>
+    /// <summary>The notification-area icon, shown whenever Settings > Window > Minimize to system tray is on. Null
+    /// until the window has a handle.</summary>
     private TrayIcon? _tray;
 
     /// <summary>What a restore returns to: the state before the last minimize, so a maximized window comes back
@@ -57,8 +58,17 @@ public partial class MainWindow : Window
         ResultsList.ItemsSource = _results;
         Dialog.Opened += (_, _) => UpdateBrowserVisibility();
         Dialog.Closed += (_, _) => UpdateBrowserVisibility();
-        _results.CollectionChanged += (_, _) =>
+        _results.CollectionChanged += (_, e) =>
+        {
             ResultsHeader.Visibility = _results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            // Settings > Window > Automatically minimize (user, 2026-10-10): closing the last open item, however it
+            // was closed, sends the player back to the game. Deliberately that plain: a rule about which items were
+            // finished was one nobody could predict. Only a close counts; a capture adds, and never minimizes.
+            if (_results.Count == 0 &&
+                e.Action is NotifyCollectionChangedAction.Remove or NotifyCollectionChangedAction.Reset &&
+                _services?.Settings.AutoMinimize == true)
+                WindowState = WindowState.Minimized;
+        };
 
         // Built off the UI thread: loading the icon index takes a moment, and building it the first time takes
         // several seconds, which would be a frozen window if it happened here. The capture button stays disabled
@@ -121,6 +131,7 @@ public partial class MainWindow : Window
             BusyPanel.Visibility = Visibility.Collapsed;
             _services.HotKeyPressed += OnHotKeyPressed;
             UpdateHotKeyLabel();
+            UpdateTrayIcon();
             CaptureButton.IsEnabled = true;
             LedgerLink.IsEnabled = true;
             AttentionLink.IsEnabled = true;
@@ -386,11 +397,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void ComeToTheFront()
     {
-        if (!IsVisible)
-        {
-            Show();
-            _tray?.Hide();
-        }
+        if (!IsVisible) Show();
         if (WindowState == WindowState.Minimized) WindowState = _restoreTo;
 
         Activate();
@@ -971,13 +978,6 @@ public partial class MainWindow : Window
     {
         if (ResultsList.SelectedItem is not ResultViewModel view) return;
         CloseItem(view);
-
-        // Settings > Window (the first tester, 2026-10-10): with nothing left that wants work, the window gets out of
-        // the way, and the next capture from the game brings it back. "Wants work" is the list's own rule — an item
-        // is finished when it shows as done — so an item still waiting for an edit, a capture or a decision keeps
-        // the window up, and nothing here is a second judgement of it.
-        if (_services?.Settings.MinimizeWhenDone == true && _results.All(r => r.IsDone))
-            WindowState = WindowState.Minimized;
     }
 
     private void CloseItem(ResultViewModel view)
@@ -1321,8 +1321,26 @@ public partial class MainWindow : Window
             _dialogOpen = false;
         }
 
-        // The hotkey may have changed while it was open.
+        // The hotkey and the tray option may have changed while it was open.
         UpdateHotKeyLabel();
+        UpdateTrayIcon();
+    }
+
+    /// <summary>
+    /// The tray icon is there whenever Settings > Window > Minimize to system tray is on, minimized or not (user,
+    /// 2026-10-10: what most apps do, and what the first tester expected). Turning the option off while the window
+    /// is hidden in the tray brings the window back, or nothing would be left to click.
+    /// </summary>
+    private void UpdateTrayIcon()
+    {
+        if (_tray is null || _services is null) return;
+        if (_services.Settings.MinimizeToTray)
+        {
+            _tray.Show();
+            return;
+        }
+        _tray.Hide();
+        if (!IsVisible) ComeToTheFront();
     }
 
     /// <summary>Counts the unsettled rows alongside the total, because over a long session that is the number worth
@@ -1353,9 +1371,8 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Minimizing hides the window to the notification area when Settings > Window says so (the first tester,
-    /// 2026-10-10). Read at each minimize, so the setting needs nothing else to take effect. The window is hidden
-    /// rather than closed: the review in progress lives only in memory.
+    /// Minimizing hides the window, leaving only its tray icon, when Settings > Window says so (the first tester,
+    /// 2026-10-10). The window is hidden rather than closed: the review in progress lives only in memory.
     /// </summary>
     protected override void OnStateChanged(EventArgs e)
     {

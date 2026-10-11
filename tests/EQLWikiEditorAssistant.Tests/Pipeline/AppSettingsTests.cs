@@ -84,15 +84,15 @@ public class AppSettingsTests : IDisposable
     {
         File.WriteAllText(_path, """{ "font": "Arial" }""");
         Assert.False(AppSettings.Load(_path).MinimizeToTray);
-        Assert.False(AppSettings.Load(_path).MinimizeWhenDone);
+        Assert.False(AppSettings.Load(_path).AutoMinimize);
 
         await new AppSettings { MinimizeToTray = true }.SaveAsync(_path);
         Assert.True(AppSettings.Load(_path).MinimizeToTray);
-        Assert.False(AppSettings.Load(_path).MinimizeWhenDone);
+        Assert.False(AppSettings.Load(_path).AutoMinimize);
 
-        await new AppSettings { MinimizeWhenDone = true }.SaveAsync(_path);
+        await new AppSettings { AutoMinimize = true }.SaveAsync(_path);
         Assert.False(AppSettings.Load(_path).MinimizeToTray);
-        Assert.True(AppSettings.Load(_path).MinimizeWhenDone);
+        Assert.True(AppSettings.Load(_path).AutoMinimize);
     }
 
     /// <summary>The acceptability rule is derived, so it is not saved — and a file from the build that did save it
