@@ -599,8 +599,9 @@ changed since 2026-09-02.
 - **The effect line is ambiguous and deliberately not acted on** (user, 2026-10-08, who is asking its author). It now
   reads `(Combat / Clicky / Can Equip / Must Equip, Casting Time: ?, Cooldown: ??? Seconds)`, under the summary "Added
   new clicky type of Can Equip". The tool writes `(Clicky, Can Equip, Casting Time: 5.0, Cooldown: 180 seconds)`. Open:
-  whether `Can Equip`/`Must Equip` replace `Clicky` rather than follow it, and whether `Seconds` is meant capitalised
-  (the game and the one real page with a cooldown both write `seconds`). Either would be a `CurrentVersion` bump.
+  whether `Can Equip`/`Must Equip` replace `Clicky` rather than follow it. That would be a `CurrentVersion` bump. (The
+  other open point, `Seconds`, was settled lowercase by the user on 2026-10-11, oldid 193243, matching what the game
+  and the tool write.)
 
 **The blueprint's 2026-10-11 revision (oldid 193216), reconciled the same day.** One line added: `Range: ?<br>`, on
 its own between the `DMG` line and `Skill Mod`. `Range` was already mapped, so the data pass wrote it all along — as a
@@ -634,6 +635,18 @@ any written value is suspect as well as unnecessary.
   so none has a `StatMapping`, and the game's label for them is unknown. The first capture of one will report it as a
   stat with no mapping, which is the moment to map it — the `Skill Mod` precedent. Census: 1 of 744 cached item pages
   (`Mithril Champion Arrows`, `Fire DMG: 3`) loses its "no place" note, nothing else moves. `CurrentVersion` 12.
+
+**The blueprint's later 2026-10-11 revisions (oldids 193243-193248, by the user), reconciled the same day.**
+- **`Cooldown: ??? seconds`, lowercase**, as the game and the tool write it. No change.
+- **`Heirloom`, `Free Storage` and `No Destroy` joined the example flags line.** No change: flags are copied from the
+  game whatever they are.
+- **The category list grew and gained order**: `Inventory` became `Inventory Items` (what pages use), `Drink`, `Drink
+  With Stats`, `Food`, `Food With Stats`, `Increased Proc Rate`, `Player Crafted`, `Tradeskill Ingredient` and `Weapon
+  Procs` were added, and a blank line now separates the zone category from the rest. The formatter now sorts categories
+  by it — see "The formatting pass". None of the new ones is derived from a capture yet; the user would like some to be.
+- **193248 added the common categories pages already used** to that group: `Book`, `Focus Items`, `Foraged`, `Pet
+  Illusion Items`, `Vendor Sold`, `Worn Effects`. The deity categories (`... Worshiper Equipment`) were left out for
+  now, so they still sort last.
 
 **The item window's trailing region.** Below the effects the game mixes real fields with developer help text,
 because there was nowhere else to put either. **Handled by rules on what a line *says*, never on where it sits.**
@@ -701,6 +714,9 @@ recorded an incomplete convention as the convention.
 - **The derived set is only ever a subset of a page's categories.** Real pages also carry zone names, `Quest Items`,
   `Focus Items`, `Inventory Items` and `Fashion:` entries, none of them derivable from an item window.
   `CategoryRules.IsDerivable` is what marks the tool's own territory; everything else is preserved untouched.
+- **The data pass appends a new category at the end; the formatter puts it in its place** (see "The formatting
+  pass"). Every category the tool derives has a place in the blueprint's order — `Pet Illusion Items` since oldid
+  193248 — and `CategoryOrderTests` fails if a new one does not.
 - The documented quirk holds: the slot is `FINGER`, the category is `Fingers`.
 - **Correction (2026-09-28): `ANY` is not a slot, and an earlier note here saying it was "a real slot with no
   category" was wrong.** `Any Slot` occurs only inside an *effect's* parenthetical — `Effect: [[Levitation]] (Any
@@ -1185,8 +1201,25 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
   writer. **This is not decoration — it caught a real bug in the formatter on 14 real pages**: the blueprint's own
   `EXPENDABLE  Charges: 10<br>` is a flag *and* a field on one line, and reading flags only from flag-only lines
   silently dropped it.
-- **It only touches the inside of the template call**, so the era banner, an in-world screenshot, categories and any
-  stray prose survive byte for byte by construction rather than by care.
+- **It only touches the inside of the template call and the block of categories that ends the page**, so the era
+  banner, an in-world screenshot, a category anywhere else and any stray prose survive byte for byte by construction
+  rather than by care.
+- **Categories are sorted into the blueprint's order** (user, 2026-10-11; `WikiMapping.CategoryOrder`, from oldid
+  193248). Its groups — classes, slots, skills, everything else — are separated by a blank line where the page uses
+  more than one, and any category the blueprint does not list goes last, after a blank line, in the page's own order.
+  - **Two blueprint entries are placeholders.** `Fashion: ?` matches any `Fashion:` category in that position. `Zone
+    Name` matches nothing, because zones cannot be listed: a zone falls into the not-in-the-blueprint group, which is
+    where the blueprint puts its zones anyway, after a blank line. So zones and unlisted categories share that group.
+  - **Only the block at the end of the page is sorted** — the run of lines holding nothing but category links and
+    blank lines. Measured on 744 cached item pages: 741 have categories, 2 have one inside `<onlyinclude>` (transcluded
+    with the item, so moving it would change other pages) and 1 has `{{Delete}}` among them; those stay where they are,
+    with a note. 139 distinct category names are not in the blueprint, almost all zones, plus the `... Worshiper
+    Equipment` deity categories, `Ground Spawn` and `Kunark Era`. (Before 193248 it was 144, led by `Vendor Sold` on 80
+    pages, which is what prompted adding the common ones.)
+  - **A link moves whole, as written**: sort key, underscore and lowercase first letter kept, matched the way MediaWiki
+    matches titles. A duplicate keeps both copies. The content check compares the block's links as a multiset and
+    requires everything else after the template call to be byte-identical.
+  - Census after it: 0 refused, 0 unsettled, median size change +18 bytes (from +17). `CurrentVersion` 13.
 - **It leaves alone anything it does not understand, completely — not even the spacing** (user, 2026-09-28). The
   triggers, measured across 1,183 real pages: a legacy flag (469 pages), an interior blank line (9, a paragraph
   break that may be doing visible work), flags spread over two lines (merging is a bigger claim than laying out), a

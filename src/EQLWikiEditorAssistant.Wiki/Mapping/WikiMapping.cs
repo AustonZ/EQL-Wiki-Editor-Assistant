@@ -229,8 +229,11 @@ public sealed class WikiMapping
     /// **12** (2026-10-11): `Fire DMG`, `Disease DMG` and `Cold DMG` have a place on the damage line, which the blueprint
     /// added the same day (oldid 193231). Formatting only, so 9's reasoning: 1 of 744 cached item pages carries a
     /// `Fire DMG` the formatter used to leave before `Class:`.
+    /// **13** (2026-10-11): the formatter sorts the categories that end a page into the blueprint's order, with a blank
+    /// line between its groups — see <see cref="CategoryOrder"/>. Formatting only, so 9's reasoning, and the widest
+    /// reach since 7: nearly every item page has categories, and a settled row would never be offered the sort.
     /// </summary>
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -395,6 +398,47 @@ public sealed class WikiMapping
     /// would mean a future reordering silently changed which parameters are blocks.
     /// </summary>
     public IReadOnlyList<string> BlockParameters { get; init; } = [];
+
+    /// <summary>
+    /// The order the formatter puts a page's categories in: the Item Page Blueprint's category list, as groups the
+    /// blueprint separates with a blank line (user, 2026-10-11). Classes, slots, skills, then everything else.
+    ///
+    /// **Two blueprint entries are placeholders, not names.** `Fashion: ?` stands for any `Fashion:` category, so an
+    /// entry ending in <c>?</c> matches every name that starts with what precedes it. `Zone Name` stands for a zone,
+    /// which no list could enumerate, so it is not here at all: a zone category is "not in the blueprint", and those
+    /// go last after a blank line — which is exactly where the blueprint puts its zones, so the two rules agree.
+    /// The same final group takes every other category the blueprint does not list, in the page's own order.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<string>> CategoryOrder { get; init; } = [];
+
+    /// <summary>
+    /// Where a category goes in <see cref="CategoryOrder"/>: its group and its place in the group, or null when the
+    /// blueprint does not list it. Compared the way MediaWiki compares titles: an underscore is a space and the first
+    /// letter's case does not matter, everything else exactly.
+    /// </summary>
+    public (int Group, int Index)? FindCategoryPosition(string category)
+    {
+        ArgumentNullException.ThrowIfNull(category);
+        string name = CategoryKey(category);
+
+        for (int group = 0; group < CategoryOrder.Count; group++)
+            for (int index = 0; index < CategoryOrder[group].Count; index++)
+            {
+                string entry = CategoryKey(CategoryOrder[group][index]);
+                bool matches = entry.EndsWith('?')
+                    ? name.StartsWith(entry[..^1].TrimEnd(), StringComparison.Ordinal)
+                    : string.Equals(name, entry, StringComparison.Ordinal);
+                if (matches) return (group, index);
+            }
+
+        return null;
+    }
+
+    private static string CategoryKey(string category)
+    {
+        string name = string.Join(' ', category.Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        return name.Length == 0 ? name : char.ToUpperInvariant(name[0]) + name[1..];
+    }
 
     /// <summary>The wiki's parenthetical token for a game effect kind, or null if it has none agreed.</summary>
     public string? FindEffectKind(string gameKind)
@@ -634,6 +678,31 @@ public sealed class WikiMapping
             BlockParameters =
             [
                 "bookcontents", "dropsfrom", "soldby", "foraged", "playercrafted", "recipes", "relatedquests",
+            ],
+            // The blueprint's category list as of 2026-10-11 (oldid 193248), group for group. Its last group,
+            // `Zone Name`, is a placeholder no list can stand in for; see CategoryOrder.
+            CategoryOrder =
+            [
+                [
+                    "Bard Equipment", "Beastlord Equipment", "Berserker Equipment", "Cleric Equipment",
+                    "Druid Equipment", "Enchanter Equipment", "Magician Equipment", "Monk Equipment",
+                    "Necromancer Equipment", "Paladin Equipment", "Ranger Equipment", "Rogue Equipment",
+                    "Shadow Knight Equipment", "Shaman Equipment", "Warrior Equipment", "Wizard Equipment",
+                ],
+                [
+                    "Primary", "Secondary", "Range", "Ammo", "Arms", "Back", "Chest", "Ear", "Face", "Feet", "Fingers",
+                    "Hands", "Head", "Legs", "Neck", "Shoulders", "Waist", "Wrist",
+                ],
+                [
+                    "1H Blunt", "2H Blunt", "1H Slashing", "2H Slashing", "Piercing", "2H Piercing", "Archery",
+                    "Hand to Hand", "Bard Instrument",
+                ],
+                [
+                    "Book", "Containers", "Drink", "Drink With Stats", "Fashion: ?", "Focus Items", "Food",
+                    "Food With Stats", "Foraged", "Increased Proc Rate", "Inventory Items", "Light source",
+                    "Pet Illusion Items", "Player Crafted", "Potion", "Quest Items", "Tradeskill Ingredient",
+                    "Vendor Sold", "Weapon Procs", "Worn Effects",
+                ],
             ],
         };
     }

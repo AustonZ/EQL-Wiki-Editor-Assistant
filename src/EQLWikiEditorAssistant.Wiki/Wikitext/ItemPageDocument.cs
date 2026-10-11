@@ -135,7 +135,9 @@ public sealed class ItemPageDocument
         return Reparse(text + separator + $"[[Category:{trimmed}]]");
     }
 
-    private static readonly Regex CategoryPattern =
+    /// <summary>A <c>[[Category:...]]</c> link, its name in the <c>name</c> group. Shared with the formatter, which
+    /// sorts the links it finds.</summary>
+    internal static readonly Regex CategoryPattern =
         new(@"\[\[\s*Category\s*:\s*(?<name>[^\]|]+?)\s*(\|[^\]]*)?\]\]", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>True if the page still carries the "lore not filled in" placeholder.</summary>

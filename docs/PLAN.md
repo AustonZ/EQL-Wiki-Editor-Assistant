@@ -389,7 +389,9 @@ From the first tester (via the user):
   be rewritten when this is built.
 
 From the user:
-- **Categories are not kept in the blueprint's order.** The data pass appends each new category after the existing ones
+- **Built 2026-10-11: categories are sorted into the blueprint's order by the formatter**, groups separated by blank
+  lines and anything the blueprint does not list last (see CLAUDE.md, "The formatting pass"). The report that led to it:
+  **categories are not kept in the blueprint's order.** The data pass appends each new category after the existing ones
   (`ItemPageDocument.WithCategory`), and the formatter never touches categories, so an added `Beastlord Equipment` lands
   after whatever was last. They should be sorted the way the blueprint lists them. Likely the formatter's job, since an
   order is layout — and with the steps combined it reaches the page in the same save.
@@ -522,7 +524,8 @@ up. The Assistant was built for this (a field's location is part of the mapping)
 
 ### The blueprint's effect line
 Its 2026-10-06 wording is still being thought about by the user and its author; **the Assistant keeps its existing effect
-behaviour until they decide** (user, 2026-10-08).
+behaviour until they decide** (user, 2026-10-08). The `Seconds` half is settled: lowercase, as written (2026-10-11). What is
+left is whether `Can Equip`/`Must Equip` replace `Clicky` or follow it.
 
 ## Future features (parked deliberately, revisit after real use)
 - **Warn when the item window's effects/info section is scrollable** (user, 2026-09-28). The game makes that section

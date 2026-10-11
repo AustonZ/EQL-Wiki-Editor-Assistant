@@ -45,9 +45,11 @@ public sealed record PrettifyResult(
 /// sign flipped off a negative.
 ///
 /// **Two deliberate limits, both of which keep that proof cheap:**
-/// - **It only touches the inside of the template call.** Everything else on the page — the era banner, an in-world
-///   screenshot, categories, stray prose — survives byte for byte, because the formatter never looks at it. The era
-///   banner is the data pass's job (it is a statement about the item, not about layout).
+/// - **It only touches the inside of the template call and the block of categories that ends the page.** Everything
+///   else — the era banner, an in-world screenshot, stray prose, a category anywhere else — survives byte for byte,
+///   because the formatter never looks at it. The era banner is the data pass's job (it is a statement about the
+///   item, not about layout). The categories are sorted into the blueprint's order (user, 2026-10-11); see
+///   <c>FormatCategories</c>.
 /// - **It will not reorder a statsblock it does not completely understand.** An unparsed line or a blank line in
 ///   the middle of a block means the tool is guessing about something, so that block keeps its existing line order
 ///   and only its spacing is normalized. Rearranging content nobody could parse is how a formatter loses data.
@@ -75,6 +77,7 @@ public static class ItemPagePrettifier
 
         var notes = new List<string>();
         string formatted = FormatTemplate(wikitext, page, mapping, notes);
+        formatted = FormatCategories(formatted, mapping, notes);
 
         // The verification pass. Everything above is a rearrangement, and a rearrangement that drops a value would
         // be invisible in review — so the result only ships if re-parsing it says the same thing.
@@ -166,6 +169,81 @@ public static class ItemPagePrettifier
         builder.Append("}}");
 
         return wikitext[..template.Start] + builder + wikitext[template.End..];
+    }
+
+    /// <summary>
+    /// Sorts the categories that end the page into the blueprint's order, a blank line between each of its groups the
+    /// page uses, and anything the blueprint does not list last, after a blank line, in the page's own order (user,
+    /// 2026-10-11). See <see cref="WikiMapping.CategoryOrder"/>, and <see cref="FindCategoryBlock"/> for what counts as
+    /// the block.
+    ///
+    /// **Each link is moved whole, exactly as written** — a sort key, an underscore or a lowercase first letter
+    /// included — so sorting changes only the order and the blank lines. A duplicate keeps both copies: removing one
+    /// would change the page's content, however little it renders.
+    /// </summary>
+    private static string FormatCategories(string text, WikiMapping mapping, List<string> notes)
+    {
+        if (ItemPageDocument.Parse(text) is not { } page) return text;
+
+        int total = ItemPageDocument.CategoryPattern.Matches(text).Count;
+        CategoryBlock? block = FindCategoryBlock(text, page.Template.End);
+        int elsewhere = total - (block?.Links.Count ?? 0);
+        if (elsewhere > 0)
+            notes.Add($"{elsewhere} categor{(elsewhere == 1 ? "y" : "ies")} elsewhere on the page {(elsewhere == 1 ? "was" : "were")} " +
+                      "left where they are: only the block of categories that ends the page is sorted.");
+        if (block is null) return text;
+
+        IEnumerable<string> groups = block.Links
+            .Select((link, position) =>
+            {
+                string name = ItemPageDocument.CategoryPattern.Match(link).Groups["name"].Value;
+                (int Group, int Index)? place = mapping.FindCategoryPosition(name);
+                return (link, position, group: place?.Group ?? int.MaxValue, index: place?.Index ?? 0);
+            })
+            .OrderBy(l => l.group).ThenBy(l => l.index).ThenBy(l => l.position)
+            .GroupBy(l => l.group)
+            .Select(g => string.Join('\n', g.Select(l => l.link)));
+
+        return text[..block.Start] + string.Join("\n\n", groups) + text[block.End..];
+    }
+
+    /// <summary>The categories that end a page: where the block starts and ends, and each link in it as written.</summary>
+    private sealed record CategoryBlock(int Start, int End, IReadOnlyList<string> Links);
+
+    /// <summary>
+    /// The block of categories that ends the page, or null when there is none after <paramref name="notBefore"/>.
+    ///
+    /// It is the run of lines at the end of the page holding nothing but category links and blank lines, read back from
+    /// the end until a line holds anything else. It starts at its first link and ends at its last, so the blank lines
+    /// before it and the page's trailing whitespace are outside it and kept. **Nothing outside it is sorted**: a
+    /// category inside <c>&lt;onlyinclude&gt;</c> is transcluded with the item, so moving it out would change other
+    /// pages, and one among other text is somebody's layout. Measured on 744 cached item pages: 741 have categories,
+    /// 2 have one inside <c>&lt;onlyinclude&gt;</c>, and 1 has a template among them.
+    /// </summary>
+    private static CategoryBlock? FindCategoryBlock(string text, int notBefore)
+    {
+        int start = -1, end = -1;
+        int lineEnd = text.Length;
+        while (lineEnd > notBefore)
+        {
+            int lineStart = text.LastIndexOf('\n', Math.Max(lineEnd - 1, 0)) + 1;
+            if (lineStart < notBefore) break;
+
+            string line = text[lineStart..lineEnd];
+            if (line.Trim().Length > 0)
+            {
+                if (ItemPageDocument.CategoryPattern.Replace(line, "").Trim().Length > 0) break;
+                start = lineStart + (line.Length - line.TrimStart().Length);
+                if (end < 0) end = lineStart + line.TrimEnd().Length;
+            }
+
+            if (lineStart == 0) break;
+            lineEnd = lineStart - 1;
+        }
+
+        if (start < 0) return null;
+        return new CategoryBlock(start, end,
+            [.. ItemPageDocument.CategoryPattern.Matches(text[start..end]).Select(m => m.Value)]);
     }
 
     /// <summary>
@@ -449,11 +527,21 @@ public static class ItemPagePrettifier
                              "would change how the page renders.");
         }
 
-        // Everything outside the call must be untouched, which is a property this pass gets for free by only ever
-        // splicing the call itself — so a failure here means a real bug, not a judgement call.
-        if (!string.Equals(before.Wikitext[..before.Template.Start], formattedText[..after.Template.Start], StringComparison.Ordinal) ||
-            !string.Equals(before.Wikitext[before.Template.End..], formattedText[after.Template.End..], StringComparison.Ordinal))
-            refusals.Add("The text outside the template call changed, which this pass must never do.");
+        // Everything outside the call must be untouched apart from the order of the categories that end the page —
+        // a property this pass gets by only ever splicing those two places, so a failure here means a real bug, not
+        // a judgement call.
+        if (!string.Equals(before.Wikitext[..before.Template.Start], formattedText[..after.Template.Start], StringComparison.Ordinal))
+            refusals.Add("The text before the template call changed, which this pass must never do.");
+
+        CategoryBlock? wasBlock = FindCategoryBlock(before.Wikitext, before.Template.End);
+        CategoryBlock? nowBlock = FindCategoryBlock(formattedText, after.Template.End);
+        string wasRest = Outside(before.Wikitext, before.Template.End, wasBlock);
+        string nowRest = Outside(formattedText, after.Template.End, nowBlock);
+        if (!string.Equals(wasRest, nowRest, StringComparison.Ordinal))
+            refusals.Add("The text after the template call changed beyond the order of its categories, which this pass " +
+                         "must never do.");
+        refusals.AddRange(CompareMultisets(
+            [.. wasBlock?.Links ?? []], [.. nowBlock?.Links ?? []], "category"));
 
         return refusals;
     }
@@ -502,6 +590,11 @@ public static class ItemPagePrettifier
                      "unreadable statsblock line"))
             yield return difference;
     }
+
+    /// <summary>The text after the template call with the category block cut out, which formatting must leave exactly
+    /// as it was.</summary>
+    private static string Outside(string text, int from, CategoryBlock? block) =>
+        block is null ? text[from..] : text[from..block.Start] + text[block.End..];
 
     /// <summary>Multisets, not sets: a value appearing twice and a value appearing once are different pages, and a
     /// set comparison would call them the same.</summary>
