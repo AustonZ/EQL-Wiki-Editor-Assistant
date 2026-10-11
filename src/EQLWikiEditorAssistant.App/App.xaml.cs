@@ -36,10 +36,15 @@ public partial class App : Application
     ///
     /// Two hooks: uninstalling offers to delete the user's data (<see cref="UninstallCleanup"/>), and a start that
     /// Velopack made after installing an update records the version, so the window can say it worked.
+    ///
+    /// **Which data folder to use is decided first**, because the uninstall hook deletes it: an installed release uses
+    /// the release's, anything else the development one (see <see cref="AppPaths"/>).
     /// </summary>
     [STAThread]
     private static void Main()
     {
+        if (InstalledByVelopack()) AppPaths.UseReleaseFolders();
+
         VelopackApp.Build()
             .OnBeforeUninstallFastCallback(_ => UninstallCleanup.OfferToRemoveData())
             .OnRestarted(version => UpdatedTo = version.ToString())
@@ -48,6 +53,15 @@ public partial class App : Application
         app.InitializeComponent();
         app.Run();
     }
+
+    /// <summary>
+    /// Whether this copy is one Velopack installed — Setup's or the portable zip's, which both put the app in a folder
+    /// beside Velopack's <c>Update.exe</c>. A build folder and <c>tools/install.ps1</c>'s copy have none. Checked by
+    /// that layout rather than by Velopack's own locator because it has to be known before <c>VelopackApp.Run</c>,
+    /// which is what sets the locator up.
+    /// </summary>
+    private static bool InstalledByVelopack() =>
+        File.Exists(Path.Combine(AppContext.BaseDirectory, "..", "Update.exe"));
 
     protected override void OnStartup(StartupEventArgs e)
     {

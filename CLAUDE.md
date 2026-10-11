@@ -1375,16 +1375,16 @@ usually read: match the captured sprite against the library, and the matching fi
   *older* icon and offered confidently. Pinned by tests that fail when the stamp check is removed.
   - **The stamp ignores file dates** (user, 2026-10-09). It used the newest write time until the installer showed
     that Velopack sets every icon's date to the moment it installs: the index rebuilt — several seconds of "Starting…"
-    — after every install and every update, and the developer's build and the installed copy, which share the index,
-    invalidated each other on every switch. Names and sizes are what an install leaves alone and a re-export changes.
+    — after every install and every update, and the developer's build and the installed copy, which shared the index
+    then, invalidated each other on every switch. Names and sizes are what an install leaves alone and a re-export changes.
     The one change it misses is a redrawn icon of exactly the same byte size; hashing contents would catch that too,
     for about a second on every start, which was judged not worth it. `NewDatesAloneDoNotRebuildTheIndex` pins it.
   - **Start-up shows the build** (user, 2026-10-09): `AppServices` reports each slow step, and the window shows it in
     the capture's own progress bar — "Loading the game's icons…", or "Indexing the game's icons, N%…" when it builds —
     because "Starting…" in the status bar alone read as a hang.
   - **The index's format version is in its file name** (`item-icons-v2.index` since the whole-cell fingerprint),
-    not only its header: the developer's build and an installed release share the folder, and with one name a release
-    on the old format and a build on the new would each rebuild the other's index on every switch.
+    not only its header: `install.ps1` copies the release's index into the developer's folder (see "Releases"), and
+    with one name a build on a newer format would rebuild it after every install.
   - **Not committed beside the icons**, deliberately: a committed index is a second record of which icons exist, and
     the moment the two disagree the tool starts matching against an out-of-date library. The folder is the only
     answer to "what icons are there".
@@ -1726,7 +1726,8 @@ a global hotkey is worth having.
     the links and the categories all render without scripts (verified on both pages). A clicked link opens in the
     user's own browser instead of navigating the review away.
   - **The browser is a native window WPF cannot draw over**, so it is hidden while a dialog is up or a page is sliding,
-    and shown once its page has loaded. Its data lives in `%LOCALAPPDATA%\EQLWikiEditorAssistant\WebView2`; it is created
+    and shown once its page has loaded. Its data lives in `AppPaths.BrowserDataDirectory` (a release's in its install
+    folder, a developer's build's in `%LOCALAPPDATA%\EQLWikiEditorAssistant-dev`); it is created
     the first time a page needs it, not at launch.
 - **Dialogs are drawn in the window, not by Windows** (`OverlayDialog`, user, 2026-10-07): a dimmed backdrop over the
   window's content, in the palette, one at a time, awaited by the caller. Every window carries one; the only Windows
@@ -1778,7 +1779,8 @@ a global hotkey is worth having.
     user, 2026-10-10), so the tools read it in that font once it is copied into the samples. See "Two UI fonts".
   - **Off unless chosen, and never inside the repository.** A frame is a full screenshot and can hold character names,
     other players' names and chat — the reason `samples/` admits only audited frames and the reason the pipeline otherwise keeps
-    every frame in memory. These go to `%APPDATA%\EQLWikiEditorAssistant\debug-captures`, outside any working copy, so no
+    every frame in memory. These go to `debug-captures` in the data folder (`%APPDATA%\EQLWikiEditorAssistant`, or
+    `EQLWikiEditorAssistant-dev` for a developer's build), outside any working copy, so no
     commit can pick one up by accident, and the newest 50 are kept.
   - **It is a setting (Settings > Saved captures, `AppSettings.KeepCaptures`), not a build flavour** (user,
     2026-10-07). It began as Debug-only, which was the same thing while the tool only ever ran from `dotnet run`; once
@@ -2587,6 +2589,13 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
   user with no administrator prompt to `%LOCALAPPDATA%\EQLWikiEditorAssistant`, with Start menu and desktop shortcuts.
   `--framework webview2` makes Setup install the WebView2 runtime if Windows lacks it. The app's state stays in
   `%APPDATA%\EQLWikiEditorAssistant`, so reinstalling never touches a tester's history, settings or login.
+- **A developer's build keeps its own data** (`%APPDATA%\EQLWikiEditorAssistant-dev`, user, 2026-10-11). The two
+  shared one folder until a build that changed what the ledger records made that a risk to the release's history.
+  `App.Main` calls `AppPaths.UseReleaseFolders` when the app sits beside Velopack's `Update.exe` (Setup's install and
+  the portable zip); every other copy, the tools included, uses the dev folders. `install.ps1` copies the release's
+  data over the dev folder on every run — ledger, settings, caches, not `errors.log` or `debug-captures` — so the
+  dev build works on real data and anything done only in it lasts until the next install. The wiki login is one
+  Credential Manager entry, still shared.
 - **`App.Main` exists for Velopack**, which must run before anything else so Setup and the uninstaller can call the app
   with their hook arguments; that is why `App.xaml` is a Page rather than the generated entry point. `vpk pack` checks
   the call is there. From a build folder it does nothing.
@@ -2623,7 +2632,8 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
   default** — Enter, Escape and closing all keep it — because the history is real work and a reinstall wants it back.
   Velopack ends the hook after 30 seconds and uninstalls anyway, so an unanswered question keeps the data too. A plain
   Windows message box, topmost: no window of the app exists then. The install folder, which holds the review browser's
-  WebView2 cache, is removed by Velopack regardless. `install.ps1`'s copy shares the data folder, so Yes clears it too.
+  WebView2 cache, is removed by Velopack regardless. The dev folder is not touched, but the login is shared, so Yes
+  logs a developer's build out too.
 
 ## Wiki reference (eqlwiki.com)
 
@@ -2688,12 +2698,14 @@ dotnet test --filter "FullyQualifiedName~StatsBlockParserTests" # run one test c
 # Run the app. Ctrl+Shift+E (changeable under Settings > Capture hotkey) captures the game window from wherever you
 # are — you never have to leave the game.
 # Reads are anonymous, so it only needs a credential the first time you save (enter one under Settings > Wiki account).
-# Its state (ledger, settings, icon cache) lives in %APPDATA%\EQLWikiEditorAssistant — see Pipeline.AppPaths.
+# Its state (ledger, settings, icon cache) lives in %APPDATA%\EQLWikiEditorAssistant-dev — an installed release's is
+# %APPDATA%\EQLWikiEditorAssistant; see Pipeline.AppPaths.
 dotnet run --project src/EQLWikiEditorAssistant.App
 
 # Or install a Release build to %LOCALAPPDATA%\Programs\EQLWikiEditorAssistant, with the icon library beside it and a Start
 # menu shortcut ("(dev build)"), so the app you use never locks the build you are working on. Run again to update; it
-# refuses while the installed copy is running. Both copies share the same %APPDATA% state. The build carries the commit
+# refuses while the installed copy is running. Each run copies the release's data (if any) over the dev data folder,
+# which this copy and `dotnet run` share. The build carries the commit
 # it came from in its product version (1.0.0-alpha.1+<commit>, with -modified for uncommitted changes).
 powershell -ExecutionPolicy Bypass -File tools/install.ps1
 
@@ -2831,7 +2843,8 @@ wrong l/I rule. A saved capture is marked by the Assistant itself; a fresh `Capt
 added by hand.
 
 **A sample can come from the capture archive rather than a fresh capture.** With Settings > Saved captures on, the app
-files every frame under `%APPDATA%\EQLWikiEditorAssistant\debug-captures`, named after the items in it, so an interesting
+files every frame under `debug-captures` in its data folder (`%APPDATA%\EQLWikiEditorAssistant` for the release,
+`EQLWikiEditorAssistant-dev` for a developer's build), named after the items in it, so an interesting
 item the user has already looked at is usually sitting there — which is how `14-race-restricted-item.png` was added
 without asking them to go and find the item again. Copy it into `samples/` under the naming convention, keeping any
 `[font <name>]` marker, then

@@ -11,8 +11,11 @@ not replace a running executable and a half-updated install is worse than none.
 Running from an install rather than `dotnet run` is what lets a build and a running copy coexist: building the repo
 no longer has to fight the app you are using for its own output files.
 
-The app's own state (ledger, settings, caches) lives in %APPDATA%\EQLWikiEditorAssistant regardless of where it runs, so
-the installed copy and a `dotnet run` copy share it.
+This copy and a `dotnet run` copy keep their state (ledger, settings, caches) in %APPDATA%\EQLWikiEditorAssistant-dev,
+apart from an installed release's %APPDATA%\EQLWikiEditorAssistant, so a build that changes what it records cannot
+damage the release's data. Each run refreshes the dev folder from the release's, when there is one: the ledger,
+settings and caches are copied over whatever the dev folder held, so work done only in a dev build lasts until the
+next install. Its own errors.log and saved screenshots are left alone and none of the release's are copied.
 
 .PARAMETER Destination
 Where to install. Defaults to %LOCALAPPDATA%\Programs\EQLWikiEditorAssistant, where per-user programs go.
@@ -63,6 +66,20 @@ Write-Host "Copying the icon library..."
 robocopy (Join-Path $repo 'game_assets\item_icons') (Join-Path $Destination 'game_assets\item_icons') `
     /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "Copying the icon library failed (robocopy exit code $LASTEXITCODE)." }
+
+# The release's data, copied over the dev copy's so it works on real data without being able to damage it. Not a
+# mirror: the dev folder's own errors.log and saved screenshots stay, and the release's are not copied — a log belongs
+# to the copy that wrote it, and the screenshots are many and large.
+$releaseData = Join-Path $env:APPDATA 'EQLWikiEditorAssistant'
+$devData = Join-Path $env:APPDATA 'EQLWikiEditorAssistant-dev'
+if (Test-Path $releaseData) {
+    Write-Host "Copying the release's data to $devData..."
+    robocopy $releaseData $devData /E /XF errors.log /XD debug-captures /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "Copying the release's data failed (robocopy exit code $LASTEXITCODE)." }
+}
+else {
+    Write-Host "No release data in $releaseData, so the dev copy keeps its own."
+}
 
 # "(dev build)", because the released installer's own shortcut is "EQL Wiki Editor Assistant" and the two would
 # overwrite each other.

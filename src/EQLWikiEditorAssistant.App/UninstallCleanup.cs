@@ -22,7 +22,8 @@ namespace EQLWikiEditorAssistant.App;
 /// the one place outside the crash handler where that is so. It is set topmost and foreground, because Windows'
 /// Settings window started the uninstall and would otherwise cover it.
 ///
-/// The developer's own build (<c>tools/install.ps1</c>) shares this folder, so answering Yes clears its state too.
+/// Only the release's own folder is offered. The developer's build keeps its state elsewhere (see <c>AppPaths</c>); the
+/// wiki login, though, is one Credential Manager entry that both use, so answering Yes logs that build out too.
 /// </summary>
 internal static class UninstallCleanup
 {
