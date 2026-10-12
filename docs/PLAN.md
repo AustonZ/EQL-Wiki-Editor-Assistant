@@ -417,6 +417,12 @@ Published by the user and tested from the installed release build. What it carri
 - **alpha.6**: categories sorted into the blueprint's order; the icon suggestion drawn as a call to action (tester
   feedback); fire, disease and cold damage placed on the damage line.
 
+### 1.0.0-alpha.7 — released 2026-10-12
+Start minimized; the window reopens where it was closed; a GitHub link in Settings; "Open wiki page" and "Refresh wiki
+data" on every item whose name was read; the five elemental damage types mapped; sharp dialog text; and links no longer
+start the browser in the install folder, which had made a tester's update fail. The user verified the update from
+alpha.6.
+
 ### Requested 2026-10-11, for next
 - **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
   whenever we can make them"), levelled items and Lore-tab captures included; with no page known, "Open wiki page"
