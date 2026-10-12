@@ -37,6 +37,10 @@ public sealed record AppSettings
     /// player is back in the game. Off unless chosen.</summary>
     public bool AutoMinimize { get; init; }
 
+    /// <summary>Whether the app starts minimized — to the notification area when <see cref="MinimizeToTray"/> is on,
+    /// else to the taskbar (a tester's request, 2026-10-12). Off unless chosen.</summary>
+    public bool StartMinimized { get; init; }
+
     public static AppSettings Load(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

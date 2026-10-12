@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -51,6 +50,7 @@ public partial class SettingsWindow : Window
         SettingsPathText.Text = AppPaths.SettingsFile;
         VersionText.Text = $"{AppInfo.Name} {AppInfo.Version}";
         VersionText.ToolTip = AppInfo.BuildVersion;
+        ProjectLink.ToolTip = MediaWikiClient.ProjectUrl;
 
         FontBox.ItemsSource = Fonts.Select(UiFonts.DisplayName);
         FontBox.SelectedIndex = Array.IndexOf(Fonts, services.Settings.Font);
@@ -62,6 +62,7 @@ public partial class SettingsWindow : Window
 
         MinimizeToTrayBox.IsChecked = services.Settings.MinimizeToTray;
         AutoMinimizeBox.IsChecked = services.Settings.AutoMinimize;
+        StartMinimizedBox.IsChecked = services.Settings.StartMinimized;
 
         KeepCapturesBox.IsChecked = services.Settings.KeepCaptures;
         CapturesFolderText.Text = CaptureArchive.Directory;
@@ -137,7 +138,8 @@ public partial class SettingsWindow : Window
         WindowSavedText.Text = "";
         try
         {
-            await _services.UseWindowOptionsAsync(MinimizeToTrayBox.IsChecked == true, AutoMinimizeBox.IsChecked == true);
+            await _services.UseWindowOptionsAsync(
+                MinimizeToTrayBox.IsChecked == true, AutoMinimizeBox.IsChecked == true, StartMinimizedBox.IsChecked == true);
             WindowSavedText.Foreground = Palette.Done;
             WindowSavedText.Text = "Saved.";
         }
@@ -174,7 +176,7 @@ public partial class SettingsWindow : Window
     private void OnOpenCapturesFolderClick(object sender, RoutedEventArgs e)
     {
         string folder = Directory.Exists(CaptureArchive.Directory) ? CaptureArchive.Directory : AppPaths.Root;
-        Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"\"{folder}\"", UseShellExecute = true });
+        ExternalLaunch.Explorer($"\"{folder}\"");
     }
 
     // ============================ Icon cache ============================
@@ -288,17 +290,13 @@ public partial class SettingsWindow : Window
     private void OnOpenIconCacheFolderClick(object sender, RoutedEventArgs e)
     {
         string folder = Directory.Exists(AppPaths.IconCacheDirectory) ? AppPaths.IconCacheDirectory : AppPaths.Root;
-        Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = $"\"{folder}\"", UseShellExecute = true });
+        ExternalLaunch.Explorer($"\"{folder}\"");
     }
 
     private void OnOpenSettingsFolderClick(object sender, RoutedEventArgs e)
     {
         string path = AppPaths.SettingsFile;
-        Process.Start(new ProcessStartInfo("explorer.exe")
-        {
-            Arguments = File.Exists(path) ? $"/select,\"{path}\"" : $"\"{AppPaths.Root}\"",
-            UseShellExecute = true,
-        });
+        ExternalLaunch.Explorer(File.Exists(path) ? $"/select,\"{path}\"" : $"\"{AppPaths.Root}\"");
     }
 
     // ============================ Capture hotkey ============================
@@ -534,8 +532,10 @@ public partial class SettingsWindow : Window
         RefreshStoredLogin();
     }
 
+    private void OnProjectLinkClick(object sender, RoutedEventArgs e) => ExternalLaunch.Open(MediaWikiClient.ProjectUrl);
+
     private void OnBotPasswordsClick(object sender, RoutedEventArgs e) =>
-        Process.Start(new ProcessStartInfo("https://eqlwiki.com/Special:BotPasswords") { UseShellExecute = true });
+        ExternalLaunch.Open("https://eqlwiki.com/Special:BotPasswords");
 
     private void SetAccountBusy(bool busy, string? message = null)
     {

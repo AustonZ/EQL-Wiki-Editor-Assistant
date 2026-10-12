@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -119,7 +118,7 @@ public partial class LedgerWindow : Window
     private void OnOpenPageClick(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkContentElement)?.DataContext is not LedgerRowViewModel { PageUrl: { } url }) return;
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        ExternalLaunch.Open(url);
     }
 
     private async void OnForgetClick(object sender, RoutedEventArgs e)
@@ -144,10 +143,6 @@ public partial class LedgerWindow : Window
     private void OnOpenLedgerFolderClick(object sender, RoutedEventArgs e)
     {
         string path = AppPaths.LedgerFile;
-        Process.Start(new ProcessStartInfo("explorer.exe")
-        {
-            Arguments = File.Exists(path) ? $"/select,\"{path}\"" : $"\"{AppPaths.Root}\"",
-            UseShellExecute = true,
-        });
+        ExternalLaunch.Explorer(File.Exists(path) ? $"/select,\"{path}\"" : $"\"{AppPaths.Root}\"");
     }
 }

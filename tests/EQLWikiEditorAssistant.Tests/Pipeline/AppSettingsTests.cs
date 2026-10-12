@@ -77,23 +77,26 @@ public class AppSettingsTests : IDisposable
         Assert.Equal(UiFont.Arial, loaded.Font);
     }
 
-    /// <summary>Both window options are off unless chosen, a file from before they existed included, and each
+    /// <summary>The window options are off unless chosen, a file from before they existed included, and each
     /// survives a save on its own.</summary>
     [Fact]
     public async Task TheWindowOptionsAreOffUnlessChosenAndRoundTrip()
     {
         File.WriteAllText(_path, """{ "font": "Arial" }""");
-        Assert.False(AppSettings.Load(_path).MinimizeToTray);
-        Assert.False(AppSettings.Load(_path).AutoMinimize);
+        Assert.Equal((false, false, false), WindowOptions(AppSettings.Load(_path)));
 
         await new AppSettings { MinimizeToTray = true }.SaveAsync(_path);
-        Assert.True(AppSettings.Load(_path).MinimizeToTray);
-        Assert.False(AppSettings.Load(_path).AutoMinimize);
+        Assert.Equal((true, false, false), WindowOptions(AppSettings.Load(_path)));
 
         await new AppSettings { AutoMinimize = true }.SaveAsync(_path);
-        Assert.False(AppSettings.Load(_path).MinimizeToTray);
-        Assert.True(AppSettings.Load(_path).AutoMinimize);
+        Assert.Equal((false, true, false), WindowOptions(AppSettings.Load(_path)));
+
+        await new AppSettings { StartMinimized = true }.SaveAsync(_path);
+        Assert.Equal((false, false, true), WindowOptions(AppSettings.Load(_path)));
     }
+
+    private static (bool Tray, bool Auto, bool Start) WindowOptions(AppSettings settings) =>
+        (settings.MinimizeToTray, settings.AutoMinimize, settings.StartMinimized);
 
     /// <summary>The acceptability rule is derived, so it is not saved — and a file from the build that did save it
     /// (the user's own, 2026-10-07, reproduced verbatim) still loads.</summary>

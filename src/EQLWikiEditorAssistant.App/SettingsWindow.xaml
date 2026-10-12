@@ -69,8 +69,12 @@
         <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0" Padding="10,8">
             <DockPanel>
                 <Button x:Name="CloseButton" DockPanel.Dock="Right" Content="Close" IsCancel="True" Padding="16,4" MinWidth="80" />
+                <!-- The project's home, always here since there is no About page (user, 2026-10-12). -->
+                <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <Hyperlink x:Name="ProjectLink" Click="OnProjectLinkClick">GitHub</Hyperlink>
+                </TextBlock>
                 <!-- The version a tester quotes in a bug report; the tooltip adds the commit it was built from. -->
-                <TextBlock x:Name="VersionText" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,16,0"
+                <TextBlock x:Name="VersionText" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,12,0"
                            Foreground="{StaticResource TextDimBrush}" />
                 <TextBlock VerticalAlignment="Center" Foreground="{StaticResource TextDimBrush}" TextTrimming="CharacterEllipsis">
                     <Hyperlink Click="OnOpenSettingsFolderClick">
@@ -155,6 +159,11 @@
                               Margin="0,16,0,0" Checked="OnWindowOptionChanged" Unchecked="OnWindowOptionChanged" />
                     <TextBlock Style="{StaticResource Prose}" Margin="28,4,0,0"
                                Text="Automatically minimizes the app after all open items are closed so you can get back to the game." />
+
+                    <CheckBox x:Name="StartMinimizedBox" Content="Start minimized"
+                              Margin="0,16,0,0" Checked="OnWindowOptionChanged" Unchecked="OnWindowOptionChanged" />
+                    <TextBlock Style="{StaticResource Prose}" Margin="28,4,0,0"
+                               Text="Starts the app minimized, to the system tray if &quot;Minimize to system tray&quot; is on." />
 
                     <TextBlock x:Name="WindowSavedText" Margin="0,14,0,0" Foreground="{StaticResource DoneBrush}" />
                 </StackPanel>

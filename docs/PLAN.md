@@ -424,6 +424,28 @@ Published by the user and tested from the installed release build. What it carri
   lookup or the ledger (`ResultViewModel.HasPage`), so an item with no page or one never looked up has none. To
   settle: where it goes when there is no page (the would-be page, which offers to create it, or a search) and, for an
   item never looked up, whether the in-game name is a good enough title.
+- **"Fire Dmg" is not reaching its place on the blueprint's damage line** (user). Reported, not yet investigated.
+- **Spike: scripts on in the review browser** (user). They are off today because the wiki's "not verified" toast edits
+  the verification list when someone types into it, which from this browser would be an anonymous edit nobody meant
+  (see CLAUDE.md, the Preview bullet). The spike is to see what turning them on would gain and what it would take to
+  keep that guarantee.
+- **Built 2026-10-12: a permanent link to the GitHub repository in the app** (user, 2026-10-12). A "GitHub" link in
+  Settings' footer, beside the app's name and version, since there is no About page. Before it the only link to GitHub
+  was the header's "What's new" when an update is available.
+- **Fixed 2026-10-12: a browser opened from the Assistant could block its next update** (tester). The update failed
+  because Firefox's `crashhelper.exe` had the install folder locked. Every link and folder the Assistant opened started
+  its process in the Assistant's working directory, the install folder, and a browser that was not already running
+  kept that directory open, children included, until it closed. Reproduced with Vivaldi. They now start in the user's
+  profile folder (`App.ExternalLaunch`); verified the same way by the user, through Settings' new GitHub link. Only
+  copies from the next release on benefit, since the copy that opens the browser is the one that changed.
+- **Built 2026-10-12: start minimized** (tester). Settings > Window > Start minimized, off unless chosen: to the
+  taskbar, or straight to the tray, never shown, when "Minimize to system tray" is on too. A start Velopack makes after
+  an update is always shown, since the user has just pressed Update and is waiting for the app.
+- **Built 2026-10-12: the main window opens where it was last closed** (tester; standard behaviour, no setting, by the
+  user's decision). Its restored position and size and whether it was maximized, in `window.json` in the data folder
+  (`App.WindowPlacement`, Windows' own window placement, which also brings back a window whose monitor has gone).
+  Checked with a throwaway harness across shown, maximized, minimized and hidden starts, with a saved normal and a
+  saved maximized window: each lands where saved and restores to the right state.
 
 ### To investigate
 - **Fixed 2026-10-10: a false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Its title bar sat flush

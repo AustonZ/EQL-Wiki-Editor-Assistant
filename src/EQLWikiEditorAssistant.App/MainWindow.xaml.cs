@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.Diagnostics;
 using System.Net.Http;
 using Velopack;
 using System.Windows;
 using System.Windows.Documents;
+using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using EQLWikiEditorAssistant.Capture;
 using EQLWikiEditorAssistant.Core.Imaging;
@@ -45,12 +45,23 @@ public partial class MainWindow : Window
     /// maximized.</summary>
     private WindowState _restoreTo = WindowState.Normal;
 
+    /// <summary>Where the window was when it last closed (<see cref="WindowPlacement"/>), applied once the handle
+    /// exists; null on a first start, which keeps the XAML's size.</summary>
+    private WindowPlacement.Saved? _savedPlacement;
+
+    private WindowPlacement.Start _start = WindowPlacement.Start.Shown;
+
+    /// <summary>True from a start hidden in the tray until the window is first shown, which then has to apply the
+    /// saved maximized state itself: Windows was told only where the window goes, not to show it.</summary>
+    private bool _neverShown;
+
     public MainWindow()
     {
         InitializeComponent();
         DarkTitleBar.Apply(this);
         SourceInitialized += (_, _) =>
         {
+            if (_savedPlacement is { } saved) WindowPlacement.Apply(this, saved, _start);
             _tray = new TrayIcon(this);
             _tray.OpenRequested += (_, _) => ComeToTheFront();
             _tray.ExitRequested += (_, _) => Close();
@@ -82,6 +93,45 @@ public partial class MainWindow : Window
         ShowBusy("Starting…");
         BusyPanel.Visibility = Visibility.Visible;
         _ = StartUpAsync();
+    }
+
+    /// <summary>
+    /// Shows the window, or doesn't: **where it was when it last closed, always** (a tester's request, 2026-10-12, made
+    /// standard behaviour by the user rather than a setting), and **minimized if Settings > Window > Start minimized
+    /// says so** — to the tray, never shown at all, when Minimize to system tray is on too. The settings are read here
+    /// rather than waiting for <see cref="AppServices"/>, which takes seconds to build, since a window that appeared
+    /// and then vanished into the tray would be the thing the option exists to avoid.
+    ///
+    /// **A start Velopack made after an update is always shown**: the user has just pressed Update and is watching
+    /// for the app to come back, and the window says the update worked.
+    /// </summary>
+    public void Start()
+    {
+        AppSettings settings = AppSettings.Load(AppPaths.SettingsFile);
+        _savedPlacement = WindowPlacement.Load(AppPaths.WindowPlacementFile);
+        if (_savedPlacement is { Maximized: true }) _restoreTo = WindowState.Maximized;
+
+        _start = !settings.StartMinimized || App.UpdatedTo is not null ? WindowPlacement.Start.Shown
+            : settings.MinimizeToTray ? WindowPlacement.Start.Hidden
+            : WindowPlacement.Start.Minimized;
+
+        switch (_start)
+        {
+            case WindowPlacement.Start.Hidden:
+                // The handle without the window: the tray icon needs one to listen on.
+                _neverShown = true;
+                new WindowInteropHelper(this).EnsureHandle();
+                _tray?.Show();
+                break;
+            case WindowPlacement.Start.Minimized:
+                // With a saved placement, Windows minimizes it and remembers whether it restores maximized.
+                if (_savedPlacement is null) WindowState = WindowState.Minimized;
+                Show();
+                break;
+            default:
+                Show();
+                break;
+        }
     }
 
     /// <summary>
@@ -147,6 +197,7 @@ public partial class MainWindow : Window
             // Fatal (user, 2026-10-07): nothing in the window works without the services, so it says why in a dialog
             // and exits rather than sitting there in a state that only looks usable.
             App.Record(ex);
+            ComeToTheFront();   // a start hidden in the tray would otherwise wait on a dialog nobody can see
             await Dialog.TellAsync(
                 "Could not start", $"{ex.Message}\n\nThe details are in:\n{App.ErrorLogFile}", DialogTone.Error);
             Application.Current.Shutdown();
@@ -192,7 +243,7 @@ public partial class MainWindow : Window
     private void OnReleasePageClick(object sender, RoutedEventArgs e)
     {
         if (_releasePage is { } page)
-            Process.Start(new ProcessStartInfo(page.AbsoluteUri) { UseShellExecute = true });
+            ExternalLaunch.Open(page.AbsoluteUri);
     }
 
     /// <summary>
@@ -397,6 +448,12 @@ public partial class MainWindow : Window
     /// </summary>
     private void ComeToTheFront()
     {
+        if (_neverShown)
+        {
+            // Started hidden in the tray: the saved maximized state is the WPF state to show with.
+            _neverShown = false;
+            WindowState = _restoreTo;
+        }
         if (!IsVisible) Show();
         if (WindowState == WindowState.Minimized) WindowState = _restoreTo;
 
@@ -1021,7 +1078,7 @@ public partial class MainWindow : Window
         if (!open || view.PageUrl is not { } url) return;
         // Whatever the user does there, the next capture should see it rather than a list read minutes ago.
         _services?.Pipeline.ExpectVerificationChange();
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        ExternalLaunch.Open(url);
     }
 
     private async void OnMarkCheckedClick(object sender, RoutedEventArgs e)
@@ -1137,7 +1194,7 @@ public partial class MainWindow : Window
     {
         if (Uri.TryCreate(uri, UriKind.Absolute, out Uri? target) &&
             (target.Scheme == Uri.UriSchemeHttps || target.Scheme == Uri.UriSchemeHttp))
-            Process.Start(new ProcessStartInfo(target.AbsoluteUri) { UseShellExecute = true });
+            ExternalLaunch.Open(target.AbsoluteUri);
     }
 
     /// <summary>
@@ -1265,7 +1322,7 @@ public partial class MainWindow : Window
     private void OnOpenPageClick(object sender, RoutedEventArgs e)
     {
         if ((sender as Hyperlink)?.DataContext is not ResultViewModel { PageUrl: { } url }) return;
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        ExternalLaunch.Open(url);
     }
 
     /// <summary>
@@ -1385,6 +1442,19 @@ public partial class MainWindow : Window
             _tray.Show();
             Hide();
         }
+    }
+
+    /// <summary>Remembers where the window is for the next start. A window minimized or hidden in the tray, or never
+    /// shown, restores to <see cref="_restoreTo"/>, so that is what it is saved as.</summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel) return;
+
+        bool maximized = WindowState == WindowState.Maximized ||
+                         (WindowState == WindowState.Minimized || !IsVisible) && _restoreTo == WindowState.Maximized;
+        if (WindowPlacement.Read(this, maximized) is { } placement)
+            WindowPlacement.Save(AppPaths.WindowPlacementFile, placement);
     }
 
     protected override void OnClosed(EventArgs e)

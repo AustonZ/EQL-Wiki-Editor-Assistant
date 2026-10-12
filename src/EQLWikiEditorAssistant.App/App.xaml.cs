@@ -82,6 +82,11 @@ public partial class App : Application
             args.SetObserved();
             Record(args.Exception);
         };
+
+        // Not StartupUri, because the window may start hidden in the tray, which a StartupUri window cannot.
+        var window = new MainWindow();
+        MainWindow = window;
+        window.Start();
     }
 
     private void Report(Exception ex)

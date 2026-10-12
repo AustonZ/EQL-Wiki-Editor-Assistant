@@ -1,8 +1,7 @@
 <Application x:Class="EQLWikiEditorAssistant.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:EQLWikiEditorAssistant.App"
-             StartupUri="MainWindow.xaml">
+             xmlns:local="clr-namespace:EQLWikiEditorAssistant.App">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>

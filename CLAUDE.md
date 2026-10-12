@@ -1936,6 +1936,16 @@ reading with the configured font.
     however it was closed — Done, its ✕, Skip, or closing them all. The first version minimized on Done only when
     every item left was finished, and the user, testing it, could not tell whether it was working: "the only way
     we're going to be predictable to the user." A capture adds items and never minimizes.
+  - **Start minimized** (a tester, 2026-10-12), off unless chosen: to the taskbar, or to the tray without ever being
+    shown when the tray option is on. `App.xaml` has no `StartupUri` for this, since a StartupUri window is always
+    shown; `MainWindow.Start` reads the settings file itself rather than waiting seconds for `AppServices`, and
+    creates only the handle, which the tray icon listens on. A start after an update is always shown.
+- **The main window opens where it last closed** (a tester, 2026-10-12; always, not a setting, by the user's decision).
+  `App.WindowPlacement` keeps Windows' own placement in `window.json`, not WPF's `Left`/`Top`: it records the restored
+  rectangle even while maximized or minimized, and `SetWindowPlacement` brings back onto a screen a window whose
+  monitor has gone. It is applied in `SourceInitialized`, before WPF shows the window; a window started hidden in the
+  tray gets its maximized state from WPF on its first show (`_neverShown`), because placing a window that is not to be
+  shown cannot also maximize it. Verified with a throwaway harness across all six combinations.
 - **The font is saved in `settings.json` (`Pipeline.AppSettings`) and switches without a restart.**
   `AppServices.UseFontAsync` is the one place after start-up that the font changes, and it sets the reader and the
   pipeline's wrong-font guard together; apart, a window would be read in one font and checked against the other. A
@@ -2682,6 +2692,11 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
     `artifacts\releases` in a folder, and start the installed copy with the variable set.
   - **Every release must therefore upload Velopack's `.nupkg` and `releases.win.json`**, which `-Draft` does. A release
     missing them is simply not offered as an update; ReleaseCheck would still have announced it.
+  - **Nothing the Assistant starts may start in its install folder** (bug found by a tester, 2026-10-12: an update
+    failed on a lock held by Firefox's `crashhelper.exe`). A process holds its working directory open, its children
+    inherit it, and the shell's default is the caller's own — so a browser first started by a link here kept the
+    install folder open until it closed, and Velopack could not replace it. Every link and Explorer window goes through
+    `App.ExternalLaunch`, which starts it in the user's profile folder; don't call `Process.Start` directly.
 - **ReleaseCheck is what other builds use** (`Pipeline.ReleaseCheck`): once per start, one anonymous GET of the
   repository's releases list on GitHub, and a link in the header when a newer one exists. The *list*, because GitHub's
   `/releases/latest` skips pre-releases and every alpha is one; a pre-release is offered only to someone already running

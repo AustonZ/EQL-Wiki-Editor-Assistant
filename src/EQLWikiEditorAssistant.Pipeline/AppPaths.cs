@@ -54,6 +54,9 @@ public static class AppPaths
     /// <summary>The user's settings — today only the UI font the game draws in. See <c>AppSettings</c>.</summary>
     public static string SettingsFile => Path.Combine(Root, "settings.json");
 
+    /// <summary>Where the main window was when it last closed, so the next start puts it back.</summary>
+    public static string WindowPlacementFile => Path.Combine(Root, "window.json");
+
     /// <summary>The wiki's list of pages marked "Verified for EQLegends", cached so it can be answered offline and
     /// on the ledger-skip path where no wiki request happens at all.</summary>
     public static string VerifiedPagesFile => Path.Combine(Root, "verified-pages.json");
