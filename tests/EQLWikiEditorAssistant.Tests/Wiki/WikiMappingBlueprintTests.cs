@@ -1,5 +1,8 @@
+using EQLWikiEditorAssistant.Core.Items;
+using EQLWikiEditorAssistant.Wiki.Analysis;
 using EQLWikiEditorAssistant.Wiki.Formatting;
 using EQLWikiEditorAssistant.Wiki.Mapping;
+using EQLWikiEditorAssistant.Wiki.Wikitext;
 
 namespace EQLWikiEditorAssistant.Tests.Wiki;
 
@@ -154,6 +157,68 @@ public class WikiMappingBlueprintTests
 
         Assert.Contains("DMG: 6  AC: 2  Fire DMG: 3  Disease DMG: 4  Cold DMG: 2  Poison DMG: 1<br>", result.Formatted);
         Assert.DoesNotContain(result.Notes, n => n.Contains("DMG", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// **Every label the blueprint's statsblock lays out is mapped, or is on a list saying why not** (bug found by the
+    /// user, 2026-10-12, on `Mithril Champion Arrows`). `Fire DMG` had a place on the damage line and no mapping, so the
+    /// game's `Fire Dmg` was reported as unknown — the `Skill Mod` bug of 2026-10-02 a second time. Checking one label
+    /// at a time is how it recurred; this checks the whole order, so a label added to it fails here until it is mapped
+    /// or deliberately listed.
+    /// </summary>
+    [Fact]
+    public void EveryBlueprintStatsblockLabelIsMappedOrKnownToBeElsewhere()
+    {
+        // Written by other parts of the Assistant, not from a stat: the flags line, the slot, the effect lines, the
+        // charges flag, the class and race lines, and the blank line the order uses as a separator.
+        string[] handledElsewhere = ["(flags)", "Slot", "Effect", "Charges", "Class", "Race", WikiMapping.BlankLine];
+        // In the blueprint, never yet captured, so the game's label for them is unknown. Map one the first time a
+        // capture reports it.
+        string[] neverCaptured = ["Attack", "Clairvoyance", "Spell Dmg", "Heal Amount"];
+
+        HashSet<string> mapped = WikiMapping.Default.Stats.Values
+            .Select(s => s.WikiLabel).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert.All(
+            WikiMapping.Default.StatsBlockLineOrder.SelectMany(line => line)
+                .Where(label => !handledElsewhere.Contains(label) && !neverCaptured.Contains(label)),
+            label => Assert.Contains(label, mapped));
+    }
+
+    /// <summary>The game writes `Fire Dmg: 3`; the page it was reported on already writes `Fire DMG: 3`, which now
+    /// matches rather than being reported as an unknown stat.</summary>
+    [Theory]
+    [InlineData("Fire Dmg", "Fire DMG")]
+    [InlineData("Disease Dmg", "Disease DMG")]
+    [InlineData("Cold Dmg", "Cold DMG")]
+    [InlineData("Magic Dmg", "Magic DMG")]
+    [InlineData("Poison Dmg", "Poison DMG")]
+    public void ElementalDamageIsMappedUnsigned(string game, string wiki)
+    {
+        StatMapping mapping = WikiMapping.Default.FindStat(game)!;
+
+        Assert.Equal(wiki, mapping.WikiLabel);
+        Assert.Equal(StatDisposition.Stored, mapping.Disposition);
+        Assert.Equal("3", mapping.ToWikiValue("3"));
+    }
+
+    [Fact]
+    public void CapturedFireDamageMatchesThePageAndIsAddedWhereMissing()
+    {
+        ParsedItem item = new("Mithril Champion Arrows", 0, false, [], ["WAR"], [], [],
+            [new("Base Dmg", "11"), new("Fire Dmg", "3")], [], [], null, null, []);
+
+        ItemPageDocument matching = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Mithril Champion Arrows\n|statsblock = \nDMG: 11  Fire DMG: 3<br>\n" +
+            "Class: WAR<br>\n|notes = \n}}")!;
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(item, matching, "Mithril Champion Arrows");
+        Assert.Equal(FieldVerdict.Matches, Assert.Single(analysis.Findings, f => f.Field == "Fire DMG").Verdict);
+
+        ItemPageDocument missing = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Mithril Champion Arrows\n|statsblock = \nDMG: 11<br>\n" +
+            "Class: WAR<br>\n|notes = \n}}")!;
+        ProposedEdit edit = ItemPageEditor.BuildEdit(missing, ItemPageAnalyzer.Analyze(item, missing, "Mithril Champion Arrows"));
+        Assert.Contains("Fire DMG: 3<br>", edit.NewWikitext);
     }
 
     // ---- Skill Mod ----

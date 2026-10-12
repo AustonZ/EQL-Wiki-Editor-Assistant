@@ -232,8 +232,10 @@ public sealed class WikiMapping
     /// **13** (2026-10-11): the formatter sorts the categories that end a page into the blueprint's order, with a blank
     /// line between its groups — see <see cref="CategoryOrder"/>. Formatting only, so 9's reasoning, and the widest
     /// reach since 7: nearly every item page has categories, and a settled row would never be offered the sort.
+    /// **14** (2026-10-12): fire, disease, cold, magic and poison damage are mapped. 8's reasoning for `Skill Mod`: an
+    /// item carrying one that was settled anyway would never be offered the line.
     /// </summary>
-    public const int CurrentVersion = 13;
+    public const int CurrentVersion = 14;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -548,6 +550,16 @@ public sealed class WikiMapping
             ("SV. Void", "SV Void"),
             ("Base Dmg", "DMG"),
             ("Backstab Dmg", "BACKSTAB"),
+            // **On the blueprint's damage line and in StatsBlockLineOrder, and missing here** (bug found by the user,
+            // 2026-10-12, on `Mithril Champion Arrows`): the game's `Fire Dmg: 3` was reported as a stat with no
+            // mapping, so the line was never written or compared — the `Skill Mod` bug again. Only `Fire Dmg` has
+            // been captured; the other four are the game's spelling by analogy with it and with `Base Dmg`. A wrong
+            // guess costs nothing: the game's real label would still be reported as unmapped.
+            ("Fire Dmg", "Fire DMG"),
+            ("Disease Dmg", "Disease DMG"),
+            ("Cold Dmg", "Cold DMG"),
+            ("Magic Dmg", "Magic DMG"),
+            ("Poison Dmg", "Poison DMG"),
             ("Delay", "Atk Delay"),
             ("Skill", "Skill"),
             ("Range", "Range"),

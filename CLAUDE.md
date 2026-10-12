@@ -528,8 +528,8 @@ stat labels across the 101 verified windows against 49 across 744 real pages.
   label no entry names is not dropped — it keeps its own line before `Class:` and is
   reported.
 - **The blueprint and the game have gaps in both directions**, all on the user's TODO: it lists labels no capture
-  has produced (`Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`, and the five elemental damage types
-  `Fire DMG`, `Disease DMG`, `Cold DMG`, `Magic DMG`, `Poison DMG`) and
+  has produced (`Attack`, `Clairvoyance`, `Spell Dmg`, `Heal Amount`; the five elemental damage types were on it
+  until 2026-10-12, see the 193231 bullet below) and
   omits several the game does (`Accuracy`, `Type`, `Items`), plus `Worn` and `Can Equip` in the effect
   parenthetical. `Range` was on that list until the 2026-10-11 revision below.
 - **`Skill Mod` was on that first list until a capture produced one** (user, 2026-10-02, on `Collapsible Fishing
@@ -631,10 +631,16 @@ any written value is suspect as well as unnecessary.
   which says `1H Piercing`, so the Assistant already wrote it and corrects the 21 cached pages that say `Piercing`.
 - **`DMG Bonus` was removed**, which is the rule above.
 - **`Fire DMG`, `Disease DMG` and `Cold DMG` joined the damage line**, in that order before `Magic DMG` and
-  `Poison DMG`. `StatsBlockLineOrder` follows. Only the formatter is affected: none of the five has ever been captured,
-  so none has a `StatMapping`, and the game's label for them is unknown. The first capture of one will report it as a
-  stat with no mapping, which is the moment to map it — the `Skill Mod` precedent. Census: 1 of 744 cached item pages
-  (`Mithril Champion Arrows`, `Fire DMG: 3`) loses its "no place" note, nothing else moves. `CurrentVersion` 12.
+  `Poison DMG`. `StatsBlockLineOrder` follows. Census: 1 of 744 cached item pages (`Mithril Champion Arrows`,
+  `Fire DMG: 3`) loses its "no place" note, nothing else moves. `CurrentVersion` 12.
+  - **All five are mapped since 2026-10-12** (bug found by the user, on a capture of that same item). Waiting for a
+    capture to map them, as this bullet used to say, meant the first capture was a bug report: the game's `Fire Dmg: 3`
+    was reported as a stat with no mapping and never compared. Only `Fire Dmg` has been seen; the other four are the
+    game's spelling by analogy, and a wrong guess just leaves the real label reported as unmapped.
+    `CurrentVersion` 14.
+  - **`EveryBlueprintStatsblockLabelIsMappedOrKnownToBeElsewhere` now checks the whole line order**, so a blueprint
+    label with no mapping fails the build unless it is listed as handled elsewhere or never yet captured (`Attack`,
+    `Clairvoyance`, `Spell Dmg`, `Heal Amount`). Checking one label at a time is how `Skill Mod`'s bug came back.
 
 **The blueprint's later 2026-10-11 revisions (oldids 193243-193248, by the user), reconciled the same day.**
 - **`Cooldown: ??? seconds`, lowercase**, as the game and the tool write it. No change.

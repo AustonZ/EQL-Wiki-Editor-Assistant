@@ -431,7 +431,10 @@ Published by the user and tested from the installed release build. What it carri
   lookup or the ledger (`ResultViewModel.HasPage`), so an item with no page or one never looked up has none. To
   settle: where it goes when there is no page (the would-be page, which offers to create it, or a search) and, for an
   item never looked up, whether the in-game name is a good enough title.
-- **"Fire Dmg" is not reaching its place on the blueprint's damage line** (user). Reported, not yet investigated.
+- **Fixed 2026-10-12: "Fire Dmg" was not reaching its place on the blueprint's damage line** (user). The line had a
+  place but no stat mapping, so the game's `Fire Dmg` was reported as unknown. All five elemental damage types are
+  mapped now (four by analogy, since only fire has been captured), and a test checks every blueprint label has a
+  mapping or a stated reason not to. `Mithril Champion Arrows` now reads as already correct.
 - **Spike: scripts on in the review browser** (user). They are off today because the wiki's "not verified" toast edits
   the verification list when someone types into it, which from this browser would be an anonymous edit nobody meant
   (see CLAUDE.md, the Preview bullet). The spike is to see what turning them on would gain and what it would take to
