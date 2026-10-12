@@ -387,6 +387,9 @@ From the first tester (via the user):
   the formatter still proves it changed nothing but layout before its part is accepted — a refused layout leaves the data
   edit to be saved alone. CLAUDE.md's "Formatting is a separate edit" and the review timeline's Formatting step are to
   be rewritten when this is built.
+  - **Known bug, parked until then** (user, 2026-10-12): text typed into the Formatting step's editor does not make
+    "Refresh wiki data" ask first, so a refresh throws it away. The check (`ResultViewModel.HasUnsavedEdits`) looks at
+    the Edit step's text and summary only. Merging the steps may remove the separate editor, so it waits.
 
 From the user:
 - **Built 2026-10-11: categories are sorted into the blueprint's order by the formatter**, groups separated by blank
@@ -415,6 +418,10 @@ Published by the user and tested from the installed release build. What it carri
   feedback); fire, disease and cold damage placed on the damage line.
 
 ### Requested 2026-10-11, for next
+- **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
+  whenever we can make them"), levelled items and Lore-tab captures included; with no page known, "Open wiki page"
+  opens the item's own name. Refreshing a levelled item or a Lore capture compares nothing, since either comparison
+  would propose a wrong edit, and refreshing over unsaved typing asks first. The two requests as recorded:
 - **Always show "Refresh wiki data" on every item** (user). Today it appears only for an item the ledger let skip the
   wiki and where the wiki stopped the comparison (not an item page, no page, a failed lookup), and only with a
   readable capture (`ResultViewModel.CanReCheck`). To settle when building it: what it does for an item that was never
@@ -578,6 +585,19 @@ left is whether `Can Equip`/`Must Equip` replace `Clicky` or follow it.
 - **Syntax highlighting in the raw wikitext editor** (user, 2026-10-07): template names, parameter names, links and
   `<br>` picked out, so a hand edit is easier to read and harder to break.
 - **A per-skin/per-scale calibration profile**, if the tool is ever shared with other players.
+- **Show a levelled item's icon in its list entry** (user, 2026-10-12). Not knowing level-0 stats is no reason to show
+  no icon. Today `ItemCheckPipeline.CheckWindowAsync` returns `Ineligible` before the icon is read, so the result
+  carries none. Reading it earlier is cheap; the care needed is that an ineligible result still writes no ledger row and
+  nothing else starts comparing it.
+- **Let the Assistant correct a levelled item's non-stat details and formatting** (user, 2026-10-12). Levelling changes
+  the stats, which is why such an item is refused (see "Item leveling"), but much of a page does not depend on them:
+  flags, class and race, slot, lore, effects, categories, the era banner, compliance and layout. To settle first:
+  - **Which fields really are level-independent**, measured rather than assumed. The corpus has 57 levelled windows,
+    many with a `+0` capture or a live page to compare against; merchant value and effect details are the ones to
+    check.
+  - **What the ledger records.** Today an ineligible item gets no row, deliberately; a partial check needs one that
+    does not count as done, or the stats are never checked when a `+0` copy turns up.
+  - **Exaltations.** A foreign one changes the effects shown, so it probably still blocks everything but formatting.
 
 ## Wiki findings (verified against eqlwiki.com)
 - MediaWiki 1.45.3; `api.php` at site root; `login`/`clientlogin` available; **no OAuth extension**. OATHAuth (2FA)

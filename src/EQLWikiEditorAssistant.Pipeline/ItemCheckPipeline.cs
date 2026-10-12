@@ -936,6 +936,12 @@ public sealed class ItemCheckPipeline
     /// <paramref name="refreshVerification"/> is for a re-analysis the user asked for ("Refresh wiki data", "Edit
     /// again"): it re-reads the verified-pages list too, whatever its age, since marking the page verified on the wiki
     /// is one of the things the user may have just done (bug found by the user, 2026-10-07).
+    ///
+    /// **A result decided before the wiki was asked comes back as it was.** "Refresh wiki data" is offered on every
+    /// item whose name was read (user, 2026-10-12), a levelled item and a Lore-tab capture included, and comparing
+    /// either against its page would be wrong in a way that writes: a levelled item's stats are legitimately higher
+    /// than the page's, and a Lore capture has no stats at all, so every field would read as missing. Nothing about the
+    /// wiki changes what was decided about them, so there is nothing to refresh.
     /// </summary>
     public async Task<ItemCheckResult> ReanalyzeAsync(
         ItemCheckResult previous, CancellationToken cancellationToken = default, bool refreshVerification = false)
@@ -943,6 +949,7 @@ public sealed class ItemCheckPipeline
         ArgumentNullException.ThrowIfNull(previous);
         if (previous.Item is not { } item)
             throw new InvalidOperationException("This result has no parsed item, so there is nothing to re-analyze.");
+        if (previous.Status is ItemCheckStatus.Ineligible or ItemCheckStatus.LoreRecorded) return previous;
 
         if (refreshVerification && _verified is not null)
             await _verified.RefreshAsync(evenIfRecent: true, cancellationToken).ConfigureAwait(false);

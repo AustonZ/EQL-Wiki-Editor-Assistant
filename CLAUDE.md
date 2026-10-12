@@ -1704,12 +1704,21 @@ a global hotkey is worth having.
 - **Solid buttons are for actions; navigation is a link or an icon** (user, 2026-10-07). Anything that writes to the
   wiki stays a clear button. History is a link and Settings a cog in the header's right corner; the hotkey hint beside Capture is a link
   to Settings > Capture hotkey; in History, the item name is the page link and Forget is an ✕.
-- **Re-check is per item, and only where the ledger let a capture skip the wiki** (user, 2026-10-07), replacing the
-  global "Re-check anyway" checkbox. **Also wherever the wiki stopped the comparison** (user, 2026-10-10, on `Large
-  Groove Nocks`, whose page wraps an Itembox in `onlyinclude`): a page that is not an item page, no page at all, or a
-  failed lookup, since fixing the wiki is the remedy and there was then no way to compare again but a new capture.
-  The link reads "Refresh wiki data". It runs `ReanalyzeAsync`, so the ledger ends up where a fresh check would leave
-  it. **That made the `AlreadyChecked` result carry its captured icon**, which it had not: the re-check fingerprints
+- **Re-check is per item** (user, 2026-10-07), replacing the global "Re-check anyway" checkbox. The link reads
+  "Refresh wiki data". It runs `ReanalyzeAsync`, so the ledger ends up where a fresh check would leave it.
+  - **It and "Open wiki page" appear on every item whose name was read** (user, 2026-10-12: "no special rules, just
+    dumb links whenever we can make them"; `ResultViewModel.HasItemName`). They used to appear only where the ledger
+    let a capture skip the wiki, then also where the wiki stopped the comparison (2026-10-10, `Large Groove Nocks`).
+    Every result past reading the window has a name, a levelled item and a Lore-tab capture included; a covered window,
+    one in the other font and one in another skin have none. With no page known, "Open wiki page" opens the item's own
+    name, which on a missing page is the wiki's offer to create it.
+  - **Refreshing a levelled item or a Lore-tab capture compares nothing** (`ReanalyzeAsync` returns it as it was).
+    Comparing either would propose a wrong edit: a levelled item's stats are legitimately higher than the page's, and
+    a Lore capture has no stats, so every field would read as missing. That second case was reachable before the links
+    changed, by capturing a Lore tab twice. Both are pinned by tests that fail without the guard.
+  - **Refreshing asks first when the wikitext or summary was changed and not saved** (`HasUnsavedEdits`), since a
+    refresh starts the review over.
+  - The rest of this bullet predates those changes and still holds. **That made the `AlreadyChecked` result carry its captured icon**, which it had not: the re-check fingerprints
   whatever icon the result holds, and a row fingerprinted without one never matches the next capture — the
   2026-09-29 ledger bug, reached by a new route. `ReCheckingAnAlreadyCheckedItemKeepsItSettled` fails without it.
   The review screen still hides the icon section for such a result, since nothing was compared.
@@ -1783,6 +1792,9 @@ a global hotkey is worth having.
   window's content, in the palette, one at a time, awaited by the caller. Every window carries one; the only Windows
   message box left is the crash handler's, which has to work when the UI itself is broken. The global hotkey is ignored
   while one is open, as it is while Settings or History is.
+  - **Its shadow is a separate Border behind the card, never an `Effect` on it** (bug found by the user, 2026-10-12:
+    every dialog's text was blurry). WPF draws an element carrying an `Effect` into a bitmap first, which turns off
+    ClearType for all the text inside. The same holds for any `Effect` placed on an element that contains text.
 - Icon uploads are still confirmed, as the one write that is not on the Submit page and the one only an admin can undo.
 - `AppServices` is a plain composition root, built **once** and **off the UI thread** — the `MediaWikiClient` must
   keep one cookie container for its whole session, and the ledger and icon cache only mean anything shared.

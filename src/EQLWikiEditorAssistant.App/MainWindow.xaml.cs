@@ -572,13 +572,22 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Compares an item the ledger let skip the wiki, now, without waiting for its data to change — the per-item form
-    /// of the old "Re-check anyway" box (user, 2026-10-07). It goes through the same re-analysis a lore capture uses,
-    /// which asks the wiki and records the outcome, so the ledger ends up exactly where a fresh check would leave it.
+    /// Compares an item against the wiki as it is now, without waiting for its data to change — the per-item form of
+    /// the old "Re-check anyway" box (user, 2026-10-07), on every item whose name was read since 2026-10-12. It goes
+    /// through the same re-analysis a lore capture uses, which asks the wiki and records the outcome, so the ledger
+    /// ends up exactly where a fresh check would leave it. Text typed and not saved would be lost, so that asks first.
     /// </summary>
     private async void OnReCheckClick(object sender, RoutedEventArgs e)
     {
         if (ResultsList.SelectedItem is not ResultViewModel { CanReCheck: true } view) return;
+        if (view.HasUnsavedEdits && !await Dialog.AskAsync(
+                "Refresh wiki data",
+                "Refreshing compares the item against the wiki again and starts its review over, so the changes you " +
+                "made to the wikitext or the summary will be lost.",
+                "Refresh",
+                "Cancel",
+                DialogTone.Warning))
+            return;
         await ReloadFromWikiAsync(view, $"Checking {view.ItemName} against the wiki…", "re-checked");
     }
 

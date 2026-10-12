@@ -675,6 +675,24 @@ public class ItemCheckPipelineTests
         Assert.Equal(0, wiki.Fetches);
     }
 
+    /// <summary>
+    /// "Refresh wiki data" is offered on an ineligible item too (user, 2026-10-12), and must not compare it: a levelled
+    /// item's stats are legitimately higher than the page's, so the comparison would propose overwriting a correct
+    /// page. It comes back exactly as it was, with no wiki request and no row.
+    /// </summary>
+    [Fact]
+    public async Task RefreshingAnIneligibleItemComparesNothing()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        ItemCheckResult refreshed = await pipeline.ReanalyzeAsync(result, refreshVerification: true);
+
+        Assert.Same(result, refreshed);
+        Assert.Equal(0, wiki.Fetches);
+        Assert.Equal(0, ledger.Count);
+    }
+
     /// <summary>...and the user's "skip" action must not sneak one in either.</summary>
     [Fact]
     public async Task SkippingAnIneligibleItemStillWritesNoRow()
@@ -1291,6 +1309,28 @@ public class ItemCheckPipelineTests
 
         Assert.False(description.NeedsLoreCapture);
         Assert.Equal("A trophy of the first bashing.", description.Lore);
+    }
+
+    /// <summary>
+    /// "Refresh wiki data" on a Lore-tab capture (user, 2026-10-12) leaves it alone. It has no stats, so comparing it
+    /// would read every field on the page as missing from the item. The Description capture is what gets compared.
+    /// </summary>
+    [Fact]
+    public async Task RefreshingALoreCaptureComparesNothing()
+    {
+        var wiki = new FakeWiki();
+        wiki.Pages["Earring of Bashing"] =
+            new WikiPage("Earring of Bashing", EarringPage(), 100, DateTimeOffset.UnixEpoch);
+        var ledger = new CheckedItemsLedger();
+        var pipeline = new ItemCheckPipeline(
+            wiki, new FakeLocator(Window(LoreTabLines, hasLoreTab: true, tab: ItemWindowTab.Lore)), ledger);
+        ItemCheckResult lore = (await pipeline.CheckAsync(BlankFrame()))[0];
+
+        ItemCheckResult refreshed = await pipeline.ReanalyzeAsync(lore, refreshVerification: true);
+
+        Assert.Same(lore, refreshed);
+        Assert.Equal(0, wiki.Fetches);
+        Assert.Equal(0, ledger.Count);
     }
 
     /// <summary>

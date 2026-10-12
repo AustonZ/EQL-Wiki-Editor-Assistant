@@ -717,6 +717,18 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public bool HasPage => KnownPageTitle is not null;
 
     /// <summary>
+    /// Whether the item's name was read, which is all "Open wiki page" and "Refresh wiki data" need (user, 2026-10-12:
+    /// "no special rules, just dumb links whenever we can make them"). Every result past the point where a window is
+    /// read has one — a levelled item and a Lore-tab capture included; a covered window, one in the other font and one
+    /// in another skin do not, since nothing was read from them.
+    /// </summary>
+    public bool HasItemName => Result.Item is not null && Result.ItemName.Length > 0;
+
+    /// <summary>The page "Open wiki page" opens: the one known, else the item's own name, which on a wiki without
+    /// that page is where the wiki offers to create it.</summary>
+    private string? LinkTitle => KnownPageTitle ?? (HasItemName ? Result.ItemName : null);
+
+    /// <summary>
     /// The page's title beside the "Open wiki page" link, only when it is not the item's own name — which happens when
     /// the wiki redirected the name to another page, or the ledger recorded a hand-chosen title (<c>Cell Key #5</c> at
     /// <c>Cell Key No. 5</c>). Otherwise the name above already says it.
@@ -725,7 +737,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         ? $"  ({title})"
         : "";
 
-    public string? PageUrl => KnownPageTitle is { } title
+    public string? PageUrl => LinkTitle is { } title
         ? $"https://eqlwiki.com/{Uri.EscapeDataString(title.Replace(' ', '_'))}"
         : null;
 
@@ -937,20 +949,22 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Whether to offer "Refresh wiki data": where the ledger let this capture skip the wiki, so it was never compared
-    /// (user, 2026-10-07), and wherever the wiki is what stopped the comparison and fixing it there is the remedy — a
-    /// page that is not an item page, no page at all, or a lookup that failed (user, 2026-10-10, on `Large Groove
-    /// Nocks`, fixed on the wiki with nothing in the app to compare it again). A result that was compared already
-    /// reflects the wiki as it stood, and its review has "Edit again" for after a save.
+    /// Whether "Refresh wiki data" can run now. It is shown on every item whose name was read (<see cref="HasItemName"/>,
+    /// user, 2026-10-12), replacing a list of the statuses where the wiki was what stopped the comparison; this only
+    /// greys it out while the item is busy. A levelled item or a Lore-tab capture comes back unchanged, since nothing
+    /// on the wiki changes what was decided about it (<c>ItemCheckPipeline.ReanalyzeAsync</c>).
     /// </summary>
-    public bool CanReCheck =>
-        !IsBusy && Result is
-        {
-            Status: ItemCheckStatus.AlreadyChecked or ItemCheckStatus.NotAnItemPage or ItemCheckStatus.NotOnWiki
-                or ItemCheckStatus.Failed,
-            Item: not null,
-            WindowImage: not null,
-        };
+    public bool CanReCheck => !IsBusy && HasItemName && Result.WindowImage is not null;
+
+    /// <summary>
+    /// Whether refreshing would throw away something typed and not saved: the wikitext or the summary, changed since
+    /// the item was loaded, on an item not yet settled. A refresh reloads the item from the wiki, so it asks first.
+    /// Moving between pages is not work a refresh loses, since the item comes back on its first page anyway.
+    /// </summary>
+    public bool HasUnsavedEdits =>
+        !_settled &&
+        (!string.Equals(_wikitext, _loadedWikitext, StringComparison.Ordinal) ||
+         !string.Equals(_summary, _loadedSummary, StringComparison.Ordinal));
 
     /// <summary>The captured icon, small, for the item list.</summary>
     public System.Windows.Media.ImageSource? TabIcon =>

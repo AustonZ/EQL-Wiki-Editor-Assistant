@@ -232,18 +232,19 @@
 
                             <!-- The page link reads "Open wiki page" rather than the title (user, 2026-10-07), since the
                                  title is the item's name above it nearly always. Not always: a redirect lands on another
-                                 title, so that one is shown beside the link. Re-check shares the line, only where the
-                                 ledger let this capture skip the wiki (replacing the global checkbox). Both are links,
-                                 since neither writes anything. -->
-                            <WrapPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <TextBlock Margin="0,0,16,0" Visibility="{Binding HasPage, Converter={StaticResource BoolToVis}}">
+                                 title, so that one is shown beside the link. Both links appear whenever the item's name
+                                 was read (user, 2026-10-12), a page or not; both are links, since neither writes
+                                 anything. -->
+                            <WrapPanel Orientation="Horizontal" Margin="0,4,0,0"
+                                       Visibility="{Binding HasItemName, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Margin="0,0,16,0">
                                     <Hyperlink Click="OnOpenPageClick" ToolTip="{Binding PageUrl}"><Run
                                         Text="&#xE8A7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BaselineAlignment="Center" /><Run
                                         Text=" Open wiki page" /></Hyperlink><Run
                                         Text="{Binding PageTitleIfDifferent, Mode=OneWay}" Foreground="{StaticResource TextDimBrush}" />
                                 </TextBlock>
-                                <TextBlock Visibility="{Binding CanReCheck, Converter={StaticResource BoolToVis}}">
-                                    <Hyperlink Click="OnReCheckClick"
+                                <TextBlock>
+                                    <Hyperlink Click="OnReCheckClick" IsEnabled="{Binding CanReCheck}"
                                                ToolTip="Compare it against the wiki as it is now"><Run
                                         Text="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BaselineAlignment="Center" /><Run
                                         Text=" Refresh wiki data" /></Hyperlink>

@@ -5,25 +5,31 @@
     <!-- The dimmed backdrop takes every click, which is what makes the window modal while this is up: nothing under
          it can be pressed. Keyboard focus is kept inside the card by cycling its tab order. -->
     <Grid Background="#B0000000">
-        <Border x:Name="Card" Background="{StaticResource ChromeBrush}" BorderBrush="{StaticResource BorderStrongBrush}"
-                BorderThickness="1" CornerRadius="6" Padding="22,18,22,16" MinWidth="340" MaxWidth="520"
-                HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
-                KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle"
-                KeyboardNavigation.DirectionalNavigation="Cycle">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.6" Color="Black" />
-            </Border.Effect>
-            <StackPanel>
-                <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,10" />
-                <!-- Selectable, so an error can be copied into a bug report. Styled as text, not as a field. -->
-                <TextBox x:Name="MessageText" IsReadOnly="True" TextWrapping="Wrap" Background="Transparent"
-                         BorderThickness="0" Padding="0" Margin="-2,0,0,0" IsTabStop="False"
-                         MaxHeight="360" VerticalScrollBarVisibility="Auto" />
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
-                    <Button x:Name="CancelButton" Click="OnCancelClick" Padding="14,5" MinWidth="80" Margin="0,0,8,0" />
-                    <Button x:Name="ConfirmButton" Click="OnConfirmClick" Padding="14,5" MinWidth="80" />
+        <Grid MinWidth="340" MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24">
+            <!-- The shadow is a Border of its own behind the card, never an Effect on the card (bug found by the user,
+                 2026-10-12: the dialog's text was blurry). An element with an Effect is drawn into a bitmap first, which
+                 turns off ClearType for everything inside it, so every word in the dialog came out soft. -->
+            <Border Background="{StaticResource ChromeBrush}" CornerRadius="6">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.6" Color="Black" />
+                </Border.Effect>
+            </Border>
+            <Border Background="{StaticResource ChromeBrush}" BorderBrush="{StaticResource BorderStrongBrush}"
+                    BorderThickness="1" CornerRadius="6" Padding="22,18,22,16"
+                    KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle"
+                    KeyboardNavigation.DirectionalNavigation="Cycle">
+                <StackPanel>
+                    <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,10" />
+                    <!-- Selectable, so an error can be copied into a bug report. Styled as text, not as a field. -->
+                    <TextBox x:Name="MessageText" IsReadOnly="True" TextWrapping="Wrap" Background="Transparent"
+                             BorderThickness="0" Padding="0" Margin="-2,0,0,0" IsTabStop="False"
+                             MaxHeight="360" VerticalScrollBarVisibility="Auto" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                        <Button x:Name="CancelButton" Click="OnCancelClick" Padding="14,5" MinWidth="80" Margin="0,0,8,0" />
+                        <Button x:Name="ConfirmButton" Click="OnConfirmClick" Padding="14,5" MinWidth="80" />
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
-        </Border>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
