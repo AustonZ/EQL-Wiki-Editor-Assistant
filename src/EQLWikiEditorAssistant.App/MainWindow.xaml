@@ -657,6 +657,15 @@
                                 <local:DiffView Lines="{Binding ProposedDiff}" />
                             </Border>
                         </StackPanel>
+
+                        <!-- Where the proposed edit would be, the verdict in words (user, 2026-10-12): otherwise "the data
+                             is right" had to be pieced together from the status, a missing diff and the notice below. -->
+                        <Border Background="{StaticResource NoticeDoneBackBrush}" BorderBrush="{StaticResource NoticeDoneBorderBrush}"
+                                BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,14,0,0"
+                                Visibility="{Binding HasMatchNotice, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="The item matches the wiki." TextWrapping="Wrap"
+                                       Foreground="{StaticResource NoticeDoneTextBrush}" />
+                        </Border>
                     </StackPanel>
 
                     <!-- Said in words, and in the warning colour, where the proposed edit would be (user, 2026-10-12:
@@ -664,7 +673,7 @@
                     <Border x:Name="LayoutNotice" Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}"
                             BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,14,0,0"
                             Visibility="{Binding HasOnlyLayoutProposed, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="The page still needs to be reformatted (no data changes)." TextWrapping="Wrap"
+                        <TextBlock Text="{Binding LayoutNoticeText}" TextWrapping="Wrap"
                                    Foreground="{StaticResource NoticeWarnTextBrush}" />
                     </Border>
 

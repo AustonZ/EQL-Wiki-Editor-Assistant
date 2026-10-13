@@ -1793,8 +1793,11 @@ a global hotkey is worth having.
        `BeginLayoutOffer`/`FinishLayoutOffer` are the two ends of it.
      - **The reformatting diff scrolls past a height fitted to the pane**, 10 to 20 rows, so a long reformatting does
        not push Next and "Don't reformat" off the screen (`OnDetailScrollerSizeChanged`).
-     - **A settled item reads "Pending formatting" until it reaches Done** (user, 2026-10-07): "Done" after "the wiki
-       is right" claimed a review that still had its layout to go.
+     - **An item whose data is settled and whose layout is not reads "Needs reformatting"** (user, 2026-10-07, worded
+       2026-10-12): after "the wiki is right", and on a page that already matched. "Done" and "No differences" each
+       left out that the review still had the layout to offer. Such a page that matched also says **"The item matches
+       the wiki."** in green where the proposed edit would be, so the verdict is stated in one place rather than pieced
+       together from the status, a missing diff and the yellow notice; so does one that matched and is laid out.
      - **Lore and every cell of the findings table are selectable text** (user, 2026-10-07): a read-only box drawn as a
        label, whose first click selects the whole value (`Behaviors.SelectAllOnFirstClick`). The table's rows are never
        selected (`Behaviors.NoRowSelection`), which did nothing useful and competed with selecting text. A DataGrid

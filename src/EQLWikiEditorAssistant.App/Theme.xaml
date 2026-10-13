@@ -73,6 +73,12 @@
     <SolidColorBrush x:Key="NoticeInfoTextBrush" Color="#93C6EF" />
     <SolidColorBrush x:Key="NoticeInfoBodyBrush" Color="#7FAACE" />
 
+    <!-- A third, for good news said where the bad would be: "The item matches the wiki", in place of a proposed edit
+         (user, 2026-10-12). The green of DoneBrush, darkened and lightened the same way as the two above. -->
+    <SolidColorBrush x:Key="NoticeDoneBackBrush" Color="#163020" />
+    <SolidColorBrush x:Key="NoticeDoneBorderBrush" Color="#2E6B47" />
+    <SolidColorBrush x:Key="NoticeDoneTextBrush" Color="#9FE3BE" />
+
     <!-- The diff's own four. The pair of backgrounds has to be dark enough that the monospaced text on top stays
          the brightest thing in the row, which is the opposite constraint from the light palette, where the tint was
          the brightest thing and the text the darkest. -->

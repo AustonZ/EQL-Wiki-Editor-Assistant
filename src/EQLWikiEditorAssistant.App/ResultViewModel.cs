@@ -770,8 +770,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         // Green either way (see StatusBrush), but worded for what actually happened (user, 2026-10-07): "Done" is
         // kept for an item the user settled by acting on it. A page that already matched had nothing done to it, and
         // an item the ledger let skip the wiki was not compared at all this time.
-        // Settled, but formatting is still to come (user, 2026-10-07): "Done" belongs to the end of the review.
-        _ when _settled && _step < ReviewStep.Done => "Pending formatting",
+        // The data is settled and the layout is all that is left (user, 2026-10-07, worded 2026-10-12): "Done" and
+        // "No differences" both left out that the review still had something to offer.
+        _ when NeedsReformattingOnly => "Needs reformatting",
         _ when _settled => "Done",
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: false } => "No differences",
         { Status: ItemCheckStatus.AlreadyChecked } => "Already checked",
@@ -803,9 +804,29 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         _ => status.ToString(),
     };
 
+    /// <summary>
+    /// The data question is answered — by the check, or by "the wiki is right" — and the page's layout is still to save
+    /// or leave. Before Done: once there, it was saved.
+    /// </summary>
+    private bool NeedsReformattingOnly =>
+        _step < ReviewStep.Done && !IsCreation &&
+        (_settled ||
+         (Result is { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: false, Review.Reformats: true }));
+
+    /// <summary>"The item matches the wiki.", where a proposed edit would otherwise be: the check found nothing to
+    /// change and nothing for a human to judge.</summary>
+    public bool HasMatchNotice =>
+        !IsCreation && Result is { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: false };
+
+    /// <summary>The first page's yellow notice. "(no data changes)" only where nothing above says so already: after
+    /// "the wiki is right" the comparison is gone, while a page that matched has the green notice (user, 2026-10-12).</summary>
+    public string LayoutNoticeText => HasMatchNotice
+        ? "The page still needs to be reformatted."
+        : "The page still needs to be reformatted (no data changes).";
+
     public Brush StatusBrush => Result switch
     {
-        _ when _settled && _step < ReviewStep.Done => Palette.Warning,
+        _ when NeedsReformattingOnly => Palette.Warning,
         _ when IsDone => Palette.Done,
         { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: true } => Palette.Attention,
         { NeedsLoreCapture: true } or { Status: ItemCheckStatus.LoreRecorded } => Palette.Attention,
