@@ -398,7 +398,12 @@ From the first tester (via the user):
     legacy vocabulary is now recognized by name (CLAUDE.md, "Reading and editing wiki pages"); after that the data diff
     carries only data on **11,312 of 11,546** item pages. The rest fall back to the raw data diff: 200 whose statsblock
     the formatter leaves alone either side (mostly a blank line mid-block), and 34 where only the final can be laid out.
-  - **Known bug, parked until then** (user, 2026-10-12): text typed into the Formatting step's editor does not make
+  - **Built 2026-10-12.** The review is Edit → Preview → Submit → Done; the Formatting step is gone. The Edit page
+    shows the proposed edit against the page laid out, with "Automatic reformatting (N lines)" collapsed under it, and
+    Submit the same. Next lays out a hand edit; one the formatter refuses is saved as typed, with a note. "The wiki is
+    right" on a page whose layout is off offers the layout alone ("Don't reformat" leaves it), and a layout-only save
+    leaves the ledger alone. Checked by tests and the build; the screen itself still wants a look in use.
+  - **Known bug, gone with the Formatting step** (user, 2026-10-12): text typed into the Formatting step's editor did not make
     "Refresh wiki data" ask first, so a refresh throws it away. The check (`ResultViewModel.HasUnsavedEdits`) looks at
     the Edit step's text and summary only. Merging the steps may remove the separate editor, so it waits.
 

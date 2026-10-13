@@ -192,7 +192,7 @@
         <Setter Property="Background" Value="{StaticResource SelectionBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
         <Setter Property="Foreground" Value="#FFFFFF" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Padding" Value="14,5" />
         <!-- Its own template, because the shared one's hover trigger paints the chrome grey by name, which no setter
              here can outrank. -->
@@ -223,6 +223,15 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- The main action of a review page (Next, Done), always first in its row so it is always in the same place (user,
+         2026-10-12). Bold and nothing louder: the wiki-write blue is kept for the one action that cannot be taken back,
+         which is the main action on the page it is on. The other buttons are decisions; anything that commits to
+         nothing (Back, Skip for now, Edit again) is a link. -->
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="20,5" />
     </Style>
 
     <!-- The icon the library suggests, and the button that puts it into the edit, in one bright green so they read as

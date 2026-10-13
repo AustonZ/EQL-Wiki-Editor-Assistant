@@ -556,7 +556,6 @@ public partial class MainWindow : Window
         bool beside = DetailArea.ActualWidth >= (double)FindResource("ShotPaneWidth") + NarrowestEditPane;
         System.Windows.Controls.Panel? target = beside ? ShotPaneHost
             : _shownPage == SubmitPage ? SubmitShotHost
-            : _shownPage == FormattingPage ? FormattingShotHost
             : _shownPage is null || _shownPage == DetailScroller ? InlineShotHost
             : null;
 
@@ -567,7 +566,7 @@ public partial class MainWindow : Window
             target.Children.Add(ShotStack);
         }
 
-        foreach (System.Windows.Controls.Panel host in new[] { InlineShotHost, SubmitShotHost, FormattingShotHost })
+        foreach (System.Windows.Controls.Panel host in new[] { InlineShotHost, SubmitShotHost })
             host.Visibility = ShotStack.Parent == host ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -589,6 +588,16 @@ public partial class MainWindow : Window
                 DialogTone.Warning))
             return;
         await ReloadFromWikiAsync(view, $"Checking {view.ItemName} against the wiki…", "re-checked");
+    }
+
+    /// <summary>
+    /// "Reset": exactly "Refresh wiki data" (user, 2026-10-12), offered beside the buttons when there is something to
+    /// undo. No question first, unlike the refresh link, because its name already says what it throws away.
+    /// </summary>
+    private async void OnResetClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel { CanReset: true } view) return;
+        await ReloadFromWikiAsync(view, $"Resetting {view.ItemName} from the wiki…", "reset");
     }
 
     /// <summary>
@@ -736,12 +745,11 @@ public partial class MainWindow : Window
     {
         ReviewStep.Preview => PreviewPage,
         ReviewStep.Submit => SubmitPage,
-        ReviewStep.Formatting => FormattingPage,
         ReviewStep.Done => DonePage,
         _ => DetailScroller,
     };
 
-    private FrameworkElement[] Pages => [DetailScroller, PreviewPage, SubmitPage, FormattingPage, DonePage];
+    private FrameworkElement[] Pages => [DetailScroller, PreviewPage, SubmitPage, DonePage];
 
     /// <summary>Moves an item to another page of its review, sliding if it is the one on screen.</summary>
     private void GoTo(ResultViewModel view, ReviewStep step)
@@ -849,22 +857,6 @@ public partial class MainWindow : Window
                     : null;
                 break;
 
-            case ReviewStep.Formatting:
-                bool nothingToLayOut = view.Formatting is null;
-                bool quiet = nothingToLayOut && !view.HasFormattingNotes;
-                FormattingGood.Visibility = quiet ? Visibility.Visible : Visibility.Collapsed;
-                FormattingNextButton.Visibility = nothingToLayOut ? Visibility.Visible : Visibility.Collapsed;
-
-                // Nothing to do and nothing to say: a moment to read that, then on (user, 2026-10-07).
-                if (quiet)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(1.2));
-                    if (ResultsList.SelectedItem == view && view.Step == ReviewStep.Formatting && !Dialog.IsOpen)
-                        GoTo(view, ReviewStep.Done);
-                }
-
-                break;
-
             case ReviewStep.Done:
                 await ShowLivePageAsync(view);
                 break;
@@ -879,12 +871,18 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// The first page's Next: on to Preview when there is something to save, or — for a page that already agrees and
-    /// was settled by the check — straight to its formatting.
+    /// The first page's Next: on to Preview when there is something to save, or — for a page that already agrees, is
+    /// laid out, and was settled by the check — straight to Done.
+    ///
+    /// **A hand edit is laid out here** (user, 2026-10-12), so Preview, Submit and the save all show exactly what is
+    /// written. One the formatter will not lay out is saved as typed, and says why.
     /// </summary>
     private void OnNextClick(object sender, RoutedEventArgs e)
     {
         if (ResultsList.SelectedItem is not ResultViewModel { CanGoNext: true } view || _services is null) return;
+
+        if (view.LayOutHandEdits() is { } why)
+            view.AddFormattingNote($"Your edit could not be laid out automatically, so it will be saved as you typed it: {why}");
 
         if (view.HasChangesToSubmit)
         {
@@ -892,15 +890,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        // No request: the page was fetched by the check and nothing has changed it since.
-        if (view.Result.Page is { } page)
-        {
-            (FormattingProposal? proposal, IReadOnlyList<string> notes) = _services.Pipeline.PrepareFormatting(page);
-            view.SetFormatting(proposal, notes);
-        }
-
         view.SkippedSubmit = true;
-        GoTo(view, ReviewStep.Formatting);
+        GoTo(view, ReviewStep.Done);
+    }
+
+    /// <summary>
+    /// "Don't reformat": the layout is all this review offers, and the user would rather leave it. The item closes
+    /// there and then (user, 2026-10-12): going on to the Done page, which shows the live page, read as though
+    /// something had been saved.
+    /// </summary>
+    private void OnSkipLayoutClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ResultViewModel { CanSkipLayout: true } view) return;
+        StatusText.Text = $"'{view.ItemName}' left as it is.";
+        CloseItem(view);
     }
 
     private void OnBackClick(object sender, RoutedEventArgs e)
@@ -926,14 +929,18 @@ public partial class MainWindow : Window
         if (ResultsList.SelectedItem is not ResultViewModel { CanSave: true } view || _services is null) return;
 
         bool creating = view.IsCreation;
+        bool layoutOnly = view.IsLayoutOnly;
         view.IsBusy = true;
         StatusText.Text = creating ? "Creating the page…" : "Saving the edit…";
         try
         {
-            // Logging in is the pipeline's gate, not this handler's — see AppServices.BeforeWriting.
+            // Logging in is the pipeline's gate, not this handler's — see AppServices.BeforeWriting. A save that only
+            // lays the page out leaves the ledger as the check or "the wiki is right" left it.
             CommitResult commit = creating
                 ? await _services.Pipeline.CreateAsync(view.Result, view.Wikitext, view.Summary)
-                : await _services.Pipeline.CommitAsync(view.Result, view.Wikitext, view.Summary);
+                : layoutOnly
+                    ? await _services.Pipeline.CommitLayoutAsync(view.Result, view.Wikitext, view.Summary)
+                    : await _services.Pipeline.CommitAsync(view.Result, view.Wikitext, view.Summary);
             await _services.SaveLedgerAsync();
             UpdateLedgerText();
 
@@ -959,11 +966,9 @@ public partial class MainWindow : Window
             view.Settled = true;
             view.Written = true;
 
-            // The formatting pass has already run against the page as it now stands; offering it is the next page,
-            // never an automatic second write.
-            view.SetFormatting(commit.Formatting, commit.FormattingNotes);
+            // The layout was saved with it (user, 2026-10-12), so the page as readers now see it is next.
             StatusText.Text = outcome;
-            GoTo(view, ReviewStep.Formatting);
+            GoTo(view, ReviewStep.Done);
         }
         catch (WikiUnavailableException ex)
         {
@@ -990,53 +995,75 @@ public partial class MainWindow : Window
         CloseItem(view);
     }
 
-    private async void OnAcceptFormattingClick(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// The change from the comparison to the layout offer, animated (user, 2026-10-12): the notice appears above the
+    /// reformatting, the comparison fades out quickly, then the reformatting opens while the faded comparison closes
+    /// up and the pane scrolls back, so the notice ends at the top. An item not on screen just changes.
+    /// </summary>
+    private async Task OfferLayoutAnimatedAsync(ResultViewModel view)
     {
-        if (ResultsList.SelectedItem is not ResultViewModel { Formatting: { } proposal } view || _services is null)
+        view.BeginLayoutOffer();
+        if (ResultsList.SelectedItem != view || !ComparisonPanel.IsVisible)
+        {
+            view.FinishLayoutOffer();
+            DetailScroller.ScrollToTop();
             return;
-
-        view.IsBusy = true;
-        try
-        {
-            // What is in the box, not what the formatter proposed — the user may have repositioned something.
-            CommitResult commit = await _services.Pipeline.CommitFormattingAsync(
-                proposal with { Formatted = view.FormattedWikitext });
-
-            view.FormattingOutcome = commit.Status switch
-            {
-                CommitStatus.Committed => $"Formatting saved as revision {commit.RevisionId}.",
-                CommitStatus.NoChange => "The wiki found the formatting identical.",
-                _ => null,
-            };
-
-            if (view.FormattingOutcome is null)
-            {
-                StatusText.Text = commit.Error ?? "The formatting edit did not go through.";
-                await Dialog.TellAsync("Nothing was written", commit.Error ?? "The wiki did not accept the edit.",
-                    DialogTone.Warning);
-                return;
-            }
-
-            StatusText.Text = view.FormattingOutcome;
-            GoTo(view, ReviewStep.Done);
         }
-        catch (WikiUnavailableException ex)
+
+        await Animate(TimeSpan.FromMilliseconds(120), t => ComparisonPanel.Opacity = 1 - t);
+
+        // Open the reformatting to learn its height, then run it up from nothing while the comparison closes down.
+        view.ReformattingExpanded = true;
+        DetailPanel.UpdateLayout();
+        double target = ReformattingContent.ActualHeight;
+        double above = ComparisonPanel.ActualHeight;
+        double fromOffset = DetailScroller.VerticalOffset;
+        ComparisonPanel.Height = above;
+        ReformattingContent.Height = 0;
+
+        await Animate(TimeSpan.FromMilliseconds(300), t =>
         {
-            ReportWikiUnavailable(ex, "The formatting was not saved");
-        }
-        finally
-        {
-            view.IsBusy = false;
-        }
+            double eased = 1 - Math.Pow(1 - t, 3);
+            ComparisonPanel.Height = above * (1 - eased);
+            ReformattingContent.Height = target * eased;
+            DetailScroller.ScrollToVerticalOffset(fromOffset * (1 - eased));
+        });
+
+        view.FinishLayoutOffer();
+        ComparisonPanel.ClearValue(HeightProperty);
+        ComparisonPanel.ClearValue(OpacityProperty);
+        ReformattingContent.ClearValue(HeightProperty);
+        DetailScroller.ScrollToTop();
     }
 
-    /// <summary>Skip on the Formatting page, and its Next when there was nothing to lay out.</summary>
-    private void OnSkipFormattingClick(object sender, RoutedEventArgs e)
+    /// <summary>Runs <paramref name="step"/> once a frame with the time elapsed, 0 to 1, finishing on exactly 1.</summary>
+    private static Task Animate(TimeSpan duration, Action<double> step)
     {
-        if (ResultsList.SelectedItem is not ResultViewModel view) return;
-        // Next past a page with nothing to lay out has finished formatting; Skip past a proposal has not.
-        view.SkippedFormatting = view.Formatting is not null;
-        GoTo(view, ReviewStep.Done);
+        var done = new TaskCompletionSource();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        void OnFrame(object? sender, EventArgs e)
+        {
+            double t = Math.Min(1, clock.Elapsed / duration);
+            step(t);
+            if (t < 1) return;
+            System.Windows.Media.CompositionTarget.Rendering -= OnFrame;
+            done.SetResult();
+        }
+
+        System.Windows.Media.CompositionTarget.Rendering += OnFrame;
+        return done.Task;
+    }
+
+    /// <summary>
+    /// The reformatting diff scrolls past a height fitted to the pane (user, 2026-10-12): what the pane has left after
+    /// the notice, the section's header and note, the source editor's header and the buttons, held between 10 and 20
+    /// rows of the diff's 12px Consolas.
+    /// </summary>
+    private void OnDetailScrollerSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        const double row = 14, reserved = 210;
+        ReformattingScroller.MaxHeight = Math.Clamp(DetailScroller.ViewportHeight - reserved, 10 * row, 20 * row);
     }
 
     /// <summary>Done closes the item, like its ✕ in the list: nothing on the wiki or in the ledger changes.</summary>
@@ -1098,21 +1125,19 @@ public partial class MainWindow : Window
         await _services.SaveLedgerAsync();
         UpdateLedgerText();
 
-        view.Settled = true;
-        view.Outcome = "Marked as checked — it will not come back unless the item itself changes.";
-        StatusText.Text = $"'{view.ItemName}' marked as checked.";
-
-        // Settling the data question is what makes formatting safe to offer (user, 2026-09-29): the page is one the
-        // user has just said is right, so the formatter is not being asked to understand data nobody has vouched for.
-        // No request — the page was fetched by the check and nothing has changed it since.
-        if (view.Result.Page is { } page)
+        // Settling the data question is what makes the layout safe to offer (user, 2026-09-29): the page is one the
+        // user has just said is right. So a page whose layout is off is offered that alone, to save or leave (user,
+        // 2026-10-12); one already laid out has nothing left to do, so it closes like Done (user, 2026-10-12: the Done
+        // page shows the live page, which reads as though something had been saved).
+        if (view.Result.Review is { Reformats: true })
         {
-            (FormattingProposal? proposal, IReadOnlyList<string> notes) = _services.Pipeline.PrepareFormatting(page);
-            view.SetFormatting(proposal, notes);
+            StatusText.Text = $"'{view.ItemName}' marked as checked. Its layout can still be saved, or left as it is.";
+            await OfferLayoutAnimatedAsync(view);
+            return;
         }
 
-        view.SkippedSubmit = true;
-        GoTo(view, ReviewStep.Formatting);
+        StatusText.Text = $"'{view.ItemName}' marked as checked. It will not come back unless the item itself changes.";
+        CloseItem(view);
     }
 
     // ============================ the embedded browser ============================

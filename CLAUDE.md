@@ -128,24 +128,29 @@ Tiara` came back as "Tarnishe ncient Tiara", which the tool then offered to crea
 the pointer Windows composites; a game drawing its own pointer into its frames would be unaffected, and the fallback
 for that is parking the pointer in a screen corner for the capture and putting it back.
 
-**Formatting is a separate edit, and the prettifier that makes it is v1 scope** (user, 2026-09-25, promoted from a
-parked future feature). *"A single 'automatically reformatted' edit with no actual data changes is much easier to
-work with when reviewing diff history."*
-- **Reversed 2026-10-10, not yet built**: the user has decided to combine the two into one step and one save (see the
-  plan, "Feedback after alpha.3"). Until that lands this section describes the code as it is; don't defend the
-  separation against that change.
+**The data edit and its formatting are reviewed and saved together** (user, 2026-10-10, built 2026-10-12, reversing
+2026-09-25's *"A single 'automatically reformatted' edit with no actual data changes is much easier to work with when
+reviewing diff history"*). The tester's case, which the user accepted: a second step on every item and a second
+revision on every page cost more than the separate revision was worth. What the separation protected survives:
+- **The reformatting cannot bury the data change, because they are two diffs** (`Pipeline.ReviewText`). The data
+  changes are drawn as *formatted original → formatted proposal*, so both sides share one layout and only data differs,
+  each line already in its blueprint place; the reformatting is *original → formatted original*, collapsed, needing no
+  approval of its own since the formatter proves it changed nothing the page says. The user rejected a single diff of
+  both, as the original separation's whole reason. Measured before building (`WikiSpike split`, simulated edits over
+  every item page): the data diff carries only data on 11,312 of 11,546, once the formatter could lay out legacy pages
+  (see "The formatting pass").
+- **The summary says when a save reformats** (`ReviewText.SummaryFor`: `...; reformatted`, or "Reformatted to the Item
+  Page Blueprint (no data changes)" when only the layout changes), so page history still tells the two apart.
+- **A layout-only save leaves the ledger alone** (`ItemCheckPipeline.CommitLayoutAsync`): the data question was
+  already settled, by the check or by "the wiki is right".
 - **The data edit goes first; the prettifier runs second.** Settled, not arbitrary: running it first would not stay
   pretty, because the data edit adds new content as unformatted lines (see the minimal-edit rule below) and the page
   would need reformatting again — prettify-first collapses into prettify-first-and-last. It would also force a
   purely syntactic pass to understand legacy forms with a very short remaining life (the `<ul><li>` merchant-value
   blocks, legacy flag lines, `{{Item Lore Missing}}`, stale era banners) that the semantic pass deletes anyway.
   **Semantics before syntax.**
-- **v1 runs the prettifier automatically after any change** and prompts to commit the reformatting if any is needed
-  — a CI formatting gate, with the twist that this codebase starts messy and the reformat must not bury the data
-  change. **A brand-new page goes through it before its first wiki commit**: there is no reason for a page's history
-  to start dirty when it doesn't have to.
-- **MVP is the flag-only version**: the tool marks a page as needing reformatting — it knows, because it knows when
-  it added an unformatted line — and the user runs the prettifier separately.
+- **Every edit is laid out before it is shown**, and so is a brand-new page: there is no reason for a page's history
+  to start dirty when it doesn't have to. A hand edit is laid out when the user leaves the first page of the review.
 - **The data edit never reformats incidentally.** No whitespace normalization, no re-rendering a block to tidy it,
   no "while we're here" fixes. That is why the raw source is the source of truth (see "Reading and editing wiki
   pages"), and it stays binding however capable the prettifier becomes.
@@ -1222,8 +1227,8 @@ and pressing something. See "Identifying an item's icon" below.
 Page Blueprint says — parameters in blueprint order with aligned `=`, statsblock lines in blueprint order with the
 blueprint's grouping, stray spacing removed — and changes nothing about what the page says **except one thing: a
 signed stat's positive value gains its `+`** (user, 2026-09-30, who classes that as formatting rather than data).
-It is always **its own edit,
-after the data edit**; see "Formatting is a separate edit" above for why that order is settled.
+It runs **after the data edit** and is saved **with it**; see "The data edit and its formatting are reviewed and saved
+together" above for why that order is settled and how the two stay apart on screen.
 - **Its licence to rearrange a public wiki's pages is that it can *prove* it preserved the content.** Every format is
   verified by re-parsing the result and comparing parameter by parameter, with the statsblock compared as a multiset
   of its fields, flags and unreadable lines; any mismatch returns the original untouched with a refusal naming what
@@ -1308,28 +1313,14 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
   the likely typos `SV.Magic`, `Dieties`, `Dmg Bon` — and `DMG Bonus` itself since 2026-10-11, which the data pass
   removes, so the formatter only meets one the user chose to keep. Dropping one would lose real data; guessing a slot would invent
   a convention the editors have not agreed.
-- **It runs automatically after a data commit, as a prompt, never as a second automatic write.**
-  `ItemCheckPipeline.CommitAsync` hands back a `FormattingProposal`; `CommitFormattingAsync` writes it under its own
-  summary ("Reformatted to the Item Page Blueprint (no data changes)"), with the same re-fetch-and-refuse conflict
-  rule as the data commit — a reflow saved over somebody else's change would be the worst kind to review.
-  - **It formats the page as it now stands, re-read from the wiki, not the text we just submitted.** MediaWiki
-    normalizes a saved page, so formatting our own submission would propose an edit against a revision that does not
-    exist. It also makes `PrepareFormattingAsync` usable on its own, for a page nobody has just edited.
-  - **A failure here never fails the data commit**: the formatting is an extra, and the user can run it again.
-  - **It is also offered where nothing is written** (user, 2026-09-29): a page whose data already matches, and one the
-    user has settled with "the wiki is right". Otherwise there is no moment at which a user is shown that a page whose
-    data is correct is laid out wrongly — `Tuft of Polar Bear Fur` is a real example. Both use
-    `PrepareFormatting(page)`, which takes the page already fetched and makes **no request**: nothing has changed it
-    since, unlike after a commit where MediaWiki normalizes what was saved and the formatter must see the result.
-  - **"Skip for now" deliberately offers nothing**, and that is the data-before-formatting rule rather than an
-    oversight: skipping leaves the data question unanswered, so the formatter would be laying out a page the data pass
-    has not modernized — the exact situation the settled order exists to prevent. A page with a *proposed* edit gets
-    none either, until the user settles that edit one way or the other; offering both at once would bury the data diff
-    under a reflow.
-  - **The two passes compose the right way round on a legacy page, which is the clearest argument for the settled
-    data-first order.** Before the data edit the formatter refuses to touch such a statsblock; the data edit replaces
-    the legacy flags line with what the game actually says, and only then is the page one the formatter understands
-    well enough to lay out. Formatting first would have met a page it declines. A test pins exactly that sequence.
+- **It runs as part of every review, never as a write of its own** (see "The data edit and its formatting are
+  reviewed and saved together"). `ReviewText.For` formats the page as fetched and the data step's edit of it; the
+  review shows the two diffs, and one save writes both.
+  - **It is also offered where no data changes** (user, 2026-09-29, kept 2026-10-12 to encourage cleanup): a page
+    whose data already matches, and one the user has settled with "the wiki is right". Otherwise there is no moment at
+    which a user is shown that a page whose data is correct is laid out wrongly — `Tuft of Polar Bear Fur` is a real
+    example. It costs no request: the check already has the page. "Don't reformat" leaves it.
+  - **"Skip for now" writes nothing at all**, the layout included: the data question is unanswered.
   - A page with nothing to do offers nothing — a prompt that appears when there is no work becomes noise the user
     learns to dismiss.
   - **A brand-new page goes through the formatter before its first commit**: the formatter runs over the generated
@@ -1752,21 +1743,58 @@ a global hotkey is worth having.
   whatever icon the result holds, and a row fingerprinted without one never matches the next capture — the
   2026-09-29 ledger bug, reached by a new route. `ReCheckingAnAlreadyCheckedItemKeepsItSettled` fails without it.
   The review screen still hides the icon section for such a result, since nothing was compared.
-- **The edit pane is a step-by-step review** (user, 2026-10-07): a timeline over five pages, sliding between them,
+- **The edit pane is a step-by-step review** (user, 2026-10-07): a timeline over four pages, sliding between them,
   with the screenshot pane beside it never moving. Each item keeps its own page, so switching items in the list returns
   to where each was left. An item with nothing to step through (occluded, ineligible, already checked, a Lore-only
   capture) shows the first page alone, with no timeline.
   1. **Edit** (named for what happens there, a new page included; it was "Differences"): warnings, icon, lore, the
-     findings, the tool's proposed edit as a diff, and "Edit wikitext source" collapsed beneath it (user, 2026-10-07;
-     expanding it scrolls it into view). The proposed diff is fixed at the check (`ProposedDiff`), unlike Submit's,
-     which is built from whatever the editor holds. The source's open state is per item (`SourceExpanded`, user,
+     findings, the tool's proposed edit as a diff, "Automatic reformatting (N lines)" collapsed beneath it (user,
+     2026-10-12), and "Edit wikitext source" collapsed beneath that (user, 2026-10-07; expanding it scrolls it into
+     view). The proposed diff is fixed at the check (`ProposedDiff`), drawn against the page laid out (see "The data
+     edit and its formatting are reviewed and saved together"), unlike Submit's, which is built from whatever the
+     editor holds. The formatter's notes (a field kept without a place, a statsblock it left alone) sit under them. The source's open state is per item (`SourceExpanded`, user,
      2026-10-08): closed whenever the item loads afresh — a capture, "Edit again" — and kept otherwise, so Back from
-     Preview finds it as it was left. Next goes to Preview when
-     the text on screen differs from the page (or is a new page), and straight to Formatting for a page that already
-     agrees and was settled by the check. "The wiki is right" settles it here and also goes on to Formatting, Preview
-     and Submit shown as not needed; "Skip for now" is a link and closes the item.
+     Preview finds it as it was left. Next lays out a hand edit (user, 2026-10-12: so Preview, Submit and the save
+     show exactly what is written; one the formatter refuses is saved as typed, with a note), then goes to Preview when
+     the text on screen differs from the page (or is a new page). Next appears only where it leads somewhere: a page
+     that already agrees, is laid out, and was settled by the check shows **Done** in its place, and a page that agrees
+     but still wants a human shows neither, until the text is changed. "The wiki is right" settles it here; on a page
+     whose layout is off it then offers the layout alone, to save or leave with "Don't reformat" (user, 2026-10-12).
+     "Skip for now" is a link, offered on anything unsettled.
+     - **What each button means** (agreed with the user, 2026-10-12), so new states follow the pattern rather than
+       invent one. *Done*, *The wiki is right* and *Don't reformat* close the item as settled (the ledger row is written
+       by the check, the save or "the wiki is right" itself; the button only closes). *Skip for now* closes it as
+       `Skipped`. *Next* and *Back* move between pages. *Save*/*Create* write to the wiki and go on to the Done page to
+       show the result. *Edit again* starts a new edit. **Only a save goes to the Done page**: anything else that ends
+       the review closes the item with a line in the status bar, because the Done page shows the live page and reads
+       as though something had been saved. The exceptions to "settled" are deliberate: a save on an item that still
+       needs attention, and a creation without a `lucy_img_ID`, are recorded `Flagged` and come back.
+     - **Every page's row reads the same way** (user, 2026-10-12, after alternating sides to click through a review):
+       the main action first, so it is always in the same place; then any other decision, as a plain button; then the
+       links. **A decision is a button, and anything that commits to nothing is a link**, so "the wiki is right" and
+       "Don't reformat" (the same choice, never shown together) are buttons, and Back, Skip for now and Edit again are
+       links, ending with **Reset** (user, 2026-10-12) when there is something to undo: the text or summary changed, or
+       the layout offer after "the wiki is right". It is exactly "Refresh wiki data", placed where it is wanted, and
+       asks nothing first since its name says what it discards. After "the wiki is right" it takes that answer back:
+       **a check that finds an edit to propose removes a row saying the item is done** (bug found by the user,
+       2026-10-12: Reset showed the edit again and the next capture skipped the wiki as "already checked"). The
+       screen and the ledger have to agree, and the screen is right, the question being open again. A row that already
+       says so (Skipped, Flagged) is kept; `RefreshingAPageThatStillDisagreesUnsettlesIt` pins it. The main action uses `PrimaryButton` (bold, no colour of its own); Save and Create keep the wiki-write
+       blue, being the main action on their page. The rows follow the content rather than sitting in a bar at the
+       bottom, except on Preview and Done, where the content ends there anyway.
+     - **Offering the layout alone clears the pane** (user, 2026-10-12, after trying it: the diff vanished and the
+       buttons changed, and the status that said why was elsewhere on screen). Warnings, icon, lore, findings and the
+       proposed edit go (`ShowsComparison`); what stays is a yellow "The page still needs to be reformatted (no data
+       changes)." and the reformatting section, open. The same notice, not "Only the layout changes" — which could be
+       read as the rendered page's layout — marks any layout-only proposal, on Submit too.
+     - **The change is animated** (user, 2026-10-12, `OfferLayoutAnimatedAsync`): the notice appears above the
+       reformatting, the comparison fades out in 120 ms, then over 300 ms the reformatting opens while the faded
+       comparison closes up and the pane scrolls back, so the notice ends at the top of the pane. The view model's
+       `BeginLayoutOffer`/`FinishLayoutOffer` are the two ends of it.
+     - **The reformatting diff scrolls past a height fitted to the pane**, 10 to 20 rows, so a long reformatting does
+       not push Next and "Don't reformat" off the screen (`OnDetailScrollerSizeChanged`).
      - **A settled item reads "Pending formatting" until it reaches Done** (user, 2026-10-07): "Done" after "the wiki
-       is right" or a save claimed a review that still had a step to go.
+       is right" claimed a review that still had its layout to go.
      - **Lore and every cell of the findings table are selectable text** (user, 2026-10-07): a read-only box drawn as a
        label, whose first click selects the whole value (`Behaviors.SelectAllOnFirstClick`). The table's rows are never
        selected (`Behaviors.NoRowSelection`), which did nothing useful and competed with selecting text. A DataGrid
@@ -1776,26 +1804,22 @@ a global hotkey is worth having.
      - **Every diff is selectable, across lines** (`DiffView`, user, 2026-10-08): one read-only document rather than a
        text block per line. The line numbers and +/- marker sit in a gutter outside the text, and a copy is rebuilt
        from each line's own text, so what is copied is wikitext that can be pasted straight into a page — no
-       numbers, no markers, no "... N unchanged lines ...". The Edit, Submit and Formatting pages share it.
+       numbers, no markers, no "... N unchanged lines ...". The Edit and Submit pages share it.
      - **The capture prompts have no button** (user, 2026-10-07): "Switch to it in game, then capture again." The
        button was clipped, and capturing again is the hotkey or Capture now like any capture.
   2. **Preview**: the wiki's own rendering of the text on screen — see the next bullet.
-  3. **Submit**: the title it goes to (large, for a creation), the final diff of the text on screen against the page,
-     the summary, and Save or Create. **This page is the confirmation** (user, 2026-10-07): there is no "are you sure?"
+  3. **Submit**: the title it goes to (large, for a creation), the final diff of the text on screen against the page
+     laid out, the same collapsed reformatting, the summary, and Save or Create. **This page is the confirmation** (user, 2026-10-07): there is no "are you sure?"
      after it. The missing-`lucy_img_ID` warning a creation used to put in its confirmation sits here instead, asked of
      the text on screen as before.
-  4. **Formatting**: the formatting diff with Accept (a wiki write, so a solid button), Skip, or Make another edit; the
-     raw editor is there but **collapsed**, to discourage formatting by hand. Nothing to lay out and nothing to say shows
-     "Formatting looks good" for a moment and moves on by itself; the formatter's notes (a field kept without a place, a
-     page it declined) are shown here instead of in the warning strip.
-  5. **Done**: the live page, with Done (closes the item) and Edit again. Its own marker shows a green check, since
+  4. **Done**: the live page, with Done (closes the item) and Edit again. Its own marker shows a green check, since
      arriving there means everything is finished.
   - **A skipped step has its own marker** (user, 2026-10-07): a hollow dashed ring around a skip-forward glyph, its
-    label struck through — not the checkmark of a finished step. Preview and Submit are skipped by "the wiki is right"
-    or a page with nothing to save; Formatting by its Skip. Formatting that found nothing to do is finished, not skipped.
+    label struck through — not the checkmark of a finished step. Preview and Submit are skipped by a page with nothing
+    to save. (A fifth step, Formatting, was its own page until 2026-10-12.)
   - **Back stops at the save.** Once the data edit is written, or the user has said the wiki is right, the earlier
-    pages describe a decision already made, so the timeline will not go back to them; "Edit again" and "Make another
-    edit" re-check the page as it now stands and start from the first page instead.
+    pages describe a decision already made, so the timeline will not go back to them; "Edit again" re-checks the page
+    as it now stands and starts from the first page instead.
   - **Re-checking a page the tool just wrote keeps its row's outcome.** "Edit again" re-checks the page it has just
     saved, and recording the agreeing page as `Matched` would have erased `Created` — the row most worth finding again.
     The AlreadyCorrect path keeps an existing `Edited` or `Created`; `ReCheckingAPageJustCreatedKeepsItRecordedAsCreated`

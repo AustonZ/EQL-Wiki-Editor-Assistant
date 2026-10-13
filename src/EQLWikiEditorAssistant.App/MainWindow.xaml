@@ -350,308 +350,352 @@
             <!-- 1. Edit. -->
             <!-- No padding on the scroller itself: it sat inside the scrolling area, so clipped content stopped short
                  of the border above and below (user, 2026-10-07). The panel's own margin scrolls with it instead. -->
-            <ScrollViewer x:Name="DetailScroller" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer x:Name="DetailScroller" VerticalScrollBarVisibility="Auto" SizeChanged="OnDetailScrollerSizeChanged">
                 <StackPanel x:Name="DetailPanel" Margin="16,10,16,16">
                     <!-- The name, status and screenshot land here when the area is too narrow for their own pane. -->
                     <StackPanel x:Name="InlineShotHost" Margin="0,0,0,4" Visibility="Collapsed" />
 
-                    <!-- **The capture comes first, above everything else** (user, 2026-10-01): the game is the
-                         source, so the panel reads from the source downward towards the finished wikitext. The
-                         icons share this row rather than taking a section of their own further down — there is
-                         spare width beside a ~400px window crop, and vertical space is what this panel runs out
-                         of. A WrapPanel is what makes that safe: on a narrow window the icons drop below the
-                         screenshot instead of being clipped. -->
-                    <WrapPanel Orientation="Horizontal">
+                    <!-- Everything about the comparison, hidden once the user has said the wiki is right and only the
+                         page's layout is left to offer (user, 2026-10-12): what remains is that offer, not a review
+                         whose diff has quietly gone. -->
+                    <StackPanel x:Name="ComparisonPanel"
+                                Visibility="{Binding ShowsComparison, Converter={StaticResource BoolToVis}}">
+                        <!-- **The capture comes first, above everything else** (user, 2026-10-01): the game is the
+                             source, so the panel reads from the source downward towards the finished wikitext. The
+                             icons share this row rather than taking a section of their own further down — there is
+                             spare width beside a ~400px window crop, and vertical space is what this panel runs out
+                             of. A WrapPanel is what makes that safe: on a narrow window the icons drop below the
+                             screenshot instead of being clipped. -->
+                        <WrapPanel Orientation="Horizontal">
 
-                        <!-- Both icons, whatever the verdict. The comparison is perceptual and has limits — it
-                             declines near-black sprites and occasionally flags a good one — and every one of those
-                             outcomes is cheap to settle if the user can just look, and expensive if they cannot. It
-                             also makes a wrong "match" visible, which no threshold can. On a creation only the
-                             captured side shows: see ShowIconComparison. -->
-                        <!-- **No MaxWidth on this panel**: the two tiles are 380px wide together at 4x (a 45x52
-                             captured strip and a 40x40 wiki file, plus borders and the gap), so any bound below
-                             that silently clips the wiki icon rather than wrapping it — which a 320 here did, at
-                             about two thirds of the second tile (user, 2026-10-01). The icon row sets the column's
-                             width and the prose wraps to it (SizedColumn, user, 2026-10-11): two tiles or three,
-                             and narrower again when a narrow window wraps the row, which no fixed width could
-                             follow — the 380 it replaced was two tiles' width, and wrapped too soon beside three. -->
-                        <local:SizedColumn Margin="0,2,0,0"
-                                    Visibility="{Binding HasIcons, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="Icon" Style="{StaticResource SectionHeading}" Margin="0,10,0,4" />
-                            <TextBlock Text="{Binding IconVerdict}" Foreground="{Binding IconVerdictBrush}"
-                                       TextWrapping="Wrap" Margin="0,0,0,6" HorizontalAlignment="Left"
-                                       Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}" />
-                            <TextBlock Text="{Binding IconColumnHint}" TextWrapping="Wrap"
-                                       Foreground="{Binding IconColumnHintBrush}" Margin="0,0,0,6"
-                                       HorizontalAlignment="Left"
-                                       Visibility="{Binding HasIconColumnHint, Converter={StaticResource BoolToVis}}" />
-                            <!-- Wraps rather than clips: three tiles need ~560px, more than the content column has at the minimum
-                                 window width (rendered, 2026-10-07). -->
-                            <WrapPanel Orientation="Horizontal" local:SizedColumn.SetsWidth="True">
-                                <StackPanel Margin="0,0,20,8">
-                                    <TextBlock Text="In game" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <!-- Collapsed when there is no image, rather than left as an empty Border: its
-                                         near-black background renders as a small dark rectangle that looks exactly
-                                         like a corrupt icon, which is how a null here got reported as a capture bug
-                                         (user, 2026-09-29). An absent icon has to look absent. -->
-                                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
-                                            Visibility="{Binding HasCapturedIcon, Converter={StaticResource BoolToVis}}">
-                                        <!-- Fitted into the same box as the wiki file (user, 2026-10-07). The
-                                             strip is a little larger than a 40x40 file, so drawn at the same 4x it
-                                             came out bigger and the pair looked unbalanced. -->
-                                        <Image x:Name="CapturedIconImage" Stretch="Uniform" Margin="4"
-                                               Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
-                                               RenderOptions.BitmapScalingMode="HighQuality" />
-                                    </Border>
-                                    <!-- An absent icon has to look absent, and now also says so where the icon would be
-                                         (user, 2026-10-07). -->
-                                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
-                                            Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}">
-                                        <Grid Margin="4" Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}">
-                                            <TextBlock Text="No icon found in the capture" TextWrapping="Wrap" TextAlignment="Center"
-                                                       VerticalAlignment="Center" Padding="10,0"
-                                                       Foreground="{StaticResource AttentionBrush}" />
-                                        </Grid>
-                                    </Border>
+                            <!-- Both icons, whatever the verdict. The comparison is perceptual and has limits — it
+                                 declines near-black sprites and occasionally flags a good one — and every one of those
+                                 outcomes is cheap to settle if the user can just look, and expensive if they cannot. It
+                                 also makes a wrong "match" visible, which no threshold can. On a creation only the
+                                 captured side shows: see ShowIconComparison. -->
+                            <!-- **No MaxWidth on this panel**: the two tiles are 380px wide together at 4x (a 45x52
+                                 captured strip and a 40x40 wiki file, plus borders and the gap), so any bound below
+                                 that silently clips the wiki icon rather than wrapping it — which a 320 here did, at
+                                 about two thirds of the second tile (user, 2026-10-01). The icon row sets the column's
+                                 width and the prose wraps to it (SizedColumn, user, 2026-10-11): two tiles or three,
+                                 and narrower again when a narrow window wraps the row, which no fixed width could
+                                 follow — the 380 it replaced was two tiles' width, and wrapped too soon beside three. -->
+                            <local:SizedColumn Margin="0,2,0,0"
+                                        Visibility="{Binding HasIcons, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Icon" Style="{StaticResource SectionHeading}" Margin="0,10,0,4" />
+                                <TextBlock Text="{Binding IconVerdict}" Foreground="{Binding IconVerdictBrush}"
+                                           TextWrapping="Wrap" Margin="0,0,0,6" HorizontalAlignment="Left"
+                                           Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}" />
+                                <TextBlock Text="{Binding IconColumnHint}" TextWrapping="Wrap"
+                                           Foreground="{Binding IconColumnHintBrush}" Margin="0,0,0,6"
+                                           HorizontalAlignment="Left"
+                                           Visibility="{Binding HasIconColumnHint, Converter={StaticResource BoolToVis}}" />
+                                <!-- Wraps rather than clips: three tiles need ~560px, more than the content column has at the minimum
+                                     window width (rendered, 2026-10-07). -->
+                                <WrapPanel Orientation="Horizontal" local:SizedColumn.SetsWidth="True">
+                                    <StackPanel Margin="0,0,20,8">
+                                        <TextBlock Text="In game" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                        <!-- Collapsed when there is no image, rather than left as an empty Border: its
+                                             near-black background renders as a small dark rectangle that looks exactly
+                                             like a corrupt icon, which is how a null here got reported as a capture bug
+                                             (user, 2026-09-29). An absent icon has to look absent. -->
+                                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                                Visibility="{Binding HasCapturedIcon, Converter={StaticResource BoolToVis}}">
+                                            <!-- Fitted into the same box as the wiki file (user, 2026-10-07). The
+                                                 strip is a little larger than a 40x40 file, so drawn at the same 4x it
+                                                 came out bigger and the pair looked unbalanced. -->
+                                            <Image x:Name="CapturedIconImage" Stretch="Uniform" Margin="4"
+                                                   Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
+                                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                        </Border>
+                                        <!-- An absent icon has to look absent, and now also says so where the icon would be
+                                             (user, 2026-10-07). -->
+                                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                                Visibility="{Binding HasNoCapturedIcon, Converter={StaticResource BoolToVis}}">
+                                            <Grid Margin="4" Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}">
+                                                <TextBlock Text="No icon found in the capture" TextWrapping="Wrap" TextAlignment="Center"
+                                                           VerticalAlignment="Center" Padding="10,0"
+                                                           Foreground="{StaticResource AttentionBrush}" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,20,8"
+                                                Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="On the wiki" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                                Visibility="{Binding HasWikiIcon, Converter={StaticResource BoolToVis}}">
+                                            <Image x:Name="WikiIconImage" Stretch="Uniform" Margin="4"
+                                                   Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
+                                                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                        </Border>
+                                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
+                                                Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}">
+                                            <Grid Margin="4" Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}">
+                                                <TextBlock Text="No icon on the wiki" TextWrapping="Wrap" TextAlignment="Center"
+                                                           VerticalAlignment="Center" Padding="10,0"
+                                                           Foreground="{StaticResource AttentionBrush}" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!-- The icon the library matched, beside the captured one. **This tile is the whole
+                                         safety argument for writing lucy_img_ID automatically**: the match is perceptual
+                                         and no threshold separates a lucky win from a real one, so the user confirming by
+                                         eye is what makes a 96.7% identifier safe to act on. -->
+                                    <!-- **The gap before this tile is not decoration**: its Border paints a background,
+                                         and with no gap it overpaints the last letter of the wiki column's "none on the
+                                         page" label, which is wider than the tile above it (rendered, 2026-10-02). Every
+                                         tile now carries the gap on its right rather than this one on its left, so a
+                                         tile that wraps to a new line starts flush (rendered, 2026-10-07). -->
+                                    <StackPanel Margin="0,0,0,8"
+                                                Visibility="{Binding ShowMatchedIcon, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding MatchedIconCaption}" FontSize="11"
+                                                   Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
+                                        <!-- 3px, not the other tiles' 1px: this is the one tile that asks for something. Its
+                                             image keeps the others' size, so the tile is 4px wider than they are. -->
+                                        <Border BorderBrush="{Binding MatchedIconBorderBrush}" BorderThickness="3" Background="{StaticResource GameBackdropBrush}"
+                                                Visibility="{Binding HasMatchedIcon, Converter={StaticResource BoolToVis}}">
+                                            <Image x:Name="MatchedIconImage" Stretch="Uniform" Margin="4"
+                                                   Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
+                                                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                        </Border>
+                                    </StackPanel>
+                                </WrapPanel>
+
+                                <!-- One button, two jobs. On a creation it publishes the file the generated id already
+                                     names; on an existing page whose icon is wrong it does whatever is needed to point
+                                     the page at the right one — uploading first when the wiki lacks the file, which it
+                                     does for 93% of the library. Both say what they will do before they do it. -->
+                                <StackPanel Margin="0,8,0,0" HorizontalAlignment="Left"
+                                            Visibility="{Binding CanActOnIcon, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding IconActionPrompt}" TextWrapping="Wrap" Margin="0,0,0,6"
+                                               Visibility="{Binding HasIconActionPrompt, Converter={StaticResource BoolToVis}}" />
+                                    <!-- The label is a TextBlock rather than string Content because **a Button eats an
+                                         underscore**: WPF reads it as an access-key prefix, so binding the file name
+                                         directly rendered "Upload Item3327.png" for a file actually called
+                                         Item_3327.png — a wrong file name on the one button whose whole job is to say
+                                         which file it publishes. Caught by rendering it; invisible in the XAML. -->
+                                    <!-- Green like the suggested tile above it, so the two read as one call to action
+                                         (tester feedback, 2026-10-11). -->
+                                    <Button Style="{StaticResource SuggestionButton}" Click="OnIconActionClick"
+                                            HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}">
+                                        <TextBlock Text="{Binding IconActionButtonText}" />
+                                    </Button>
                                 </StackPanel>
-                                <StackPanel Margin="0,0,20,8"
-                                            Visibility="{Binding ShowIconComparison, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="On the wiki" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
-                                            Visibility="{Binding HasWikiIcon, Converter={StaticResource BoolToVis}}">
-                                        <Image x:Name="WikiIconImage" Stretch="Uniform" Margin="4"
-                                               Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
-                                               RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                <TextBlock Text="{Binding IconUploadOutcome}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                           HorizontalAlignment="Left"
+                                           Foreground="{Binding IconUploadOutcomeBrush}"
+                                           Visibility="{Binding HasIconUploadOutcome, Converter={StaticResource BoolToVis}}" />
+                            </local:SizedColumn>
+                        </WrapPanel>
+
+                        <!-- Warnings first and unmissable. A flagged gap is the product here; silently-wrong data on a
+                             public wiki is the failure this whole tool exists to avoid. -->
+                        <ItemsControl ItemsSource="{Binding Warnings}" Margin="0,12,0,0"
+                                      Visibility="{Binding HasWarnings, Converter={StaticResource BoolToVis}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1"
+                                            CornerRadius="3" Padding="8,5" Margin="0,0,0,4">
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}" />
                                     </Border>
-                                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" Background="{StaticResource GameBackdropBrush}"
-                                            Visibility="{Binding HasNoWikiIcon, Converter={StaticResource BoolToVis}}">
-                                        <Grid Margin="4" Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}">
-                                            <TextBlock Text="No icon on the wiki" TextWrapping="Wrap" TextAlignment="Center"
-                                                       VerticalAlignment="Center" Padding="10,0"
-                                                       Foreground="{StaticResource AttentionBrush}" />
-                                        </Grid>
-                                    </Border>
-                                </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
-                                <!-- The icon the library matched, beside the captured one. **This tile is the whole
-                                     safety argument for writing lucy_img_ID automatically**: the match is perceptual
-                                     and no threshold separates a lucky win from a real one, so the user confirming by
-                                     eye is what makes a 96.7% identifier safe to act on. -->
-                                <!-- **The gap before this tile is not decoration**: its Border paints a background,
-                                     and with no gap it overpaints the last letter of the wiki column's "none on the
-                                     page" label, which is wider than the tile above it (rendered, 2026-10-02). Every
-                                     tile now carries the gap on its right rather than this one on its left, so a
-                                     tile that wraps to a new line starts flush (rendered, 2026-10-07). -->
-                                <StackPanel Margin="0,0,0,8"
-                                            Visibility="{Binding ShowMatchedIcon, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="{Binding MatchedIconCaption}" FontSize="11"
-                                               Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,3" />
-                                    <!-- 3px, not the other tiles' 1px: this is the one tile that asks for something. Its
-                                         image keeps the others' size, so the tile is 4px wider than they are. -->
-                                    <Border BorderBrush="{Binding MatchedIconBorderBrush}" BorderThickness="3" Background="{StaticResource GameBackdropBrush}"
-                                            Visibility="{Binding HasMatchedIcon, Converter={StaticResource BoolToVis}}">
-                                        <Image x:Name="MatchedIconImage" Stretch="Uniform" Margin="4"
-                                               Width="{StaticResource IconTileSize}" Height="{StaticResource IconTileSize}"
-                                               RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                                    </Border>
-                                </StackPanel>
-                            </WrapPanel>
-
-                            <!-- One button, two jobs. On a creation it publishes the file the generated id already
-                                 names; on an existing page whose icon is wrong it does whatever is needed to point
-                                 the page at the right one — uploading first when the wiki lacks the file, which it
-                                 does for 93% of the library. Both say what they will do before they do it. -->
-                            <StackPanel Margin="0,8,0,0" HorizontalAlignment="Left"
-                                        Visibility="{Binding CanActOnIcon, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="{Binding IconActionPrompt}" TextWrapping="Wrap" Margin="0,0,0,6"
-                                           Visibility="{Binding HasIconActionPrompt, Converter={StaticResource BoolToVis}}" />
-                                <!-- The label is a TextBlock rather than string Content because **a Button eats an
-                                     underscore**: WPF reads it as an access-key prefix, so binding the file name
-                                     directly rendered "Upload Item3327.png" for a file actually called
-                                     Item_3327.png — a wrong file name on the one button whose whole job is to say
-                                     which file it publishes. Caught by rendering it; invisible in the XAML. -->
-                                <!-- Green like the suggested tile above it, so the two read as one call to action
-                                     (tester feedback, 2026-10-11). -->
-                                <Button Style="{StaticResource SuggestionButton}" Click="OnIconActionClick"
-                                        HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}">
-                                    <TextBlock Text="{Binding IconActionButtonText}" />
-                                </Button>
-                            </StackPanel>
-                            <TextBlock Text="{Binding IconUploadOutcome}" TextWrapping="Wrap" Margin="0,6,0,0"
-                                       HorizontalAlignment="Left"
-                                       Foreground="{Binding IconUploadOutcomeBrush}"
-                                       Visibility="{Binding HasIconUploadOutcome, Converter={StaticResource BoolToVis}}" />
-                        </local:SizedColumn>
-                    </WrapPanel>
-
-                    <!-- Warnings first and unmissable. A flagged gap is the product here; silently-wrong data on a
-                         public wiki is the failure this whole tool exists to avoid. -->
-                    <ItemsControl ItemsSource="{Binding Warnings}" Margin="0,12,0,0"
-                                  Visibility="{Binding HasWarnings, Converter={StaticResource BoolToVis}}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1"
-                                        CornerRadius="3" Padding="8,5" Margin="0,0,0,4">
-                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}" />
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <!-- The reverse of the Lore tab prompt below (user, 2026-10-07): the Lore tab was captured first,
-                         so the item's data is still to come. -->
-                    <Border Visibility="{Binding WantsDescriptionCapture, Converter={StaticResource BoolToVis}}"
-                            Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1" CornerRadius="3"
-                            Padding="10,7" Margin="0,12,0,0">
-                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
-                                   Text="This item's Description tab has not been captured yet. Switch to it in game, then capture again." />
-                    </Border>
-
-                    <!-- One lore region, always in the same place: the prompt to capture the Lore tab, the lore once
-                         captured, and the comparison against the page all live here rather than the lore capture
-                         taking over the whole screen (user, 2026-09-28). -->
-                    <StackPanel Visibility="{Binding HasLoreSection, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="Lore" Style="{StaticResource SectionHeading}" />
-
-                        <!-- Waiting for the second capture. No button of its own (user, 2026-10-07): capturing again
-                             is the hotkey or Capture now, as for any capture, and the button was being clipped. -->
-                        <Border Visibility="{Binding WantsLoreCapture, Converter={StaticResource BoolToVis}}"
+                        <!-- The reverse of the Lore tab prompt below (user, 2026-10-07): the Lore tab was captured first,
+                             so the item's data is still to come. -->
+                        <Border Visibility="{Binding WantsDescriptionCapture, Converter={StaticResource BoolToVis}}"
                                 Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1" CornerRadius="3"
-                                Padding="10,7">
+                                Padding="10,7" Margin="0,12,0,0">
                             <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
-                                       Text="This item has a Lore tab that has not been captured yet. Switch to it in game, then capture again." />
+                                       Text="This item's Description tab has not been captured yet. Switch to it in game, then capture again." />
                         </Border>
 
-                        <!-- Captured, and the page has none to compare against — it will be added by the edit. -->
-                        <Border Visibility="{Binding HasCapturedLoreOnly, Converter={StaticResource BoolToVis}}"
-                                BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3" Padding="8">
-                            <StackPanel>
-                                <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"
-                                           Margin="0,0,0,4" />
-                                <TextBox Text="{Binding CapturedLore, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                        <!-- One lore region, always in the same place: the prompt to capture the Lore tab, the lore once
+                             captured, and the comparison against the page all live here rather than the lore capture
+                             taking over the whole screen (user, 2026-09-28). -->
+                        <StackPanel Visibility="{Binding HasLoreSection, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Lore" Style="{StaticResource SectionHeading}" />
 
-                    <!-- The comparison, when the page already has lore of its own. The tool never overwrites it, so
-                         this is purely "do you still like what the page says?". -->
-                    <StackPanel Visibility="{Binding HasLoreToCompare, Converter={StaticResource BoolToVis}}">
-                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,6,0,6"
-                                   Text="The page's lore and the captured lore differ. Lore is never overwritten, so the page keeps its own wording unless you change it by hand." />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
-                                    Padding="8" Margin="0,0,5,0">
-                                <StackPanel>
-                                    <TextBlock Text="On the wiki (kept)" FontWeight="SemiBold" Foreground="{StaticResource DoneBrush}"
-                                               Margin="0,0,0,4" />
-                                    <TextBox Text="{Binding LoreOnWiki, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
-                                </StackPanel>
+                            <!-- Waiting for the second capture. No button of its own (user, 2026-10-07): capturing again
+                                 is the hotkey or Capture now, as for any capture, and the button was being clipped. -->
+                            <Border Visibility="{Binding WantsLoreCapture, Converter={StaticResource BoolToVis}}"
+                                    Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}" BorderThickness="1" CornerRadius="3"
+                                    Padding="10,7">
+                                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}"
+                                           Text="This item has a Lore tab that has not been captured yet. Switch to it in game, then capture again." />
                             </Border>
-                            <Border Grid.Column="1" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
-                                    Padding="8" Margin="5,0,0,0">
+
+                            <!-- Captured, and the page has none to compare against — it will be added by the edit. -->
+                            <Border Visibility="{Binding HasCapturedLoreOnly, Converter={StaticResource BoolToVis}}"
+                                    BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3" Padding="8">
                                 <StackPanel>
                                     <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"
                                                Margin="0,0,0,4" />
-                                    <TextBox Text="{Binding LoreInGame, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
+                                    <TextBox Text="{Binding CapturedLore, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
                                 </StackPanel>
                             </Border>
-                        </Grid>
+                        </StackPanel>
+
+                        <!-- The comparison, when the page already has lore of its own. The tool never overwrites it, so
+                             this is purely "do you still like what the page says?". -->
+                        <StackPanel Visibility="{Binding HasLoreToCompare, Converter={StaticResource BoolToVis}}">
+                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,6,0,6"
+                                       Text="The page's lore and the captured lore differ. Lore is never overwritten, so the page keeps its own wording unless you change it by hand." />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
+                                        Padding="8" Margin="0,0,5,0">
+                                    <StackPanel>
+                                        <TextBlock Text="On the wiki (kept)" FontWeight="SemiBold" Foreground="{StaticResource DoneBrush}"
+                                                   Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding LoreOnWiki, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3"
+                                        Padding="8" Margin="5,0,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="In game (captured)" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}"
+                                                   Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding LoreInGame, Mode=OneWay}" Style="{StaticResource SelectableItemData}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+
+                        <TextBlock Text="Proposed changes" Style="{StaticResource SectionHeading}"
+                                   Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}" />
+                        <!-- PreviewMouseWheel: a DataGrid has its own ScrollViewer, which swallows the wheel even when
+                             it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
+                        <!-- Every cell is selectable text (user, 2026-10-07): the first click selects the whole value, later
+                             ones pick out part of it. Rows are never selected, which did nothing useful. The text takes the
+                             row's colour, since a text box sets its own foreground rather than inheriting one. -->
+                        <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
+                                  CanUserReorderColumns="False" CanUserResizeColumns="True"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
+                                  BorderBrush="{StaticResource BorderBrushKey}" HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                  PreviewMouseWheel="OnPassScrollToPage" local:Behaviors.NoRowSelection="True"
+                                  Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
+                            <DataGrid.Resources>
+                                <Style x:Key="FindingCell" TargetType="TextBox" BasedOn="{StaticResource SelectableItemData}">
+                                    <Setter Property="Margin" Value="2,3" />
+                                    <Setter Property="Foreground" Value="{Binding Foreground}" />
+                                </Style>
+                                <Style x:Key="FindingProse" TargetType="TextBox" BasedOn="{StaticResource FindingCell}">
+                                    <Setter Property="FontFamily" Value="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                    <Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                </Style>
+                            </DataGrid.Resources>
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="Field" Width="1.2*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Field, Mode=OneWay}" Style="{StaticResource FindingProse}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <!-- The compared values wrap: an effect line or a lore paragraph is far wider than a cell, and
+                                     truncating it hid the very thing the row exists to show. -->
+                                <DataGridTemplateColumn Header="In game" Width="1.6*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Captured, Mode=OneWay}" Style="{StaticResource FindingCell}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="On the wiki" Width="1.6*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding OnWiki, Mode=OneWay}" Style="{StaticResource FindingCell}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Verdict" Width="Auto">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Verdict, Mode=OneWay}" Style="{StaticResource FindingProse}"
+                                                     TextWrapping="NoWrap" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <!-- The note wraps; truncated mid-sentence it lost the part explaining *why*. -->
+                                <DataGridTemplateColumn Header="Note" Width="2.2*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Explanation, Mode=OneWay}" Style="{StaticResource FindingProse}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                            <!-- A row that gets selected regardless (a second click does it) shows nothing: the
+                                 highlight sat behind the text's own selection and made it hard to read (user, 2026-10-08). -->
+                            <DataGrid.CellStyle>
+                                <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                                    <Setter Property="Focusable" Value="False" />
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="Transparent" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.CellStyle>
+                        </DataGrid>
+
+
+                        <!-- **The tool's own proposal as a diff, and the source collapsed beneath it** (user, 2026-10-07). The
+                             diff is the edit the tool worked out, fixed when the item was checked; Submit shows the final
+                             one, from whatever the editor then holds. The source is there to change it further, and what is
+                             in it is what Preview renders and Submit saves. Expanding it brings it into view. -->
+                        <StackPanel Visibility="{Binding HasProposedDiff, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Proposed edit" Style="{StaticResource SectionHeading}" />
+                            <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3">
+                                <local:DiffView Lines="{Binding ProposedDiff}" />
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
 
-                    <TextBlock Text="Proposed changes" Style="{StaticResource SectionHeading}"
-                               Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}" />
-                    <!-- PreviewMouseWheel: a DataGrid has its own ScrollViewer, which swallows the wheel even when
-                         it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
-                    <!-- Every cell is selectable text (user, 2026-10-07): the first click selects the whole value, later
-                         ones pick out part of it. Rows are never selected, which did nothing useful. The text takes the
-                         row's colour, since a text box sets its own foreground rather than inheriting one. -->
-                    <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
-                              CanUserReorderColumns="False" CanUserResizeColumns="True"
-                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
-                              BorderBrush="{StaticResource BorderBrushKey}" HorizontalScrollBarVisibility="Disabled"
-                              ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                              PreviewMouseWheel="OnPassScrollToPage" local:Behaviors.NoRowSelection="True"
-                              Visibility="{Binding HasFindings, Converter={StaticResource BoolToVis}}">
-                        <DataGrid.Resources>
-                            <Style x:Key="FindingCell" TargetType="TextBox" BasedOn="{StaticResource SelectableItemData}">
-                                <Setter Property="Margin" Value="2,3" />
-                                <Setter Property="Foreground" Value="{Binding Foreground}" />
-                            </Style>
-                            <Style x:Key="FindingProse" TargetType="TextBox" BasedOn="{StaticResource FindingCell}">
-                                <Setter Property="FontFamily" Value="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=Window}}" />
-                                <Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Window}}" />
-                            </Style>
-                        </DataGrid.Resources>
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="Field" Width="1.2*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding Field, Mode=OneWay}" Style="{StaticResource FindingProse}" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <!-- The compared values wrap: an effect line or a lore paragraph is far wider than a cell, and
-                                 truncating it hid the very thing the row exists to show. -->
-                            <DataGridTemplateColumn Header="In game" Width="1.6*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding Captured, Mode=OneWay}" Style="{StaticResource FindingCell}" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="On the wiki" Width="1.6*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding OnWiki, Mode=OneWay}" Style="{StaticResource FindingCell}" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="Verdict" Width="Auto">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding Verdict, Mode=OneWay}" Style="{StaticResource FindingProse}"
-                                                 TextWrapping="NoWrap" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <!-- The note wraps; truncated mid-sentence it lost the part explaining *why*. -->
-                            <DataGridTemplateColumn Header="Note" Width="2.2*">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding Explanation, Mode=OneWay}" Style="{StaticResource FindingProse}" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                        <!-- A row that gets selected regardless (a second click does it) shows nothing: the
-                             highlight sat behind the text's own selection and made it hard to read (user, 2026-10-08). -->
-                        <DataGrid.CellStyle>
-                            <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
-                                <Setter Property="Focusable" Value="False" />
-                                <Style.Triggers>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter Property="Background" Value="Transparent" />
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </DataGrid.CellStyle>
-                    </DataGrid>
+                    <!-- Said in words, and in the warning colour, where the proposed edit would be (user, 2026-10-12:
+                         "Only the layout changes" could be read as the rendered page's layout). -->
+                    <Border x:Name="LayoutNotice" Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}"
+                            BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,14,0,0"
+                            Visibility="{Binding HasOnlyLayoutProposed, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="The page still needs to be reformatted (no data changes)." TextWrapping="Wrap"
+                                   Foreground="{StaticResource NoticeWarnTextBrush}" />
+                    </Border>
 
-
-                    <!-- **The tool's own proposal as a diff, and the source collapsed beneath it** (user, 2026-10-07). The
-                         diff is the edit the tool worked out, fixed when the item was checked; Submit shows the final
-                         one, from whatever the editor then holds. The source is there to change it further, and what is
-                         in it is what Preview renders and Submit saves. Expanding it brings it into view. -->
-                    <StackPanel Visibility="{Binding HasProposedDiff, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="Proposed edit" Style="{StaticResource SectionHeading}" />
-                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3">
-                            <local:DiffView Lines="{Binding ProposedDiff}" />
-                        </Border>
-                    </StackPanel>
+                    <!-- **The page's own reformatting, collapsed** (user, 2026-10-12): saved with the edit, needing no
+                         approval of its own, since the formatter proves it changed nothing the page says. The proposed
+                         edit above is drawn against the page laid out the same way, so it holds only the data. -->
+                    <Expander Header="{Binding ReformattingHeader}" Margin="0,14,0,0"
+                              IsExpanded="{Binding ReformattingExpanded}"
+                              Visibility="{Binding HasReformatting, Converter={StaticResource BoolToVis}}">
+                        <!-- Clipped while it animates open (see OfferLayoutAnimatedAsync). -->
+                        <StackPanel x:Name="ReformattingContent" Margin="0,6,0,0" ClipToBounds="True">
+                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6"
+                                       Text="Laid out to the Item Page Blueprint and saved with the edit. Layout only: the Assistant checks that nothing the page says changes." />
+                            <!-- Scrolls past a height fitted to the pane, 10 to 20 rows (user, 2026-10-12), so a long
+                                 reformatting does not push Next and "Don't reformat" off the screen. -->
+                            <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3">
+                                <ScrollViewer x:Name="ReformattingScroller" VerticalScrollBarVisibility="Auto">
+                                    <local:DiffView Lines="{Binding ReformattingDiff}" />
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+                    </Expander>
+                    <ItemsControl ItemsSource="{Binding FormattingNotes}" Margin="0,8,0,0"
+                                  Visibility="{Binding HasFormattingNotes, Converter={StaticResource BoolToVis}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}"
+                                           Margin="0,0,0,2" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <Expander x:Name="SourceExpander" Header="Edit wikitext source" Margin="0,14,0,0"
                               Expanded="OnSourceExpanded" IsExpanded="{Binding SourceExpanded}"
                               Visibility="{Binding HasEditor, Converter={StaticResource BoolToVis}}">
@@ -675,19 +719,38 @@
 
                     <!-- Next, or settle it here: "the wiki is right" is the only way a flagged item becomes done, and
                          without it an item whose page the user has decided is correct would come back on every capture
-                         forever. Skipping writes nothing to the wiki, so it is a link. -->
+                         forever. Skipping commits to nothing, so it is a link.
+                         Every row is the main action first, then the decision to keep what the wiki has ("the wiki is
+                         right", or once that is settled "don't reformat"; never both), then the links (user,
+                         2026-10-12). -->
                     <WrapPanel Margin="0,14,0,0" Orientation="Horizontal">
-                        <Button Content="Next" Click="OnNextClick" Padding="20,5" Margin="0,0,10,6" FontWeight="SemiBold"
+                        <Button Content="Next" Click="OnNextClick" Style="{StaticResource PrimaryButton}" Margin="0,0,10,6"
                                 IsEnabled="{Binding CanGoNext}"
-                                Visibility="{Binding HasReview, Converter={StaticResource BoolToVis}}" />
+                                Visibility="{Binding ShowsNext, Converter={StaticResource BoolToVis}}" />
+                        <!-- Nothing to save and nothing left to decide: close it here (user, 2026-10-12), rather than
+                             step through a review with nothing in it. Next takes its place once the text is changed. -->
+                        <Button Content="Done" Click="OnDoneClick" Style="{StaticResource PrimaryButton}" Margin="0,0,10,6"
+                                ToolTip="Nothing to change. Close this item."
+                                Visibility="{Binding CanFinishHere, Converter={StaticResource BoolToVis}}" />
                         <Button Content="The wiki is right — mark as checked" Click="OnMarkCheckedClick" Padding="14,5"
                                 Margin="0,0,10,6"
                                 ToolTip="Records the item as checked without changing the page. It comes back only if the item itself changes."
                                 Visibility="{Binding CanMarkChecked, Converter={StaticResource BoolToVis}}" />
+                        <!-- The same kind of decision as "the wiki is right", so the same kind of control (user,
+                             2026-10-12). -->
+                        <Button Content="Don't reformat" Click="OnSkipLayoutClick" Padding="14,5" Margin="0,0,10,6"
+                                ToolTip="Leave the page's layout as it is and close this item. Nothing is written."
+                                Visibility="{Binding CanSkipLayout, Converter={StaticResource BoolToVis}}" />
                         <TextBlock VerticalAlignment="Center" Margin="0,0,0,6"
                                    Visibility="{Binding CanSkip, Converter={StaticResource BoolToVis}}">
                             <Hyperlink Click="OnSkipClick"
                                        ToolTip="Leave it for now. It comes back on the next capture.">Skip for now</Hyperlink>
+                        </TextBlock>
+                        <!-- Last, as the way back out of whatever was done here (user, 2026-10-12). -->
+                        <TextBlock VerticalAlignment="Center" Margin="14,0,0,6"
+                                   Visibility="{Binding CanReset, Converter={StaticResource BoolToVis}}">
+                            <Hyperlink Click="OnResetClick"
+                                       ToolTip="Start this review over from the page as it is on the wiki now. Your changes here are discarded.">Reset</Hyperlink>
                         </TextBlock>
                     </WrapPanel>
 
@@ -704,9 +767,11 @@
                 <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0"
                         Padding="16,10">
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="Back" Click="OnBackClick" Padding="14,5" Margin="0,0,8,0" />
-                        <Button Content="Next" Click="OnPreviewNextClick" Padding="20,5" FontWeight="SemiBold"
+                        <Button Content="Next" Click="OnPreviewNextClick" Style="{StaticResource PrimaryButton}"
                                 IsEnabled="{Binding HasChangesToSubmit}" />
+                        <TextBlock VerticalAlignment="Center" Margin="14,0,0,0">
+                            <Hyperlink Click="OnBackClick">Back</Hyperlink>
+                        </TextBlock>
                     </StackPanel>
                 </Border>
                 <TextBlock DockPanel.Dock="Top" Margin="16,10,16,8" TextWrapping="Wrap"
@@ -737,111 +802,67 @@
                         <TextBlock Text="{Binding SubmitNotice}" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}" />
                     </Border>
 
-                    <TextBlock Text="What will be written" Style="{StaticResource SectionHeading}" />
-                    <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3">
-                        <local:DiffView Lines="{Binding Diff}" />
+                    <StackPanel Visibility="{Binding HasDiff, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="What will be written" Style="{StaticResource SectionHeading}" />
+                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3">
+                            <local:DiffView Lines="{Binding Diff}" />
+                        </Border>
+                    </StackPanel>
+                    <Border Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}"
+                            BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,14,0,0"
+                            Visibility="{Binding HasOnlyLayoutToSubmit, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="The page still needs to be reformatted (no data changes)." TextWrapping="Wrap"
+                                   Foreground="{StaticResource NoticeWarnTextBrush}" />
                     </Border>
+                    <Expander Header="{Binding ReformattingHeader}" Margin="0,10,0,0"
+                              IsExpanded="{Binding ReformattingExpanded}"
+                              Visibility="{Binding HasReformatting, Converter={StaticResource BoolToVis}}">
+                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3" Margin="0,6,0,0">
+                            <local:DiffView Lines="{Binding ReformattingDiff}" />
+                        </Border>
+                    </Expander>
+                    <ItemsControl ItemsSource="{Binding FormattingNotes}" Margin="0,8,0,0"
+                                  Visibility="{Binding HasFormattingNotes, Converter={StaticResource BoolToVis}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}"
+                                           Margin="0,0,0,2" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                     <TextBlock Text="Edit summary" Style="{StaticResource SectionHeading}" />
                     <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Padding="4,3"
                              FontFamily="Consolas" FontSize="12" />
 
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                        <Button Content="Back" Click="OnBackClick" Padding="14,5" Margin="0,0,8,0"
-                                IsEnabled="{Binding IsNotBusy}" />
                         <!-- A TextBlock rather than string content, so no underscore in it is eaten as an access key. -->
                         <Button Style="{StaticResource WikiWriteButton}" Click="OnSaveClick" IsEnabled="{Binding CanSave}">
                             <TextBlock Text="{Binding SaveButtonText}" />
                         </Button>
+                        <TextBlock VerticalAlignment="Center" Margin="14,0,0,0">
+                            <Hyperlink Click="OnBackClick" IsEnabled="{Binding IsNotBusy}">Back</Hyperlink>
+                        </TextBlock>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- 4. Formatting: always its own edit, never folded into the data one, because a reformatting commit with
-                 no data changes is what makes page history reviewable. -->
-            <ScrollViewer x:Name="FormattingPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="16,10,16,16">
-                    <StackPanel x:Name="FormattingShotHost" Margin="0,0,0,4" Visibility="Collapsed" />
-
-                    <TextBlock Text="{Binding Outcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
-                               Margin="0,0,0,10" TextWrapping="Wrap"
-                               Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
-
-                    <TextBlock x:Name="FormattingGood" Text="Formatting looks good." FontSize="16" FontWeight="SemiBold"
-                               Foreground="{StaticResource DoneBrush}" Visibility="Collapsed" />
-
-                    <ItemsControl ItemsSource="{Binding FormattingNotes}" Margin="0,8,0,0"
-                                  Visibility="{Binding HasFormattingNotes, Converter={StaticResource BoolToVis}}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}"
-                                        BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,0,0,4">
-                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{StaticResource NoticeWarnTextBrush}" />
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <StackPanel Visibility="{Binding HasFormatting, Converter={StaticResource BoolToVis}}">
-                        <Border Background="{StaticResource NoticeInfoBackBrush}" BorderBrush="{StaticResource NoticeInfoBorderBrush}"
-                                BorderThickness="1" CornerRadius="3" Padding="10,7" Margin="0,4,0,0">
-                            <StackPanel>
-                                <TextBlock FontWeight="SemiBold" Foreground="{StaticResource NoticeInfoTextBrush}"
-                                           Text="The page can be tidied — as a separate edit" />
-                                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource NoticeInfoBodyBrush}" Margin="0,3,0,0"
-                                           Text="Layout only: nothing the page says changes. Saved as its own edit." />
-                            </StackPanel>
-                        </Border>
-
-                        <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3" Margin="0,8,0,0">
-                            <local:DiffView Lines="{Binding FormattingDiff}" />
-                        </Border>
-
-                        <!-- **Collapsed by default** (user, 2026-10-07), to discourage formatting by hand: the formatter is
-                             meant to be deterministic and trusted. Still editable, because it has to put a field it has
-                             no rule for somewhere and the user may disagree. What is in the box is what gets saved. -->
-                        <Expander Header="Raw wikitext" Margin="0,10,0,0">
-                            <TextBox Text="{Binding FormattedWikitext, UpdateSourceTrigger=PropertyChanged}"
-                                     AcceptsReturn="True" FontFamily="Consolas" FontSize="12" Height="260"
-                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                                     Margin="0,6,0,0" />
-                        </Expander>
-
-                        <WrapPanel Orientation="Horizontal" Margin="0,12,0,0">
-                            <Button Content="Accept the formatting" Style="{StaticResource WikiWriteButton}"
-                                    Click="OnAcceptFormattingClick" Margin="0,0,8,6"
-                                    IsEnabled="{Binding CanCommitFormatting}" />
-                            <Button Content="Skip" Click="OnSkipFormattingClick" Padding="14,5" Margin="0,0,8,6"
-                                    IsEnabled="{Binding IsNotBusy}" ToolTip="Leave the layout as it is" />
-                            <Button Content="Make another edit" Click="OnEditAgainClick" Padding="14,5" Margin="0,0,0,6"
-                                    IsEnabled="{Binding IsNotBusy}"
-                                    ToolTip="Back to the first page, compared afresh against the page as it now stands" />
-                        </WrapPanel>
-                    </StackPanel>
-
-                    <Button x:Name="FormattingNextButton" Content="Next" Click="OnSkipFormattingClick" Padding="20,5"
-                            FontWeight="SemiBold" HorizontalAlignment="Left" Margin="0,14,0,0" Visibility="Collapsed" />
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- 5. Done: the page as readers now see it. -->
+            <!-- 4. Done: the page as readers now see it. -->
             <DockPanel x:Name="DonePage" Visibility="Collapsed">
                 <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,1,0,0"
                         Padding="16,10">
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="Done" Click="OnDoneClick" Padding="20,5" FontWeight="SemiBold" Margin="0,0,8,0"
+                        <Button Content="Done" Click="OnDoneClick" Style="{StaticResource PrimaryButton}"
                                 ToolTip="Close this item" />
-                        <Button Content="Edit again" Click="OnEditAgainClick" Padding="14,5"
-                                IsEnabled="{Binding IsNotBusy}"
-                                ToolTip="Back to the first page, compared afresh against the page as it now stands" />
+                        <TextBlock VerticalAlignment="Center" Margin="14,0,0,0">
+                            <Hyperlink Click="OnEditAgainClick" IsEnabled="{Binding IsNotBusy}"
+                                       ToolTip="Back to the first page, compared afresh against the page as it now stands">Edit again</Hyperlink>
+                        </TextBlock>
                     </StackPanel>
                 </Border>
                 <StackPanel DockPanel.Dock="Top" Margin="16,10,16,8">
                     <TextBlock Text="{Binding Outcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
                                TextWrapping="Wrap" Visibility="{Binding HasOutcome, Converter={StaticResource BoolToVis}}" />
-                    <TextBlock Text="{Binding FormattingOutcome}" Foreground="{StaticResource DoneBrush}" FontWeight="SemiBold"
-                               TextWrapping="Wrap"
-                               Visibility="{Binding HasFormattingOutcome, Converter={StaticResource BoolToVis}}" />
                     <!-- Repeats the page link under the item's name, here where the page is (user, 2026-10-07: "even
                          I forgot about it"). A link, since it only opens a page. -->
                     <DockPanel Margin="0,4,0,0">

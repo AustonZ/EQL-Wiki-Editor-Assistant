@@ -4,6 +4,7 @@ using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.Core.Glyphs;
 using EQLWikiEditorAssistant.Pipeline;
 using EQLWikiEditorAssistant.Tests.Wiki;
+using EQLWikiEditorAssistant.Wiki.Formatting;
 using EQLWikiEditorAssistant.Wiki.Ledger;
 using EQLWikiEditorAssistant.Wiki.MediaWiki;
 
@@ -399,15 +400,54 @@ public class ItemCheckPipelineTests
         Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
     }
 
-    // --- formatting offered without a data edit ---------------------------------------------------------
-
     /// <summary>
-    /// **A page that already agrees still gets its formatting checked** (user, 2026-09-29). There is otherwise no
-    /// moment at which a user would be shown that a page whose data is right is laid out wrongly. It costs no
-    /// request: the page was just fetched and nothing has changed it since.
+    /// **A refresh that finds an edit to propose takes back an earlier "the wiki is right"** (bug found by the user,
+    /// 2026-10-12). Reset after "the wiki is right" showed the edit again, and the next capture then skipped the wiki
+    /// as already checked, because the Matched row was still there. The screen and the ledger have to agree.
     /// </summary>
     [Fact]
-    public async Task APageThatAlreadyMatchesIsStillOfferedItsFormatting()
+    public async Task RefreshingAPageThatStillDisagreesUnsettlesIt()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
+            Build(Window(EarringLines), UntidyPage());
+
+        ItemCheckResult first = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+        Assert.Equal(ItemCheckStatus.EditProposed, first.Status);
+        pipeline.RecordCheckedByHand(first);
+        Assert.Equal(CheckOutcome.Matched, ledger.Find("Earring of Bashing")!.Outcome);
+
+        ItemCheckResult reset = await pipeline.ReanalyzeAsync(first, refreshVerification: true);
+        Assert.Equal(ItemCheckStatus.EditProposed, reset.Status);
+        Assert.Null(ledger.Find("Earring of Bashing"));
+
+        int before = wiki.Fetches;
+        ItemCheckResult again = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+        Assert.Equal(ItemCheckStatus.EditProposed, again.Status);
+        Assert.True(wiki.Fetches > before);
+    }
+
+    /// <summary>...and leaves alone a row that already says the question is open: a skip is the user's own record.</summary>
+    [Fact]
+    public async Task RefreshingKeepsASkip()
+    {
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(EarringLines), UntidyPage());
+
+        ItemCheckResult first = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+        pipeline.RecordSkipped(first);
+        await pipeline.ReanalyzeAsync(first);
+
+        Assert.Equal(CheckOutcome.Skipped, ledger.Find("Earring of Bashing")!.Outcome);
+    }
+
+    // --- the layout, reviewed with the data ---------------------------------------------------------------
+
+    /// <summary>
+    /// **A page that already agrees still gets its layout offered** (user, 2026-09-29, and 2026-10-12 to encourage
+    /// cleanup). There is otherwise no moment at which a user would be shown that a page whose data is right is laid
+    /// out wrongly. It costs no request: the page was just fetched and nothing has changed it since.
+    /// </summary>
+    [Fact]
+    public async Task APageThatAlreadyMatchesIsStillOfferedItsLayout()
     {
         // The real `Earring of Bashing` fixture: its data matches this capture exactly (the ledger test above
         // relies on that), and the prettifier still has work to do on it — notes out of blueprint order, Size and
@@ -419,7 +459,10 @@ public class ItemCheckPipelineTests
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
         Assert.Equal(ItemCheckStatus.AlreadyCorrect, results[0].Status);
-        Assert.NotNull(results[0].Formatting);
+        ReviewText review = results[0].Review!;
+        Assert.True(review.Reformats);
+        Assert.Equal(review.FormattedOriginal, review.Proposed);   // nothing but the layout changes
+        Assert.Equal(ReviewText.LayoutOnlySummary, review.SummaryFor(results[0].Edit!));
         Assert.Equal(before + 1, wiki.Fetches); // the page's own fetch, and nothing more
     }
 
@@ -444,47 +487,39 @@ public class ItemCheckPipelineTests
         public void Report(T value) => into.Add(value);
     }
 
-    /// <summary>A page the tool wants to change does not get one yet: that edit rebuilds the layout anyway, and
-    /// offering both at once would bury the data diff under a reflow.</summary>
+    /// <summary>
+    /// **A proposed edit is reviewed with its layout** (user, 2026-10-12): the proposal is laid out, and the data
+    /// changes are drawn against the page laid out the same way, so they are not buried under the reflow. The
+    /// summary says the save reformats the page too.
+    /// </summary>
     [Fact]
-    public async Task APageWithAProposedEditIsNotOfferedFormattingYet()
+    public async Task AProposedEditIsReviewedWithItsLayout()
     {
         (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines), UntidyPage());
 
-        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
 
-        Assert.Equal(ItemCheckStatus.EditProposed, results[0].Status);
-        Assert.Null(results[0].Formatting);
+        Assert.Equal(ItemCheckStatus.EditProposed, result.Status);
+        ReviewText review = result.Review!;
+        Assert.True(review.Reformats);
+        Assert.False(ItemPagePrettifier.Format(review.Proposed).Changed);
+        // Laid out on both sides, so the statsblock's reordering is not part of the data diff.
+        Assert.Contains("Slot: EAR<br>\nAC: 5<br>", review.FormattedOriginal);
+        Assert.Contains("Slot: EAR<br>\nAC: 5<br>", review.Proposed);
+        Assert.EndsWith("; reformatted", review.SummaryFor(result.Edit!));
     }
 
-    /// <summary>Formatting a page already in hand asks the wiki for nothing — the whole reason it can be offered on
-    /// a match without making captures slower.</summary>
+    /// <summary>Skipping writes nothing — neither the data nor the layout, which are one save now.</summary>
     [Fact]
-    public async Task PreparingFormattingFromAPageInHandMakesNoRequest()
+    public async Task SkippingWritesNothing()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), EarringPage());
-        IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
-
-        int before = wiki.Fetches;
-        (FormattingProposal? proposal, _) = pipeline.PrepareFormatting(results[0].Page!);
-
-        Assert.NotNull(proposal);
-        Assert.Equal(before, wiki.Fetches);
-    }
-
-    /// <summary>**Skipping never offers formatting**, and that is the data-before-formatting rule rather than an
-    /// oversight: skipping leaves the data question unanswered, and the formatter must never be asked to lay out a
-    /// page the data pass has not modernized (user, 2026-09-29).</summary>
-    [Fact]
-    public async Task SkippingLeavesTheFormattingAlone()
-    {
-        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(EarringLines), UntidyPage());
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines), UntidyPage());
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
         pipeline.RecordSkipped(results[0]);
 
         Assert.Equal(CheckOutcome.Skipped, ledger.Find("Earring of Bashing")!.Outcome);
-        Assert.Null(results[0].Formatting);
+        Assert.Equal(0, wiki.Edits);
     }
 
     // --- verification (reported, never enforced) --------------------------------------------------------
@@ -1163,74 +1198,69 @@ public class ItemCheckPipelineTests
         Assert.True(wiki.Fetches > after);
     }
 
-    // --- the formatting follow-up ----------------------------------------------------------------------
+    // --- saving the edit and its layout -----------------------------------------------------------------
 
     /// <summary>
-    /// **The formatting is offered, never folded in.** Mixing it into the data edit would bury a one-value
-    /// correction under a whole-page reflow, which is the review problem this tool exists to solve — so the data
-    /// commit writes exactly once and hands back a separate proposal.
+    /// **The data edit and its layout are one save** (user, 2026-10-12, reversing 2026-09-25's separate formatting
+    /// edit): one revision, whose summary says it reformats too, and a page that needs no further layout afterwards.
     /// </summary>
     [Fact]
-    public async Task CommittingOffersTheFormattingAsASecondEditWithoutWritingIt()
+    public async Task TheEditAndItsLayoutAreSavedTogether()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines), UntidyPage());
         ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
+        ReviewText review = result.Review!;
 
-        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+        CommitResult commit = await pipeline.CommitAsync(result, review.Proposed, review.SummaryFor(result.Edit!));
 
         Assert.Equal(CommitStatus.Committed, commit.Status);
         Assert.Equal(1, wiki.Edits);
-        Assert.NotNull(commit.Formatting);
-        Assert.DoesNotContain("Reformatted", wiki.LastSummary);
+        Assert.Contains("reformatted", wiki.LastSummary);
+        Assert.Equal(CheckOutcome.Edited, ledger.Find("Earring of Bashing")!.Outcome);
+
+        ItemCheckResult again = await pipeline.ReanalyzeAsync(result);
+        Assert.Equal(ItemCheckStatus.AlreadyCorrect, again.Status);
+        Assert.False(again.Review!.Reformats);
     }
 
+    /// <summary>
+    /// A save that only lays the page out says so, and **leaves the ledger as it was**: the data question was settled
+    /// before it, by the check or by "the wiki is right", and laying the page out says nothing new about it.
+    /// </summary>
     [Fact]
-    public async Task TheFormattingEditIsWrittenSeparatelyAndSaysSo()
+    public async Task ALayoutOnlySaveSaysSoAndLeavesTheLedgerAlone()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(EarringLines), EarringPage());
         ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
-        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+        LedgerEntry before = ledger.Find("Earring of Bashing")!;
 
-        CommitResult formatting = await pipeline.CommitFormattingAsync(commit.Formatting!);
+        CommitResult commit = await pipeline.CommitLayoutAsync(
+            result, result.Review!.FormattedOriginal, ReviewText.LayoutOnlySummary);
 
-        Assert.Equal(CommitStatus.Committed, formatting.Status);
-        Assert.Equal(2, wiki.Edits);
+        Assert.Equal(CommitStatus.Committed, commit.Status);
+        Assert.Equal(1, wiki.Edits);
         Assert.Contains("no data changes", wiki.LastSummary);
-    }
-
-    /// <summary>A page already laid out offers nothing — the prompt has to be silent when there is nothing to do, or
-    /// it becomes noise the user learns to dismiss.</summary>
-    [Fact]
-    public async Task ATidyPageOffersNoFormatting()
-    {
-        (ItemCheckPipeline pipeline, _, _) = Build(Window(EarringLines), UntidyPage());
-        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
-        CommitResult first = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
-        await pipeline.CommitFormattingAsync(first.Formatting!);
-
-        (FormattingProposal? again, _) = await pipeline.PrepareFormattingAsync("Earring of Bashing");
-
-        Assert.Null(again);
+        Assert.Same(before, ledger.Find("Earring of Bashing"));
     }
 
     /// <summary>Same conflict rule as the data commit: a reflow saved over somebody else's change would be the worst
     /// kind of edit to review.</summary>
     [Fact]
-    public async Task TheFormattingEditRefusesAPageThatMovedOn()
+    public async Task ALayoutOnlySaveRefusesAPageThatMovedOn()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), EarringPage());
         ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
-        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
 
         wiki.Pages["Earring of Bashing"] = wiki.Pages["Earring of Bashing"] with
         {
             Wikitext = wiki.Pages["Earring of Bashing"].Wikitext + "\n[[Category:Somebody's addition]]",
         };
 
-        CommitResult formatting = await pipeline.CommitFormattingAsync(commit.Formatting!);
+        CommitResult commit = await pipeline.CommitLayoutAsync(
+            result, result.Review!.FormattedOriginal, ReviewText.LayoutOnlySummary);
 
-        Assert.Equal(CommitStatus.PageChangedSinceCheck, formatting.Status);
-        Assert.Equal(1, wiki.Edits);
+        Assert.Equal(CommitStatus.PageChangedSinceCheck, commit.Status);
+        Assert.Equal(0, wiki.Edits);
     }
 
     /// <summary>
@@ -1245,19 +1275,15 @@ public class ItemCheckPipelineTests
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), legacy);
 
-        (FormattingProposal? before, IReadOnlyList<string> notes) =
-            await pipeline.PrepareFormattingAsync("Earring of Bashing");
-        Assert.NotNull(before);
-        Assert.Contains("MAGIC ITEM, LORE ITEM<br>\nSlot: EAR<br>", before!.Formatted);
-        Assert.DoesNotContain(notes, n => n.Contains("left exactly as it was", StringComparison.Ordinal));
-
         ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
-        CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);
+        ReviewText review = result.Review!;
+        Assert.Contains("MAGIC ITEM, LORE ITEM<br>\nSlot: EAR<br>", review.FormattedOriginal);
+        Assert.DoesNotContain("MAGIC ITEM", review.Proposed);
+
+        CommitResult commit = await pipeline.CommitAsync(result, review.Proposed, review.SummaryFor(result.Edit!));
 
         Assert.Equal(CommitStatus.Committed, commit.Status);
         Assert.Equal(1, wiki.Edits);
-        Assert.NotNull(commit.Formatting);
-        Assert.DoesNotContain("MAGIC ITEM", commit.Formatting!.Formatted);
     }
 
     /// <summary>A page whose statsblock is laid out the wrong way round, so the formatter has something to do.</summary>
@@ -1384,16 +1410,16 @@ public class ItemCheckPipelineTests
     /// merely fail late. The gate runs before the conflict re-fetch for that reason.
     /// </summary>
     [Fact]
-    public async Task TheFormattingCommitWillNotWriteWhenTheGateRefuses()
+    public async Task TheLayoutOnlySaveWillNotWriteWhenTheGateRefuses()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
-        (FormattingProposal? proposal, _) = await pipeline.PrepareFormattingAsync("Earring of Bashing");
-        Assert.NotNull(proposal);
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
 
         int fetchesBefore = wiki.Fetches;
         pipeline.BeforeWriting = _ => Task.FromResult<string?>("No bot password is stored.");
 
-        CommitResult commit = await pipeline.CommitFormattingAsync(proposal);
+        CommitResult commit = await pipeline.CommitLayoutAsync(
+            result, result.Review!.FormattedOriginal, ReviewText.LayoutOnlySummary);
 
         Assert.Equal(CommitStatus.Failed, commit.Status);
         Assert.Equal("No bot password is stored.", commit.Error);
@@ -1433,13 +1459,14 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task AGateThatAllowsTheWriteChangesNothing()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), UntidyPage());
-        (FormattingProposal? proposal, _) = await pipeline.PrepareFormattingAsync("Earring of Bashing");
+        (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), EarringPage());
+        ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
 
         var asked = 0;
         pipeline.BeforeWriting = _ => { asked++; return Task.FromResult<string?>(null); };
 
-        CommitResult commit = await pipeline.CommitFormattingAsync(proposal!);
+        CommitResult commit = await pipeline.CommitLayoutAsync(
+            result, result.Review!.FormattedOriginal, ReviewText.LayoutOnlySummary);
 
         Assert.Equal(CommitStatus.Committed, commit.Status);
         Assert.Equal(1, wiki.Edits);

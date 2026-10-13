@@ -559,9 +559,8 @@ public sealed class ItemCheckPipeline
             NeedsLoreCapture = needsLore,
             Warnings = warnings,
 
-            // Only when the data already agrees. A page the tool wants to change is one whose formatting would be
-            // rebuilt by that change anyway, and offering both at once would bury the data diff under a reflow.
-            Formatting = edit.HasChanges ? null : PrepareFormatting(wikiPage).Proposal,
+            // Reviewed and saved with the data edit: see ReviewText for how the two stay apart on screen.
+            Review = ReviewText.For(wikiPage.Wikitext, edit.NewWikitext, _mapping),
         };
 
         // A page that already agrees is settled here and now — there is nothing for the user to approve. Anything
@@ -582,6 +581,16 @@ public sealed class ItemCheckPipeline
                     : CheckOutcome.Matched,
                 wikiPage.RevisionId,
                 fingerprint);
+        }
+        // **A page with an edit to propose is not done, whatever an earlier answer said** (bug found by the user,
+        // 2026-10-12). A first check of such a page writes no row; but "Refresh wiki data" or Reset after "the wiki is
+        // right" found the page disagreeing while the row still said Matched, so the screen offered the edit again and
+        // the next capture skipped the wiki as "already checked". The screen and the ledger have to agree, and the
+        // screen is right: the question is open again. A row that is not done (Skipped, Flagged) already says so.
+        else if (result.Status == ItemCheckStatus.EditProposed &&
+                 _ledger.Find(item.Name) is { } row && CheckedItemsLedger.MeansDone(row.Outcome))
+        {
+            _ledger.Remove(item.Name);
         }
 
         return result;
@@ -812,16 +821,8 @@ public sealed class ItemCheckPipeline
                 edit.NewRevisionId ?? current.RevisionId,
                 FingerprintOf(result));
 
-            // The formatting pass runs automatically after any change, as the user specified — but as its own
-            // proposal, for its own commit. Never folded into this one.
-            (FormattingProposal? formatting, IReadOnlyList<string> notes) =
-                await PrepareFormattingAsync(title, cancellationToken).ConfigureAwait(false);
-
-            return new CommitResult(
-                edit.NoChange ? CommitStatus.NoChange : CommitStatus.Committed,
-                edit.NewRevisionId,
-                Formatting: formatting,
-                FormattingNotes: notes);
+            // The layout was reviewed and saved with the data (user, 2026-10-12), so nothing follows.
+            return new CommitResult(edit.NoChange ? CommitStatus.NoChange : CommitStatus.Committed, edit.NewRevisionId);
         }
         catch (MediaWikiException ex)
         {
@@ -880,17 +881,9 @@ public sealed class ItemCheckPipeline
                 created.NewRevisionId,
                 FingerprintOf(result));
 
-            // The formatting follow-up runs here too, for the reason the user gave when asking for creation
-            // (2026-10-01): the generated text is already laid out, so this normally finds nothing — but the box is
-            // editable and a hand-edit can mangle it, which is exactly when a formatting pass is worth offering.
-            (FormattingProposal? formatting, IReadOnlyList<string> notes) =
-                await PrepareFormattingAsync(title, cancellationToken).ConfigureAwait(false);
-
-            return new CommitResult(
-                CommitStatus.Committed,
-                created.NewRevisionId,
-                Formatting: formatting,
-                FormattingNotes: notes);
+            // The generated text is laid out before it is shown, and a hand edit is laid out when the user leaves the
+            // first page of the review, so nothing follows the save.
+            return new CommitResult(CommitStatus.Committed, created.NewRevisionId);
         }
         catch (MediaWikiException ex)
         {
@@ -981,85 +974,37 @@ public sealed class ItemCheckPipeline
     }
 
     /// <summary>
-    /// Fetches a page as it now stands and asks the formatting pass what it would do to it.
-    ///
-    /// **It formats what is actually on the wiki, not what we think we wrote.** MediaWiki normalizes a saved page
-    /// (trailing whitespace, for one), so formatting our own submitted text would propose an edit against a revision
-    /// that does not exist. It also means this is usable on its own, for a page nobody has just edited.
-    ///
-    /// Returns no proposal when the page is already laid out, when the formatter declined, or when there is nothing
-    /// to format — with the formatter's own notes either way, because "why is this page still untidy" is a question
-    /// the user will have and the answer is usually "it still carries legacy flags".
-    /// </summary>
     /// <summary>
-    /// Runs the formatter over a page already in hand, with no wiki request.
-    ///
-    /// **For the cases where nothing is being written** (user, 2026-09-29): a page that already matches the capture,
-    /// and one the user has settled by hand. Both leave the page untouched, so the copy just fetched *is* the current
-    /// one and re-reading it would be a request for nothing — unlike after a commit, where MediaWiki normalizes what
-    /// was saved and the formatter has to see the result.
-    ///
-    /// **Deliberately not offered after "Skip for now".** Skipping means the data question is unanswered, and the
-    /// whole reason formatting runs second is that the formatter should never have to understand a page the data pass
-    /// has not modernized yet.
+    /// Writes a save that changes only the page's layout — a page whose data already matched, or one the user has said
+    /// the wiki is right about — **and leaves the ledger as it is**: the data question was settled before this, by the
+    /// check or by the user, and laying the page out says nothing new about it. Same conflict rule as
+    /// <see cref="CommitAsync"/>: re-fetch, and refuse a page that has moved on.
     /// </summary>
-    public (FormattingProposal? Proposal, IReadOnlyList<string> Notes) PrepareFormatting(WikiPage page)
+    public async Task<CommitResult> CommitLayoutAsync(
+        ItemCheckResult result, string wikitext, string summary, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(page);
-
-        PrettifyResult formatting = ItemPagePrettifier.Format(page.Wikitext, _mapping);
-        if (!formatting.IsSafe) return (null, formatting.Refusals);
-        if (!formatting.Changed) return (null, formatting.Notes);
-
-        return (
-            new FormattingProposal(page.Title, page.Wikitext, formatting.Formatted, formatting.Notes, page.Timestamp),
-            formatting.Notes);
-    }
-
-    public async Task<(FormattingProposal? Proposal, IReadOnlyList<string> Notes)> PrepareFormattingAsync(
-        string title, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(title);
-
-        try
-        {
-            WikiPage? current = await _wiki.FetchPageAsync(title, cancellationToken).ConfigureAwait(false);
-            return current is null ? (null, []) : PrepareFormatting(current);
-        }
-        catch (Exception ex) when (ex is MediaWikiException or HttpRequestException or TaskCanceledException)
-        {
-            // A data edit that succeeded must not be reported as failed because the follow-up could not be
-            // prepared. The formatting is an extra, and the user can run it again.
-            return (null, [$"The page could not be re-read to check its formatting: {ex.Message}"]);
-        }
-    }
-
-    /// <summary>
-    /// Writes the formatting edit. Same conflict rule as the data commit — re-fetch, and refuse a page that has
-    /// moved on — because a reflow saved over somebody else's change would be the worst kind to review.
-    /// </summary>
-    public async Task<CommitResult> CommitFormattingAsync(
-        FormattingProposal proposal, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(proposal);
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentException.ThrowIfNullOrWhiteSpace(wikitext);
+        ArgumentException.ThrowIfNullOrWhiteSpace(summary);
+        if (result.Page is not { } page)
+            throw new InvalidOperationException("This result has no page, so there is nothing to lay out.");
 
         if (await WhyWritingIsNotAllowedAsync(cancellationToken).ConfigureAwait(false) is { } blocked)
             return new CommitResult(CommitStatus.Failed, Error: blocked);
 
         try
         {
-            WikiPage? current = await _wiki.FetchPageAsync(proposal.PageTitle, cancellationToken).ConfigureAwait(false);
+            WikiPage? current = await _wiki.FetchPageAsync(page.Title, cancellationToken).ConfigureAwait(false);
             if (current is null)
-                return new CommitResult(CommitStatus.Failed, Error: $"'{proposal.PageTitle}' no longer exists.");
+                return new CommitResult(CommitStatus.Failed, Error: $"'{page.Title}' no longer exists.");
 
-            if (!string.Equals(current.Wikitext, proposal.Original, StringComparison.Ordinal))
+            if (!string.Equals(current.Wikitext, page.Wikitext, StringComparison.Ordinal))
                 return new CommitResult(
                     CommitStatus.PageChangedSinceCheck,
-                    Error: $"'{proposal.PageTitle}' changed since the formatting was worked out. Nothing was " +
-                           "written — capture the item again.");
+                    Error: $"'{page.Title}' has been edited since this item was checked. Nothing was written — " +
+                           "capture the item again.");
 
-            EditResult edit = await _wiki.EditAsync(
-                    proposal.PageTitle, proposal.Formatted, proposal.Summary, current.Timestamp, cancellationToken)
+            EditResult edit = await _wiki.EditAsync(page.Title, wikitext, summary, current.Timestamp, cancellationToken)
                 .ConfigureAwait(false);
 
             return new CommitResult(

@@ -8,6 +8,8 @@ using EQLWikiEditorAssistant.Core.Items;
 using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.Pipeline;
 using EQLWikiEditorAssistant.Wiki.Analysis;
+using EQLWikiEditorAssistant.Wiki.Formatting;
+using EQLWikiEditorAssistant.Wiki.Mapping;
 using EQLWikiEditorAssistant.Wiki.Ledger;
 
 namespace EQLWikiEditorAssistant.App;
@@ -136,7 +138,6 @@ public enum ReviewStep
     Edit,
     Preview,
     Submit,
-    Formatting,
     Done,
 }
 
@@ -204,15 +205,13 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private string _summary;
     private string? _outcome;
     private bool _isBusy;
-    private FormattingProposal? _formatting;
-    private string? _formattingOutcome;
     private CapturedImage? _loreImage;
-    private string _formattedWikitext = "";
     private string? _captureFile;
     private bool _settled;
     private ReviewStep _step;
     private bool _skippedSubmit;
-    private bool _skippedFormatting;
+    private bool _layoutOffered;
+    private bool _reformattingExpanded;
     private bool _sourceExpanded;
     private string _loadedWikitext = "";
     private string _loadedSummary = "";
@@ -233,46 +232,53 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(result);
         Result = result;
-        // A new item has no page to start from, so the box is seeded with the whole page the tool would create.
-        _wikitext = result.Creation?.Wikitext ?? result.Edit?.NewWikitext ?? result.Page?.Wikitext ?? "";
+        // A new item has no page to start from, so the box is seeded with the whole page the tool would create. An
+        // existing one gets the proposed edit laid out, since the edit and its formatting are saved together.
+        _wikitext = result.Creation?.Wikitext ?? result.Review?.Proposed ?? result.Edit?.NewWikitext
+            ?? result.Page?.Wikitext ?? "";
         // Left blank when the tool proposes nothing, rather than inheriting its "No changes" — if the user is
         // hand-editing a page the tool judged correct, that summary would be a false description of the revision,
         // and there is nothing to inherit. CanAct requires one, so it has to be typed. A creation does have one to
-        // inherit, because "created from the in-game item window" is the whole truth about that revision.
+        // inherit, because "created from the in-game item window" is the whole truth about that revision. A page
+        // whose layout alone changes gets the layout summary (see ReviewText.SummaryFor).
         _summary = result.Creation?.Summary
+            ?? (result.Review is { } texts && result.Edit is { } toolEdit ? texts.SummaryFor(toolEdit) : null)
             ?? (result.Edit is { HasChanges: true } proposed ? proposed.Summary : "");
         _loadedWikitext = _wikitext;
         _loadedSummary = _summary;
         _outcome = null;
         _settled = false;
-        _formatting = null;
-        _formattingOutcome = null;
         // Every reload starts the review over: a re-capture, a lore capture joining, or "Edit again" after a save all
         // mean there is a fresh comparison to read first.
         _step = ReviewStep.Edit;
         _skippedSubmit = false;
-        _skippedFormatting = false;
+        _layoutOffered = false;
         _sourceExpanded = false;
         _written = false;
         _submitNotice = null;
         PreviewedText = null;
         PreviewDocument = null;
-        FormattingNotes.Clear();
+        Replace(FormattingNotes, result.Review?.FormattingNotes.Distinct() ?? []);
         Diff.Clear();
-        Replace(ProposedDiff, result.Edit is { HasChanges: true } toolEdit && !IsCreation
-            ? WikitextDiff.Compute(toolEdit.OriginalWikitext, toolEdit.NewWikitext).Select(l => new DiffLineViewModel(l))
-            : []);
+        // The data changes against the page laid out the same way, so the diff holds nothing but data, each line in
+        // its blueprint place; the reformatting is its own section (user, 2026-10-12, see ReviewText).
+        Replace(ProposedDiff, IsCreation || result.Edit is not { HasChanges: true } ? []
+            : result.Review is { } review
+                ? WikitextDiff.Compute(review.FormattedOriginal, review.Proposed).Select(l => new DiffLineViewModel(l))
+                : WikitextDiff.Compute(result.Edit.OriginalWikitext, result.Edit.NewWikitext).Select(l => new DiffLineViewModel(l)));
+        IReadOnlyList<DiffLine> reformatting = result.Review is { Reformats: true } layout && !IsCreation
+            ? WikitextDiff.Compute(layout.Original, layout.FormattedOriginal)
+            : [];
+        Replace(ReformattingDiff, reformatting.Select(l => new DiffLineViewModel(l)));
+        _reformattedLines = reformatting.Count(l => l.Kind is DiffLineKind.Added or DiffLineKind.Removed);
         Replace(Findings, (result.Analysis?.Findings
                 .Where(f => f.IsChange || f.Blocks)
                 .Select(FindingViewModel.For) ?? [])
             .Concat(ComplianceRows(result)));
         Replace(Warnings, BuildWarnings());
-        FormattingDiff.Clear();
 
-        // Through the property, not the field, so its diff gets built. A page that already matches arrives with its
-        // formatting proposal already worked out — the check had the page in hand, so it cost nothing. For one the
-        // tool wants to edit this stays null until the user settles the data question.
-        Formatting = result.Formatting;
+        // Open when the layout is all there is to look at.
+        _reformattingExpanded = HasOnlyLayoutProposed;
 
         RebuildSteps();
 
@@ -298,6 +304,114 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public ObservableCollection<DiffLineViewModel> ProposedDiff { get; } = [];
 
     public bool HasProposedDiff => ProposedDiff.Count > 0;
+
+    /// <summary>
+    /// The page's own reformatting — as fetched against laid out to the blueprint — shown collapsed under the proposed
+    /// edit (user, 2026-10-12). It needs no approval of its own: the formatter proves it changed nothing the page says.
+    /// The same on the Submit page, since the text on screen is laid out before it gets there.
+    /// </summary>
+    public ObservableCollection<DiffLineViewModel> ReformattingDiff { get; } = [];
+
+    private int _reformattedLines;
+
+    public bool HasReformatting => ReformattingDiff.Count > 0;
+
+    public string ReformattingHeader =>
+        $"Automatic reformatting ({_reformattedLines} line{(_reformattedLines == 1 ? "" : "s")})";
+
+    /// <summary>Nothing about the data changes, only the layout: said in words where the proposed edit would be.</summary>
+    public bool HasOnlyLayoutProposed => (!HasProposedDiff || _settled) && HasReformatting && IsLayoutOnly;
+
+    /// <summary>The same on the Submit page, from the text on screen.</summary>
+    public bool HasOnlyLayoutToSubmit => !HasDiff && HasReformatting && IsLayoutOnly;
+
+    /// <summary>
+    /// Whether the text on screen changes only the page's layout: it is the page laid out and nothing else. Such a
+    /// save leaves the ledger alone (<c>ItemCheckPipeline.CommitLayoutAsync</c>), since the data question was already
+    /// settled — by the check, or by "the wiki is right".
+    /// </summary>
+    public bool IsLayoutOnly =>
+        !IsCreation && Result.Review is { Reformats: true } review &&
+        string.Equals(_wikitext, review.FormattedOriginal, StringComparison.Ordinal);
+
+    /// <summary>
+    /// After "the wiki is right" on a page whose layout is off (user, 2026-10-12): the data stays as the page has it,
+    /// and the review offers the page's layout instead, to save or leave. In two halves so the screen can animate
+    /// between them: <see cref="BeginLayoutOffer"/> puts up the notice with the comparison still showing, and
+    /// <see cref="FinishLayoutOffer"/> takes the comparison away and opens the reformatting.
+    /// </summary>
+    public void OfferLayoutOnly()
+    {
+        BeginLayoutOffer();
+        FinishLayoutOffer();
+    }
+
+    public void BeginLayoutOffer()
+    {
+        if (Result.Review is not { Reformats: true } review) return;
+
+        _wikitext = review.FormattedOriginal;
+        _loadedWikitext = _wikitext;
+        _summary = ReviewText.LayoutOnlySummary;
+        _loadedSummary = _summary;
+        _settled = true;
+        RebuildSteps();
+        OnPropertyChanged(null);
+    }
+
+    public void FinishLayoutOffer()
+    {
+        if (Result.Review is not { Reformats: true }) return;
+
+        // The comparison is answered, so it goes, and what is left is shown open (user, 2026-10-12).
+        ProposedDiff.Clear();
+        _layoutOffered = true;
+        _reformattingExpanded = true;
+        OnPropertyChanged(null);
+    }
+
+    /// <summary>Whether the first page shows the comparison — warnings, icon, lore, findings and proposed edit. Not
+    /// once "the wiki is right" has answered it and only the layout is left to offer (user, 2026-10-12).</summary>
+    public bool ShowsComparison => !_layoutOffered;
+
+    /// <summary>Whether the reformatting section is open. Collapsed by default; open when the layout is all the review
+    /// offers. The user can open or close it either way.</summary>
+    public bool ReformattingExpanded
+    {
+        get => _reformattingExpanded;
+        set => Set(ref _reformattingExpanded, value);
+    }
+
+    /// <summary>
+    /// "Done" in place of Next (user, 2026-10-12): a page that already agrees, needs no layout and has nothing typed
+    /// into it has nothing to step through, so the item closes from here. Next comes back once the text is changed.
+    /// </summary>
+    public bool CanFinishHere =>
+        HasReview && !IsCreation && IsDone && !HasChangesToSubmit && !HasOutcome && _step == ReviewStep.Edit;
+
+    /// <summary>Next only where it leads somewhere (user, 2026-10-12): a page that agrees but still wants a human shows
+    /// "the wiki is right" and "Skip for now" instead, until the text is changed.</summary>
+    public bool ShowsNext => HasReview && !CanFinishHere && NextGoesSomewhere;
+
+    /// <summary>
+    /// Lays out a hand edit as the first page is left, so Preview, Submit and the save all show exactly what is written
+    /// (user, 2026-10-12). Text the tool proposed is laid out already. Returns why the formatter would not, when it
+    /// would not: the text is then saved as typed.
+    /// </summary>
+    public string? LayOutHandEdits()
+    {
+        if (Result.Review is { } review &&
+            (string.Equals(_wikitext, review.Proposed, StringComparison.Ordinal) ||
+             string.Equals(_wikitext, review.FormattedOriginal, StringComparison.Ordinal)))
+            return null;
+        if (Result.Review is null && !IsCreation) return null;
+        if (IsCreation && string.Equals(_wikitext, Result.Creation?.Wikitext, StringComparison.Ordinal)) return null;
+
+        PrettifyResult formatted = ItemPagePrettifier.Format(_wikitext, WikiMapping.Default);
+        if (!formatted.IsSafe) return string.Join(" ", formatted.Refusals);
+        if (formatted.Changed) Wikitext = formatted.Formatted;
+        return null;
+    }
 
     /// <summary>
     /// Whether the user has done anything to this item since it was loaded: moved on from the first page, settled it,
@@ -516,9 +630,14 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
         if (Result.Edit is { } edit)
         {
-            Replace(Diff, WikitextDiff.Compute(edit.OriginalWikitext, wikitext).Select(l => new DiffLineViewModel(l)));
+            // Laid out like the rest of the proposal, so a new lucy_img_ID line lines up with its neighbours.
+            if (Result.Review is not null && ItemPagePrettifier.Format(wikitext, WikiMapping.Default) is { IsSafe: true } laidOut)
+                _wikitext = laidOut.Formatted;
+
+            string before = Result.Review?.FormattedOriginal ?? edit.OriginalWikitext;
+            Replace(Diff, WikitextDiff.Compute(before, _wikitext).Select(l => new DiffLineViewModel(l)));
             // Setting the icon is the tool's proposal too, so the proposed edit shows it.
-            Replace(ProposedDiff, WikitextDiff.Compute(edit.OriginalWikitext, wikitext).Select(l => new DiffLineViewModel(l)));
+            Replace(ProposedDiff, WikitextDiff.Compute(before, _wikitext).Select(l => new DiffLineViewModel(l)));
         }
 
         if (IsCreation)
@@ -635,6 +754,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             Set(ref _settled, value);
             OnPropertyChanged(nameof(IsDone));
             OnPropertyChanged(nameof(CanGoNext));
+            OnPropertyChanged(nameof(ShowsNext));
             OnPropertyChanged(nameof(StatusText));
             OnPropertyChanged(nameof(StatusBrush));
             // A page just created becomes clickable at this moment and not before — see KnownPageTitle.
@@ -753,8 +873,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public bool HasLedgerNote => LedgerNote.Length > 0;
 
-    /// <summary>The final diff on the Submit page, against the page as fetched — or, for a new page, the whole text.
-    /// Built on entering that page, from whatever the editor then holds.</summary>
+    /// <summary>The final diff on the Submit page, against the page as fetched and laid out — so, like the first page's,
+    /// it holds the data changes and the reformatting is its own section — or, for a new page, the whole text. Built on
+    /// entering that page, from whatever the editor then holds.</summary>
     public bool HasDiff => Diff.Count > 0;
 
     /// <summary>Whether the first page shows the raw wikitext editor: anything with a page to edit, including one
@@ -765,9 +886,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// the diff shown beside it has to be of that, not of the tool's proposal.</summary>
     public void RefreshSubmitDiff()
     {
-        string before = IsCreation ? "" : Result.Edit?.OriginalWikitext ?? "";
+        string before = IsCreation ? "" : Result.Review?.FormattedOriginal ?? Result.Edit?.OriginalWikitext ?? "";
         Replace(Diff, WikitextDiff.Compute(before, _wikitext).Select(l => new DiffLineViewModel(l)));
         OnPropertyChanged(nameof(HasDiff));
+        OnPropertyChanged(nameof(HasOnlyLayoutToSubmit));
     }
     public bool HasFindings => Findings.Count > 0;
     public bool HasWarnings => Warnings.Count > 0;
@@ -790,65 +912,6 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public string LoreInGame => LoreToCompare?.Captured ?? "";
 
     /// <summary>
-    /// The formatting edit offered after a data commit — its own edit, never folded into the first one.
-    /// </summary>
-    public FormattingProposal? Formatting
-    {
-        get => _formatting;
-        set
-        {
-            _formatting = value;
-            _formattedWikitext = value?.Formatted ?? "";
-            FormattingDiff.Clear();
-            if (value is not null)
-                foreach (DiffLine line in WikitextDiff.Compute(value.Original, value.Formatted))
-                    FormattingDiff.Add(new DiffLineViewModel(line));
-
-            OnPropertyChanged(nameof(FormattedWikitext));
-            OnPropertyChanged(nameof(Formatting));
-            OnPropertyChanged(nameof(HasFormatting));
-            OnPropertyChanged(nameof(CanCommitFormatting));
-            OnPropertyChanged(nameof(CanActOnIcon));
-            OnPropertyChanged(nameof(IsNotBusy));
-        }
-    }
-
-    public ObservableCollection<DiffLineViewModel> FormattingDiff { get; } = [];
-
-    /// <summary>
-    /// The formatted text the user is about to save, editable.
-    ///
-    /// **Editable for the same reason the data edit is**: the formatter has to put a field it has no rule for
-    /// *somewhere*, and the user may disagree — real case, a `Velocity` field somebody added to a bridle. What is
-    /// in the box is what gets written.
-    /// </summary>
-    public string FormattedWikitext
-    {
-        get => _formattedWikitext;
-        set => Set(ref _formattedWikitext, value);
-    }
-
-    public bool HasFormatting => _formatting is not null;
-
-    public bool CanCommitFormatting => _formatting is not null && !IsBusy && FormattingOutcome is null;
-
-    /// <summary>What the formatting commit did, shown in place of its button afterwards.</summary>
-    public string? FormattingOutcome
-    {
-        get => _formattingOutcome;
-        set
-        {
-            Set(ref _formattingOutcome, value);
-            OnPropertyChanged(nameof(HasFormattingOutcome));
-            OnPropertyChanged(nameof(CanCommitFormatting));
-            OnPropertyChanged(nameof(CanActOnIcon));
-            OnPropertyChanged(nameof(IsNotBusy));
-        }
-    }
-
-    public bool HasFormattingOutcome => !string.IsNullOrEmpty(_formattingOutcome);
-
-    /// <summary>
     /// Whether the user can settle this item by hand, recording it as matched against this capture so it stops
     /// coming back.
     ///
@@ -861,7 +924,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// forever.
     /// </summary>
     public bool CanMarkChecked =>
-        !HasOutcome && !IsBusy &&
+        !HasOutcome && !IsBusy && !_settled &&
         (Result.Status == ItemCheckStatus.EditProposed ||
          (Result.Status == ItemCheckStatus.AlreadyCorrect && Result.NeedsAttention));
 
@@ -878,6 +941,12 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanSave));
             OnPropertyChanged(nameof(HasChangesToSubmit));
             OnPropertyChanged(nameof(CanGoNext));
+            OnPropertyChanged(nameof(IsLayoutOnly));
+            OnPropertyChanged(nameof(HasOnlyLayoutProposed));
+            OnPropertyChanged(nameof(CanSkipLayout));
+            OnPropertyChanged(nameof(CanFinishHere));
+            OnPropertyChanged(nameof(ShowsNext));
+            OnPropertyChanged(nameof(CanReset));
         }
     }
 
@@ -890,6 +959,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanCreatePage));
             OnPropertyChanged(nameof(CanSave));
+            OnPropertyChanged(nameof(CanReset));
         }
     }
 
@@ -906,10 +976,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanCreatePage));
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
-            OnPropertyChanged(nameof(CanCommitFormatting));
             OnPropertyChanged(nameof(CanActOnIcon));
             OnPropertyChanged(nameof(IsNotBusy));
             OnPropertyChanged(nameof(HasOutcome));
+            OnPropertyChanged(nameof(CanReset));
         }
     }
 
@@ -945,10 +1015,11 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanCreatePage));
             OnPropertyChanged(nameof(CanSkip));
             OnPropertyChanged(nameof(CanMarkChecked));
-            OnPropertyChanged(nameof(CanCommitFormatting));
+            OnPropertyChanged(nameof(CanSkipLayout));
             OnPropertyChanged(nameof(CanActOnIcon));
             OnPropertyChanged(nameof(CanReCheck));
             OnPropertyChanged(nameof(IsNotBusy));
+            OnPropertyChanged(nameof(CanReset));
         }
     }
 
@@ -959,6 +1030,18 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// on the wiki changes what was decided about it (<c>ItemCheckPipeline.ReanalyzeAsync</c>).
     /// </summary>
     public bool CanReCheck => !IsBusy && HasItemName && Result.WindowImage is not null;
+
+    /// <summary>
+    /// "Reset" on the first page (user, 2026-10-12): "Refresh wiki data" under a name that says what it is for here,
+    /// shown only when there is something to undo — the text or summary changed (by hand, or by the icon button), or
+    /// "the wiki is right" turned the review into the layout offer. Resetting from there takes that answer back, in
+    /// the ledger too: a check that finds an edit to propose removes a row saying the item is done.
+    /// </summary>
+    public bool CanReset =>
+        CanReCheck && HasReview && !HasOutcome && _step == ReviewStep.Edit &&
+        (_layoutOffered ||
+         !string.Equals(_wikitext, _loadedWikitext, StringComparison.Ordinal) ||
+         !string.Equals(_summary, _loadedSummary, StringComparison.Ordinal));
 
     /// <summary>
     /// Whether refreshing would throw away something typed and not saved: the wikitext or the summary, changed since
@@ -1013,11 +1096,20 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         !string.IsNullOrWhiteSpace(_wikitext) &&
         !string.IsNullOrWhiteSpace(_summary);
 
+    /// <summary>
+    /// "Don't reformat": leave a page's layout as it is, when the layout is all the review offers — a page whose data
+    /// already matched, or one the user has said the wiki is right about. Nothing is written and the ledger stays as
+    /// the check or the user left it.
+    /// </summary>
+    public bool CanSkipLayout => !IsBusy && !HasOutcome && _step == ReviewStep.Edit && IsDone && IsLayoutOnly;
+
     /// <summary>Skipping is available for anything that reached the wiki but was not settled — including a page the
-    /// tool would not touch — so the user can record "I looked, not now".</summary>
+    /// tool would not touch, and one that agrees but still wants a human (user, 2026-10-12) — so the user can record "I
+    /// looked, not now".</summary>
     public bool CanSkip =>
-        !HasOutcome && !IsBusy &&
-        Result.Status is ItemCheckStatus.EditProposed or ItemCheckStatus.NotOnWiki or ItemCheckStatus.NotAnItemPage;
+        !HasOutcome && !IsBusy && !_settled &&
+        (Result.Status is ItemCheckStatus.EditProposed or ItemCheckStatus.NotOnWiki or ItemCheckStatus.NotAnItemPage ||
+         (Result.Status == ItemCheckStatus.AlreadyCorrect && Result.NeedsAttention));
 
     // ============================ the step-by-step review ============================
 
@@ -1037,8 +1129,12 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             if (_step == value) return;
             _step = value;
             OnPropertyChanged(nameof(Step));
+            OnPropertyChanged(nameof(CanSkipLayout));
+            OnPropertyChanged(nameof(CanFinishHere));
+            OnPropertyChanged(nameof(ShowsNext));
             OnPropertyChanged(nameof(StatusText));
             OnPropertyChanged(nameof(StatusBrush));
+            OnPropertyChanged(nameof(CanReset));
             RebuildSteps();
         }
     }
@@ -1051,18 +1147,6 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         set
         {
             _skippedSubmit = value;
-            RebuildSteps();
-        }
-    }
-
-    /// <summary>True when the user pressed Skip on the Formatting page, so the timeline shows it as skipped rather than
-    /// done. Formatting that found nothing to do is done, not skipped.</summary>
-    public bool SkippedFormatting
-    {
-        get => _skippedFormatting;
-        set
-        {
-            _skippedFormatting = value;
             RebuildSteps();
         }
     }
@@ -1085,7 +1169,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     {
         // Back is allowed only until something is settled: after a save, or "the wiki is right", the earlier pages
         // describe a decision already made.
-        bool settledAlready = _skippedSubmit || _written || _step >= ReviewStep.Formatting;
+        bool settledAlready = _skippedSubmit || _written;
         var steps = new List<StepViewModel>();
         foreach (ReviewStep step in Enum.GetValues<ReviewStep>())
         {
@@ -1094,7 +1178,6 @@ public sealed class ResultViewModel : INotifyPropertyChanged
                 step == _step && step == ReviewStep.Done ? StepState.Finished
                 : step == _step ? StepState.Current
                 : _skippedSubmit && step is ReviewStep.Preview or ReviewStep.Submit ? StepState.Skipped
-                : _skippedFormatting && step == ReviewStep.Formatting ? StepState.Skipped
                 : step < _step ? StepState.Finished
                 : StepState.Upcoming;
 
@@ -1110,7 +1193,6 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         ReviewStep.Edit => "Edit",
         ReviewStep.Preview => "Preview",
         ReviewStep.Submit => "Submit",
-        ReviewStep.Formatting => "Formatting",
         _ => "Done",
     };
 
@@ -1123,12 +1205,14 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     /// <summary>
     /// Whether the first page's Next goes anywhere: on to Preview when there is something to save, or straight to
-    /// Formatting for a page that already agrees and was settled by the check itself.
+    /// Done for a page that already agrees, is laid out, and was settled by the check itself.
     ///
     /// A page that agrees but still wants a human is not settled, so it has no Next — "the wiki is right" is how it
     /// moves on, and that is a decision the user has to make rather than one Next makes for them.
     /// </summary>
-    public bool CanGoNext => !IsBusy && (HasChangesToSubmit || (IsDone && Result.Page is not null));
+    public bool CanGoNext => !IsBusy && NextGoesSomewhere;
+
+    private bool NextGoesSomewhere => HasChangesToSubmit || (IsDone && Result.Page is not null);
 
     /// <summary>Whether the Submit page's button writes anything: the edit or the creation, with a summary.</summary>
     public bool CanSave => IsCreation ? CanCreatePage : CanAct;
@@ -1155,16 +1239,16 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public bool HasSubmitNotice => !string.IsNullOrEmpty(_submitNotice);
 
-    /// <summary>What the formatting pass had to say besides a layout — fields it kept without a place for them, or
-    /// why it left the page alone. Shown on the Formatting page.</summary>
+    /// <summary>What the formatting pass had to say besides a layout — fields it kept without a place for them, why it
+    /// left the statsblock alone, or why a hand edit is saved as typed. Shown under the proposed edit and on Submit.
+    /// </summary>
     public ObservableCollection<string> FormattingNotes { get; } = [];
 
     public bool HasFormattingNotes => FormattingNotes.Count > 0;
 
-    public void SetFormatting(FormattingProposal? proposal, IEnumerable<string> notes)
+    public void AddFormattingNote(string note)
     {
-        Formatting = proposal;
-        Replace(FormattingNotes, notes.Distinct());
+        if (!FormattingNotes.Contains(note)) FormattingNotes.Add(note);
         OnPropertyChanged(nameof(HasFormattingNotes));
     }
 
