@@ -441,6 +441,14 @@ data" on every item whose name was read; the five elemental damage types mapped;
 start the browser in the install folder, which had made a tester's update fail. The user verified the update from
 alpha.6.
 
+### 1.0.0-alpha.8 — released 2026-10-12
+The data edit and its formatting reviewed and saved together, in one step and one revision; legacy pages laid out, their
+legacy flags removed and the classic window's food and book lines moved into the notes; Preview and Done running the
+wiki's scripts behind a write guard, so they show the level slider and the damage figures; "The item matches the wiki"
+and "The page's formatting is correct", "Needs reformatting", "Don't reformat" and Reset; one button order on every
+page; and levelled items' icons in the list. A refresh after "the wiki is right" no longer leaves the next capture
+reporting the item already checked.
+
 ### Requested 2026-10-11, for next
 - **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
   whenever we can make them"), levelled items and Lore-tab captures included; with no page known, "Open wiki page"
