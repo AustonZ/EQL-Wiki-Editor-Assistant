@@ -1797,7 +1797,10 @@ a global hotkey is worth having.
        2026-10-12): after "the wiki is right", and on a page that already matched. "Done" and "No differences" each
        left out that the review still had the layout to offer. Such a page that matched also says **"The item matches
        the wiki."** in green where the proposed edit would be, so the verdict is stated in one place rather than pieced
-       together from the status, a missing diff and the yellow notice; so does one that matched and is laid out.
+       together from the status, a missing diff and the yellow notice; so does one that matched and is laid out, with a
+       second green **"The page's formatting is correct."** beneath it (user, 2026-10-12: two plain yeses reassure that
+       there is nothing to do). That one needs the formatter to have understood the page and left no note: a page it
+       declined to lay out also comes back unchanged, and is not known to be right.
      - **Lore and every cell of the findings table are selectable text** (user, 2026-10-07): a read-only box drawn as a
        label, whose first click selects the whole value (`Behaviors.SelectAllOnFirstClick`). The table's rows are never
        selected (`Behaviors.NoRowSelection`), which did nothing useful and competed with selecting text. A DataGrid

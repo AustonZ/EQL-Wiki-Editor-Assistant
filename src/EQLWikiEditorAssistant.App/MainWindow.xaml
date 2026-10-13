@@ -666,6 +666,12 @@
                             <TextBlock Text="The item matches the wiki." TextWrapping="Wrap"
                                        Foreground="{StaticResource NoticeDoneTextBrush}" />
                         </Border>
+                        <Border Background="{StaticResource NoticeDoneBackBrush}" BorderBrush="{StaticResource NoticeDoneBorderBrush}"
+                                BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,6,0,0"
+                                Visibility="{Binding HasLayoutCorrectNotice, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="The page's formatting is correct." TextWrapping="Wrap"
+                                       Foreground="{StaticResource NoticeDoneTextBrush}" />
+                        </Border>
                     </StackPanel>
 
                     <!-- Said in words, and in the warning colour, where the proposed edit would be (user, 2026-10-12:

@@ -818,6 +818,14 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public bool HasMatchNotice =>
         !IsCreation && Result is { Status: ItemCheckStatus.AlreadyCorrect, NeedsAttention: false };
 
+    /// <summary>
+    /// "The page's formatting is correct.", the second green notice (user, 2026-10-12: with nothing to do, saying so
+    /// twice is what reassures). Only where the formatter understood the page and had nothing to change: a page it left
+    /// alone also comes back unchanged, but with a note saying why, and that page's layout is not known to be right.
+    /// </summary>
+    public bool HasLayoutCorrectNotice =>
+        HasMatchNotice && Result.Review is { Reformats: false, FormattingNotes.Count: 0 };
+
     /// <summary>The first page's yellow notice. "(no data changes)" only where nothing above says so already: after
     /// "the wiki is right" the comparison is gone, while a page that matched has the green notice (user, 2026-10-12).</summary>
     public string LayoutNoticeText => HasMatchNotice
