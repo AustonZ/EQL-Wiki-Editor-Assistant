@@ -20,12 +20,15 @@ namespace EQLWikiEditorAssistant.Wiki.MediaWiki;
 /// <param name="Stylesheets">The skin's own stylesheets, as site-relative addresses. **<c>action=parse</c> leaves these
 /// out of <paramref name="HeadHtml"/>** — it links only the site's styles, so the item box rendered as plain serif
 /// text — and a real page view links them separately; see <see cref="SkinStylesheets"/>.</param>
+/// <param name="Scripts">The scripts a page view runs, which <c>action=parse</c> leaves out for the same reason; see
+/// <see cref="PageScripts"/>.</param>
 public sealed record RenderedPage(
     string Title,
     string HeadHtml,
     string BodyHtml,
     string CategoriesHtml,
-    IReadOnlyList<string>? Stylesheets = null)
+    IReadOnlyList<string>? Stylesheets = null,
+    PageScripts? Scripts = null)
 {
     /// <summary>
     /// One self-contained HTML document, for a browser that is handed the text rather than navigated to a URL.
@@ -57,7 +60,8 @@ public sealed record RenderedPage(
                "<h1 id=\"firstHeading\" class=\"firstHeading mw-first-heading\"><span class=\"mw-page-title-main\">" +
                WebUtility.HtmlEncode(Title) + "</span></h1></header>" +
                "<div id=\"bodyContent\" class=\"vector-body\"><div id=\"mw-content-text\" class=\"mw-body-content\">" +
-               BodyHtml + "</div>" + CategoriesHtml + "</div></main></div></div></div></body></html>";
+               BodyHtml + "</div>" + CategoriesHtml + "</div></main></div></div></div>" +
+               (Scripts?.LoaderScript() ?? "") + "</body></html>";
     }
 
     /// <summary>

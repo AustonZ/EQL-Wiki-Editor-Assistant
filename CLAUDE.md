@@ -1835,12 +1835,35 @@ a global hotkey is worth having.
     as plain serif text, dark on dark. A real page view links `skins.EQLImmersive.core` and friends separately. The
     client reads those links once per session from a view of `Special:BlankPage` (`RenderedPage.SkinStylesheets`, which
     takes only the wiki's own `load.php` addresses), and the document wraps the content in a real page's containers,
-    since the skin's styles are written against them. Rendered, it is indistinguishable from the live page.
-  - **The embedded browser (WebView2) runs with scripts off.** The wiki's scripts include the "not verified" toast, which
-    edits the verification list when someone types into it, and from this browser that would be an anonymous edit
-    nobody meant to make. Nothing inside the review may write to the wiki except the buttons that say so; the item box,
-    the links and the categories all render without scripts (verified on both pages). A clicked link opens in the
-    user's own browser instead of navigating the review away.
+    since the skin's styles are written against them. Rendered, it is indistinguishable from the live page. The same
+    view supplies the page's scripts (see the next bullet).
+  - **The embedded browser (WebView2) runs the wiki's scripts, behind a write guard** (user, 2026-10-12, reversing
+    2026-10-07's scripts-off). The wiki works out part of what a reader sees in the reader's browser — the item level
+    slider (`ext.itemLevelSlider`), the damage bonus and ratio (the site's `Common.js`) — so without scripts Preview and
+    Done showed a page no reader sees: *"people are going to want to see precisely what is coming out on the wiki."*
+    - **Why a guard and not trust**: the browser is never logged in, **anonymous visitors may edit this wiki** (an
+      anonymous rights query lists `edit`), and its scripts write: the "not verified" toast's "Verified" is a
+      `postWithEditToken` edit, the skin's base script posts `purge`, `Common.js` posts `options`. The scripts are the
+      wiki's admins' to change, so the rule cannot be a list of the scripts that write. Every request either browser
+      makes goes through `WebResourceRequested` to `ReviewBrowserRequests.MayPass`: GET, HEAD and OPTIONS pass; a POST
+      passes only to the wiki's `api.php` and only when every `action` it names, in the address or the body, is a read
+      (`parse`, `query`, `eqlmetadata` — EQL's client-data API takes nothing but POST, even to read); everything else is
+      answered with a 403 by the Assistant and never sent. `ReviewBrowserTests` pins both sides, the toast's own request
+      among them.
+    - **The toast is hidden** (`#verificationBanner`, by a style added on every document): it cannot work here, and the
+      review's red badge says the same thing.
+    - **The preview loads the page view's scripts itself**, because `action=parse` leaves them out as it leaves out the
+      stylesheets: they are added to every page *view*. The same `Special:BlankPage` view supplies `RLPAGEMODULES` and
+      the wiki's own `wgEQL…`/`wgItemLevel…` settings (`PageScripts`) — not the ones about the page viewed (verified,
+      talk page), which would describe Special:BlankPage — and the editor's own `ext.visualEditor.*` modules are left out.
+    - **The preview is served from an address on the wiki** (`Special:BlankPage&eqlwiki-assistant-preview=N`,
+      answered by the Assistant from `WebResourceRequested` and never sent). A document handed over as a string has no
+      address, so every script asking the wiki anything was refused as a cross-site request. Should the answer ever not
+      be made, the browser loads an empty wiki page, which is harmless.
+    - Verified by reading the real Special:BlankPage through `PageScripts.Read`: the slider, the skin and the site's
+      scripts are loaded and only the wiki's own settings come across. **Not yet verified on screen.**
+    - A clicked link still opens in the user's own browser instead of navigating the review away, and a script's
+      navigation is caught the same way.
   - **The browser is a native window WPF cannot draw over**, so it is hidden while a dialog is up or a page is sliding,
     and shown once its page has loaded. Its data lives in `AppPaths.BrowserDataDirectory` (a release's in its install
     folder, `install.ps1`'s in its own, `%LOCALAPPDATA%\EQLWikiEditorAssistant-dev`); it is created

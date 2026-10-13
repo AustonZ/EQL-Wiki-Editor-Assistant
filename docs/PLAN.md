@@ -251,6 +251,8 @@ The last work before calling v1 done. Grouped and ordered by agreement:
    on page 1; History and Settings use the in-app dialog too, and only the crash handler keeps a Windows message box.
    Found while building: `action=parse` omits the skin's stylesheet (read once per session from `Special:BlankPage`),
    and the embedded browser runs with scripts off so the wiki's "not verified" toast cannot make an anonymous edit.
+   **Scripts on since 2026-10-12**, behind a guard that refuses every request that could write (see CLAUDE.md, "The
+   review UI"), so Preview and Done show the level slider and the damage figures the wiki works out in the browser.
    The hotkey hint beside Capture is now a link to Settings > Capture hotkey.
 5. Preview arrives with group 4 rather than separately. **Built with it.**
 6. **Keep the mouse cursor out of captures** (user, 2026-10-07, after a cursor over an item window's text looked

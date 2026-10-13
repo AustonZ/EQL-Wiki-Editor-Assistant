@@ -174,42 +174,48 @@ public sealed class MediaWikiClient : IMediaWikiClient, IDisposable
         }, cancellationToken).ConfigureAwait(false);
 
         JsonElement parse = response.RootElement.GetProperty("parse");
+        (IReadOnlyList<string> stylesheets, PageScripts? scripts) =
+            await PageViewAssetsAsync(cancellationToken).ConfigureAwait(false) ?? new PageViewAssets([], null);
         return new RenderedPage(
             Title: parse.TryGetProperty("title", out JsonElement t) ? t.GetString() ?? title : title,
             HeadHtml: parse.TryGetProperty("headhtml", out JsonElement head) ? head.GetString() ?? "" : "",
             BodyHtml: parse.TryGetProperty("text", out JsonElement text) ? text.GetString() ?? "" : "",
             CategoriesHtml: parse.TryGetProperty("categorieshtml", out JsonElement cats) ? cats.GetString() ?? "" : "",
-            Stylesheets: await SkinStylesheetsAsync(cancellationToken).ConfigureAwait(false));
+            Stylesheets: stylesheets,
+            Scripts: scripts);
     }
 
-    private IReadOnlyList<string>? _skinStylesheets;
+    /// <summary>A reference, so a concurrent preview swaps it whole rather than reading half of one.</summary>
+    private sealed record PageViewAssets(IReadOnlyList<string> Stylesheets, PageScripts? Scripts);
+
+    private PageViewAssets? _pageViewAssets;
 
     /// <summary>
-    /// The skin's stylesheets, which <c>action=parse</c> does not link: read once per session from a page view of
-    /// <c>Special:BlankPage</c>, the smallest page the wiki serves with its full skin.
+    /// The skin's stylesheets and the page view's scripts, neither of which <c>action=parse</c> includes: read once per
+    /// session from a page view of <c>Special:BlankPage</c>, the smallest page the wiki serves with its full skin.
     ///
-    /// **A preview without them is still a preview**, just an unstyled one, so a failure here is swallowed and simply
-    /// not remembered — the next preview asks again. An unreachable wiki is the exception, and is reported by the parse
-    /// request that follows rather than here.
+    /// **A preview without them is still a preview**, just an unstyled or unscripted one, so a failure here is swallowed
+    /// and simply not remembered — the next preview asks again. An unreachable wiki is the exception, and is reported by
+    /// the parse request that follows rather than here.
     /// </summary>
-    private async Task<IReadOnlyList<string>> SkinStylesheetsAsync(CancellationToken cancellationToken)
+    private async Task<PageViewAssets?> PageViewAssetsAsync(CancellationToken cancellationToken)
     {
-        if (_skinStylesheets is not null) return _skinStylesheets;
+        if (_pageViewAssets is { } known) return known;
 
         try
         {
             using HttpResponseMessage response = await _http
                 .GetAsync(new Uri(_endpoint, "index.php?title=Special:BlankPage"), cancellationToken)
                 .ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode) return [];
+            if (!response.IsSuccessStatusCode) return null;
 
             string html = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            return _skinStylesheets = RenderedPage.SkinStylesheets(html);
+            return _pageViewAssets = new PageViewAssets(RenderedPage.SkinStylesheets(html), PageScripts.Read(html));
         }
         catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException) &&
                                    !cancellationToken.IsCancellationRequested)
         {
-            return [];
+            return null;
         }
     }
 

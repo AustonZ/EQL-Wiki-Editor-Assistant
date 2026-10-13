@@ -1155,11 +1155,13 @@ public partial class MainWindow : Window
     /// <summary>
     /// Readies a browser the first time it is needed, so the app does not start one at launch.
     ///
-    /// **Scripts are off.** The pages shown are the wiki's own, and its scripts include the "not verified" toast, which
-    /// edits the wiki's verification list when someone types into it — from this browser that would be an anonymous
-    /// edit nobody meant to make. Nothing inside the review may write to the wiki except the buttons that say so, and
-    /// the item box, the effect links and the categories all render without scripts. A link opens in the user's own
-    /// browser rather than navigating this one away from the review.
+    /// **Scripts are on, behind a guard** (user, 2026-10-12). The wiki works some of what a reader sees out in the
+    /// reader's browser — the item level slider, the damage bonus and ratio — so without scripts Preview and Done
+    /// showed a page nobody reads. But the browser is never logged in, anonymous visitors may edit this wiki, and its
+    /// scripts include the "not verified" toast, which edits the verification list when someone types into it. So
+    /// every request the browser makes is put to <see cref="ReviewBrowserRequests"/>, which lets reads through and
+    /// refuses anything that could write; the toast is hidden as well, since it cannot work here and the review's own
+    /// badge says the same. A link opens in the user's own browser rather than navigating this one away from the review.
     /// </summary>
     private async Task<bool> EnsureBrowserAsync(Microsoft.Web.WebView2.Wpf.WebView2 browser, System.Windows.Controls.TextBlock status)
     {
@@ -1182,7 +1184,13 @@ public partial class MainWindow : Window
         }
 
         Microsoft.Web.WebView2.Core.CoreWebView2 core = browser.CoreWebView2!;
-        core.Settings.IsScriptEnabled = false;
+        core.Settings.IsScriptEnabled = true;
+        core.AddWebResourceRequestedFilter(
+            "*",
+            Microsoft.Web.WebView2.Core.CoreWebView2WebResourceContext.All,
+            Microsoft.Web.WebView2.Core.CoreWebView2WebResourceRequestSourceKinds.All);
+        core.WebResourceRequested += (_, e) => OnBrowserRequest(browser, core, e);
+        await core.AddScriptToExecuteOnDocumentCreatedAsync(HideVerificationToast);
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreHostObjectsAllowed = false;
@@ -1222,6 +1230,62 @@ public partial class MainWindow : Window
         };
 
         return true;
+    }
+
+    /// <summary>The wiki's "not verified" toast, hidden: typing into it would be refused here anyway, and the item's own
+    /// red badge already says the page is not verified. Matched by the id the toast's script gives it.</summary>
+    private const string HideVerificationToast =
+        "document.addEventListener('DOMContentLoaded',function(){var s=document.createElement('style');" +
+        "s.textContent='#verificationBanner{display:none!important}';document.head.appendChild(s);});";
+
+    /// <summary>
+    /// Where the preview is served from: an address on the wiki itself, answered by the Assistant and never sent.
+    /// **The preview has to have the wiki's address for its scripts to work** — a document handed to the browser as a
+    /// string has none, so every script that asks the wiki something is refused as a cross-site request. Should the
+    /// answer ever not be made, the browser would load an empty page of the wiki's, which is harmless. Numbered, so the
+    /// browser never shows a stale preview from its cache.
+    /// </summary>
+    private static string PreviewAddress =>
+        new Uri(WikiSite, "index.php?title=Special:BlankPage&eqlwiki-assistant-preview=").AbsoluteUri;
+
+    private int _previewNumber;
+    private string? _previewUri;
+    private string? _previewDocument;
+
+    /// <summary>Every request either browser makes: the preview's own address is answered with the preview, and
+    /// anything <see cref="ReviewBrowserRequests"/> refuses is answered with a refusal and never sent.</summary>
+    private void OnBrowserRequest(
+        Microsoft.Web.WebView2.Wpf.WebView2 browser,
+        Microsoft.Web.WebView2.Core.CoreWebView2 core,
+        Microsoft.Web.WebView2.Core.CoreWebView2WebResourceRequestedEventArgs e)
+    {
+        Microsoft.Web.WebView2.Core.CoreWebView2WebResourceRequest request = e.Request;
+
+        if (browser == PreviewBrowser && _previewDocument is { } document && request.Uri == _previewUri)
+        {
+            e.Response = core.Environment.CreateWebResourceResponse(
+                new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(document)), 200, "OK",
+                "Content-Type: text/html; charset=utf-8\r\nCache-Control: no-store");
+            return;
+        }
+
+        byte[]? body = null;
+        if (request.Content is { } content)
+        {
+            using var copy = new System.IO.MemoryStream();
+            content.CopyTo(copy);
+            body = copy.ToArray();
+            // Read to judge it, so it is put back for the request to carry if it passes.
+            request.Content = new System.IO.MemoryStream(body);
+        }
+
+        string? contentType = request.Headers.Contains("Content-Type") ? request.Headers.GetHeader("Content-Type") : null;
+        if (Uri.TryCreate(request.Uri, UriKind.Absolute, out Uri? address) &&
+            ReviewBrowserRequests.MayPass(request.Method, address, contentType, body, WikiSite))
+            return;
+
+        e.Response = core.Environment.CreateWebResourceResponse(
+            null, 403, "Forbidden", "Content-Type: text/plain");
     }
 
     private static void OpenExternally(string uri)
@@ -1292,7 +1356,9 @@ public partial class MainWindow : Window
 
         if (ResultsList.SelectedItem != view || view.Step != ReviewStep.Preview) return;
         PreviewStatus.Text = "Loading…";
-        Navigate(PreviewBrowser, core => core.NavigateToString(view.PreviewDocument!));
+        _previewDocument = view.PreviewDocument!;
+        _previewUri = PreviewAddress + ++_previewNumber;
+        Navigate(PreviewBrowser, core => core.Navigate(_previewUri));
     }
 
     /// <summary>The page as readers now see it — an ordinary page view, the natural sequel to a save.</summary>
