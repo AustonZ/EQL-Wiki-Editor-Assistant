@@ -329,12 +329,37 @@ eqlwiki.com (2026-09-24) in two independent samples; `tools/WikiSpike -- grammar
     the user — do not let blind regeneration silently downgrade a correct page. The user may later ask for this
     exact pair to be treated as *matching* (i.e. stop alerting), probably as a setting, so keep the comparison and
     the alert separable rather than hard-coding one behaviour.
-  - **`This is a meal!` and friends: alert, never act** (user, 2026-09-24). These appear on the flags line of 11
-    sampled pages and in no captured window — EQL removed them. They are not meaningless: in original EverQuest
-    `This is a hearty meal!` meant the food lasted longer, and that may still be true under the hood with the UI
-    simply no longer exposing it. The user's own practice is to move the text into `notes` by hand to preserve the
-    history. **The tool must not do that move itself and must not silently drop the line** — it raises it in the
-    UI and leaves it to the human.
+  - **`This is a meal!` and friends move to `notes`, after the lore** (user, 2026-10-12, reversing 2026-09-24's
+    "alert, never act"). EQL's window shows none of them, but they are not meaningless — in original EverQuest
+    `This is a hearty meal!` meant the food lasted longer — so they are kept, exactly as the page wrote them, on a line
+    of their own after the `{{Item Lore|...}}` call and before anything else (`ItemPageDocument.WithNotesLine`). The
+    move was always the user's own practice by hand.
+  - **The legacy vocabulary is recognized by name** (`Wiki.Wikitext.LegacyStatsText`, user, 2026-10-12), because it
+    is a closed list from a game that is not changing. Every item page on the wiki was read to find it
+    (`WikiSpike allpages`, then `flagcensus`): 7,202 of 11,546 carry something on the flags line that is not a current
+    flag.
+    - **Legacy flags** (removed): the user's list — `LORE ITEM`, `MAGIC ITEM`, `QUEST ITEM`, `NO DROP`, `NO TRADE`,
+      `NO DESTROY`, `NO SELL`, `HEIRLOOM`, `CONSUMABLE`, `ARTIFACT`, `TEMPORARY` — plus the census's `EXPENDABLE`
+      (293 pages), `NODROP`, `NO RENT` and `NORENT`. **Also every current flag written in capitals** (user,
+      2026-10-12: a new contributor keeping the legacy look, as `Prickly Pear`'s `QUEST` did): `NO TRADE`,
+      `LORE EQUIPPED`, `ATTUNABLE`, `PLACEABLE`, `QUEST`, `NO DESTROY`, `NO STORAGE`, `FREE STORAGE`, `NO PET`,
+      `HEIRLOOM`, `TEMPORARY`, `BANK ONLY`, `MARKETPLACE` — every current flag a capture or a page has shown. The game supplies the right spelling.
+      A misspelt one (`ATTUNEABLE`) is rare and goes to a human. Case decides it: `NO TRADE` is legacy and `No Trade`
+      current. About 240 pages write several single-spaced (`MAGIC ITEM LORE ITEM NO TRADE`), which the
+      grammar reads as one token and the list splits.
+    - **The classic window's own text** (moved to notes): food and drink sizes, any case, with or without closing
+      punctuation, and the wiki's variants (`a enduring`, `banquet size`/`sized`/`-sized`, `This is a Banquet`,
+      `This meal is a feast!`); and `The Book is closed.`, `The Note is rolled up.`, `The letter is sealed.`,
+      `The compass points East.`, `This item can be used in tradeskills.`, `(This item acts as a light source.)`.
+    - **Anything else is raised for a human and blocks the flags rewrite**, as prose always did. That includes
+      `Required level of N.` (a requirement may still be data) and an all-caps token not on the list. **The shape
+      rule used to delete those**: any all-caps token counted as legacy, so a class list that had lost its label
+      (`MNK BRD ROG SHM`, real) would have gone with the legacy flags around it.
+    - **Every line carrying flags is read and rewritten, not just the first** (226 pages spread them over several):
+      a food line on its own line, and the old blueprint's `EXPENDABLE  Charges: 10`, whose flag goes while the field
+      stays (`StatsBlockLine.WithoutFlags`). The live blueprint writes `Charges: XX` alone now.
+    - **`Temporary` is a current flag** (user, 2026-10-12) and needs nothing: current flags are judged by shape.
+    - `CurrentVersion` 15.
 - **A label is at most two words, and digits end it.** Both bounds came from a failing measurement, not from
   reasoning. Allowing digits let a backward label scan run through a preceding value, so
   `STR: +10 WIS: +10 INT: +10` (single-spaced, real) read as one field. Allowing three words then made every
@@ -1227,20 +1252,19 @@ after the data edit**; see "Formatting is a separate edit" above for why that or
     requires everything else after the template call to be byte-identical.
   - Census after it: 0 refused, 0 unsettled, median size change +18 bytes (from +17). `CurrentVersion` 13.
 - **It leaves alone anything it does not understand, completely — not even the spacing** (user, 2026-09-28). The
-  triggers, measured across 1,183 real pages: a legacy flag (469 pages), an interior blank line (9, a paragraph
-  break that may be doing visible work), flags spread over two lines (merging is a bigger claim than laying out), a
-  duplicate label with conflicting values, and a line the grammar could not read.
-  - **Legacy flags stop it dead, by the user's decision**: *"I don't want the prettifier to get into the business of
-    understanding/reformatting obsolete flags and fields."* Discarding legacy flags is the **data** pass's call, made
-    against a live capture; a formatting pass has no business half-modernizing an old page. Real usage aims at items
-    already updated for EQL, so this costs little and is reported rather than silent.
-  - **Legacy is told from current by *shape*, not by a list** — the same reasoning that forbids a known-flags list on
-    the capture side, since the devs keep adding flags and a list would reject the rare items most worth recording.
-    Measured, not assumed: across 1,183 pages every legacy flag is ALL-CAPS (`MAGIC ITEM`, `EXPENDABLE`, `NODROP`,
-    `NO RENT`) and every current one is Title Case (`Lore Equipped`, `No Trade`, `Attunable`). The same rule catches
-    the third category the census found — prose that landed on the flags line (`This is a meal!`, `The Book is
-    closed.`, `Required level of 55.`) and one page's mis-parsed `Class:CLR DRU SHM` — via a lowercase word, a
-    terminal stop or a colon.
+  triggers, measured across all 11,546 item pages (2026-10-12): an interior blank line (176, a paragraph break that may
+  be doing visible work), flags-line text it does not recognize (53), current flags spread over two lines (3, merging
+  is a bigger claim than laying out), and a duplicate label with conflicting values (1). 233 pages in all, 2%.
+  - **Legacy flags no longer stop it** (user, 2026-10-12, reversing 2026-09-28's *"I don't want the prettifier to get
+    into the business of understanding/reformatting obsolete flags and fields"*). They did, on 62% of item pages. With
+    the legacy vocabulary recognized by name (`LegacyStatsText`, see "Reading and editing wiki pages"), legacy flags
+    are laid out like any other flag — a legacy flag on a second line, like the old `EXPENDABLE  Charges: 10`, joins
+    the flags line — and the classic window's own text keeps a line of its own after the flags, as written.
+    Discarding legacy flags and moving that text are still the **data** pass's decisions, made against a live capture.
+  - **Why it had to change**: combining the edit and formatting steps shows the data changes as "formatted original →
+    formatted final", which is only clean when the original can be laid out. Measured with `WikiSpike split` over
+    every item page with simulated edits: the data diff carries nothing but data on **11,312 of 11,546** pages, from
+    36% of the old cache before. The formatter census over them is 0 refused, 0 unsettled.
 - **A value whose markup only works at the start of a line keeps its own line.** A `*` is a bullet only there, so
   folding `|relatedquests = * [[Quest]]` onto the parameter's line turns a list into a literal asterisk while the
   value string stays byte-identical — **a rendering change no content check can see**. The layout rule has to be

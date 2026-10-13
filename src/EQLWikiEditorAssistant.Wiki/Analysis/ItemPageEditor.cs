@@ -9,6 +9,7 @@ public enum EditChangeKind
     Removed,
     Added,
     Updated,
+    Moved,
 }
 
 /// <summary>
@@ -29,6 +30,7 @@ public sealed record EditChange(EditChangeKind Kind, string What)
     {
         EditChangeKind.Removed => "removed",
         EditChangeKind.Added => "added",
+        EditChangeKind.Moved => "moved",
         _ => "updated",
     };
 }
@@ -70,7 +72,7 @@ public sealed record ProposedEdit(
             // saying "categories" once is the point of naming things rather than listing values.
             (EditChangeKind Kind, string What)[] items =
             [
-                .. new[] { EditChangeKind.Removed, EditChangeKind.Added, EditChangeKind.Updated }
+                .. new[] { EditChangeKind.Removed, EditChangeKind.Added, EditChangeKind.Updated, EditChangeKind.Moved }
                     .SelectMany(kind => Changes
                         .Where(c => c.Kind == kind)
                         .Select(c => c.What)
@@ -224,6 +226,19 @@ public static class ItemPageEditor
             }
         }
 
+        // --- window text into notes ------------------------------------------------------------------------
+        // After the parameters, so the lore this same edit may have written is already there to follow, and in the
+        // page's order: each line goes after the lore and before the ones it moves later, so they are inserted last
+        // first. The flags rewrite below takes them off the flags line.
+        foreach (FieldFinding finding in analysis.Findings
+                     .Where(f => f.Field == ItemPageAnalyzer.WindowTextField && f.OnWiki is not null).Reverse())
+        {
+            bool creating = edited.Template.Find(mapping.NotesParameter) is null;
+            edited = edited.WithNotesLine(finding.OnWiki!, mapping.ParameterOrder);
+            changes.Add(new EditChange(EditChangeKind.Moved, "flags-line text to notes"));
+            addedUnformattedLine |= creating;
+        }
+
         // --- statsblock lines -----------------------------------------------------------------------------
         if (edited.ReadStatsBlock() is { } block)
         {
@@ -238,7 +253,7 @@ public static class ItemPageEditor
                 if (finding.Captured is not { } wanted) continue;
                 if (finding.Field is ItemPageAnalyzer.MerchantValueField or ItemPageAnalyzer.PageTitleField
                     or ItemPageAnalyzer.ItemNameField or ItemPageAnalyzer.FlagProseField
-                    or ItemPageAnalyzer.LoreField
+                    or ItemPageAnalyzer.WindowTextField or ItemPageAnalyzer.LoreField
                     or ItemPageAnalyzer.CategoryField) continue; // all written outside the statsblock, above
 
                 if (finding.Field == ItemPageAnalyzer.FlagsField)
@@ -303,30 +318,48 @@ public static class ItemPageEditor
     private static EditChangeKind Kind(bool creating) =>
         creating ? EditChangeKind.Added : EditChangeKind.Updated;
 
-    /// <summary>The flags line is regenerated whole rather than edited field by field: it has no labels to edit in
-    /// place, and legacy flags are discarded rather than translated, so what replaces it shares nothing with what
-    /// was there.</summary>
+    /// <summary>
+    /// The flags line is regenerated whole rather than edited field by field: it has no labels to edit in place, and
+    /// legacy flags are discarded rather than translated, so what replaces it shares nothing with what was there.
+    ///
+    /// **Every line carrying flags is part of it** (user, 2026-10-12), matching what the analyzer compares: the first
+    /// flags-only line takes the new flags, other flags-only lines go, and a line that opens with flags before its
+    /// fields (<c>EXPENDABLE  Charges: 10</c>) keeps its fields. Window text on these lines has already been written
+    /// to notes by then.
+    /// </summary>
     private static StatsBlock ReplaceFlagsLine(StatsBlock block, string wanted, List<EditChange> changes)
     {
-        int index = block.Lines.ToList().FindIndex(l => l.Kind == StatsLineKind.Flags);
+        List<int> flagsOnly = [.. Enumerable.Range(0, block.Lines.Count).Where(i => block.Lines[i].Kind == StatsLineKind.Flags)];
+        List<int> mixed = [.. Enumerable.Range(0, block.Lines.Count)
+            .Where(i => block.Lines[i].Kind == StatsLineKind.Fields && block.Lines[i].Flags.Count > 0)];
+        bool hadFlags = flagsOnly.Count > 0 || mixed.Count > 0;
+        bool writing = !string.IsNullOrWhiteSpace(wanted);
 
-        // An item with genuinely no flags — 20 of the 101 verified windows — loses the line entirely rather than
-        // keeping an empty one, which would leave a bare `<br>` behind.
-        if (string.IsNullOrWhiteSpace(wanted))
+        // A mixed line keeps its fields where it stands. Done first: it removes no line, so no index moves.
+        foreach (int i in mixed)
+            if (block.Lines[i].WithoutFlags() is { } fieldsOnly)
+                block = block.ReplaceLine(i, fieldsOnly);
+
+        // The first flags-only line takes the new flags; the rest go, last first so the earlier indices hold. An item
+        // with genuinely no flags — 20 of the 101 verified windows — loses them all rather than keeping an empty
+        // line, which would leave a bare `<br>` behind.
+        int keep = writing && flagsOnly.Count > 0 ? flagsOnly[0] : -1;
+        foreach (int i in flagsOnly.Where(i => i != keep).Reverse())
+            block = block.RemoveLine(i);
+        if (keep >= 0)
         {
-            if (index < 0) return block;
-            changes.Add(new EditChange(EditChangeKind.Removed, "flags"));
-            return block.RemoveLine(index);
+            changes.Add(new EditChange(EditChangeKind.Updated, "flags"));
+            return block.ReplaceLine(keep, block.Lines[keep].ReplaceText(wanted));
         }
 
-        if (index < 0)
+        if (writing)
         {
-            changes.Add(new EditChange(EditChangeKind.Added, "flags"));
+            changes.Add(new EditChange(hadFlags ? EditChangeKind.Updated : EditChangeKind.Added, "flags"));
             return block.InsertLine(wanted);
         }
 
-        changes.Add(new EditChange(EditChangeKind.Updated, "flags"));
-        return block.ReplaceLine(index, block.Lines[index].ReplaceText(wanted));
+        if (hadFlags) changes.Add(new EditChange(EditChangeKind.Removed, "flags"));
+        return block;
     }
 
     /// <summary>

@@ -387,6 +387,17 @@ From the first tester (via the user):
   the formatter still proves it changed nothing but layout before its part is accepted — a refused layout leaves the data
   edit to be saved alone. CLAUDE.md's "Formatting is a separate edit" and the review timeline's Formatting step are to
   be rewritten when this is built.
+  - **Design agreed 2026-10-12** (user): one review, one save. The Edit page shows the data changes as a diff of the
+    *formatted* original against the *formatted* final page, so both sides share one layout and only the data differs,
+    each line already in its blueprint place. The reformatting (original against formatted original) is a collapsed
+    section, needing no approval of its own; Submit shows the same split. The data step still runs on the original,
+    unchanged. Pages whose data already matches are still offered their reformatting automatically, to encourage
+    cleanup, and an edit that includes reformatting says so in its summary.
+  - **Measured before building** (`WikiSpike split`, simulated edits over every item page): the split was clean
+    wherever the formatter could lay out the original, and it could not on 62% of pages, all for legacy flags. The
+    legacy vocabulary is now recognized by name (CLAUDE.md, "Reading and editing wiki pages"); after that the data diff
+    carries only data on **11,312 of 11,546** item pages. The rest fall back to the raw data diff: 200 whose statsblock
+    the formatter leaves alone either side (mostly a blank line mid-block), and 34 where only the final can be laid out.
   - **Known bug, parked until then** (user, 2026-10-12): text typed into the Formatting step's editor does not make
     "Refresh wiki data" ask first, so a refresh throws it away. The check (`ResultViewModel.HasUnsavedEdits`) looks at
     the Edit step's text and summary only. Merging the steps may remove the separate editor, so it waits.

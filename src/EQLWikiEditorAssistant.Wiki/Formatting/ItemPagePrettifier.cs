@@ -306,7 +306,12 @@ public static class ItemPagePrettifier
         // writes `EXPENDABLE  Charges: 10<br>` — one line carrying a flag *and* a field — so reading flags only
         // from lines that are nothing but flags silently dropped the flag on 14 real pages. The verification pass
         // is what caught that, which is the entire reason it exists.
-        List<string> flags = [.. lines.SelectMany(l => l.Flags)];
+        //
+        // **The classic item window's own text keeps its own lines** (user, 2026-10-12): `This is a meal!` is a line of
+        // text, not a flag, so it is written as the page wrote it, each on a line of its own just after the flags. The
+        // data pass moves it to notes; laying it out here is what lets a legacy page be formatted at all.
+        List<string> windowText = [.. lines.SelectMany(l => l.Flags).Where(FlagDialect.IsWindowText)];
+        List<string> flags = [.. lines.SelectMany(l => l.Flags).Where(f => !FlagDialect.IsWindowText(f))];
         var output = new List<string>();
         bool blankPending = false;
 
@@ -323,6 +328,7 @@ public static class ItemPagePrettifier
             if (slot is ["(flags)"])
             {
                 if (flags.Count > 0) Emit(string.Join(", ", flags) + "<br>");
+                foreach (string text in windowText) Emit(text + "<br>");
                 continue;
             }
 
@@ -427,14 +433,17 @@ public static class ItemPagePrettifier
             return $"'{unparsed.Text}' could not be read, and moving a line nobody could parse is how a formatter " +
                    "loses data.";
 
-        // **Legacy flags stop the formatter dead** (user, 2026-09-28): *"I don't want the prettifier to get into the
-        // business of understanding/reformatting obsolete flags and fields."* Real usage aims at items already
-        // updated for EQL; an old page should be left alone and reported rather than half-modernized by a pass whose
-        // only job is layout. Discarding legacy flags is the *data* pass's decision, made against a live capture.
-        if (lines.SelectMany(l => l.Flags).FirstOrDefault(f => !IsCurrentFlag(f)) is { } legacy)
-            return $"'{legacy}' is not a current EQL flag — it is a legacy one, or prose the grammar read as a " +
-                   "flag. Laying out a line that is not understood is how a formatter loses meaning, so the " +
-                   "whole block was left as it is.";
+        // **Only text nobody recognizes stops the formatter now.** Legacy flags used to stop it dead (user,
+        // 2026-09-28: *"I don't want the prettifier to get into the business of understanding/reformatting obsolete
+        // flags and fields."*), and that left 62% of item pages unformattable — 7,202 of 11,546 carry one. Reversed
+        // with the legacy vocabulary recognized by name (user, 2026-10-12): legacy flags are laid out like any other
+        // flag and window text keeps its own lines, so a page can be laid out before the data pass modernizes it,
+        // which is what lets the review show the data changes against an already-formatted page. Discarding legacy
+        // flags is still the data pass's decision, made against a live capture.
+        if (lines.SelectMany(l => l.Flags).FirstOrDefault(IsUnrecognized) is { } unrecognized)
+            return $"'{unrecognized}' is not a flag or anything else the Assistant recognizes on a flags line. " +
+                   "Laying out a line that is not understood is how a formatter loses meaning, so the whole block " +
+                   "was left as it is.";
 
         // A blank line is normally a reason to leave the block alone — it is a paragraph break that may be doing
         // visible work. The exception is the one this formatter puts there itself, separating the trailing section
@@ -443,10 +452,12 @@ public static class ItemPagePrettifier
         if (lines.Any(l => l.Kind == StatsLineKind.Blank) && !OnlyBlankIsTheTrailingSeparator(lines, trailingLabels))
             return "it has a blank line in the middle, which is a paragraph break that may be doing visible work.";
 
-        // Counted across every line that carries a flag, not just flags-only lines, because the blueprint's own
-        // `EXPENDABLE  Charges: 10` shape puts one on a field line. Two such lines would be merged into one, and
-        // merging is a bigger claim than a formatter should make unasked.
-        if (lines.Count(l => l.Flags.Count > 0) > 1)
+        // Counted across every line that carries a current flag, not just flags-only lines, because a flag can open a
+        // field line. Two such lines would be merged into one, and merging current flags is a bigger claim than a
+        // formatter should make unasked. Legacy flags on a second line merge freely — the old blueprint's
+        // `EXPENDABLE  Charges: 10` shape is 79 pages of it — since the data pass removes them whatever the layout,
+        // and window text keeps lines of its own anyway.
+        if (lines.Count(l => l.Flags.Any(IsCurrentFlag)) > 1)
             return "it carries flags on more than one line, and merging them is a bigger claim than laying them out.";
 
         List<string> duplicates =
@@ -471,7 +482,9 @@ public static class ItemPagePrettifier
     /// out), and two copies would drift into one pass rewriting a line the other declared it could not read. Its
     /// summary carries the measurement and the three dialects.
     /// </summary>
-    private static bool IsCurrentFlag(string flag) => FlagDialect.IsCurrent(flag);
+    private static bool IsCurrentFlag(string flag) => !FlagDialect.IsWindowText(flag) && FlagDialect.IsCurrent(flag);
+
+    private static bool IsUnrecognized(string flag) => !FlagDialect.IsWindowText(flag) && FlagDialect.IsUnrecognized(flag);
 
     /// <summary>
     /// Proves the formatted page says what the original said, and lists every way it does not.

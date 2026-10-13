@@ -143,6 +143,21 @@ public sealed record StatsBlockLine(string Raw)
         return string.Concat(Raw.AsSpan(0, offset + start), Raw.AsSpan(offset + end));
     }
 
+    /// <summary>
+    /// The line without the flags it opens with, keeping its fields as the page wrote them: <c>EXPENDABLE  Charges:
+    /// 10</c> becomes <c>Charges: 10</c>. The grammar reads flags only from the text before the first label, so
+    /// everything from that label on is kept. Returns null when the line has no fields, since the caller removes a
+    /// flags-only line whole.
+    /// </summary>
+    public string? WithoutFlags()
+    {
+        if (Flags.Count == 0 || Fields.Count == 0 || Fields[0].LabelStart < 0) return null;
+
+        int labelStart = Fields[0].LabelStart;
+        while (labelStart < Text.Length && char.IsWhiteSpace(Text[labelStart])) labelStart++;
+        return ReplaceText(Text[labelStart..]);
+    }
+
     /// <summary>Replaces the line's whole content, keeping its break tag and surrounding whitespace. Used where an
     /// in-place field edit will not do — regenerating the flags line, or rewriting an effect.</summary>
     public string ReplaceText(string newText)

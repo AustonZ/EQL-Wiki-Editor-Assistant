@@ -234,8 +234,11 @@ public sealed class WikiMapping
     /// reach since 7: nearly every item page has categories, and a settled row would never be offered the sort.
     /// **14** (2026-10-12): fire, disease, cold, magic and poison damage are mapped. 8's reasoning for `Skill Mod`: an
     /// item carrying one that was settled anyway would never be offered the line.
+    /// **15** (2026-10-12): the legacy statsblock vocabulary is recognized by name (see <c>LegacyStatsText</c>). Legacy
+    /// flags on any line are removed — `EXPENDABLE  Charges: 10` used to be missed, and a page settled with it kept
+    /// it — food and book lines move to notes, and the formatter lays out legacy pages.
     /// </summary>
-    public const int CurrentVersion = 14;
+    public const int CurrentVersion = 15;
 
     public int Version { get; init; } = CurrentVersion;
 

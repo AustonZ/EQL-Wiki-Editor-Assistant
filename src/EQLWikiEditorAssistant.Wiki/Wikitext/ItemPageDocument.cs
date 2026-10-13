@@ -470,6 +470,77 @@ public sealed class ItemPageDocument
             Wikitext, notes, value[..start] + call + "<br>\n" + value[start..]));
     }
 
+    /// <summary>
+    /// Puts one line of text into <c>notes</c> on its own line, after the <c>{{Item Lore|...}}</c> call that opens it
+    /// and before anything else (user, 2026-10-12: where the classic item window's food, drink and book lines go when
+    /// they come off the flags line). With no lore call it opens the notes; with no notes it becomes them, in a
+    /// parameter created where the blueprint puts one. Text the notes already hold, in any case, is not added again —
+    /// a human may have moved it by hand.
+    /// </summary>
+    public ItemPageDocument WithNotesLine(string text, IReadOnlyList<string>? blueprintOrder = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+
+        if (Template.Find("notes") is not { } notes)
+        {
+            if (blueprintOrder is null)
+                throw new InvalidOperationException("The page has no |notes= parameter to write into.");
+            return WithParameter("notes", text, blueprintOrder);
+        }
+
+        string value = notes.RawValue;
+        if (value.Contains(text, StringComparison.OrdinalIgnoreCase)) return this;
+        if (string.IsNullOrWhiteSpace(value)) return WithParameter("notes", text);
+
+        int start = 0;
+        while (start < value.Length && char.IsWhiteSpace(value[start])) start++;
+
+        string inserted;
+        int at;
+        if (WikitextScanner.FindTemplates(value, LoreTemplateName).FirstOrDefault() is { } lore && lore.Start == start)
+        {
+            int afterBreak = SkipBreak(value, lore.End);
+            bool hasBreak = afterBreak > lore.End;
+
+            if (value[afterBreak..].Trim().Length == 0)
+            {
+                // The lore is all the notes hold. The new line goes before the whitespace that ends the value, which
+                // is the parameter's own line end — taking it would pull the next parameter onto this line, the trap
+                // WithoutLoreMissingPlaceholder documents.
+                at = afterBreak;
+                inserted = (hasBreak ? "\n" : "<br>\n") + text;
+            }
+            else if (hasBreak)
+            {
+                // Lore, a break, then a human's text: between the two, on a line of its own.
+                at = afterBreak;
+                if (at < value.Length && value[at] == '\r') at++;
+                if (at < value.Length && value[at] == '\n') at++;
+                inserted = text + "<br>\n";
+            }
+            else
+            {
+                at = lore.End;
+                inserted = "<br>\n" + text + "<br>\n";
+            }
+        }
+        else
+        {
+            // No lore: the line opens the notes.
+            at = start;
+            inserted = text + "<br>\n";
+        }
+
+        return Reparse(WikitextScanner.ReplaceValue(Wikitext, notes, value[..at] + inserted + value[at..]));
+
+        static int SkipBreak(string s, int i)
+        {
+            foreach (string tag in new[] { "<br>", "<br/>", "<br />" })
+                if (string.CompareOrdinal(s, i, tag, 0, tag.Length) == 0) return i + tag.Length;
+            return i;
+        }
+    }
+
     private ItemPageDocument Reparse(string wikitext) =>
         Parse(wikitext) ?? throw new InvalidOperationException(
             "The edit left the page without a parseable {{Itempage}} call; this is a bug in the edit, not in the page.");

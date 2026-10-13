@@ -83,6 +83,7 @@ public class ItemPageAnalyzerTests
     [InlineData("QUEST", "Quest")]
     [InlineData("NO TRADE", "No Trade")]
     [InlineData("LORE EQUIPPED", "Lore Equipped")]
+    [InlineData("PLACEABLE", "Placeable")]
     public void ALegacyFlagSpelledLikeACurrentOneIsStillADifference(string onPage, string captured)
     {
         string page = """
@@ -102,6 +103,28 @@ public class ItemPageAnalyzerTests
         Assert.True(finding.IsChange, $"'{onPage}' is not what the tool would write, so the line has to be rewritten");
         Assert.Equal(captured, finding.Captured);
         Assert.Equal(onPage, finding.OnWiki);
+    }
+
+    /// <summary>
+    /// A misspelt capitalized flag is not on the legacy list, so it is raised for a human rather than removed (user,
+    /// 2026-10-12: rare enough to look at). It still never matches the captured flag, so the item cannot be recorded
+    /// as done with it on the page, and the line is left as it is.
+    /// </summary>
+    [Fact]
+    public void AMisspeltCapsFlagIsRaisedAndNeverMatches()
+    {
+        const string page =
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = \nATTUNEABLE<br>\nClass: ALL<br>\nRace: ALL<br>\n}}" +
+            "</onlyinclude>";
+        ItemPageDocument document = ItemPageDocument.Parse(page)!;
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(Captured(name: "Thing", flags: ["Attunable"]), document, "Thing");
+
+        Assert.Null(analysis.Find(ItemPageAnalyzer.FlagsField));
+        FieldFinding raised = analysis.Find(ItemPageAnalyzer.FlagProseField)!;
+        Assert.Equal(FieldVerdict.NeedsReview, raised.Verdict);
+        Assert.Equal("ATTUNEABLE", raised.OnWiki);
+        Assert.Contains("ATTUNEABLE<br>", ItemPageEditor.BuildEdit(document, analysis).NewWikitext);
     }
 
     /// <summary>
@@ -142,26 +165,48 @@ public class ItemPageAnalyzerTests
     }
 
     /// <summary>
-    /// **Prose on the flags line blocks the rewrite**, which this fix had to settle rather than inherit: the tool is
-    /// forbidden to move or discard `This is a meal!` (user, 2026-09-24), and the flags line is regenerated *whole*,
-    /// so rewriting it at all would silently delete the prose. Widening when the line gets rewritten — which is what
-    /// fixing the legacy bug did — would have made that worse, so it is guarded instead, and the prose finding is
-    /// what reaches the user.
-    ///
-    /// `Arctic Mussels` is the real fixture for this: its whole flags line is `This is a meal!`.
+    /// **Unrecognized text on the flags line blocks the rewrite.** The flags line is regenerated *whole*, so rewriting
+    /// it would silently delete the text; it is raised for a human instead. `Required level of 55.` is real (on
+    /// `Narandi's Lance`) and deliberately not recognized (user, 2026-10-12): a level requirement may still be data.
     /// </summary>
     [Fact]
-    public void ProseOnTheFlagsLineIsNeverRewrittenAway()
+    public void UnrecognizedTextOnTheFlagsLineIsNeverRewrittenAway()
+    {
+        const string text =
+            "<onlyinclude>{{Itempage\n|itemname = Thing\n|statsblock = \nMAGIC ITEM  Required level of 55.<br>\n" +
+            "Class: ALL<br>\nRace: ALL<br>\n|notes = \n}}</onlyinclude>";
+        ItemPageDocument page = ItemPageDocument.Parse(text)!;
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
+            Captured(name: "Thing", flags: ["Lore Equipped"]), page, "Thing");
+
+        Assert.False(analysis.Find(ItemPageAnalyzer.FlagsField)?.IsChange ?? false);
+        Assert.Equal("Required level of 55.", analysis.Find(ItemPageAnalyzer.FlagProseField)!.OnWiki);
+
+        // And the edit really does leave the whole line there, which is the half that matters on a public wiki.
+        Assert.Contains("MAGIC ITEM  Required level of 55.<br>", ItemPageEditor.BuildEdit(page, analysis).NewWikitext);
+    }
+
+    /// <summary>
+    /// **The classic window's food line moves to notes, and the flags line is rewritten without it** (user,
+    /// 2026-10-12, reversing the 2026-09-24 rule that only a human moved it). `Arctic Mussels` is the real fixture:
+    /// its whole flags line is `This is a meal!`, and its notes open with a human's text and no lore, so the food
+    /// line opens the notes.
+    /// </summary>
+    [Fact]
+    public void FoodTextOnTheFlagsLineMovesToTheNotes()
     {
         ItemPageDocument page = ItemPageDocument.Parse(WikiFixtures.Load("Arctic Mussels"))!;
         ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(
             Captured(name: "Arctic Mussels", flags: ["Lore Equipped"]), page, "Arctic Mussels");
 
-        Assert.False(analysis.Find(ItemPageAnalyzer.FlagsField)?.IsChange ?? false);
-        Assert.NotNull(analysis.Find(ItemPageAnalyzer.FlagProseField));
+        Assert.Equal("This is a meal!", analysis.Find(ItemPageAnalyzer.WindowTextField)!.OnWiki);
+        Assert.Null(analysis.Find(ItemPageAnalyzer.FlagProseField));
 
-        // And the edit really does leave it there, which is the half that matters on a public wiki.
-        Assert.Contains("This is a meal!", ItemPageEditor.BuildEdit(page, analysis).NewWikitext);
+        ProposedEdit edit = ItemPageEditor.BuildEdit(page, analysis);
+        Assert.Contains("|notes       = This is a meal!<br>\n'''Edible'''", edit.NewWikitext);
+        Assert.Contains("|statsblock  = \nLore Equipped<br>\nWT: 0.5", edit.NewWikitext);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(edit.NewWikitext, "This is a meal!"));
+        Assert.Contains(new EditChange(EditChangeKind.Moved, "flags-line text to notes"), edit.Changes);
     }
 
     /// <summary>
@@ -350,18 +395,17 @@ public class ItemPageAnalyzerTests
     }
 
     /// <summary>EQL dropped these strings but they may still mean something the UI stopped exposing — in original
-    /// EverQuest "This is a hearty meal!" meant the food lasted longer. Raised for the user; never moved, never
-    /// dropped silently.</summary>
+    /// EverQuest "This is a hearty meal!" meant the food lasted longer. So they are kept, in notes, never dropped.
+    /// The finding says where it goes, and blocks nothing.</summary>
     [Fact]
-    public void FoodProseOnTheFlagsLineIsRaisedButNeverActedOn()
+    public void FoodTextOnTheFlagsLineIsAChangeThatBlocksNothing()
     {
         ItemPageAnalysis analysis = Analyze(Captured(name: "Arctic Mussels"), "Arctic Mussels");
 
-        FieldFinding finding = analysis.Find(ItemPageAnalyzer.FlagProseField)!;
-        Assert.Equal(FieldVerdict.NeedsReview, finding.Verdict);
-        Assert.Contains("This is a meal!", finding.OnWiki);
-        Assert.False(finding.IsChange);
-        Assert.Contains("Move it into notes by hand", finding.Explanation);
+        FieldFinding finding = analysis.Find(ItemPageAnalyzer.WindowTextField)!;
+        Assert.True(finding.IsChange);
+        Assert.False(finding.Blocks);
+        Assert.Contains("notes", finding.Explanation);
     }
 
     // ---- stats ----

@@ -33,6 +33,10 @@ using FieldVerdict = EQLWikiEditorAssistant.Wiki.Analysis.FieldVerdict;
 //                                             it covers (48 of 744 item pages when measured)
 //   WikiSpike logout                          delete the stored credential
 //   WikiSpike edit <User: page>               append a timestamped line, then revert it (userspace only)
+//   WikiSpike freshpages <count> [--seed N]   sample item pages untouched in the recent-changes window
+//   WikiSpike split --cached <dir>...         measure the two-diff split for combining edit and formatting
+//                                             (see SplitMeasurement.cs)
+//   WikiSpike allpages | flagcensus --cached <dir>   the legacy statsblock vocabulary (see LegacyCensus.cs)
 //
 // The round-trip check is the acceptance test for the wikitext layer: parse a real page, render it back, and
 // require the result to be identical to the input. Anything less means an edit could silently reformat somebody
@@ -61,6 +65,10 @@ switch (args[0])
     case "whoami": return await WhoAmIAsync();
     case "logout": return Logout();
     case "edit": return await EditAsync();
+    case "freshpages": return await FreshPages.RunAsync(endpoint, args);
+    case "split": return SplitMeasurement.Run(args);
+    case "allpages": return await AllPages.RunAsync(endpoint);
+    case "flagcensus": return FlagCensus.Run(args);
     default: Usage(); return 1;
 }
 

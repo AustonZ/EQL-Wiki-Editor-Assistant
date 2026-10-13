@@ -1234,25 +1234,22 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
-    /// **The two passes compose the right way round on a legacy page**, which is the clearest argument for the
-    /// settled data-first order: the data edit replaces the legacy flags line with what the game actually says, and
-    /// only then does the formatter have a page it understands well enough to lay out. Running the formatter first
-    /// would have met a page it refuses to touch.
+    /// **The two passes compose on a legacy page**: the formatter lays it out with its legacy flags kept, since it
+    /// recognizes them by name (user, 2026-10-12), and only the data edit removes them, replacing the line with what
+    /// the game actually says. Before 2026-10-12 the formatter refused such a statsblock until the data edit had run.
     /// </summary>
     [Fact]
-    public async Task ALegacyPageBecomesFormattableOnceTheDataEditHasModernizedIt()
+    public async Task ALegacyPageIsLaidOutWithItsFlagsAndOnlyTheDataEditRemovesThem()
     {
         string legacy = UntidyPage().Replace("Lore Equpped, No Trade<br>", "MAGIC ITEM  LORE ITEM<br>");
 
         (ItemCheckPipeline pipeline, FakeWiki wiki, _) = Build(Window(EarringLines), legacy);
 
-        // Before the data edit, the formatter lays out the parameters it understands but will not touch the
-        // statsblock — the legacy flags line comes back byte for byte, with a note saying why.
-        (FormattingProposal? before, IReadOnlyList<string> whyNot) =
+        (FormattingProposal? before, IReadOnlyList<string> notes) =
             await pipeline.PrepareFormattingAsync("Earring of Bashing");
         Assert.NotNull(before);
-        Assert.Contains("MAGIC ITEM  LORE ITEM<br>", before!.Formatted);
-        Assert.Contains(whyNot, n => n.Contains("not a current EQL flag"));
+        Assert.Contains("MAGIC ITEM, LORE ITEM<br>\nSlot: EAR<br>", before!.Formatted);
+        Assert.DoesNotContain(notes, n => n.Contains("left exactly as it was", StringComparison.Ordinal));
 
         ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
         CommitResult commit = await pipeline.CommitAsync(result, result.Edit!.NewWikitext, result.Edit.Summary);

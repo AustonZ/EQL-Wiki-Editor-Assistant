@@ -79,6 +79,9 @@ public static class ItemPageAnalyzer
     public const string CategoryField = "category";
     public const string FlagsField = "flags";
     public const string FlagProseField = "flags (descriptive text)";
+    /// <summary>The classic item window's own text on the flags line (<see cref="LegacyStatsText.IsWindowText"/>),
+    /// which moves to notes. One finding per line of text.</summary>
+    public const string WindowTextField = "flags-line text";
     public const string OrphanEffectField = "effect (not in the capture)";
     public const string ClassesField = "Class";
     public const string RacesField = "Race";
@@ -328,7 +331,9 @@ public static class ItemPageAnalyzer
     private static void AddFlagFindings(List<FieldFinding> findings, ParsedItem captured, StatsBlock? block)
     {
         IReadOnlyList<string> onWiki = block is null ? [] : ReadFlagLine(block);
-        string[] prose = [.. onWiki.Where(FlagDialect.IsProse)];
+        // Window text is told apart first: a food line in Title Case would otherwise pass for a current flag.
+        string[] windowText = [.. onWiki.Where(FlagDialect.IsWindowText)];
+        string[] prose = [.. onWiki.Where(f => !FlagDialect.IsWindowText(f) && FlagDialect.IsUnrecognized(f))];
 
         // **There is no separate "legacy flags" finding, and removing it was the fix** (user, 2026-10-02, on
         // `Drake-Hide Mask`): the differences table showed two rows for one line, a `flags (legacy)` row listing the
@@ -337,20 +342,32 @@ public static class ItemPageAnalyzer
         // only place those tokens were reported. Fixing that on 2026-10-01 made this row say a second time what the
         // `flags` row already says, and nobody noticed because both were correct.
 
-        // **Prose on the flags line stops the rewrite, and that is the whole reason this is checked before
-        // comparing.** The line is regenerated *whole*, so rewriting one that carries `This is a meal!` would
-        // delete it — and the tool is forbidden to move or discard that text (user, 2026-09-24), only to raise it.
-        // So the flags question waits for the human: once they have moved the text into notes, the next capture
-        // sees an ordinary flags line and fixes it. Reported here rather than silently skipped, because "the tool
-        // left the flags alone and did not say why" is the failure this project most avoids.
+        // **Unrecognized text on the flags line stops the rewrite, and that is the whole reason this is checked
+        // before comparing.** The line is regenerated *whole*, so rewriting one that carries text nobody has
+        // classified would delete it. So the flags question waits for the human: once they have dealt with the text,
+        // the next capture sees an ordinary flags line and fixes it. Reported rather than silently skipped, because
+        // "the tool left the flags alone and did not say why" is the failure this project most avoids.
+        //
+        // Recognized text is not this case any more (user, 2026-10-12): legacy flags go with the rewrite and the
+        // classic window's food, drink and book lines move to notes, both below. What is left here is genuinely
+        // unexpected — a class list that lost its label, `Required level of 46.`, a pasted merchant value.
         if (prose.Length > 0)
         {
             findings.Add(new FieldFinding(
                 FlagProseField, FieldVerdict.NeedsReview, null, string.Join(", ", prose),
-                "Not a flag, and EQL no longer shows it. Move it into notes by hand to keep it; until then the flags " +
-                "line is left as it is, because rewriting it would delete this text."));
+                "Not a flag or anything else the Assistant recognizes on a flags line. Move or remove it by hand; " +
+                "until then the flags line is left as it is, because rewriting it would delete this text."));
             return;
         }
+
+        // The classic item window's own lines (`This is a Hearty Meal!`, `The Book is closed.`): EQL's window shows
+        // none of them, and they may still mean something, so they are kept — in notes, after the lore, as the page
+        // wrote them (user, 2026-10-12, reversing the 2026-09-24 rule that only a human moved them). The flags
+        // comparison below still sees them, so the line is rewritten without them.
+        foreach (string text in windowText)
+            findings.Add(new FieldFinding(
+                WindowTextField, FieldVerdict.Differs, null, text,
+                "EQL's item window no longer shows this, so it moves from the flags line to the notes, after the lore."));
 
         // The captured set is authoritative and open-ended: the devs keep adding flags (No Pet, Heirloom, Free
         // Storage), so an unfamiliar one is ordinary data, never a warning.
@@ -363,10 +380,18 @@ public static class ItemPageAnalyzer
         if (wikiSaysAttunable && capturedSaysNoTrade)
         {
             wanted[wanted.FindIndex(f => string.Equals(f, "No Trade", StringComparison.OrdinalIgnoreCase))] = "Attunable";
-            findings.Add(new FieldFinding(
-                FlagsField, FieldVerdict.Unverifiable, string.Join(", ", captured.Flags), string.Join(", ", onWiki),
+            const string keepingAttunable =
                 "The page says Attunable and this copy says No Trade, which is what an Attunable item shows once " +
-                "attuned. Keeping the page's Attunable, since it cannot be re-observed from this copy."));
+                "attuned. Keeping the page's Attunable, since it cannot be re-observed from this copy.";
+
+            // Legacy flags or window text beside it still have to come off the line, with Attunable kept.
+            if (onWiki.All(FlagDialect.IsCurrent))
+                findings.Add(new FieldFinding(
+                    FlagsField, FieldVerdict.Unverifiable, string.Join(", ", captured.Flags), string.Join(", ", onWiki),
+                    keepingAttunable));
+            else
+                findings.Add(new FieldFinding(
+                    FlagsField, FieldVerdict.Differs, string.Join(", ", wanted), string.Join(", ", onWiki), keepingAttunable));
             return;
         }
 
@@ -416,8 +441,14 @@ public static class ItemPageAnalyzer
         a.Count == b.Count &&
         a.Order(StringComparer.Ordinal).SequenceEqual(b.Order(StringComparer.Ordinal), StringComparer.Ordinal);
 
+    /// <summary>
+    /// Every flag-like token in the block, from every line that carries one — not only the first flags line (user,
+    /// 2026-10-12). 226 of 11,546 item pages spread them over several: a food line on a line of its own, and 79 in
+    /// the old blueprint's <c>EXPENDABLE  Charges: 10</c> shape, a legacy flag opening a field line. Reading only the
+    /// first left those standing however the flags line was rewritten.
+    /// </summary>
     private static IReadOnlyList<string> ReadFlagLine(StatsBlock block) =>
-        block.Lines.FirstOrDefault(l => l.Kind == StatsLineKind.Flags)?.Flags ?? [];
+        [.. block.Lines.SelectMany(l => l.Flags)];
 
     private static void AddListFinding(
         List<FieldFinding> findings, string wikiLabel, IReadOnlyList<string> capturedValues, StatsBlock? block)

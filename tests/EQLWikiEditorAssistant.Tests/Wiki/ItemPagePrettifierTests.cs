@@ -176,13 +176,13 @@ public class ItemPagePrettifierTests
     /// <summary>
     /// A block the formatter refuses to reorder keeps its unsigned values, because that path returns the raw text
     /// untouched. **That is the rule rather than a gap**: a pass which has just said it does not understand a block
-    /// has no business editing values inside it. It does mean the 469 legacy-flag pages get no signs until the data
-    /// pass modernizes them first, which is the settled data-before-formatting order working as intended.
+    /// has no business editing values inside it. Since 2026-10-12 only unrecognized text on the flags line does that,
+    /// so it is what this uses.
     /// </summary>
     [Fact]
     public void ABlockTheFormatterWillNotReorderKeepsItsUnsignedValues()
     {
-        PrettifyResult result = ItemPagePrettifier.Format(Page("MAGIC ITEM  LORE ITEM<br>\nSTR: 5<br>"));
+        PrettifyResult result = ItemPagePrettifier.Format(Page("Required level of 55.<br>\nSTR: 5<br>"));
 
         Assert.True(result.IsSafe);
         Assert.Contains("STR: 5<br>", result.Formatted);
@@ -343,36 +343,56 @@ public class ItemPagePrettifierTests
         Assert.Contains("Charges: 10<br>", result.Formatted);
     }
 
-    // --- legacy content stops it dead --------------------------------------------------------------------
+    // --- legacy content -----------------------------------------------------------------------------------
 
     /// <summary>
-    /// **A legacy flag leaves the whole block exactly as it was** (user, 2026-09-28): the formatting pass has no
-    /// business understanding obsolete flags, and discarding them is the *data* pass's decision, made against a live
-    /// capture. Real usage aims at items already updated for EQL; an old page gets reported, not half-modernized.
+    /// **A legacy statsblock is laid out like any other** (user, 2026-10-12, reversing 2026-09-28's "leave it exactly
+    /// as it was"). Legacy flags are recognized by name now, so the formatter understands the line, and laying out a
+    /// legacy page before the data pass modernizes it is what lets the review show the data changes against a page
+    /// already in the blueprint's layout. Discarding the flags is still the data pass's decision.
     /// </summary>
     [Fact]
-    public void ALegacyFlagLeavesTheStatsblockExactlyAsItWas()
+    public void ALegacyStatsblockIsLaidOutWithItsFlagsKept()
     {
         PrettifyResult result = ItemPagePrettifier.Format(Page("MAGIC ITEM  LORE ITEM  NO DROP<br>\nRace: ALL<br>\nAC: 10<br>"));
 
-        Assert.True(result.IsSafe);
-        Assert.Contains("MAGIC ITEM  LORE ITEM  NO DROP<br>\nRace: ALL<br>\nAC: 10<br>", result.Formatted);
-        Assert.Contains(result.Notes, n => n.Contains("not a current EQL flag"));
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Contains("MAGIC ITEM, LORE ITEM, NO DROP<br>\nAC: 10<br>\nRace: ALL<br>", result.Formatted);
+        Assert.DoesNotContain(result.Notes, n => n.Contains("left exactly as it was", StringComparison.Ordinal));
     }
 
-    /// <summary>...including the legacy separators. Nothing about that line is touched, not even its spacing.</summary>
-    [Fact]
-    public void LegacyFlagSeparatorsAreNotNormalized()
+    /// <summary>The classic window's food line is text, not a flag: it keeps a line of its own, just after the flags,
+    /// as the page wrote it — on a page that put it first, and on one that put it on a later line.</summary>
+    [Theory]
+    [InlineData("This is a meal!<br>\nMAGIC ITEM<br>\nRace: ALL<br>\nAC: 10<br>")]
+    [InlineData("MAGIC ITEM<br>\nAC: 10<br>\nThis is a meal!<br>\nRace: ALL<br>")]
+    public void WindowTextKeepsItsOwnLineAfterTheFlags(string statsblock)
     {
-        PrettifyResult result = ItemPagePrettifier.Format(Page("MAGIC ITEM  LORE ITEM<br>"));
+        PrettifyResult result = ItemPagePrettifier.Format(Page(statsblock));
 
-        Assert.DoesNotContain("MAGIC ITEM, LORE ITEM", result.Formatted);
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Contains("MAGIC ITEM<br>\nThis is a meal!<br>\nAC: 10<br>", result.Formatted);
+    }
+
+    /// <summary>The old blueprint's `EXPENDABLE  Charges: 10` beside a flags line: 79 real pages. A legacy flag on a
+    /// second line joins the flags; merging *current* flags from two lines is still refused.</summary>
+    [Fact]
+    public void ALegacyFlagOnASecondLineJoinsTheFlags()
+    {
+        PrettifyResult result = ItemPagePrettifier.Format(Page("MAGIC ITEM<br>\nEXPENDABLE  Charges: 10<br>\nRace: ALL<br>"));
+
+        Assert.True(result.IsSafe, string.Join("; ", result.Refusals));
+        Assert.Contains("MAGIC ITEM, EXPENDABLE<br>", result.Formatted);
+        Assert.Contains("Charges: 10<br>", result.Formatted);
+
+        PrettifyResult current = ItemPagePrettifier.Format(Page("No Trade<br>\nQuest  Charges: 10<br>\nRace: ALL<br>"));
+        Assert.Contains(current.Notes, n => n.Contains("more than one line", StringComparison.Ordinal));
     }
 
     /// <summary>
-    /// The shape rule, rather than a vocabulary list — the same reason the capture side keeps no known-flags list:
-    /// the devs keep adding flags, and a list would reject exactly the rare items most worth recording. All three
-    /// categories here are real, from a census of 1,183 pages.
+    /// What still leaves a statsblock alone: text on the flags line that is neither a flag nor recognized window
+    /// text. Current flags are judged by shape — the devs keep adding them — and the legacy flags and window text by
+    /// name. Every row is real, from the 2026-10-12 census of every item page.
     /// </summary>
     [Theory]
     [InlineData("Lore Equipped", true)]
@@ -381,19 +401,23 @@ public class ItemPagePrettifierTests
     [InlineData("Placeable", true)]
     [InlineData("Quest", true)]
     [InlineData("Heirloom", true)]           // never seen on the wiki, but current — a list would have rejected it
-    [InlineData("MAGIC ITEM", false)]        // legacy
-    [InlineData("NODROP", false)]
-    [InlineData("EXPENDABLE", false)]
-    [InlineData("NO RENT", false)]
-    [InlineData("This is a meal!", false)]   // prose that landed on the flags line
-    [InlineData("The Book is closed.", false)]
-    [InlineData("Required level of 55.", false)]
+    [InlineData("Temporary", true)]
+    [InlineData("MAGIC ITEM", true)]         // legacy, recognized
+    [InlineData("NODROP", true)]
+    [InlineData("EXPENDABLE", true)]
+    [InlineData("NO RENT", true)]
+    [InlineData("MAGIC ITEM LORE ITEM NO TRADE", true)] // single-spaced, split against the list
+    [InlineData("This is a meal!", true)]    // the classic window's own text, recognized
+    [InlineData("The Book is closed.", true)]
+    [InlineData("Required level of 55.", false)]        // may still be data: for a human
     [InlineData("Class:CLR DRU SHM", false)] // a mis-parsed Class line
-    public void CurrentFlagsAreToldFromLegacyOnesByShape(string flag, bool current)
+    [InlineData("MNK BRD ROG SHM", false)]   // a class list that lost its label, which the shape rule used to delete
+    [InlineData("PENDING LORE", false)]
+    public void OnlyUnrecognizedFlagsLineTextLeavesTheBlockAlone(string flag, bool laidOut)
     {
         PrettifyResult result = ItemPagePrettifier.Format(Page($"{flag}<br>\nRace: ALL<br>\nAC: 10<br>"));
 
-        Assert.Equal(current, !result.Notes.Any(n => n.Contains("not a current EQL flag")));
+        Assert.Equal(laidOut, !result.Notes.Any(n => n.Contains("left exactly as it was", StringComparison.Ordinal)));
     }
 
     /// <summary>

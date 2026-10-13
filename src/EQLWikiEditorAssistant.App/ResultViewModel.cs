@@ -69,7 +69,10 @@ public sealed record FindingViewModel(
         DisplayField(finding.Field),
         finding.Captured ?? "—",
         finding.OnWiki ?? "—",
-        DisplayVerdict(finding.Verdict, finding.Captured, finding.OnWiki),
+        // Window text is not removed but moved, which is what the reader needs to know about it.
+        finding.Field == ItemPageAnalyzer.WindowTextField
+            ? "Move to notes"
+            : DisplayVerdict(finding.Verdict, finding.Captured, finding.OnWiki),
         finding.Explanation ?? "",
         finding.Blocks);
 
@@ -87,6 +90,7 @@ public sealed record FindingViewModel(
         ItemPageAnalyzer.CategoryField => "Category",
         ItemPageAnalyzer.FlagsField => "Flags",
         ItemPageAnalyzer.FlagProseField => "Flags (text)",
+        ItemPageAnalyzer.WindowTextField => "Flags (old window text)",
         ItemPageAnalyzer.OrphanEffectField => "Effect",
         "focus_effect" => "Focus effect",
         _ => field,
