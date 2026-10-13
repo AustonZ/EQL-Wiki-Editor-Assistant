@@ -79,6 +79,67 @@ public sealed record FindingViewModel(
         finding.Blocks);
 
     /// <summary>
+    /// The table's rows, with derived categories listed one row per family rather than one per category (user,
+    /// 2026-10-12): a bard instrument going from `Class: BRD` to `Class: ALL` gains fifteen class categories, and
+    /// fifteen rows pushed everything else off the screen. A family's row sits where its first category would have.
+    /// The edit itself still adds each category, as the analyzer reported it; only the reading is grouped. A class or
+    /// slot with no known category is not a category, so it keeps a row of its own.
+    /// </summary>
+    public static IEnumerable<FindingViewModel> ForAll(IEnumerable<FieldFinding> findings)
+    {
+        List<FieldFinding> all = [.. findings];
+        var emitted = new HashSet<(CategoryGroup, FieldVerdict, bool)>();
+        foreach (FieldFinding finding in all)
+        {
+            if (CategoryKey(finding) is not { } key)
+            {
+                yield return For(finding);
+                continue;
+            }
+
+            if (!emitted.Add(key)) continue;
+            FieldFinding[] family = [.. all.Where(f => CategoryKey(f) == key)];
+            if (family.Length == 1)
+            {
+                yield return For(finding) with { Field = GroupName(key.Group, plural: false) };
+                continue;
+            }
+
+            bool onPage = key.OnPage;
+            string joined = string.Join(", ", family.Select(f => (onPage ? f.OnWiki : f.Captured)!));
+            yield return new FindingViewModel(
+                GroupName(key.Group, plural: true),
+                onPage ? "—" : joined,
+                onPage ? joined : "—",
+                DisplayVerdict(finding.Verdict, finding.Captured, finding.OnWiki),
+                onPage
+                    ? "The page is in these categories, but nothing in the capture implies them. Categories are never " +
+                      "removed — check whether the item changed or the categories are wrong."
+                    : "The item's classes, slot or properties put it in these categories, and the page is not in them.",
+                family.Any(f => f.Blocks));
+        }
+    }
+
+    /// <summary>What a category row is grouped by: its family, its verdict, and which side has it. Null for anything
+    /// that is not a derived category.</summary>
+    private static (CategoryGroup Group, FieldVerdict Verdict, bool OnPage)? CategoryKey(FieldFinding finding)
+    {
+        if (finding.Field != ItemPageAnalyzer.CategoryField) return null;
+        bool onPage = finding.Captured is null;
+        string? category = onPage ? finding.OnWiki : finding.Captured;
+        if (category is null || CategoryRules.GroupOf(category) is not (var group and not CategoryGroup.NotDerived))
+            return null;
+        return (group, finding.Verdict, onPage);
+    }
+
+    private static string GroupName(CategoryGroup group, bool plural) => (group switch
+    {
+        CategoryGroup.Class => "Class ",
+        CategoryGroup.Slot => "Slot ",
+        _ => "Property ",
+    }) + (plural ? "categories" : "category");
+
+    /// <summary>
     /// The analyzer's field names, as a reader would write them (user, 2026-10-07). They are keys in the
     /// <c>Wiki</c> layer and the tests pin them, so they are translated here rather than renamed there. A stat keeps
     /// its wiki label (<c>AC</c>, <c>SV Fire</c>), which is already what the reader sees on the page.
@@ -271,9 +332,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             : [];
         Replace(ReformattingDiff, reformatting.Select(l => new DiffLineViewModel(l)));
         _reformattedLines = reformatting.Count(l => l.Kind is DiffLineKind.Added or DiffLineKind.Removed);
-        Replace(Findings, (result.Analysis?.Findings
-                .Where(f => f.IsChange || f.Blocks)
-                .Select(FindingViewModel.For) ?? [])
+        Replace(Findings, FindingViewModel.ForAll(result.Analysis?.Findings.Where(f => f.IsChange || f.Blocks) ?? [])
             .Concat(ComplianceRows(result)));
         Replace(Warnings, BuildWarnings());
 

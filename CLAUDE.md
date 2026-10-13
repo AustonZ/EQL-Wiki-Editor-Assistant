@@ -754,6 +754,11 @@ recorded an incomplete convention as the convention.
   pass"). Every category the tool derives has a place in the blueprint's order — `Pet Illusion Items` since oldid
   193248 — and `CategoryOrderTests` fails if a new one does not.
 - The documented quirk holds: the slot is `FINGER`, the category is `Fingers`.
+- **The review's "Proposed changes" table lists each family as one row** (user, 2026-10-12;
+  `CategoryRules.GroupOf`, `FindingViewModel.ForAll`): class categories, slot categories, property categories, split
+  by whether they are added or only on the page. A bard instrument going from `Class: BRD` to `ALL` had fifteen rows.
+  Only the reading is grouped: the analyzer still reports, and the editor still adds, one category at a time. A class
+  or slot with no known category keeps a row of its own.
 - **Correction (2026-09-28): `ANY` is not a slot, and an earlier note here saying it was "a real slot with no
   category" was wrong.** `Any Slot` occurs only inside an *effect's* parenthetical — `Effect: [[Levitation]] (Any
   Slot, Casting Time: 4.0)` — where it means the effect works whichever slot the item is in. Measured when the user

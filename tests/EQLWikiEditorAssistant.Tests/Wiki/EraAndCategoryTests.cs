@@ -194,6 +194,30 @@ public class CategoryRulesTests
     public void OnlyDerivedCategoriesAreOwnedByTheTool(string category, bool expected) =>
         Assert.Equal(expected, CategoryRules.IsDerivable(category));
 
+    /// <summary>The review lists each family of derived category as one row, so every category the rules can derive
+    /// must fall in the family it came from.</summary>
+    [Theory]
+    [InlineData("Bard Equipment", CategoryGroup.Class)]
+    [InlineData("shadow knight equipment", CategoryGroup.Class)]
+    [InlineData("Fingers", CategoryGroup.Slot)]
+    [InlineData("Primary", CategoryGroup.Slot)]
+    [InlineData("Pet Illusion Items", CategoryGroup.Property)]
+    [InlineData("Instant Click Equipment", CategoryGroup.NotDerived)]
+    [InlineData("Quest Items", CategoryGroup.NotDerived)]
+    public void EachDerivedCategoryBelongsToItsFamily(string category, CategoryGroup expected) =>
+        Assert.Equal(expected, CategoryRules.GroupOf(category));
+
+    [Fact]
+    public void EveryCategoryTheRulesDeriveHasAFamily()
+    {
+        IReadOnlyList<string> categories = CategoryRules.Derive(
+            [CategoryRules.AllClasses], [.. CategoryRules.SlotCategoryNames.Keys], out _, ["Pet Illusion"]);
+
+        Assert.Equal(16, categories.Count(c => CategoryRules.GroupOf(c) == CategoryGroup.Class));
+        Assert.Equal(18, categories.Count(c => CategoryRules.GroupOf(c) == CategoryGroup.Slot));
+        Assert.Equal(1, categories.Count(c => CategoryRules.GroupOf(c) == CategoryGroup.Property));
+    }
+
     /// <summary>Earring of Bashing's real categories, as a sanity check that the derivation matches a page a human
     /// maintained: Class WAR SHD SHM BST BER plus Slot EAR.</summary>
     [Fact]

@@ -498,6 +498,12 @@ reporting the item already checked.
 - **Fixed 2026-10-12: a window laid over another's bottom, almost exactly aligned, was traced as part of it** (user, on
   `Shiverback-Hide Wristbands` under `Midnight Clad Straps`). A traced rectangle may now hold only its own Description
   tab; see CLAUDE.md, "Locating item windows".
+- **Take `Inventory Items` out of `WikiMapping.CategoryOrder` once no page uses it** (user, 2026-10-13). The blueprint
+  dropped it on 2026-10-12, deprecating the category, and another editor is removing it from every page in a bulk pass.
+  The Assistant never adds it, so only the sort order is left; taking it out first would move it to the end of every
+  page still carrying it, churning pages the bulk pass is about to clean. Confirm the category is empty, then remove it.
+- **Fixed 2026-10-13: the review's table listed every derived category as its own row** (user). Each family now reads
+  as one row; see CLAUDE.md, "Derived categories".
 
 ### To investigate
 - **Fixed 2026-10-10: a false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Its title bar sat flush

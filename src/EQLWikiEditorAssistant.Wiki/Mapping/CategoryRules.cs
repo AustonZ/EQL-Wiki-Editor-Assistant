@@ -165,13 +165,31 @@ public static class CategoryRules
     /// <summary>Whether a category name is one this tool derives, and therefore one it may add. Everything else on a
     /// page — zone names, `Quest Items`, `Focus Items`, `Fashion:` entries — is somebody else's and is left
     /// alone.</summary>
-    public static bool IsDerivable(string category)
+    public static bool IsDerivable(string category) => GroupOf(category) is not CategoryGroup.NotDerived;
+
+    /// <summary>
+    /// Which rule a derived category comes from, so the review can list each family as one row (user, 2026-10-12): an
+    /// item going from `Class: BRD` to `Class: ALL` gains fifteen class categories, and fifteen rows saying the same
+    /// thing pushed everything else off the screen.
+    /// </summary>
+    public static CategoryGroup GroupOf(string category)
     {
         ArgumentNullException.ThrowIfNull(category);
         string trimmed = category.Trim();
-        return SlotCategories.Values.Contains(trimmed, StringComparer.OrdinalIgnoreCase)
-            || FieldCategories.Values.Contains(trimmed, StringComparer.OrdinalIgnoreCase)
-            || (trimmed.EndsWith(" Equipment", StringComparison.OrdinalIgnoreCase)
-                && ClassNames.Values.Contains(trimmed[..^" Equipment".Length], StringComparer.OrdinalIgnoreCase));
+        if (trimmed.EndsWith(" Equipment", StringComparison.OrdinalIgnoreCase)
+            && ClassNames.Values.Contains(trimmed[..^" Equipment".Length], StringComparer.OrdinalIgnoreCase))
+            return CategoryGroup.Class;
+        if (SlotCategories.Values.Contains(trimmed, StringComparer.OrdinalIgnoreCase)) return CategoryGroup.Slot;
+        if (FieldCategories.Values.Contains(trimmed, StringComparer.OrdinalIgnoreCase)) return CategoryGroup.Property;
+        return CategoryGroup.NotDerived;
     }
+}
+
+/// <summary>The families of category <see cref="CategoryRules"/> derives, plus everything it does not.</summary>
+public enum CategoryGroup
+{
+    NotDerived,
+    Class,
+    Slot,
+    Property,
 }
