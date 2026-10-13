@@ -63,6 +63,46 @@ public class ItemWindowLocatorTests
         Assert.False(window.HasLoreTab);
     }
 
+    /// <summary>
+    /// **A window laid over another's bottom edge, almost exactly aligned, is not part of it** (bug found by the user,
+    /// 2026-10-12: `Midnight Clad Straps` over the bottom of `Shiverback-Hide Wristbands`, one pixel to the left). The
+    /// lower window carried the upper one's sides straight down and its own bottom edge closed the rectangle, so the
+    /// upper window came back as both, read as one item. Built here from a real window pasted over its own bottom in
+    /// the same arrangement, since that frame was never audited for the samples.
+    /// </summary>
+    [Fact]
+    public async Task Locate_AWindowOverAnotherAlignedBottom_CoversItRatherThanJoiningIt()
+    {
+        if (await Load("01-single-weapon-lvl0-tradeable-pink-background.png") is not { } l) return;
+        Rect w = Assert.Single(ItemWindowLocator.Locate(l.Image, l.Reader)).Bounds;
+
+        // A copy goes above the window, one pixel to the right, its last 60 rows under the window's top; then the
+        // window is put back on top. So the window is the one in front, a pixel left of the one behind — as the user's
+        // frame had it. Built upward because below this window is the game's chat panel. Each paste takes a few pixels
+        // beyond the traced bounds at the sides and bottom, so it carries the dark outer frame the tracer requires.
+        const int frame = 4, overlap = 60;
+        int above = w.Y - w.Height + overlap;
+        Assert.True(above >= 0, "The sample has no room above its window for the copy.");
+        byte[] pixels = (byte[])l.Image.Pixels.Clone();
+        void Paste(int toX, int toY)
+        {
+            for (int row = 0; row < w.Height + frame; row++)
+                Array.Copy(l.Image.Pixels, ((w.Y + row) * l.Image.Width + w.X - frame) * 4,
+                    pixels, ((toY + row) * l.Image.Width + toX - frame) * 4, (w.Width + 2 * frame) * 4);
+        }
+        Paste(w.X + 1, above);
+        Paste(w.X, w.Y);
+
+        IReadOnlyList<LocatedWindow> windows =
+            ItemWindowLocator.Locate(new CapturedImage(l.Image.Width, l.Image.Height, pixels), l.Reader);
+        Dump(windows);
+
+        Assert.Equal(2, windows.Count);
+        Assert.True(windows[0].PossiblyOccluded);            // the one behind, whose bottom cannot be seen
+        Assert.False(windows[1].PossiblyOccluded);           // the one in front, whole
+        Assert.Equal(w, windows[1].Bounds);
+    }
+
     [Fact]
     public async Task Locate_LoreTabActive_StillTracesTheWindow()
     {

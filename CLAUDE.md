@@ -2336,6 +2336,15 @@ against the full real-sample set is very likely to reintroduce a bug this histor
   outline must be present at the corners, not just where probes crossed it. A covered edge's consensus lands on
   the *occluding* window's outline, and this window's own bottom outline doesn't reach that corner. Without this,
   a partly-covered window came back confidently 587px wide, silently merged with its neighbour.
+- **Closure is fooled by a window laid over another's bottom almost exactly aligned, so a rectangle may hold only its
+  own Description tab** (bug found by the user, 2026-10-12: `Midnight Clad Straps` over the bottom of
+  `Shiverback-Hide Wristbands`, one pixel to the left). The front window carried the back one's sides straight down
+  into its own and its bottom edge closed the rectangle, so the back window traced as both, 910px tall, and was read as
+  one item. But a tab visible inside a rectangle belongs to a window drawn on top of it, so `ItemWindowLocator` marks
+  any window whose traced rectangle contains another window's tab as `PossiblyOccluded`. Measured before committing:
+  **all 147 sample windows trace to identical rectangles and verdicts**, and the corpus is unchanged.
+  `Locate_AWindowOverAnotherAlignedBottom_CoversItRatherThanJoiningIt` rebuilds the arrangement from a real window
+  pasted over a copy of itself (the user's frame is not an audited sample) and fails without the rule.
 - **There is no size ceiling and no edge-scan limit short of the frame** (bug found by the user, 2026-10-07). Item
   windows can be resized, and a 1074px-wide one was refused as "partly covered" by the 600x700 ceiling that used to
   sit here — a backstop for an occluder flush along an *entire* side, where every probe agrees on the same oversized

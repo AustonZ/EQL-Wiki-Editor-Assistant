@@ -28,7 +28,8 @@ public static class ItemWindowLocator
         CapturedImage image, GlyphTextReader reader, CancellationToken cancellationToken = default)
     {
         var windows = new List<LocatedWindow>();
-        foreach (DescriptionTab anchor in DescriptionTabFinder.Find(image))
+        List<DescriptionTab> anchors = [.. DescriptionTabFinder.Find(image)];
+        foreach (DescriptionTab anchor in anchors)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -44,6 +45,17 @@ public static class ItemWindowLocator
             }
 
             Rect? bounds = WindowBoundsFinder.TryFindBounds(image, anchor.Label);
+
+            // **A window's rectangle holds one Description tab, its own** (bug found by the user, 2026-10-12, on
+            // `Shiverback-Hide Wristbands`). Another window laid over its bottom, almost exactly aligned, carries the
+            // sides straight on down into its own, and its bottom edge closes the rectangle — so the trace passes
+            // every check and comes back as both windows in one, read as one item. But the other window's tab is
+            // then inside the rectangle, and a tab that can be seen there belongs to a window drawn on top: this one
+            // is covered, wherever exactly its real edge is.
+            if (bounds is { } traced &&
+                anchors.Any(other => other.Label != anchor.Label && other.Label.IntersectsWith(traced)))
+                bounds = null;
+
             if (bounds is null)
             {
                 // Found a real item window (it has a Description tab) but couldn't establish clean bounds for
