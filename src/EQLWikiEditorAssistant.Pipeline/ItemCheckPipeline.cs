@@ -257,6 +257,17 @@ public sealed class ItemCheckPipeline
         ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
         var warnings = new List<string>(item.Warnings);
 
+        // Cropped whatever the verdict: the review screen shows it beside the wiki's copy so the user can settle by
+        // eye anything the comparison declines or gets wrong. The icon's own cell rather than the fingerprinted strip,
+        // so it shows at the same scale as the wiki's file — see ItemIconReader.IconCell. **Before the eligibility
+        // check** (user, 2026-10-12): a levelled item is compared with nothing, but its entry in the list still shows
+        // its icon like every other item's. The Lore tab draws no icon.
+        CapturedImage? iconCrop = window.ActiveTab == ItemWindowTab.Description
+            ? frame.Crop(new Rect(
+                window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
+                ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height))
+            : null;
+
         if (item.TitleContentNameMismatch)
             warnings.Add(
                 "The name in the title bar does not match the one in the window body, which usually means the " +
@@ -275,6 +286,7 @@ public sealed class ItemCheckPipeline
                 ItemName = item.Name,
                 Item = item,
                 WindowImage = crop,
+                CapturedIconImage = iconCrop,
                 Eligibility = eligibility,
                 Warnings = warnings,
             };
@@ -304,15 +316,6 @@ public sealed class ItemCheckPipeline
             ItemIconReader.TryRead(frame, window, out IconFingerprint read, out string? noIconBecause) ? read : null;
         string? iconUnreadableNote =
             noIconBecause is null ? null : $"The icon was not compared: {noIconBecause}.";
-
-        // Cropped whatever the verdict: the review screen shows it beside the wiki's copy so the user can settle by
-        // eye anything the comparison declines or gets wrong. The icon's own cell rather than the fingerprinted strip,
-        // so it shows at the same scale as the wiki's file — see ItemIconReader.IconCell.
-        CapturedImage? iconCrop = window.ActiveTab == ItemWindowTab.Description
-            ? frame.Crop(new Rect(
-                window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
-                ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height))
-            : null;
 
         string? lore = PendingLoreFor(item.Name);
         bool needsLore = window.HasLoreTab && lore is null;

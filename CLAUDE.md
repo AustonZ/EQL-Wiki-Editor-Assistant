@@ -1040,6 +1040,9 @@ checked properly. `ShouldWriteLedgerEntry` says so on the result rather than lea
   would read an ornamentation named like the item itself as "native". Its explanation also avoids claiming a name
   mismatch, which would be misleading for a slot that is foreign by nature.
 - Every blocker is reported, not just the first, so the user sees the whole picture in one pass.
+- **An ineligible item still shows its icon in the list** (user, 2026-10-12): the icon's cell is cropped before the
+  check and carried on the result for that alone. It is not fingerprinted and nothing compares it; the review's icon
+  panel stays hidden for it.
 - **It runs before the Lore branch, so a Lore-tab capture is judged too** (bug found by the user, 2026-10-07, on
   `Arydryidriyorn +5`). The Lore tab's title carries the level, but the pipeline used to record a Lore capture's prose
   before asking whether the item was eligible — so a levelled item was accepted and the list asked for a Description

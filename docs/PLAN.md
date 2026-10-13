@@ -615,7 +615,9 @@ left is whether `Can Equip`/`Must Equip` replace `Clicky` or follow it.
 - **Show a levelled item's icon in its list entry** (user, 2026-10-12). Not knowing level-0 stats is no reason to show
   no icon. Today `ItemCheckPipeline.CheckWindowAsync` returns `Ineligible` before the icon is read, so the result
   carries none. Reading it earlier is cheap; the care needed is that an ineligible result still writes no ledger row and
-  nothing else starts comparing it.
+  nothing else starts comparing it. **Built 2026-10-12**: the icon's cell is cropped before the eligibility check and
+  carried on the `Ineligible` result for the list only; it is not fingerprinted, writes no row, and the review's icon
+  panel stays hidden (`AnIneligibleItemStillCarriesItsIcon`).
 - **Let the Assistant correct a levelled item's non-stat details and formatting** (user, 2026-10-12). Levelling changes
   the stats, which is why such an item is refused (see "Item leveling"), but much of a page does not depend on them:
   flags, class and race, slot, lore, effects, categories, the era banner, compliance and layout. To settle first:

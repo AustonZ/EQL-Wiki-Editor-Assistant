@@ -477,8 +477,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// <summary>Whether there is anything to show in the icon section — at least one of the images.</summary>
     /// <remarks>Not for an item the ledger let skip the wiki: nothing was compared, so the section could only say
     /// "not compared" beside an empty wiki tile. It carries the icon for its list entry and a re-check.</remarks>
+    // Not for an item nothing was compared for: one the ledger let skip the wiki, or a levelled one, whose captured icon
+    // is there only for its entry in the list.
     public bool HasIcons =>
-        Result.Status != ItemCheckStatus.AlreadyChecked &&
+        Result.Status is not (ItemCheckStatus.AlreadyChecked or ItemCheckStatus.Ineligible) &&
         (Result.CapturedIconImage is not null || Result.WikiIconImage is not null || MatchedIconImage is not null);
 
     /// <summary>The artwork the icon library matched, for a new item. This is what the user confirms against the

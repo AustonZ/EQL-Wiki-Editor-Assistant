@@ -710,6 +710,21 @@ public class ItemCheckPipelineTests
         Assert.Equal(0, wiki.Fetches);
     }
 
+    /// <summary>A levelled item is compared with nothing, but its entry in the list shows its icon like any other's
+    /// (user, 2026-10-12). The icon used to be cropped only after the eligibility check had returned.</summary>
+    [Fact]
+    public async Task AnIneligibleItemStillCarriesItsIcon()
+    {
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+
+        ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
+
+        Assert.Equal(ItemCheckStatus.Ineligible, result.Status);
+        Assert.NotNull(result.CapturedIconImage);
+        Assert.Equal(0, ledger.Count);
+        Assert.Equal(0, wiki.Fetches);
+    }
+
     /// <summary>
     /// "Refresh wiki data" is offered on an ineligible item too (user, 2026-10-12), and must not compare it: a levelled
     /// item's stats are legitimately higher than the page's, so the comparison would propose overwriting a correct
