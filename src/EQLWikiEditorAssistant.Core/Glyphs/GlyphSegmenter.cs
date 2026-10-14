@@ -60,8 +60,14 @@ public static class GlyphSegmenter
     public const int WordGapColumns = 2;
 
 
-    public static SegmentResult Segment(CapturedImage image, Rect region)
+    /// <param name="scale">The game's UI scale, a whole number. Gaps scale with it, like everything else in a window
+    /// (measured 2026-10-13: at 2.00-4.00 every chrome distance is the 1.00 one times the scale).</param>
+    /// <param name="wholeRuns">Takes each run as one glyph rather than splitting it at every blank column. Only for the
+    /// glyph sheet, whose characters are spaced apart: from 2.00 up the two marks of a <c>"</c> have a blank column
+    /// between them (one at 2.00, two at 4.00), which splitting would count as two characters.</param>
+    public static SegmentResult Segment(CapturedImage image, Rect region, int scale = 1, bool wholeRuns = false)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(scale, 1);
         int regionBackground = DetectBackground(image, region);
         int offRamp = 0;
         var bands = new List<TextBand>();
@@ -73,7 +79,7 @@ public static class GlyphSegmenter
             // Two passes over the band's runs: the first only to learn each run's colour and the brightest pixel
             // of that colour anywhere in the band, because a run cannot be normalized until its colour's true
             // peak is known (see the class remarks — a narrow 'i' never reaches it on its own).
-            var extents = FindRuns(image, region, background, top, bottom);
+            var extents = FindRuns(image, region, background, top, bottom, WordGapColumns * scale);
             var peakByMask = new Dictionary<int, int>();
             var masks = new List<int>(extents.Count);
             foreach ((int left, int right) in extents)
@@ -89,7 +95,9 @@ public static class GlyphSegmenter
                 (int left, int right) = extents[r];
                 int peak = peakByMask[masks[r]];
                 var glyphs = new List<GlyphBox>();
-                foreach ((int gLeft, int gRight) in FindGlyphColumns(image, background, left, right, top, bottom))
+                foreach ((int gLeft, int gRight) in wholeRuns
+                             ? [(left, right)]
+                             : FindGlyphColumns(image, background, left, right, top, bottom))
                     glyphs.Add(Extract(image, background, peak, gLeft, gRight, top, bottom, ref offRamp));
 
                 if (glyphs.Count > 0) runs.Add(new GlyphRun(left, right, masks[r], peak, glyphs));
@@ -172,7 +180,7 @@ public static class GlyphSegmenter
     }
 
     private static List<(int Left, int Right)> FindRuns(
-        CapturedImage image, Rect region, int background, int top, int bottom)
+        CapturedImage image, Rect region, int background, int top, int bottom, int gapColumns)
     {
         var runs = new List<(int, int)>();
         int? start = null;
@@ -187,7 +195,7 @@ public static class GlyphSegmenter
                 start ??= x;
                 gap = 0;
             }
-            else if (start is int s && ++gap >= WordGapColumns)
+            else if (start is int s && ++gap >= gapColumns)
             {
                 runs.Add((s, x - gap));
                 start = null;

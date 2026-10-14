@@ -547,6 +547,15 @@ reporting the item already checked.
       items already in the corpus, so their ground truth is the 1.00 entry's. Still to measure for the build: the
       window chrome at each scale (outline widths, title bar, icon cell, row and column gaps), and the atlas tool must
       take `"`, which from 1.75 up is two separate marks.
+    - **Measured 2026-10-13: at 2.00-4.00 the window is the 1.00 window with every distance times the scale**, the
+      colours unchanged: frame 2N, interior gap 3N, outline N (always 57/60/57), title bar 16N, and the icon cell
+      (12N, 54N, 44N square; the Fresh Fish icon's 43x43 ink 1px inside at 1.00 is 86x86, 2px inside, at 2.00). Only
+      text is drawn fresh rather than enlarged. So a scale's profile is today's distances times N, plus its own
+      atlas and Description template — no per-scale tracing rules. `GlyphSpike atlas --scale N` builds the atlases
+      (each sheet character is one run, the run gap scaled, so the two marks of `"` stay together; the 1.00 atlas is
+      byte-identical). 2.00, 3.00 and 4.00 each give 90 distinct shapes, `l` and `I` included, and 0 off-ramp
+      pixels. The 2.00 atlas reads every letter of a real window; what is left is the reader's own 1.00-sized
+      distances (spaces inside words, `+` and `( )` refused by its size limits), which the build scales.
     - Frames: `40a`/`40b` (2.00), `41a`/`41b` (0.75 None/Linear), `42a`/`42b` (1.25 None/Linear), `43b` (1.00
       Linear), `44a`/`44b` (1.75, moved), `45a`/`45b` (3.00, moved), `46a`-`46c` (4.00 sheet, item, moved). Not
       audited; most show chat.

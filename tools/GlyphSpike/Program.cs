@@ -13,7 +13,9 @@ using EQLWikiEditorAssistant.TestSupport;
 //                                               read directly instead of inferred from what was read
 //   GlyphSpike segment <image> [x,y,w,h]        text bands / runs / glyph boxes the segmenter finds
 //   GlyphSpike cluster <image> [x,y,w,h]        cluster glyphs by exact equality and render each distinct shape
-//   GlyphSpike atlas <image> [x,y,w,h] --out f  build the labelled atlas from the Notes Window glyph sheet
+//   GlyphSpike atlas <image> [x,y,w,h] [--scale N] --out f
+//                                               build the labelled atlas from the Notes Window glyph sheet, captured
+//                                               at UI scale N (a whole number; 1 if not given)
 //   GlyphSpike atlas <image> [x,y,w,h] --font <sheet font> --merge-into <atlas> [--existing-font Arial] --out f
 //                                               add a second UI font's sheet to an existing atlas: shapes both
 //                                               fonts draw stay shared, the rest are tagged with their font
@@ -150,7 +152,11 @@ static string[] SheetRows() =>
 
 static int Atlas(CapturedImage image, Rect region, string[] args)
 {
-    SegmentResult result = GlyphSegmenter.Segment(image, region);
+    // The sheet spaces its characters apart, so each run is one character, whatever blank columns it holds inside:
+    // from 2.00 up, a '"' has its two marks apart. The run gap scales with the UI.
+    int scaleIndex = Array.IndexOf(args, "--scale");
+    int scale = scaleIndex >= 0 && scaleIndex + 1 < args.Length ? int.Parse(args[scaleIndex + 1]) : 1;
+    SegmentResult result = GlyphSegmenter.Segment(image, region, scale, wholeRuns: true);
     PrintHeader(args[1], image, region, result);
 
     GlyphAtlas atlas;
