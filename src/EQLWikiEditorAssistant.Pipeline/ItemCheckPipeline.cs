@@ -205,16 +205,18 @@ public sealed class ItemCheckPipeline
     private async Task<ItemCheckResult> CheckWindowAsync(
         CapturedImage frame, LocatedWindow window, CancellationToken cancellationToken)
     {
-        CapturedImage crop = frame.Crop(window.Bounds);
-
         // Found, but in a skin whose windows cannot be read. Said outright rather than reported as covered, which it
         // would otherwise look like, and which moving the window would not fix.
+        //
+        // Neither this nor a covered window has a traced rectangle, only its Description tab, so a crop of it would
+        // be a strip reading "Description" (user, 2026-10-12). The whole frame is shown instead, with the tab marked.
         if (window.InOtherSkin)
             return new ItemCheckResult
             {
                 Status = ItemCheckStatus.UnsupportedSkin,
                 ItemName = "",
-                WindowImage = crop,
+                Frame = frame,
+                TabInFrame = window.Bounds,
                 Warnings =
                 [
                     "This window is drawn in another of the game's UI skins. Only default_modern can be read: switch " +
@@ -229,9 +231,12 @@ public sealed class ItemCheckPipeline
             {
                 Status = ItemCheckStatus.Occluded,
                 ItemName = "",
-                WindowImage = crop,
+                Frame = frame,
+                TabInFrame = window.Bounds,
                 Warnings = ["This window is partly covered, so nothing was read from it. Move it clear and capture again."],
             };
+
+        CapturedImage crop = frame.Crop(window.Bounds);
 
         // A window drawn in another UI font than the reader was set to is refused the same way, and for the same
         // reason: what was read from it cannot be trusted. The font decides what the bare bar means, so an Arial

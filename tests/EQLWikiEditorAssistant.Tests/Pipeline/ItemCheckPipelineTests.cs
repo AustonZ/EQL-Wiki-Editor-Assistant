@@ -771,6 +771,29 @@ public class ItemCheckPipelineTests
         Assert.Equal(0, wiki.Fetches);
     }
 
+    /// <summary>
+    /// A window that could not be traced is shown as the whole frame with its tab marked, not as a crop of the tab
+    /// (user, 2026-10-12): all that crop ever showed was the word "Description". Both kinds of untraceable window.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AnUntraceableWindowCarriesTheFrameWithItsTabMarked(bool inOtherSkin)
+    {
+        var tab = new Rect(120, 340, 62, 11);
+        var window = new LocatedWindow(tab, [], HasLoreTab: false, PossiblyOccluded: true,
+            DrawnIn: UiFont.Arial, InOtherSkin: inOtherSkin);
+        (ItemCheckPipeline pipeline, _, _) = Build(window);
+        pipeline.ConfiguredFont = UiFont.Arial;
+        CapturedImage frame = BlankFrame();
+
+        ItemCheckResult result = Assert.Single(await pipeline.CheckAsync(frame));
+
+        Assert.Same(frame, result.Frame);
+        Assert.Equal(tab, result.TabInFrame);
+        Assert.Null(result.WindowImage);
+    }
+
     // ---- the UI font (user, 2026-10-05) ----
 
     /// <summary>

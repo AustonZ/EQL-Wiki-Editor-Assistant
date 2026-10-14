@@ -982,6 +982,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasOnlyLayoutToSubmit));
     }
     public bool HasFindings => Findings.Count > 0;
+
+    /// <summary>A window that could not be traced, shown as the whole capture with its tab ringed (MarkedFrame).</summary>
+    public bool HasFrame => Result is { Frame: not null, TabInFrame: not null };
     public bool HasWarnings => Warnings.Count > 0;
 
     /// <summary>

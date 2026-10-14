@@ -490,7 +490,8 @@ reporting the item already checked.
   saved maximized window: each lands where saved and restores to the right state.
 
 ### Found 2026-10-12, for 1.0.0
-- **A covered window's screenshot is just its "Description" tab** (user). `ItemWindowLocator` reports a covered window
+- **Fixed 2026-10-13: a covered window's screenshot was just its "Description" tab** (user). Now the whole frame with
+  the tab ringed, full size on a click; see CLAUDE.md, "Multi-window / occlusion handling". The report as found: `ItemWindowLocator` reports a covered window
   with only its tab label as its bounds, since its real edges are unknown, and the review shows that crop: a strip
   reading "Description", which says nothing about what is wrong. Either show something that makes the covering visible
   (a crop around the tab wide enough to see the window over it, or the window's traceable part with the covering

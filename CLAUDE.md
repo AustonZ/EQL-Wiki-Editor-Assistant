@@ -2236,6 +2236,14 @@ warning rather than silently processed as if complete. Implemented as `ItemWindo
 (`Core.Locate`), validated against real occluded samples — see "Locating item windows" below for the design.
 Parse adds a second, content-level check (reconciling the title-bar name against the content-area name) as
 defence in depth.
+- **A window that cannot be traced is shown as the whole frame with its tab ringed** (user, 2026-10-12, built
+  2026-10-13): a covered window, or one in another skin. The locator knows only its Description tab, so a crop showed
+  the word "Description" and nothing else. The result carries the frame and the tab's rectangle
+  (`ItemCheckResult.Frame`/`TabInFrame`) instead of a crop; the Edit page shows it shrunk to the pane's width, and a
+  click opens it full size, scrolled to the ring (`App.MarkedFrame`). Every window in one capture shares the frame,
+  held in memory only. **Kept plain on purpose, since it will rarely be looked at**: the ring is two rectangles at
+  frame coordinates inside a Viewbox, so no layout code can drift it off the window. Rendered at 1500 and 760px wide
+  and full size on `06a`.
 
 **Locating item windows (`ItemWindowLocator` + `WindowBoundsFinder`, `Core.Locate`).** Find each window's
 `Description` tab label by its pixels (`DescriptionTabFinder`, below), then trace the window's **own content-area

@@ -101,6 +101,18 @@ public sealed record ItemCheckResult
     /// <summary>The window's crop of the frame, for showing the user what was captured beside the diff.</summary>
     public CapturedImage? WindowImage { get; init; }
 
+    /// <summary>
+    /// The whole captured frame, for a window that could not be traced — one partly covered or in another skin — in
+    /// place of <see cref="WindowImage"/> (user, 2026-10-12). All the locator knows of such a window is its
+    /// Description tab, and a crop of that said nothing about what was wrong; the frame with the tab marked
+    /// (<see cref="TabInFrame"/>) shows where the window is and what is over it. Every window in one capture shares
+    /// the one frame. It stays in memory only, like every capture.
+    /// </summary>
+    public CapturedImage? Frame { get; init; }
+
+    /// <summary>Where the untraceable window's Description tab is in <see cref="Frame"/>.</summary>
+    public Rect? TabInFrame { get; init; }
+
     public ItemEligibility? Eligibility { get; init; }
 
     public LedgerVerdict LedgerVerdict { get; init; }

@@ -503,6 +503,20 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
+                        <!-- A window that could not be traced, shown as the whole capture with its tab ringed (user,
+                             2026-10-12), using the width this pane has spare for such an item. Shrunk to fit, never
+                             enlarged; a click shows it full size (MarkedFrame). -->
+                        <StackPanel Margin="0,8,0,0" Visibility="{Binding HasFrame, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,4" Text="Captured screenshot" />
+                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,6">
+                                <Run Text="The window is ringed in red." />
+                                <Hyperlink Click="OnShowFrameClick"><Run Text="Show it full size" /></Hyperlink>
+                            </TextBlock>
+                            <Viewbox x:Name="FrameBox" Stretch="Uniform" StretchDirection="DownOnly"
+                                     HorizontalAlignment="Left" Cursor="Hand" MouseLeftButtonUp="OnShowFrameClick"
+                                     ToolTip="Show it full size" />
+                        </StackPanel>
+
                         <!-- The reverse of the Lore tab prompt below (user, 2026-10-07): the Lore tab was captured first,
                              so the item's data is still to come. -->
                         <Border Visibility="{Binding WantsDescriptionCapture, Converter={StaticResource BoolToVis}}"

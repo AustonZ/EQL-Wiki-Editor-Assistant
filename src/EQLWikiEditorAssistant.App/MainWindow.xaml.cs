@@ -662,9 +662,17 @@ public partial class MainWindow : Window
         else UpdateBrowserVisibility();
     }
 
+    /// <summary>The capture of an untraceable window at full size, in a window of its own.</summary>
+    private void OnShowFrameClick(object sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is ResultViewModel { Result: { Frame: { } frame, TabInFrame: { } tab } })
+            MarkedFrame.ShowFullSize(this, frame, tab);
+    }
+
     private void ShowImages(ResultViewModel? view)
     {
         WindowImage.Source = view?.Result.WindowImage is { } image ? Bitmaps.From(image) : null;
+        FrameBox.Child = view?.Result is { Frame: { } frame, TabInFrame: { } tab } ? MarkedFrame.Build(frame, tab) : null;
         LoreImage.Source = view?.LoreImage is { } lore ? Bitmaps.From(lore) : null;
         ShotLabel.Text = WindowImage.Source is not null && LoreImage.Source is not null
             ? "Captured screenshots"
