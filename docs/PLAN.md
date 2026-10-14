@@ -522,6 +522,34 @@ reporting the item already checked.
   (everything is measured relative to the window); UI scale and skin do, since every edge-finding constant and the glyph
   atlas belong to one scale and skin. Likely shape: a one-time calibration on a known window that measures the frame and
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
+  - **Spike, 2026-10-13: how the game draws text at other scales.** The game offers 0.75, 1.00, 2.00, 3.00 and 4.00,
+    plus 1.25-2.75 in quarter steps marked Experimental, and a "UI Text Filtering" setting (None, Linear). Captured in
+    Arial (`samples/40a`-`43b`, gitignored, not audited) and measured with `GlyphSpike`:
+    - **Above 1.00 with filtering None, text is drawn fresh at the target size and exactly**: the same 7-level
+      anti-aliasing ramp, 0 off-ramp pixels. At 1.25 all 90 sheet characters are distinct (`l` and `I` differ there),
+      and an atlas built from the sheet alone read a whole item window exactly but for one learned spacing (`0. 1`).
+      So each scale needs its own atlas, label template and measurements, and nothing else changes in kind.
+    - **At 0.75 text is a shrunk 1.00 drawing**: with None, whole rows and columns are dropped (1,098 off-ramp pixels
+      on the sheet), depending on where a glyph lands; with Linear it is blended (4,129). Neither is exactly readable.
+    - **Linear filtering blends text at any scale but 1.00** (1.25: 4,848 off-ramp pixels, nothing read), and changes
+      nothing at 1.00, where the shipped reader parses all three windows exactly.
+    - **At fractional scales a glyph's shape depends on where it lands** (the user saw text "dance" against the
+      window border while dragging at 1.75). The same window captured at two positions (`44a`/`44b`, regions aligned
+      on the measured offset) differs in about 1 glyph in 20 — `v`, `e`, `o`, `M` among them — and the window's own
+      boxes differ by a pixel too. An exact atlas would need every glyph at every sub-pixel phase, and a missed variant
+      is a skipped letter. **At 2.00, 3.00 and 4.00 the same test finds every glyph identical** (242, 76 and 60
+      glyphs), and the sheets have 0 off-ramp pixels.
+    - **Decided (user, 2026-10-13): v1 supports 1.00, 2.00, 3.00 and 4.00** — the game's full-support list less 0.75 —
+      with Text Filtering None above 1.00. 0.75, the Experimental fractional scales, and Linear above 1.00 are
+      refused, named in the "no window found" message; fractional support can come later if testers ask. Detect the
+      scale from which scale's Description template matches (as the font is today), and ship one measured profile per
+      scale built on the developer's machine rather than a calibration step for players. Per-scale samples reuse
+      items already in the corpus, so their ground truth is the 1.00 entry's. Still to measure for the build: the
+      window chrome at each scale (outline widths, title bar, icon cell, row and column gaps), and the atlas tool must
+      take `"`, which from 1.75 up is two separate marks.
+    - Frames: `40a`/`40b` (2.00), `41a`/`41b` (0.75 None/Linear), `42a`/`42b` (1.25 None/Linear), `43b` (1.00
+      Linear), `44a`/`44b` (1.75, moved), `45a`/`45b` (3.00, moved), `46a`-`46c` (4.00 sheet, item, moved). Not
+      audited; most show chat.
 - **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
   tester can have it, since it is never distributed, so choosing it only gets every capture refused. Options: show it
   only when it is already the saved choice, or publish the build instructions so anyone can make it. **Decided after
