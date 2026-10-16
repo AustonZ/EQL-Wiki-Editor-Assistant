@@ -99,6 +99,9 @@ stays gitignored, and audited frames are added deliberately).
 - Out of scope for v1: icon-fix workflow, spells/monsters/quests, drops/soldby/quests/recipes sections (preserved
   untouched on existing pages).
 - **UI scale and UI skins: out of scope for v1, but a likely feature if this is ever shared with other players.**
+  *(Superseded: UI scale was brought into 1.0.0 and is done, 2026-10-16, as built-in measured profiles rather than a
+  calibration pass; the other skins are detected and refused. See "1.0.0 (full release)". This bullet is the original
+  reasoning.)*
   EQL supports both. The tool is currently built and validated against one player's fixed UI scale and default
   skin, and that assumption is baked deeper than it looks: **every constant in `WindowBoundsFinder` is a measured
   pixel value** — the content outline's 50-62 grey, the 0-8 outer frame, the ~16 interior, the probe distances,
@@ -522,6 +525,9 @@ reporting the item already checked.
   (everything is measured relative to the window); UI scale and skin do, since every edge-finding constant and the glyph
   atlas belong to one scale and skin. Likely shape: a one-time calibration on a known window that measures the frame and
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
+  **UI scale is done (2026-10-16)**, as one built-in measured profile per supported scale instead of a calibration step,
+  and tested by the user with a real capture and save at 2.00; skins are settled below. What remains of this item is
+  the font: reading it from the `.ini`, and the custom-font question.
   - **Spike, 2026-10-13: how the game draws text at other scales.** The game offers 0.75, 1.00, 2.00, 3.00 and 4.00,
     plus 1.25-2.75 in quarter steps marked Experimental, and a "UI Text Filtering" setting (None, Linear). Captured in
     Arial (`samples/40a`-`43b`, audited and in the corpus since 2026-10-16) and measured with `GlyphSpike`:
@@ -594,7 +600,9 @@ reporting the item already checked.
 - **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
   tester can have it, since it is never distributed, so choosing it only gets every capture refused. Options: show it
   only when it is already the saved choice, or publish the build instructions so anyone can make it. **Decided after
-  the UI-scale work** (user, 2026-10-10), since what calibration learns about fonts may settle it.
+  the UI-scale work** (user, 2026-10-10), since what calibration learns about fonts may settle it. That work is done and
+  settled one part: the font's glyph sheet exists only at 1.00, so it is offered at no other scale
+  (`UiScales.FontsAt`), and a tester choosing it could use it only at 1.00. Ready to decide.
 - **The game's skins: `default_modern` is required, and the Assistant says so** (user, 2026-10-09, after a spike). The
   game ships three: `default`, `default_light` and `default_modern`. Everything so far was built on `default_modern`.
   Measured on five frames of each other skin (`samples/30*`, `31*`, all in the corpus since 2026-10-16):
@@ -705,7 +713,8 @@ left is whether `Can Equip`/`Must Equip` replace `Clicky` or follow it.
 - **Ask which era an item belongs to** once the first expansion ships and `Classic` stops being a constant.
 - **Syntax highlighting in the raw wikitext editor** (user, 2026-10-07): template names, parameter names, links and
   `<br>` picked out, so a hand edit is easier to read and harder to break.
-- **A per-skin/per-scale calibration profile**, if the tool is ever shared with other players.
+- **A per-skin profile**, if a tester asks for one of the other skins (per-scale profiles are built in since
+  2026-10-16; see "1.0.0 (full release)").
 - **Show a levelled item's icon in its list entry** (user, 2026-10-12). Not knowing level-0 stats is no reason to show
   no icon. Today `ItemCheckPipeline.CheckWindowAsync` returns `Ineligible` before the icon is read, so the result
   carries none. Reading it earlier is cheap; the care needed is that an ineligible result still writes no ledger row and
