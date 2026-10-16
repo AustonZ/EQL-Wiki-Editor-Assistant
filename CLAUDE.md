@@ -2678,6 +2678,33 @@ both fonts; Arial reading is exactly what it was.
   glyph) and learned 4px from the first new-font capture. Re-scored before anything else changed: the Arial corpus
   was identical, 2230 correct and 0 everywhere.
 
+**UI scales (`Core.Glyphs.UiScales`, 2026-10-13).** The Assistant reads the game at UI Scaling 1.00, 2.00, 3.00 and
+4.00, with UI Text Filtering None above 1.00 (user, after a spike that captured every scale; see the plan, "1.0.0").
+0.75 is a shrunk 1.00 drawing, the fractional scales draw a letter differently wherever it lands, and Linear blends;
+none can be read exactly, so a window at any of them is simply not found and the "no item window" dialog names the
+supported scales.
+- **A scale is the 1.00 window with every distance times N, plus its own atlas.** Measured: frame, gaps, outline,
+  title bar and icon cell are the 1.00 ones times N, colours unchanged; only text is drawn fresh at the size. So the
+  window's scale is whichever tab template matched (`DescriptionTab.Scale`, `LocatedWindow.Scale`), and the tracer,
+  the reader, the parser's row tolerance and `ItemIconReader.CellIn` multiply their 1.00 distances by it. Colour
+  thresholds are not distances and do not change. Pass the scale on to anything new that measures pixels.
+- **Atlases**: `eql-ui-font.atlas` (1.00, both fonts) and `eql-ui-font-2x/3x/4x.atlas` (Arial only — the other font's
+  sheet exists only at 1.00, so `UiScales.FontsAt` offers it nowhere else). Above 1.00 every shape is distinct, l and I
+  included. `GlyphSpike atlas --scale N` builds one, and the builder rebases each sheet row on the characters that rest
+  on the baseline, since at 2.00 and 3.00 the punctuation row's tie broke 5 rows off.
+- **Above 1.00 text is laid out at fractional advances**: a glyph's shape is fixed, but the gap after it varies by a
+  pixel along a word. So the tab templates above 1.00 use the label's measured glyph positions
+  (`DescriptionTabFinder.MeasuredLayouts`), not the learned cells, and the cells are only good for spacing:
+  - a space is 2N + 1 past the cell (`GlyphReader.SpaceThreshold`), because no space lands at most N past it and a
+    space at least 2.5N — 3N would miss the 5-column spaces at 2.00;
+  - a learned cell above 1.00 is judged against the glyph's 1.00 cell times N (`GlyphReader.ClampAdvance`), because
+    side bearings do not scale either: '1''s real 14-column cell at 2.00 was clamped by the ink rule and every "1.0"
+    read "1 .0".
+- **The review shows a scaled window at its 1.00 size** (`Bitmaps.From`'s `uiScale`, a DPI of 96N), so it fits the
+  screenshot pane and is pixel-exact on a monitor whose Windows scale matches.
+- The corpus has no scaled samples yet (see the plan); the tracing at each scale is pinned synthetically
+  (`WindowTopEdgeTests.AtEachUiScaleTheRectangleIsTheOneAt100TimesTheScale`), the rest by `UiScaleTests`.
+
 **Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to the
 reader, the locator or the parser rules must be judged by a number, not by eyeballing warning counts — a hundred-odd
 item windows are unmeasurable by eye, and the failure that matters most (a *silently* wrong value) is invisible that
@@ -2945,13 +2972,20 @@ dotnet run --project tools/GlyphSpike -- bars .local-data/wiki-pages [--titles <
 # Then relearn cell widths from real windows: the sheet spaces every character out, so it cannot show them.
 dotnet run --project tools/GlyphSpike -- atlas "samples/notepad-with-all-glyphs.png" 986,700,570,250 \
   --out src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas
-dotnet run --project tools/GlyphSpike -- advances "samples/any screenshot.png"   # updates the atlas in place
+dotnet run --project tools/GlyphSpike -- advances [--scale N]   # updates that scale's atlas in place
 
 # A second UI font: merge its glyph sheet into the existing atlas instead of replacing it. Shapes both fonts draw
 # stay shared; the rest are tagged with their font. Then rerun `advances` so the new shapes learn their cells.
 dotnet run --project tools/GlyphSpike -- atlas "samples/15a-eql-wiki-editor-assistant-font [font EqlWikiEditorAssistant].png" 1330,860,650,112 \
   --font EqlWikiEditorAssistant --merge-into src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas \
   --out src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas
+
+# Another UI scale (see "UI scales"): build its atlas from the sheet captured at that scale, then learn its cells. Until
+# its tab template has them no window at that scale can be found, so the first pass reads regions given by hand, each
+# inside a window; later passes learn from every sample window at that scale.
+dotnet run --project tools/GlyphSpike -- atlas "samples/<sheet at 2.00>.png" x,y,w,h --scale 2 \
+  --out src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font-2x.atlas
+dotnet run --project tools/GlyphSpike -- advances --scale 2 --region "samples/<frame>.png" x,y,w,h [--region ...]
 
 # Wiki side. Reads are anonymous, so fetch/roundtrip/grammar need no credential:
 dotnet run --project tools/WikiSpike -- fetch "Earring of Bashing"       # page source + parsed v1 fields

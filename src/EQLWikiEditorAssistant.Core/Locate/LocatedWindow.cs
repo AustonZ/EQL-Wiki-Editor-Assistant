@@ -30,6 +30,10 @@ public enum ItemWindowTab
 /// the Assistant can find but not read (user, 2026-10-09). It is also marked <see cref="PossiblyOccluded"/>, so
 /// everything that skips a window it cannot read skips this one: it has no lines, and <see cref="Bounds"/> is only its
 /// tab's label. Whatever tells the user why must ask this first, since moving the window would not help.
+///
+/// <see cref="Scale"/> is the game's UI scale the window is drawn at, from which scale's tab template matched (see
+/// <see cref="Glyphs.UiScales"/>). Every pixel distance measured inside the window, the icon cell included, is the 1.00
+/// one times it.
 /// </summary>
 public sealed record LocatedWindow(
     Rect Bounds,
@@ -38,4 +42,5 @@ public sealed record LocatedWindow(
     bool PossiblyOccluded,
     ItemWindowTab ActiveTab = ItemWindowTab.Description,
     UiFont? DrawnIn = null,
-    bool InOtherSkin = false);
+    bool InOtherSkin = false,
+    int Scale = 1);

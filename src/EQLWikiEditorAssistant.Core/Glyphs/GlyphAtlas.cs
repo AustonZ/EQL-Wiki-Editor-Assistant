@@ -58,18 +58,32 @@ public sealed class GlyphAtlas
 
     public IReadOnlyList<AtlasEntry> Ambiguous => [.. Entries.Where(e => e.IsAmbiguous)];
 
-    private static readonly Lazy<GlyphAtlas> Default = new(() =>
-    {
-        using Stream stream = typeof(GlyphAtlas).Assembly
-            .GetManifestResourceStream("EQLWikiEditorAssistant.Core.Glyphs.eql-ui-font.atlas")
-            ?? throw new InvalidOperationException("The bundled glyph atlas is missing from this assembly.");
-        using var reader = new StreamReader(stream);
-        return Parse(reader.ReadToEnd());
-    });
+    private static readonly Dictionary<int, Lazy<GlyphAtlas>> ByScale = UiScales.Supported.ToDictionary(
+        scale => scale,
+        scale => new Lazy<GlyphAtlas>(() =>
+        {
+            using Stream stream = typeof(GlyphAtlas).Assembly
+                .GetManifestResourceStream($"EQLWikiEditorAssistant.Core.Glyphs.{FileName(scale)}")
+                ?? throw new InvalidOperationException($"The bundled glyph atlas for UI scale {scale} is missing from this assembly.");
+            using var reader = new StreamReader(stream);
+            return Parse(reader.ReadToEnd());
+        }));
 
-    /// <summary>The atlas shipped inside this assembly. Embedded rather than written beside the executable so it
-    /// cannot go missing at runtime — a loose file beside the executable is one more thing an install can lose.</summary>
-    public static GlyphAtlas Bundled => Default.Value;
+    /// <summary>The atlas shipped inside this assembly for UI scale 1.00. Embedded rather than written beside the
+    /// executable so it cannot go missing at runtime — a loose file beside the executable is one more thing an install
+    /// can lose.</summary>
+    public static GlyphAtlas Bundled => BundledAt(1);
+
+    /// <summary>The atlas shipped for one of <see cref="UiScales.Supported"/>. The game draws its text fresh at each
+    /// scale rather than enlarging the 1.00 drawing, so every scale has its own shapes and its own cell widths.</summary>
+    public static GlyphAtlas BundledAt(int scale) =>
+        ByScale.TryGetValue(scale, out Lazy<GlyphAtlas>? atlas)
+            ? atlas.Value
+            : throw new ArgumentOutOfRangeException(nameof(scale), scale, "Not a UI scale the Assistant supports.");
+
+    /// <summary>The atlas file for a scale, in <c>Core/Glyphs</c>: <c>eql-ui-font.atlas</c> at 1.00, and
+    /// <c>eql-ui-font-2x.atlas</c> and so on above it.</summary>
+    public static string FileName(int scale) => scale == 1 ? "eql-ui-font.atlas" : $"eql-ui-font-{scale}x.atlas";
 
     /// <summary>The characters a shape could be, or empty if the atlas has never seen it. Empty is a valid,
     /// expected answer — non-text shapes (the item icon, the tier bar, checkboxes) hit it constantly, and an
@@ -118,10 +132,11 @@ public sealed class GlyphAtlas
         {
             List<GlyphBox> glyphs = [.. bands[start + row].Glyphs.OrderBy(g => g.X)];
             string expected = expectedRows[row];
+            int rebase = BaselineCorrection(glyphs, expected);
 
             for (int i = 0; i < glyphs.Count; i++)
             {
-                var key = (glyphs[i].Bitmap, glyphs[i].BaselineOffset);
+                var key = (glyphs[i].Bitmap, glyphs[i].BaselineOffset - rebase);
                 if (!byShape.TryGetValue(key, out List<string>? labels)) byShape[key] = labels = [];
                 string label = expected[i].ToString();
                 if (!labels.Contains(label)) labels.Add(label);
@@ -130,6 +145,26 @@ public sealed class GlyphAtlas
 
         return new GlyphAtlas([.. byShape.Select(kv => new AtlasEntry(kv.Value, kv.Key.Item2, kv.Key.Item1))
             .OrderBy(e => e.Labels[0], StringComparer.Ordinal)]);
+    }
+
+    /// <summary>Characters that rest on the baseline, neither descending below it nor floating above it.</summary>
+    private const string OnBaseline = "!#%&.:?0123456789abcdefhiklmnorstuvwxzABCDEFGHIJKLMNOPRSTUVWXYZ";
+
+    /// <summary>
+    /// How far a sheet row's segmented baseline sits from the real one, judged by the row's characters that rest on it.
+    ///
+    /// The segmenter takes a band's baseline from the most common glyph bottom, which a row of punctuation can get
+    /// wrong: at 2.00 the `!@#$%^&amp;*()_+` row has `@ ( ) _` all descending by the same 5 rows and `! # % &amp;` on the
+    /// baseline, a 4-4 tie broken downward, so every glyph in the row went into the atlas 5 rows off and a '(' beside
+    /// letters was read as a row of its own. Here the labels are known, so the baseline is where those that rest on it
+    /// end. A row with none of them keeps the segmenter's answer; at 1.00 every row already agrees, so nothing moves.
+    /// </summary>
+    private static int BaselineCorrection(List<GlyphBox> glyphs, string expected)
+    {
+        int[] offsets = [.. glyphs.Where((_, i) => OnBaseline.Contains(expected[i])).Select(g => g.BaselineOffset)];
+        return offsets.Length == 0
+            ? 0
+            : offsets.GroupBy(o => o).OrderByDescending(g => g.Count()).ThenBy(g => Math.Abs(g.Key)).First().Key;
     }
 
     /// <summary>

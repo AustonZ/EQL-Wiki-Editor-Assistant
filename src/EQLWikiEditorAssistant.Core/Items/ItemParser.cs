@@ -45,10 +45,13 @@ public static class ItemParser
     private static readonly string[] EffectModifierLabels =
         ["Cast Time", "Cooldown", "Cooldown Group", "Required Level", "Charges"];
 
-    public static ParsedItem Parse(IReadOnlyList<TextLine> lines, ItemWindowTab activeTab = ItemWindowTab.Description)
+    /// <param name="scale">The UI scale the window was drawn at (<c>LocatedWindow.Scale</c>), which the one pixel
+    /// distance here, the row tolerance, is multiplied by.</param>
+    public static ParsedItem Parse(
+        IReadOnlyList<TextLine> lines, ItemWindowTab activeTab = ItemWindowTab.Description, int scale = 1)
     {
         var warnings = new List<string>();
-        List<List<TextLine>> rows = JoinWrappedRows([.. GroupIntoRows(lines).Where(HasAnyAlphanumeric)]);
+        List<List<TextLine>> rows = JoinWrappedRows([.. GroupIntoRows(lines, scale).Where(HasAnyAlphanumeric)]);
         int i = 0;
 
         if (rows.Count == 0)
@@ -349,9 +352,9 @@ public static class ItemParser
         return [.. stats.Where(s => seen.Add($"{s.Key}\u0000{s.Value}"))];
     }
 
-    private static List<List<TextLine>> GroupIntoRows(IReadOnlyList<TextLine> lines)
+    private static List<List<TextLine>> GroupIntoRows(IReadOnlyList<TextLine> lines, int scale)
     {
-        const int rowTolerancePx = 8; // see WindowBoundsFinder's similar tolerance constants for the same reasoning
+        int rowTolerancePx = 8 * scale; // see WindowBoundsFinder's similar tolerance constants for the same reasoning
 
         List<TextLine> sorted = lines.OrderBy(l => l.BoundingBox.Y).ThenBy(l => l.BoundingBox.X).ToList();
         var rows = new List<List<TextLine>>();

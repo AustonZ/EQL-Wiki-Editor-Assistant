@@ -19,9 +19,13 @@ using EQLWikiEditorAssistant.TestSupport;
 //   GlyphSpike atlas <image> [x,y,w,h] --font <sheet font> --merge-into <atlas> [--existing-font Arial] --out f
 //                                               add a second UI font's sheet to an existing atlas: shapes both
 //                                               fonts draw stay shared, the rest are tagged with their font
-//   GlyphSpike read <image> [x,y,w,h] [--font <name>] [--atlas f]
+//   GlyphSpike read <image> [x,y,w,h] [--font <name>] [--scale N] [--atlas f]
 //                                               read a region through the real engine, in the image's UI font
 //                                               (SampleFonts: --font, ground truth, file-name marker, else Arial)
+//                                               and at UI scale N with that scale's bundled atlas
+//   GlyphSpike advances [--scale N] [--atlas f] [--region <image> x,y,w,h]...
+//                                               learn the cell widths of scale N's atlas from every sample window
+//                                               at that scale, or only from the regions given
 //   GlyphSpike bars <wiki-pages-dir> [--titles <file>] [--prose <dir>]
 //                                               how well Arial's l/I rule reads real text: hides every l and I in
 //                                               the cached pages' item names, statsblocks, lore and notes (and in a
@@ -29,6 +33,9 @@ using EQLWikiEditorAssistant.TestSupport;
 //                                               scores what the rule gives back
 //
 // The whole approach rests on the font being a deterministic bitmap blit: see GlyphRamp for the measurements.
+
+// Reads the samples (or the regions it is given), not one image, so it is dispatched before an image is loaded.
+if (args.Length >= 1 && args[0] == "advances") return await Advances(args);
 
 if (args.Length < 2)
 {
@@ -53,7 +60,6 @@ switch (command)
     case "atlas": return Atlas(image, region, args);
     case "verify": return Verify(image, region, args);
     case "read": return ReadRegion(image, region, args);
-    case "advances": return await Advances(args);
     default:
         Console.Error.WriteLine($"unknown command '{command}'");
         return 1;
@@ -342,14 +348,16 @@ static bool IsInkAt(CapturedImage image, int background, int x, int y) =>
 static int ReadRegion(CapturedImage image, Rect region, string[] args)
 {
     int atlasIndex = Array.IndexOf(args, "--atlas");
+    int scaleIndex = Array.IndexOf(args, "--scale");
+    int scale = scaleIndex >= 0 && scaleIndex + 1 < args.Length ? int.Parse(args[scaleIndex + 1]) : 1;
     GlyphAtlas atlas = atlasIndex >= 0 && atlasIndex + 1 < args.Length
         ? GlyphAtlas.Parse(File.ReadAllText(args[atlasIndex + 1]))
-        : GlyphAtlas.Bundled;
+        : GlyphAtlas.BundledAt(scale);
 
     UiFont font = SampleFonts.For(args[1], args);
 
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-    IReadOnlyList<TextLine> lines = GlyphReader.Read(image, region, atlas, font);
+    IReadOnlyList<TextLine> lines = GlyphReader.Read(image, region, atlas, font, scale);
     stopwatch.Stop();
 
     Console.WriteLine($"{args[1]} region {region.X},{region.Y} {region.Width}x{region.Height}, read as {UiFonts.DisplayName(font)}");
@@ -439,14 +447,27 @@ static int Bars(string[] args)
 
 static async Task<int> Advances(string[] args)
 {
+    int scaleIndex = Array.IndexOf(args, "--scale");
+    int scale = scaleIndex >= 0 && scaleIndex + 1 < args.Length ? int.Parse(args[scaleIndex + 1]) : 1;
     int atlasIndex = Array.IndexOf(args, "--atlas");
     string atlasPath = atlasIndex >= 0 && atlasIndex + 1 < args.Length
         ? args[atlasIndex + 1]
-        : "src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas";
+        : $"src/EQLWikiEditorAssistant.Core/Glyphs/{GlyphAtlas.FileName(scale)}";
     GlyphAtlas atlas = GlyphAtlas.Parse(File.ReadAllText(atlasPath));
 
-    IReadOnlyList<string> files = CorpusRunner.EnumerateSampleFiles();
-    if (files.Count == 0)
+    // Regions given by hand (`--region <file> x,y,w,h`, repeatable) are read as they are, with nothing located. That
+    // is how a new scale's atlas learns its first advances: its "Description" template is laid out from them, so until
+    // it has them no window at that scale can be found. Each region must lie inside windows — see below.
+    var regions = new List<(string File, Rect Region)>();
+    for (int i = 0; i < args.Length - 2; i++)
+        if (args[i] == "--region")
+        {
+            int[] r = [.. args[i + 2].Split(',').Select(int.Parse)];
+            regions.Add((args[i + 1], new Rect(r[0], r[1], r[2], r[3])));
+        }
+
+    IReadOnlyList<string> files = regions.Count > 0 ? [] : CorpusRunner.EnumerateSampleFiles();
+    if (files.Count == 0 && regions.Count == 0)
     {
         Console.Error.WriteLine("  no samples/ on disk — advances can only be learned from real text");
         return 1;
@@ -455,22 +476,45 @@ static async Task<int> Advances(string[] args)
     // Learned inside *located windows*, not whole screenshots. A screenshot's 3D world sits at intensity 150-170,
     // so on a full frame essentially every pixel counts as ink and the reader's ink-anchored search degenerates
     // into a full sweep — measured at minutes per image, hours for the corpus, and full of world-texture noise.
+    // Only windows at the atlas's own scale: the others are drawn in other shapes.
     var advances = new Dictionary<string, int>();
     var observations = new List<(string Label, int Distance)>();
+    foreach ((string file, Rect region) in regions)
+    {
+        CapturedImage sample = await ImageFile.LoadAsync(file);
+        GlyphReader.LearnAdvances(sample, region, atlas, advances, observations, scale);
+        Console.WriteLine($"  {Path.GetFileName(file),-56} region {region.X},{region.Y}, {advances.Count} glyph(s) known");
+    }
     foreach (string file in files)
     {
         CapturedImage sample = await ImageFile.LoadAsync(file);
         IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(sample, SampleFonts.Reader(file, []));
-        foreach (LocatedWindow window in windows.Where(w => !w.PossiblyOccluded))
-            GlyphReader.LearnAdvances(sample, window.Bounds, atlas, advances, observations);
+        foreach (LocatedWindow window in windows.Where(w => !w.PossiblyOccluded && w.Scale == scale))
+            GlyphReader.LearnAdvances(sample, window.Bounds, atlas, advances, observations, scale);
 
-        Console.WriteLine($"  {Path.GetFileName(file),-56} {windows.Count} window(s), {advances.Count} glyph(s) known");
+        Console.WriteLine($"  {Path.GetFileName(file),-56} {windows.Count(w => w.Scale == scale)} window(s) at {scale}.00, " +
+                          $"{advances.Count} glyph(s) known");
     }
+
+    // Above 1.00 a learned cell is judged against the same glyph's 1.00 cell (GlyphReader.ClampAdvance). The atlases
+    // above 1.00 have Arial's shapes only, and at 1.00 Arial's l and I are one entry.
+    int CellAtOne(AtlasEntry entry) => scale == 1 ? 0 : GlyphAtlas.Bundled.Entries
+        .FirstOrDefault(e => e.Labels.Contains(entry.Labels[0]) && e.Font is null or UiFont.Arial)?.Advance ?? 0;
 
     var updated = new GlyphAtlas([.. atlas.Entries.Select(e =>
         advances.TryGetValue(e.Key, out int advance)
-            ? e with { Advance = GlyphReader.ClampAdvance(advance, e.Bitmap.Width) }
+            ? e with { Advance = GlyphReader.ClampAdvance(advance, e.Bitmap.Width, scale, CellAtOne(e)) }
             : e)]);
+    foreach (AtlasEntry entry in atlas.Entries)
+    {
+        if (!advances.TryGetValue(entry.Key, out int learned)) continue;
+        int kept = GlyphReader.ClampAdvance(learned, entry.Bitmap.Width, scale, CellAtOne(entry));
+        if (kept != learned)
+            Console.WriteLine($"  clamped '{entry.Key}': learned {learned} on {entry.Bitmap.Width}px of ink");
+        else if (CellAtOne(entry) > 0)
+            Console.WriteLine($"  kept '{entry.Key}': {learned}, the 1.00 cell x {scale} {CellAtOne(entry) * scale:+0;-0;+0} " +
+                              $"({learned - CellAtOne(entry) * scale:+0;-0;0})");
+    }
 
     // The histogram that sets MinSpaceAdvance. Every adjacent pair is bucketed by how far past the preceding
     // glyph's cell the next one starts: 0 means tightly packed (no space) and a space shows as a separate,

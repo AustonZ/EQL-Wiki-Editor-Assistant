@@ -1,3 +1,4 @@
+using EQLWikiEditorAssistant.Core.Icons;
 using EQLWikiEditorAssistant.Core.Locate;
 using EQLWikiEditorAssistant.Core.Imaging;
 using EQLWikiEditorAssistant.TestSupport;
@@ -64,7 +65,9 @@ for (int i = 0; i < windows.Count; i++)
         // The icon sits in the strip left of the content text, drawn with transparency straight onto the window's
         // 16-grey — there is no frame around it. Chrome rules and the content outline live in the 26-70 band, so
         // requiring a brighter pixel keeps them out; x starts at 2 to clear the outline column entirely.
-        const int scanLeft = 2, scanTop = 30, scanRight = 58, scanBottom = 130, inkFloor = 70;
+        // Distances are the 1.00 ones, times the window's UI scale.
+        const int inkFloor = 70;
+        int scanLeft = 2 * w.Scale, scanTop = 30 * w.Scale, scanRight = 58 * w.Scale, scanBottom = 130 * w.Scale;
         int minX = int.MaxValue, minY = int.MaxValue, maxX = -1, maxY = -1, lit = 0;
         for (int y = scanTop; y < scanBottom; y++)
             for (int x = scanLeft; x < scanRight; x++)
@@ -81,7 +84,9 @@ for (int i = 0; i < windows.Count; i++)
 
         Console.WriteLine(lit == 0
             ? "  icon: nothing found in the strip"
-            : $"  icon ink: x {minX}..{maxX} (w {maxX - minX + 1}), y {minY}..{maxY} (h {maxY - minY + 1}), {lit} px");
+            : $"  icon ink: x {minX}..{maxX} (w {maxX - minX + 1}), y {minY}..{maxY} (h {maxY - minY + 1}), {lit} px; " +
+              $"scale {w.Scale}, cell {ItemIconReader.CellIn(w).X - w.Bounds.X}..{ItemIconReader.CellIn(w).Right - w.Bounds.X - 1} x " +
+              $"{ItemIconReader.CellIn(w).Y - w.Bounds.Y}..{ItemIconReader.CellIn(w).Bottom - w.Bounds.Y - 1}");
         continue;
     }
 

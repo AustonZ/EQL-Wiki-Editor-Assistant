@@ -162,7 +162,10 @@ public sealed class ItemCheckPipeline
         for (int i = 0; i < windows.Count; i++)
         {
             progress?.Report(new CheckProgress(CheckStage.CheckingWindow, i + 1, windows.Count));
-            results.Add(await CheckWindowAsync(frame, windows[i], cancellationToken).ConfigureAwait(false));
+            results.Add(await CheckWindowAsync(frame, windows[i], cancellationToken).ConfigureAwait(false) with
+            {
+                Scale = windows[i].Scale,
+            });
         }
 
         return results;
@@ -259,7 +262,7 @@ public sealed class ItemCheckPipeline
                 ],
             };
 
-        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab, window.Scale);
         var warnings = new List<string>(item.Warnings);
 
         // Cropped whatever the verdict: the review screen shows it beside the wiki's copy so the user can settle by
@@ -268,9 +271,7 @@ public sealed class ItemCheckPipeline
         // check** (user, 2026-10-12): a levelled item is compared with nothing, but its entry in the list still shows
         // its icon like every other item's. The Lore tab draws no icon.
         CapturedImage? iconCrop = window.ActiveTab == ItemWindowTab.Description
-            ? frame.Crop(new Rect(
-                window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
-                ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height))
+            ? frame.Crop(ItemIconReader.CellIn(window))
             : null;
 
         if (item.TitleContentNameMismatch)
@@ -960,7 +961,7 @@ public sealed class ItemCheckPipeline
 
         try
         {
-            return await AnalyzeAgainstWikiAsync(
+            return (await AnalyzeAgainstWikiAsync(
                     item,
                     previous.WindowImage!,
                     previous.LedgerVerdict,
@@ -973,7 +974,7 @@ public sealed class ItemCheckPipeline
                     fingerprint,
                     [.. item.Warnings],
                     cancellationToken)
-                .ConfigureAwait(false);
+                .ConfigureAwait(false)) with { Scale = previous.Scale };
         }
         catch (Exception ex) when (ex is MediaWikiException or HttpRequestException or TaskCanceledException)
         {

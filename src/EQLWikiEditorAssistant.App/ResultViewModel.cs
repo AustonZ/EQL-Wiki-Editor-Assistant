@@ -533,6 +533,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public bool HasLoreImage => _loreImage is not null;
 
+    /// <summary>The UI scale <see cref="LoreImage"/> was drawn at, so it is shown at its 1.00 size like the
+    /// Description capture.</summary>
+    public int LoreScale { get; set; } = 1;
+
     /// <summary>Whether there is anything to show in the icon section — at least one of the images.</summary>
     /// <remarks>Not for an item the ledger let skip the wiki: nothing was compared, so the section could only say
     /// "not compared" beside an empty wiki tile. It carries the icon for its list entry and a re-check.</remarks>

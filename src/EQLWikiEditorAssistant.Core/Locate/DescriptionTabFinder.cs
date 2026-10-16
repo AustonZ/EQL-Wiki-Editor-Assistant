@@ -4,9 +4,9 @@ using EQLWikiEditorAssistant.Core.Imaging;
 namespace EQLWikiEditorAssistant.Core.Locate;
 
 /// <summary>An item window's "Description" tab label, found in a frame: the label's ink box, in frame coordinates, the
-/// UI font that drew it, and whether it sits on a texture — which means the window is in one of the game's other skins
-/// (see <see cref="DescriptionTabFinder.TexturedSpread"/>).</summary>
-public sealed record DescriptionTab(Rect Label, UiFont Font, bool Textured = false);
+/// UI font that drew it, the UI scale it was drawn at, and whether it sits on a texture — which means the window is in
+/// one of the game's other skins (see <see cref="DescriptionTabFinder.TexturedSpread"/>).</summary>
+public sealed record DescriptionTab(Rect Label, UiFont Font, bool Textured = false, int Scale = 1);
 
 /// <summary>
 /// Finds every item window's "Description" tab label in a whole frame by matching the label's own pixels, with no
@@ -40,6 +40,10 @@ public sealed record DescriptionTab(Rect Label, UiFont Font, bool Textured = fal
 /// not found at all, where the old model's fuzzy match reported it as occluded; that much overlap is obvious to the
 /// user, and a partial template would also match "inscription" in lore or chat.
 ///
+/// **There is one template per UI scale and font, so which one matched is also the window's scale** (2026-10-13). Each
+/// scale has its own atlas, because the game draws its text fresh at each size (see <see cref="UiScales"/>). A window
+/// at a scale the Assistant does not support has no template and is simply not found.
+///
 /// **Compared in the green channel**, not the brightest one the glyph reader uses. The blend happens per colour
 /// channel: the selected tab's label is yellow, which has no blue, and the light skin's texture is not neutral, so the
 /// brightest channel of the background can be one the text never touches, and the prediction then starts from the wrong
@@ -68,8 +72,28 @@ public static class DescriptionTabFinder
     /// </summary>
     public const int TexturedSpread = 20;
 
+    /// <summary>
+    /// Where each glyph of the label starts, measured from its first, at the scales above 1.00.
+    ///
+    /// **Above 1.00 the game lays text out at fractional advances**, so a glyph's cell width is not a whole number and
+    /// the rounding carries along the word: in the 2.00 label, 'c' is followed 14 columns on by 'r' and 'o' 15 on by
+    /// 'n', where the atlas's learned cells (the tightest spacing seen anywhere) are 13 and 14. A template laid out from
+    /// the cells is a pixel out in places and matches nothing. The shapes themselves never change, and neither does the
+    /// layout of one string: measured with <c>GlyphSpike segment</c> on every tab in the spike frames (2026-10-13),
+    /// three at 2.00, two at 3.00 and one at 4.00, all identical within a scale. At 1.00 the cells are whole and the
+    /// template is laid out from them, which a test proves is the real label.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<int, IReadOnlyList<int>> MeasuredLayouts = new Dictionary<int, IReadOnlyList<int>>
+    {
+        [2] = [0, 17, 31, 44, 58, 66, 72, 85, 93, 98, 113],
+        [3] = [0, 27, 48, 68, 89, 102, 110, 130, 143, 150, 173],
+        [4] = [0, 36, 65, 91, 119, 136, 146, 172, 189, 198, 229],
+    };
+
     private static readonly Lazy<IReadOnlyList<LabelTemplate>> BundledTemplates = new(() =>
-        [.. Enum.GetValues<UiFont>().Select(font => LabelTemplate.Render(GlyphAtlas.Bundled, Label, font))]);
+        [.. UiScales.Supported.SelectMany(scale => UiScales.FontsAt(scale)
+            .Select(font => LabelTemplate.Render(GlyphAtlas.BundledAt(scale), Label, font, scale,
+                MeasuredLayouts.GetValueOrDefault(scale))))]);
 
     /// <summary>Every "Description" label in the frame, top to bottom then left to right.</summary>
     public static IReadOnlyList<DescriptionTab> Find(CapturedImage image) => Find(image, BundledTemplates.Value);
@@ -85,7 +109,7 @@ public static class DescriptionTabFinder
                 // A label matches one position, but nothing rules out a tolerant match a pixel to one side as well.
                 if (!found.Any(f => Overlaps(f.Label, label)))
                     found.Add(new DescriptionTab(label, template.Font,
-                        template.BackgroundSpread(green, image.Width, label) > TexturedSpread));
+                        template.BackgroundSpread(green, image.Width, label) > TexturedSpread, template.Scale));
 
         return [.. found.OrderBy(t => t.Label.Y).ThenBy(t => t.Label.X)];
     }
@@ -108,6 +132,10 @@ public static class DescriptionTabFinder
 public sealed class LabelTemplate
 {
     public UiFont Font { get; }
+
+    /// <summary>The UI scale the atlas it was rendered from is drawn at.</summary>
+    public int Scale { get; }
+
     public int Width { get; }
     public int Height { get; }
 
@@ -117,9 +145,10 @@ public sealed class LabelTemplate
     private readonly int[] _fifteenths;
     private readonly int[] _full, _none, _part; // pixel offsets (y * Width + x) by kind
 
-    private LabelTemplate(UiFont font, int width, int height, int[] fifteenths)
+    private LabelTemplate(UiFont font, int scale, int width, int height, int[] fifteenths)
     {
         Font = font;
+        Scale = scale;
         Width = width;
         Height = height;
         _fifteenths = fifteenths;
@@ -133,10 +162,15 @@ public sealed class LabelTemplate
     /// a learned advance, or this throws: a template guessed at the spacing would match nothing and say nothing, and
     /// a missing window is the failure this exists to prevent.
     /// </summary>
-    public static LabelTemplate Render(GlyphAtlas atlas, string text, UiFont font)
+    /// <param name="lefts">Where each glyph starts, measured from the first, in place of the atlas's learned advances
+    /// (see <see cref="DescriptionTabFinder.MeasuredLayouts"/>).</param>
+    public static LabelTemplate Render(
+        GlyphAtlas atlas, string text, UiFont font, int scale = 1, IReadOnlyList<int>? lefts = null)
     {
         ArgumentNullException.ThrowIfNull(atlas);
         ArgumentException.ThrowIfNullOrEmpty(text);
+        if (lefts is not null && lefts.Count != text.Length)
+            throw new ArgumentException($"{lefts.Count} glyph positions for the {text.Length} characters of '{text}'.", nameof(lefts));
 
         var placed = new List<(AtlasEntry Entry, int Left, int Top)>();
         int left = 0;
@@ -149,8 +183,8 @@ public sealed class LabelTemplate
                     $"The atlas has {candidates.Length} entries for '{ch}' in {font}; a label template needs exactly one.");
             AtlasEntry entry = candidates[0];
             // Glyphs sit on one baseline, at row 0 here; a glyph's bottom row is BaselineOffset below it.
-            placed.Add((entry, left, -(entry.Bitmap.Height - 1 - entry.BaselineOffset)));
-            if (i < text.Length - 1)
+            placed.Add((entry, lefts?[i] ?? left, -(entry.Bitmap.Height - 1 - entry.BaselineOffset)));
+            if (lefts is null && i < text.Length - 1)
             {
                 if (!entry.HasAdvance)
                     throw new InvalidOperationException($"'{ch}' in {font} has no learned advance, so the label cannot be laid out.");
@@ -171,7 +205,7 @@ public sealed class LabelTemplate
                     fifteenths[i] = Math.Max(fifteenths[i], GlyphRamp.Fifteenths[bitmap[x, y]]);
                 }
         }
-        return new LabelTemplate(font, width, height, fifteenths);
+        return new LabelTemplate(font, scale, width, height, fifteenths);
     }
 
     /// <summary>Every position where the template matches under the blend model; see <see cref="DescriptionTabFinder"/>.</summary>

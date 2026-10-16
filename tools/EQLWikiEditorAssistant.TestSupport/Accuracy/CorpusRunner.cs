@@ -43,7 +43,7 @@ public static class CorpusRunner
         IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(image, new GlyphTextReader(font), cancellationToken);
 
         var items = windows
-            .Select(w => w.PossiblyOccluded ? null : ItemParser.Parse(w.Lines, w.ActiveTab))
+            .Select(w => w.PossiblyOccluded ? null : ItemParser.Parse(w.Lines, w.ActiveTab, w.Scale))
             .ToList();
 
         return new CorpusSample(Path.GetFileName(path), windows, items, font);

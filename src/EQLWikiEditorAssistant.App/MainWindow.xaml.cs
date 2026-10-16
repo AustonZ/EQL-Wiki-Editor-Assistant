@@ -395,8 +395,14 @@ public partial class MainWindow : Window
             // The "none found" case names the window it read. That is the one message where the user needs to know
             // *what* was searched — a capture of the wrong window looks exactly like a capture with no item windows
             // open, which is how a browser being captured instead of the game went undiagnosed (user, 2026-09-29).
+            //
+            // It also names the UI scales the Assistant reads, since a window at any other is simply not found (see
+            // UiScales): 0.75 and the fractional scales do not draw the same letter the same way twice, and Linear
+            // text filtering blends it.
             if (results.Count == 0)
-                ReportCaptureProblem($"No item window was found in {captured}.");
+                ReportCaptureProblem($"No item window was found in {captured}.",
+                    "The Assistant reads the game's UI at UI Scaling 1.00, 2.00, 3.00 and 4.00, with UI Text Filtering " +
+                    "set to None above 1.00. If the game is set otherwise, change it in the game's options and capture again.");
             else
                 StatusText.Text = results.Count == 1 ? "1 item window checked." : $"{results.Count} item windows checked.";
         }
@@ -425,10 +431,11 @@ public partial class MainWindow : Window
 
     /// <summary>A capture that produced nothing to review: said in the status line and in a dialog, because the
     /// hotkey is pressed from inside the game and a status line alone is easy to miss (user, 2026-10-07).</summary>
-    private void ReportCaptureProblem(string message)
+    /// <param name="detail">More for the dialog, kept out of the status bar.</param>
+    private void ReportCaptureProblem(string message, string? detail = null)
     {
         StatusText.Text = message;
-        _ = Dialog.TellAsync("Nothing to check", message, DialogTone.Warning);
+        _ = Dialog.TellAsync("Nothing to check", detail is null ? message : $"{message}\n\n{detail}", DialogTone.Warning);
     }
 
     /// <summary>The busy label and the status line say the same thing while work is under way.</summary>
@@ -482,6 +489,7 @@ public partial class MainWindow : Window
             ItemCheckResult updated = await _services.Pipeline.ReanalyzeAsync(existing.Result);
             existing.Load(updated);
             existing.LoreImage = result.WindowImage;
+            existing.LoreScale = result.Scale;
             Select(existing);
             return;
         }
@@ -496,6 +504,7 @@ public partial class MainWindow : Window
             CapturedImage? lore = existing.Result.Status == ItemCheckStatus.LoreRecorded
                 ? existing.Result.WindowImage
                 : existing.LoreImage;
+            if (existing.Result.Status == ItemCheckStatus.LoreRecorded) existing.LoreScale = existing.Result.Scale;
             existing.Load(result);
             existing.LoreImage = lore;
             Select(existing);
@@ -671,9 +680,9 @@ public partial class MainWindow : Window
 
     private void ShowImages(ResultViewModel? view)
     {
-        WindowImage.Source = view?.Result.WindowImage is { } image ? Bitmaps.From(image) : null;
+        WindowImage.Source = view?.Result.WindowImage is { } image ? Bitmaps.From(image, uiScale: view.Result.Scale) : null;
         FrameBox.Child = view?.Result is { Frame: { } frame, TabInFrame: { } tab } ? MarkedFrame.Build(frame, tab) : null;
-        LoreImage.Source = view?.LoreImage is { } lore ? Bitmaps.From(lore) : null;
+        LoreImage.Source = view?.LoreImage is { } lore ? Bitmaps.From(lore, uiScale: view.LoreScale) : null;
         ShotLabel.Text = WindowImage.Source is not null && LoreImage.Source is not null
             ? "Captured screenshots"
             : "Captured screenshot";

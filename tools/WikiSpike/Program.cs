@@ -435,7 +435,7 @@ async Task<int> CompareIconsAsync()
             continue;
         }
 
-        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab, window.Scale);
         ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
         if (lookup.Outcome != LookupOutcome.Found)
         {
@@ -527,7 +527,7 @@ async Task<int> DiffIconPixelsAsync()
     {
         if (window.PossiblyOccluded || window.ActiveTab != ItemWindowTab.Description) continue;
 
-        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab, window.Scale);
         ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
         if (lookup.Outcome != LookupOutcome.Found) continue;
         if (ItemPageDocument.Parse(lookup.Page!.Wikitext)?.IconId is not { Length: > 0 } iconId) continue;
@@ -538,9 +538,7 @@ async Task<int> DiffIconPixelsAsync()
         CapturedImage wiki = await ImageFile.LoadOverBackgroundAsync(file, background: 16);
 
         // Ink boxes on both sides, using the same floor, so the two are measured identically.
-        Rect captured = InkBox(image, new Rect(
-            window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
-            ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height));
+        Rect captured = InkBox(image, ItemIconReader.CellIn(window));
         Rect onWiki = InkBox(wiki, new Rect(0, 0, wiki.Width, wiki.Height));
         if (captured.Width == 0 || onWiki.Width == 0) continue;
 
@@ -610,7 +608,7 @@ async Task<int> PreviewEditsAsync()
     {
         if (window.PossiblyOccluded) { Console.WriteLine("--- (occluded window, skipped)"); continue; }
 
-        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+        ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab, window.Scale);
         Console.WriteLine();
         Console.WriteLine($"=== {item.Name}");
 
@@ -1022,12 +1020,10 @@ async Task<int> MeasureIconsAcrossCorpusAsync()
             if (window.PossiblyOccluded || window.ActiveTab != ItemWindowTab.Description) continue;
 
             // Deliberately *not* ItemIconReader.TryRead: that applies the contrast gate this run exists to measure.
-            var region = new Rect(
-                window.Bounds.X + ItemIconReader.IconCell.X, window.Bounds.Y + ItemIconReader.IconCell.Y,
-                ItemIconReader.IconCell.Width, ItemIconReader.IconCell.Height);
+            Rect region = ItemIconReader.CellIn(window);
             if (!IconHasher.TryFingerprint(image, region, out IconFingerprint icon)) continue;
 
-            ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+            ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab, window.Scale);
             if (captured.ContainsKey(item.Name)) continue;
 
             ItemPageLookupResult lookup = await ItemPageLookup.FindAsync(client, item.Name);
@@ -1299,7 +1295,7 @@ async Task<int> MeasureIconSearchAsync()
         CapturedImage image = await ImageFile.LoadAsync(file);
         foreach (LocatedWindow window in ItemWindowLocator.Locate(image, SampleFonts.Reader(file, args)))
         {
-            ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+            ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab, window.Scale);
             if (string.IsNullOrWhiteSpace(item.Name) || !seen.Add(item.Name)) continue;
             if (!ItemIconReader.TryRead(image, window, out IconFingerprint captured)) continue;
 

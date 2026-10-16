@@ -40,11 +40,11 @@ public static class ItemWindowLocator
             if (anchor.Textured)
             {
                 windows.Add(new LocatedWindow(anchor.Label, Array.Empty<TextLine>(), HasLoreTab: false,
-                    PossiblyOccluded: true, DrawnIn: anchor.Font, InOtherSkin: true));
+                    PossiblyOccluded: true, DrawnIn: anchor.Font, InOtherSkin: true, Scale: anchor.Scale));
                 continue;
             }
 
-            Rect? bounds = WindowBoundsFinder.TryFindBounds(image, anchor.Label);
+            Rect? bounds = WindowBoundsFinder.TryFindBounds(image, anchor.Label, anchor.Scale);
 
             // **A window's rectangle holds one Description tab, its own** (bug found by the user, 2026-10-12, on
             // `Shiverback-Hide Wristbands`). Another window laid over its bottom, almost exactly aligned, carries the
@@ -61,19 +61,23 @@ public static class ItemWindowLocator
                 // Found a real item window (it has a Description tab) but couldn't establish clean bounds for
                 // it — something is drawn over part of it. Report it as occluded with no data, rather than
                 // guessing; the caller should tell the user to rearrange windows and recapture.
-                windows.Add(new LocatedWindow(anchor.Label, Array.Empty<TextLine>(), HasLoreTab: false, PossiblyOccluded: true));
+                windows.Add(new LocatedWindow(anchor.Label, Array.Empty<TextLine>(), HasLoreTab: false, PossiblyOccluded: true,
+                    Scale: anchor.Scale));
                 continue;
             }
 
             CapturedImage crop = image.Crop(bounds.Value);
-            IReadOnlyList<TextLine> lines = reader.Read(crop);
+            IReadOnlyList<TextLine> lines = reader.Read(crop, anchor.Scale);
             TextLine? loreTab = lines.FirstOrDefault(l => IsLoreTabLabel(l.Text));
             ItemWindowTab activeTab = loreTab is not null && IsActiveTabLabel(crop, loreTab.BoundingBox)
                 ? ItemWindowTab.Lore
                 : ItemWindowTab.Description;
 
+            // Above 1.00 the atlas has one font's shapes only, so no line can say which font drew it, and the tab's
+            // template — a whole label in that font — does instead.
             windows.Add(new LocatedWindow(
-                bounds.Value, lines, loreTab is not null, PossiblyOccluded: false, activeTab, DrawnIn(lines)));
+                bounds.Value, lines, loreTab is not null, PossiblyOccluded: false, activeTab,
+                DrawnIn(lines) ?? anchor.Font, Scale: anchor.Scale));
         }
 
         return windows.OrderBy(w => w.Bounds.Y).ThenBy(w => w.Bounds.X).ToList();

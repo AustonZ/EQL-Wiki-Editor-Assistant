@@ -101,6 +101,10 @@ public sealed record ItemCheckResult
     /// <summary>The window's crop of the frame, for showing the user what was captured beside the diff.</summary>
     public CapturedImage? WindowImage { get; init; }
 
+    /// <summary>The game's UI scale the window was drawn at (<c>LocatedWindow.Scale</c>), so the review can show
+    /// <see cref="WindowImage"/> at the size the window has at 1.00.</summary>
+    public int Scale { get; init; } = 1;
+
     /// <summary>
     /// The whole captured frame, for a window that could not be traced — one partly covered or in another skin — in
     /// place of <see cref="WindowImage"/> (user, 2026-10-12). All the locator knows of such a window is its

@@ -38,6 +38,11 @@ namespace EQLWikiEditorAssistant.Core.Locate;
 /// content-area name), so the top is placed from the *title bar's own pure-black band* instead — see
 /// <see cref="ScanToTitleBarBottom"/>.
 ///
+/// **Every distance here is the 1.00 one, and is multiplied by the UI scale** (the <c>scale</c> passed in, written
+/// <c>n</c> below). Measured 2026-10-13: at 2.00, 3.00 and 4.00 the frame, the gaps, the outline and the title bar are
+/// the 1.00 ones times the scale, with the same colours (see <see cref="Glyphs.UiScales"/>). The colour thresholds are
+/// not distances and do not change.
+///
 /// Every threshold here was measured against real screenshots, not derived on paper. Re-tune only with
 /// <c>tools/LocateSpike</c> against the full real-sample set — <c>--probe</c> for raw pixel values, and
 /// <c>EQLWIKI_LOCATE_DIAG=1</c> to print what every individual probe answered, which is how the agreement
@@ -116,28 +121,30 @@ public static class WindowBoundsFinder
 
     /// <summary>Returns the window's pixel bounds, or null if its outline can't be traced consistently (treat as
     /// occluded — don't parse it).</summary>
-    public static Rect? TryFindBounds(CapturedImage image, Rect anchorBox)
+    public static Rect? TryFindBounds(CapturedImage image, Rect anchorBox, int scale = 1)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(scale, 1);
+        int n = scale;
         int cx = anchorBox.X + anchorBox.Width / 2;
 
-        int interiorY = FindContentInteriorBelowAnchor(image, cx, anchorBox.Bottom);
+        int interiorY = FindContentInteriorBelowAnchor(image, cx, anchorBox.Bottom, n);
         if (interiorY >= image.Height || !IsInterior(image, cx, interiorY)) return null;
 
-        if (!TryConsensusOutlineVertical(image, cx - SafeHorizontalProbeHalfWidth, cx + SafeHorizontalProbeHalfWidth,
-                interiorY, dy: 1, out int bottom))
+        if (!TryConsensusOutlineVertical(image, cx - SafeHorizontalProbeHalfWidth * n, cx + SafeHorizontalProbeHalfWidth * n,
+                interiorY, dy: 1, n, out int bottom))
             return null;
 
-        if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4, cx, dx: -1, out int left)) return null;
-        if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4, cx, dx: 1, out int right)) return null;
+        if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4 * n, cx, dx: -1, n, out int left)) return null;
+        if (!TryConsensusOutlineHorizontal(image, interiorY, bottom - 4 * n, cx, dx: 1, n, out int right)) return null;
 
-        if (!TryConsensusTitleBarBottom(image, left + TitleBarProbeInset, right - TitleBarProbeInset,
-                interiorY, out int titleBarBottom))
+        if (!TryConsensusTitleBarBottom(image, left + TitleBarProbeInset * n, right - TitleBarProbeInset * n,
+                interiorY, n, out int titleBarBottom))
             return null;
-        int top = Math.Max(0, titleBarBottom - TitleBarHeight + 1);
+        int top = Math.Max(0, titleBarBottom - TitleBarHeight * n + 1);
 
         int width = right - left, height = bottom - top;
-        if (width < 50 || height < 50) return null;
-        if (!IsRectangleClosed(image, left, right, bottom, interiorY)) return null;
+        if (width < 50 * n || height < 50 * n) return null;
+        if (!IsRectangleClosed(image, left, right, bottom, interiorY, n)) return null;
 
         return new Rect(left, top, width + 1, height + 1);
     }
@@ -153,20 +160,20 @@ public static class WindowBoundsFinder
     /// area's top outline itself look like the window's bottom on the very next downward scan.</item>
     /// </list>
     /// </summary>
-    private static int FindContentInteriorBelowAnchor(CapturedImage image, int cx, int anchorBottom)
+    private static int FindContentInteriorBelowAnchor(CapturedImage image, int cx, int anchorBottom, int n)
     {
-        const int chromeSearchDistance = 40;
-        const int clearanceBelowChrome = 4;
-        const int interiorSearchDistance = 24;
+        int chromeSearchDistance = 40 * n;
+        int clearanceBelowChrome = 4 * n;
+        int interiorSearchDistance = 24 * n;
 
         int? lastLine = null;
         int y = anchorBottom;
         for (int guard = 0; guard < 8; guard++)
         {
-            int searchDistance = lastLine is null ? chromeSearchDistance : LineClusterGapPx;
+            int searchDistance = lastLine is null ? chromeSearchDistance : LineClusterGapPx * n;
             // No frame check here: these are the window's *internal* tab-chrome lines, which by definition have
             // more window beyond them, not frame.
-            if (ScanForOutline(image, cx, y + 1, dx: 0, dy: 1, searchDistance, requireFrameBeyond: false) is not { } line) break;
+            if (ScanForOutline(image, cx, y + 1, dx: 0, dy: 1, searchDistance, requireFrameBeyond: false, n) is not { } line) break;
             lastLine = line;
             y = line;
         }
@@ -185,45 +192,45 @@ public static class WindowBoundsFinder
 
     /// <summary>Probes ProbeCount columns and returns the consensus Y of the first confirmed outline each one
     /// finds scanning vertically.</summary>
-    private static bool TryConsensusOutlineVertical(CapturedImage image, int xRangeStart, int xRangeEnd, int fromY, int dy, out int consensus)
+    private static bool TryConsensusOutlineVertical(CapturedImage image, int xRangeStart, int xRangeEnd, int fromY, int dy, int n, out int consensus)
     {
         var found = new List<int>();
         for (int i = 0; i < ProbeCount; i++)
         {
             int x = xRangeStart + (xRangeEnd - xRangeStart) * i / Math.Max(1, ProbeCount - 1);
             if (x < 0 || x >= image.Width || !IsInterior(image, x, fromY)) continue;
-            if (ScanForOutline(image, x, fromY + dy, dx: 0, dy, Math.Max(image.Width, image.Height), requireFrameBeyond: true) is { } v) found.Add(v);
+            if (ScanForOutline(image, x, fromY + dy, dx: 0, dy, Math.Max(image.Width, image.Height), requireFrameBeyond: true, n) is { } v) found.Add(v);
         }
-        return TryGetConsensus(found, MinOutlineAgreementFraction, out consensus);
+        return TryGetConsensus(found, MinOutlineAgreementFraction, n, out consensus);
     }
 
     /// <summary>Probes ProbeCount rows spread through the content area and returns the consensus X of the first
     /// confirmed outline each one finds scanning horizontally.</summary>
-    private static bool TryConsensusOutlineHorizontal(CapturedImage image, int yRangeStart, int yRangeEnd, int fromX, int dx, out int consensus)
+    private static bool TryConsensusOutlineHorizontal(CapturedImage image, int yRangeStart, int yRangeEnd, int fromX, int dx, int n, out int consensus)
     {
         var found = new List<int>();
         for (int i = 0; i < ProbeCount; i++)
         {
             int y = yRangeStart + (yRangeEnd - yRangeStart) * i / Math.Max(1, ProbeCount - 1);
             if (y < 0 || y >= image.Height || !IsInterior(image, fromX, y)) continue;
-            if (ScanForOutline(image, fromX + dx, y, dx, dy: 0, Math.Max(image.Width, image.Height), requireFrameBeyond: true) is { } v) found.Add(v);
+            if (ScanForOutline(image, fromX + dx, y, dx, dy: 0, Math.Max(image.Width, image.Height), requireFrameBeyond: true, n) is { } v) found.Add(v);
         }
-        return TryGetConsensus(found, MinOutlineAgreementFraction, out consensus);
+        return TryGetConsensus(found, MinOutlineAgreementFraction, n, out consensus);
     }
 
     /// <summary>Steps outward looking for the first pixel that looks like the outline and is confirmed by
     /// <see cref="VerifyLineRun"/> — and, when <paramref name="requireFrameBeyond"/>, by the window's outer frame
     /// lying just past it. Returns the coordinate along the scan axis, or null if none is found.</summary>
-    private static int? ScanForOutline(CapturedImage image, int x, int y, int dx, int dy, int maxSteps, bool requireFrameBeyond)
+    private static int? ScanForOutline(CapturedImage image, int x, int y, int dx, int dy, int maxSteps, bool requireFrameBeyond, int n)
     {
         for (int step = 0; step < maxSteps; step++)
         {
             int nx = x + dx * step, ny = y + dy * step;
             if (nx < 0 || nx >= image.Width || ny < 0 || ny >= image.Height) return null;
             if (IsOutlinePixel(image, nx, ny)
-                && VerifyLineRun(image, nx, ny, dx, dy)
-                && (!requireFrameBeyond || HasFrameBeyond(image, nx, ny, dx, dy)))
-                return requireFrameBeyond ? OutermostOutline(image, nx, ny, dx, dy) : dx != 0 ? nx : ny;
+                && VerifyLineRun(image, nx, ny, dx, dy, n)
+                && (!requireFrameBeyond || HasFrameBeyond(image, nx, ny, dx, dy, n)))
+                return requireFrameBeyond ? OutermostOutline(image, nx, ny, dx, dy, n) : dx != 0 ? nx : ny;
         }
         return null;
     }
@@ -239,17 +246,17 @@ public static class WindowBoundsFinder
     /// right and 6px at the bottom — narrower than the Description capture stacked above it. A Description window has
     /// nothing between its outline and the frame, so this changes nothing there.
     /// </summary>
-    private static int OutermostOutline(CapturedImage image, int x, int y, int dx, int dy)
+    private static int OutermostOutline(CapturedImage image, int x, int y, int dx, int dy, int n)
     {
         int best = dx != 0 ? x : y;
-        for (int step = 1; step <= LineClusterGapPx; step++)
+        for (int step = 1; step <= LineClusterGapPx * n; step++)
         {
             int nx = x + dx * step, ny = y + dy * step;
             if (nx < 0 || nx >= image.Width || ny < 0 || ny >= image.Height) break;
             if (IsFrameBlack(image, nx, ny)) break;
 
-            if (IsOutlinePixel(image, nx, ny) && VerifyLineRun(image, nx, ny, dx, dy) &&
-                HasFrameBeyond(image, nx, ny, dx, dy))
+            if (IsOutlinePixel(image, nx, ny) && VerifyLineRun(image, nx, ny, dx, dy, n) &&
+                HasFrameBeyond(image, nx, ny, dx, dy, n))
                 best = dx != 0 ? nx : ny;
         }
 
@@ -259,17 +266,17 @@ public static class WindowBoundsFinder
     /// <summary>True if the window's outer frame (a short run of near-black, darker than the interior) lies
     /// within a short distance beyond a candidate outline — see <see cref="FrameMaxChannel"/> for why this is
     /// what distinguishes a real boundary from an internal divider rule.</summary>
-    private static bool HasFrameBeyond(CapturedImage image, int x, int y, int dx, int dy)
+    private static bool HasFrameBeyond(CapturedImage image, int x, int y, int dx, int dy, int n)
     {
         int run = 0;
-        for (int step = 1; step <= FrameSearchDistance; step++)
+        for (int step = 1; step <= FrameSearchDistance * n; step++)
         {
             int nx = x + dx * step, ny = y + dy * step;
             if (nx < 0 || nx >= image.Width || ny < 0 || ny >= image.Height) return false;
 
             if (IsFrameBlack(image, nx, ny))
             {
-                if (++run >= FrameMinRun) return true;
+                if (++run >= FrameMinRun * n) return true;
             }
             else
             {
@@ -287,10 +294,10 @@ public static class WindowBoundsFinder
     /// separates them. Closure does, because a covered edge's consensus lands on the *occluding* window's
     /// outline — and this window's own bottom outline then doesn't reach that corner, since the neighbour's
     /// interior is there instead. Geometry that can't close is exactly "the border is broken somewhere".</summary>
-    private static bool IsRectangleClosed(CapturedImage image, int left, int right, int bottom, int interiorY)
+    private static bool IsRectangleClosed(CapturedImage image, int left, int right, int bottom, int interiorY, int n)
     {
-        const int cornerInset = 10;
-        const int tolerance = 3;
+        int cornerInset = 10 * n;
+        int tolerance = 3 * n;
 
         // The bottom outline must span the full traced width …
         if (!HasOutlinePixelNear(image, left + cornerInset, bottom, dx: 0, dy: 1, tolerance)) return false;
@@ -324,8 +331,9 @@ public static class WindowBoundsFinder
     /// to the scan direction — which is the direction the line itself runs. A glyph edge spans a few px and a
     /// stat value-box outline a few tens, so neither survives this; the content outline runs the window's full
     /// width/height. A broken run is also exactly what "the border is obscured here" looks like.</summary>
-    private static bool VerifyLineRun(CapturedImage image, int x, int y, int dx, int dy)
+    private static bool VerifyLineRun(CapturedImage image, int x, int y, int dx, int dy, int n)
     {
+        int halfRun = LineVerifyHalfRun * n;
         int pdx = dy != 0 ? 1 : 0; // the line runs across the scan direction
         int pdy = dx != 0 ? 1 : 0;
         int reference = MaxChannel(image, x, y);
@@ -333,7 +341,7 @@ public static class WindowBoundsFinder
         int matches = 0, total = 0;
         for (int side = -1; side <= 1; side += 2)
         {
-            for (int k = 1; k <= LineVerifyHalfRun; k++)
+            for (int k = 1; k <= halfRun; k++)
             {
                 int nx = x + pdx * k * side, ny = y + pdy * k * side;
                 if (nx < 0 || nx >= image.Width || ny < 0 || ny >= image.Height) break;
@@ -343,32 +351,32 @@ public static class WindowBoundsFinder
             }
         }
 
-        return total >= LineVerifyHalfRun && (double)matches / total >= LineVerifyMinMatch;
+        return total >= halfRun && (double)matches / total >= LineVerifyMinMatch;
     }
 
     /// <summary>Probes ProbeCount columns and returns the consensus Y of the title bar's bottom row.</summary>
     private static bool TryConsensusTitleBarBottom(
-        CapturedImage image, int xRangeStart, int xRangeEnd, int fromY, out int consensus)
+        CapturedImage image, int xRangeStart, int xRangeEnd, int fromY, int n, out int consensus)
     {
         var found = new List<int>();
         for (int i = 0; i < ProbeCount; i++)
         {
             int x = xRangeStart + (xRangeEnd - xRangeStart) * i / Math.Max(1, ProbeCount - 1);
             if (x < 0 || x >= image.Width) continue;
-            if (ScanToTitleBarBottom(image, x, fromY) is { } v) found.Add(v);
+            if (ScanToTitleBarBottom(image, x, fromY, n) is { } v) found.Add(v);
         }
-        return TryGetConsensus(found, MinTopAgreementFraction, out consensus);
+        return TryGetConsensus(found, MinTopAgreementFraction, n, out consensus);
     }
 
     /// <summary>The first pure-black row going up from inside the content area — the title bar's bottom — or null
     /// when there is none within reach.</summary>
-    private static int? ScanToTitleBarBottom(CapturedImage image, int x, int fromY)
+    private static int? ScanToTitleBarBottom(CapturedImage image, int x, int fromY, int n)
     {
         int y = fromY;
         int searched = 0;
         while (!IsPureBlack(image, x, y))
         {
-            if (++searched > TitleBarSearchDistance || --y < 0) return null;
+            if (++searched > TitleBarSearchDistance * n || --y < 0) return null;
         }
         return y;
     }
@@ -378,7 +386,7 @@ public static class WindowBoundsFinder
     /// Plurality rather than median: a wide title or a partly-covered edge can split the probes into groups, and
     /// the median would side with whichever happens to sit mid-list rather than the correct one. The threshold is
     /// deliberately under 50% because on a busy real window even the correct cluster can be a minority.</summary>
-    private static bool TryGetConsensus(List<int> values, double minAgreementFraction, out int consensus)
+    private static bool TryGetConsensus(List<int> values, double minAgreementFraction, int n, out int consensus)
     {
         consensus = 0;
         if (values.Count == 0) return false;
@@ -388,13 +396,13 @@ public static class WindowBoundsFinder
         int bestCount = 0, bestValue = values[0];
         foreach (int candidate in values)
         {
-            int count = values.Count(v => Math.Abs(v - candidate) <= AgreementTolerancePx);
+            int count = values.Count(v => Math.Abs(v - candidate) <= AgreementTolerancePx * n);
             if (count > bestCount) { bestCount = count; bestValue = candidate; }
         }
 
         if ((double)bestCount / values.Count < minAgreementFraction) return false;
 
-        consensus = (int)Math.Round(values.Where(v => Math.Abs(v - bestValue) <= AgreementTolerancePx).Average());
+        consensus = (int)Math.Round(values.Where(v => Math.Abs(v - bestValue) <= AgreementTolerancePx * n).Average());
         return true;
     }
 

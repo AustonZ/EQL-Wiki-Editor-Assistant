@@ -22,16 +22,18 @@ public sealed class GlyphTextReader
     /// while no capture is running, and together with the pipeline's wrong-font guard, in one setter.</summary>
     public UiFont Font { get; set; }
 
+    /// <param name="atlas">The atlas to read 1.00 with, for tests; other scales always use the bundled atlas.</param>
     public GlyphTextReader(UiFont font, GlyphAtlas? atlas = null)
     {
         Font = font;
         _atlas = atlas ?? GlyphAtlas.Bundled;
     }
 
-    /// <summary>Every line of text in <paramref name="image"/>, in reading order.</summary>
-    public IReadOnlyList<TextLine> Read(CapturedImage image)
+    /// <summary>Every line of text in <paramref name="image"/>, in reading order, drawn at the given UI scale.</summary>
+    public IReadOnlyList<TextLine> Read(CapturedImage image, int scale = 1)
     {
         ArgumentNullException.ThrowIfNull(image);
-        return GlyphReader.Read(image, new Rect(0, 0, image.Width, image.Height), _atlas, Font);
+        GlyphAtlas atlas = scale == 1 ? _atlas : GlyphAtlas.BundledAt(scale);
+        return GlyphReader.Read(image, new Rect(0, 0, image.Width, image.Height), atlas, Font, scale);
     }
 }

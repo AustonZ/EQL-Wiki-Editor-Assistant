@@ -73,6 +73,17 @@ public class WindowTopEdgeTests
         return f;
     }
 
+    /// <summary>The frame as the game draws it at a whole-number UI scale: every pixel N by N. Measured 2026-10-13, at
+    /// 2.00, 3.00 and 4.00 the window's chrome is exactly the 1.00 chrome enlarged, colours unchanged.</summary>
+    private static Frame Enlarged(Frame f, int n)
+    {
+        var big = new Frame(f.Width * n, f.Height * n);
+        for (int y = 0; y < big.Height; y++)
+            for (int x = 0; x < big.Width; x++)
+                big.Set(x, y, f.Pixels[((y / n) * f.Width + x / n) * 4]);
+        return big;
+    }
+
     /// <summary>The tab label's box, which is what the locator hands in as its anchor.</summary>
     private static Rect Anchor() => new(260, ContentTop + 6, 72, 14);
 
@@ -166,6 +177,36 @@ public class WindowTopEdgeTests
 
         Assert.NotNull(bounds);
         Assert.Equal(TitleTop, bounds.Value.Y);
+    }
+
+    /// <summary>
+    /// **At a UI scale above 1.00 the window is the 1.00 window enlarged, and so is its rectangle** (2026-10-13): every
+    /// distance the tracer measured at 1.00 is multiplied by the scale. Checked with the arrangements above that a
+    /// fixed 1.00 distance would get wrong once enlarged — the Lore tab's inner outline 3N in, and another title bar
+    /// flush across the whole width — as well as a plain window.
+    /// </summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void AtEachUiScaleTheRectangleIsTheOneAt100TimesTheScale(int n)
+    {
+        Frame plain = AWindow();
+        Frame lore = AWindow();
+        lore.Fill(WindowLeft + 3, ContentTop + 3, WindowRight - 3, ContentBottom - 6, Outline);
+        lore.Fill(WindowLeft + 4, ContentTop + 4, WindowRight - 4, ContentBottom - 7, Interior);
+        Frame flush = AWindow();
+        flush.Fill(0, TitleTop - 25, 599, TitleTop - 1, 0);
+        Rect anchor = Anchor();
+        var scaledAnchor = new Rect(anchor.X * n, anchor.Y * n, anchor.Width * n, anchor.Height * n);
+        var expected = new Rect(WindowLeft * n, TitleTop * n, (WindowRight - WindowLeft + 1) * n,
+            (ContentBottom - TitleTop + 1) * n);
+
+        foreach (Frame f in new[] { plain, lore, flush })
+        {
+            Assert.Equal(new Rect(WindowLeft, TitleTop, WindowRight - WindowLeft + 1, ContentBottom - TitleTop + 1), Find(f));
+            Assert.Equal(expected, WindowBoundsFinder.TryFindBounds(Enlarged(f, n).ToImage(), scaledAnchor, n));
+        }
     }
 
     /// <summary>

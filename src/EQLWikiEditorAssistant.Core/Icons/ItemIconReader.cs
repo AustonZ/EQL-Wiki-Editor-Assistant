@@ -17,9 +17,20 @@ public static class ItemIconReader
     ///
     /// Measured across 119 icons in the sample set: the ink starts at y 54 and ends at y 97 (44 rows), starts at x 12,
     /// and reaches x 55 on an icon that uses its full width (`Spiderling Silk`), with the item's name starting just
-    /// beyond. Like every other constant derived from this UI's pixels, it belongs to one UI scale and skin.
+    /// beyond. Like every other constant derived from this UI's pixels it belongs to one skin, and it is the 1.00 cell:
+    /// at the other scales it is this times the scale (measured at 2.00, 2026-10-13: Fresh Fish's ink 2px inside the
+    /// doubled cell, as it is 1px inside this one), which <see cref="CellIn"/> applies.
     /// </summary>
     public static readonly Rect IconCell = new(X: 12, Y: 54, Width: 44, Height: 44);
+
+    /// <summary>The icon's cell in the frame, for a window at its own UI scale.</summary>
+    public static Rect CellIn(LocatedWindow window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        int n = window.Scale;
+        return new Rect(window.Bounds.X + IconCell.X * n, window.Bounds.Y + IconCell.Y * n,
+            IconCell.Width * n, IconCell.Height * n);
+    }
 
     /// <summary>
     /// Fingerprints the icon of a located window, or returns false when there is nothing usable to fingerprint.
@@ -50,8 +61,7 @@ public static class ItemIconReader
             return false;
         }
 
-        var cell = new Rect(window.Bounds.X + IconCell.X, window.Bounds.Y + IconCell.Y, IconCell.Width, IconCell.Height);
-        if (!IconHasher.TryFingerprint(image, cell, out fingerprint))
+        if (!IconHasher.TryFingerprint(image, CellIn(window), out fingerprint))
         {
             whyNot = "the icon's cell lies outside the screenshot";
             return false;

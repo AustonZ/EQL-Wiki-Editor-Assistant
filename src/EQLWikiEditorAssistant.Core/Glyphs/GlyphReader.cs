@@ -48,8 +48,24 @@ public static class GlyphReader
     /// </code>
     /// That empty bucket is what makes a threshold safe here, and is precisely what a bare pixel-gap rule never
     /// had — gaps for spaced and unspaced pairs overlap outright at 3px.
+    ///
+    /// That is the 1.00 figure; <see cref="SpaceThreshold"/> gives it at each UI scale.
     /// </summary>
     public const int MinSpaceAdvance = 3;
+
+    /// <summary>
+    /// <see cref="MinSpaceAdvance"/> at a UI scale: 2N + 1, which is 3 at 1.00.
+    ///
+    /// Not 3N, because a space does not grow as fast as the scale. Measured from the spike frames (2026-10-13), how far
+    /// past the preceding cell the next glyph starts, with no space and with one:
+    /// <code>
+    ///   1.00:  0-1  |  3 and up        3.00:  0-3  |  8 and up
+    ///   2.00:  0-2  |  5 and up        4.00:  0-4  | 10 and up
+    /// </code>
+    /// No space is never more than N past the cell, and a space never less than 2.5N, so 2N + 1 falls in the empty band
+    /// at every scale. 3N would read the 5s at 2.00 as no space.
+    /// </summary>
+    public static int SpaceThreshold(int scale) => 2 * scale + 1;
 
     /// <summary>Most a glyph's cell may exceed its own ink before the learned value is disbelieved.
     ///
@@ -70,9 +86,18 @@ public static class GlyphReader
     /// ink+1 the "WIZ MAG" pair then lands 2 past the cell — inside the empty bucket of the distribution above,
     /// which the threshold reads as no space, and the class list merges into "WIZMAG". Clamping to the ink width
     /// is safe in both directions: a genuinely tight follower lands at 0 or 1 (no space) and a spaced one at 3 or
-    /// more (space), which is exactly the separation the measurement shows.</summary>
-    public static int ClampAdvance(int learned, int inkWidth) =>
-        learned > inkWidth + MaxSideBearing ? inkWidth : learned;
+    /// more (space), which is exactly the separation the measurement shows.
+    ///
+    /// <para><b>Above 1.00 the limit is the glyph's 1.00 cell times the scale, plus one scale</b>, when that cell is known
+    /// (<paramref name="cellAtOne"/>). The ink is no guide there, because side bearings do not grow with the scale: '1'
+    /// has 2px at 1.00 and 6-7 at 2.00, where a spaced '/' has the same 7 columns past its ink. Measured from the spike
+    /// frames (2026-10-13), the real cell at scale N lies within one scale of the 1.00 cell times N (-1 to +2 at 2.00,
+    /// -3 to +3 at 3.00, -4 to +4 at 4.00), and a space adds at least two and a half scales, so (cell + 1) x N sits
+    /// between the two.</para></summary>
+    public static int ClampAdvance(int learned, int inkWidth, int scale = 1, int cellAtOne = 0) =>
+        learned > (scale > 1 && cellAtOne > 0 ? (cellAtOne + 1) * scale : inkWidth + MaxSideBearing * scale)
+            ? inkWidth
+            : learned;
 
     /// <summary>
     /// Whether two adjacent glyphs are separated by a space.
@@ -88,10 +113,10 @@ public static class GlyphReader
     /// because the sheet the atlas is built from deliberately spaces every character out and so cannot show them.
     /// A glyph with no learned advance falls back to the gap threshold.
     /// </summary>
-    public static bool IsSpace(GlyphMatch previous, GlyphMatch next) =>
+    public static bool IsSpace(GlyphMatch previous, GlyphMatch next, int scale = 1) =>
         previous.Entry.HasAdvance
-            ? next.Left - previous.Left >= previous.Entry.Advance + MinSpaceAdvance
-            : next.Left - previous.Right - 1 >= WordGapColumns;
+            ? next.Left - previous.Left >= previous.Entry.Advance + SpaceThreshold(scale)
+            : next.Left - previous.Right - 1 >= WordGapColumns * scale;
 
     /// <summary>Permitted deviation, in raw intensity, between a pixel and the value its ramp level demands once
     /// background and peak are solved. The game's own rounding is not reproducible exactly from the outside, so
@@ -111,12 +136,15 @@ public static class GlyphReader
     /// <summary>Reads the region's text. <paramref name="font"/> is the UI font the caller says the game is drawing
     /// in, and it changes exactly one thing: what the bare vertical bar means — see <see cref="ResolveBar"/>.
     /// Every atlas entry is matched regardless, so a capture in the other font still reads, and each line records
-    /// the font it was actually drawn in when it held a character only one font draws.</summary>
-    public static IReadOnlyList<TextLine> Read(CapturedImage image, Rect region, GlyphAtlas atlas, UiFont font)
+    /// the font it was actually drawn in when it held a character only one font draws.
+    ///
+    /// <paramref name="scale"/> is the game's UI scale, which <paramref name="atlas"/> must be drawn at: every distance
+    /// below was measured at 1.00 and is multiplied by it (see <see cref="UiScales"/>).</summary>
+    public static IReadOnlyList<TextLine> Read(CapturedImage image, Rect region, GlyphAtlas atlas, UiFont font, int scale = 1)
     {
         List<GlyphMatch> matches = FindMatches(image, region, atlas);
         List<GlyphMatch> accepted = ResolveOverlaps(matches);
-        return BuildLines(accepted, font);
+        return BuildLines(accepted, font, scale);
     }
 
     /// <summary>Learns each glyph's cell width from real text: the tightest spacing observed to a following glyph
@@ -128,9 +156,9 @@ public static class GlyphReader
     /// invents spaces inside every word using that glyph.</summary>
     public static void LearnAdvances(
         CapturedImage image, Rect region, GlyphAtlas atlas, Dictionary<string, int> advances,
-        List<(string Label, int Distance)>? observations = null)
+        List<(string Label, int Distance)>? observations = null, int scale = 1)
     {
-        const int minPlausible = 2, maxPlausible = 14;
+        int minPlausible = 2 * scale, maxPlausible = 14 * scale;
 
         List<GlyphMatch> accepted = ResolveOverlaps(FindMatches(image, region, atlas));
         foreach (var line in accepted.GroupBy(m => m.Baseline))
@@ -345,31 +373,31 @@ public static class GlyphReader
     /// before the left-hand one — reversing reading order for the parser downstream.</summary>
     public const int BaselineTolerance = 2;
 
-    private static List<TextLine> BuildLines(List<GlyphMatch> accepted, UiFont font)
+    private static List<TextLine> BuildLines(List<GlyphMatch> accepted, UiFont font, int scale)
     {
         var lines = new List<TextLine>();
-        foreach (List<GlyphMatch> row in ClusterRows(accepted))
+        foreach (List<GlyphMatch> row in ClusterRows(accepted, scale))
         {
             List<GlyphMatch> ordered = [.. row.OrderBy(m => m.Left)];
 
             var segment = new List<GlyphMatch>();
             for (int i = 0; i < ordered.Count; i++)
             {
-                if (i > 0 && ordered[i].Left - ordered[i - 1].Right - 1 >= ColumnGapColumns)
+                if (i > 0 && ordered[i].Left - ordered[i - 1].Right - 1 >= ColumnGapColumns * scale)
                 {
-                    Emit(lines, segment, font);
+                    Emit(lines, segment, font, scale);
                     segment = [];
                 }
                 segment.Add(ordered[i]);
             }
-            Emit(lines, segment, font);
+            Emit(lines, segment, font, scale);
         }
         return lines;
     }
 
     /// <summary>Groups matches into visual rows, merging baselines within <see cref="BaselineTolerance"/>, and
     /// returns them top to bottom so the emitted lines are in reading order.</summary>
-    private static List<List<GlyphMatch>> ClusterRows(List<GlyphMatch> accepted)
+    private static List<List<GlyphMatch>> ClusterRows(List<GlyphMatch> accepted, int scale)
     {
         var rows = new List<List<GlyphMatch>>();
         List<GlyphMatch> current = [];
@@ -377,7 +405,7 @@ public static class GlyphReader
 
         foreach (GlyphMatch match in accepted.OrderBy(m => m.Baseline).ThenBy(m => m.Left))
         {
-            if (current.Count > 0 && match.Baseline - anchor > BaselineTolerance)
+            if (current.Count > 0 && match.Baseline - anchor > BaselineTolerance * scale)
             {
                 rows.Add(current);
                 current = [];
@@ -390,10 +418,11 @@ public static class GlyphReader
         return rows;
     }
 
-    private static void Emit(List<TextLine> lines, List<GlyphMatch> segment, UiFont font)
+    private static void Emit(List<TextLine> lines, List<GlyphMatch> segment, UiFont font, int scale)
     {
         if (segment.Count == 0) return;
-        if (segment.Count == 1 && segment[0].Entry.Bitmap.InkWeight < LoneGlyphMinInk) return;
+        // Ink is an area, so it grows with the square of the scale.
+        if (segment.Count == 1 && segment[0].Entry.Bitmap.InkWeight < LoneGlyphMinInk * scale * scale) return;
 
         // A fragment with no letter or digit in it is chrome, not text. The title bar's decorations match '.' and
         // '_' exactly, and because the parser joins a row's fragments before reading it positionally, those turned
@@ -405,7 +434,7 @@ public static class GlyphReader
         var text = new System.Text.StringBuilder();
         for (int i = 0; i < segment.Count; i++)
         {
-            if (i > 0 && IsSpace(segment[i - 1], segment[i])) text.Append(' ');
+            if (i > 0 && IsSpace(segment[i - 1], segment[i], scale)) text.Append(' ');
             text.Append(segment[i].Entry.Labels.Count == 1 ? segment[i].Entry.Labels[0] : AmbiguousMarker);
         }
 

@@ -35,7 +35,7 @@ foreach (LocatedWindow window in windows)
         continue;
     }
 
-    ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab);
+    ParsedItem item = ItemParser.Parse(window.Lines, window.ActiveTab, window.Scale);
     Console.WriteLine($"  Name: {item.Name}  Level: +{item.Level}  Tab: {window.ActiveTab}  TitleContentNameMismatch: {item.TitleContentNameMismatch}");
     if (item.Lore is not null) Console.WriteLine($"  Lore: {item.Lore}");
     Console.WriteLine($"  Flags: {string.Join(", ", item.Flags)}");

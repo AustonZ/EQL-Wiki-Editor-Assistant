@@ -559,6 +559,33 @@ reporting the item already checked.
     - Frames: `40a`/`40b` (2.00), `41a`/`41b` (0.75 None/Linear), `42a`/`42b` (1.25 None/Linear), `43b` (1.00
       Linear), `44a`/`44b` (1.75, moved), `45a`/`45b` (3.00, moved), `46a`-`46c` (4.00 sheet, item, moved). Not
       audited; most show chat.
+    - **Built 2026-10-13** (`Core.Glyphs.UiScales`). Each window gets its scale from which tab template matched
+      (`LocatedWindow.Scale`), and every 1.00 distance in the tracer, the reader, the parser's row tolerance and the
+      icon cell is multiplied by it. Atlases `eql-ui-font-2x/3x/4x.atlas`, Arial only. All six windows in the
+      2.00-4.00 frames, moved and unmoved, trace to the 1.00 rectangle times the scale and read every field right; the
+      0.75 and fractional frames find nothing, and the "no item window" dialog names the supported scales. At 1.00,
+      every sample's rectangles, verdicts, lines and parsed fields are byte-identical and the corpus is unchanged.
+      Three things the measurements did not predict:
+      - **Above 1.00 the game lays text out at fractional advances.** A glyph's shape never changes, but in a word
+        the gap after it is one of two values: the 2.00 "Description" has 'c' then 'r' 14 apart where 'c''s tightest
+        cell is 13. So a tab template laid out from learned cells matched nothing. The label's layout is fixed for
+        each scale, though (every tab in the frames agrees), so the templates use measured glyph positions
+        (`DescriptionTabFinder.MeasuredLayouts`).
+      - **A space does not grow with the scale**: with no space a glyph lands at most N past the cell, with one at
+        least 2.5N (1.00: 0-1 / 3+, 2.00: 0-2 / 5+, 3.00: 0-3 / 8+, 4.00: 0-4 / 10+), so the threshold is 2N + 1
+        (`GlyphReader.SpaceThreshold`), not 3N. Nor do side bearings: '1' has 2px at 1.00 and 6-7 at 2.00, where
+        the ink-based limit on a learned cell rejected its real 14 and read "1.0" as "1 .0". Above 1.00 a cell is
+        judged against the same glyph's 1.00 cell times N (`GlyphReader.ClampAdvance`).
+      - **The sheet's punctuation row had its baseline 5 rows off at 2.00 and 3.00**: four of its glyphs descend by
+        the same amount and four sit on the baseline, and the segmenter broke the tie downward. The atlas builder now
+        rebases each row on the characters known to rest on the baseline; the 1.00 atlas is byte-identical.
+    - **Still to do: per-scale samples in the corpus**, fresh captures of items already in it (cleared chat, so no
+      auditing), so that the scaled reading is gated like 1.00 and the cells can be learned from more text: at 3.00
+      and 4.00 `m` and `Z` have none yet, so they fall back to the gap rule. The spike frames are not to be
+      committed.
+    - **Reading is slower at larger scales**, since there is more ink to match: in Release, 0.4s a window at 2.00,
+      about 0.9 at 3.00 and 1.6 at 4.00, against 0.08 at 1.00. The tab search is unchanged (140 against 145ms a
+      frame), with 0.2s more setup once a session. Worth speeding up if a tester at 4.00 finds it slow.
 - **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
   tester can have it, since it is never distributed, so choosing it only gets every capture refused. Options: show it
   only when it is already the saved choice, or publish the build instructions so anyone can make it. **Decided after
