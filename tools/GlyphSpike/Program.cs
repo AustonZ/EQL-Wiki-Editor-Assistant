@@ -23,9 +23,9 @@ using EQLWikiEditorAssistant.TestSupport;
 //                                               read a region through the real engine, in the image's UI font
 //                                               (SampleFonts: --font, ground truth, file-name marker, else Arial)
 //                                               and at UI scale N with that scale's bundled atlas
-//   GlyphSpike advances [--scale N] [--atlas f] [--region <image> x,y,w,h]...
+//   GlyphSpike advances [--scale N] [--atlas f] [--region <image> x,y,w,h]... [--regions-only]
 //                                               learn the cell widths of scale N's atlas from every sample window
-//                                               at that scale, or only from the regions given
+//                                               at that scale and any regions given, or from the regions alone
 //   GlyphSpike bars <wiki-pages-dir> [--titles <file>] [--prose <dir>]
 //                                               how well Arial's l/I rule reads real text: hides every l and I in
 //                                               the cached pages' item names, statsblocks, lore and notes (and in a
@@ -455,9 +455,10 @@ static async Task<int> Advances(string[] args)
         : $"src/EQLWikiEditorAssistant.Core/Glyphs/{GlyphAtlas.FileName(scale)}";
     GlyphAtlas atlas = GlyphAtlas.Parse(File.ReadAllText(atlasPath));
 
-    // Regions given by hand (`--region <file> x,y,w,h`, repeatable) are read as they are, with nothing located. That
-    // is how a new scale's atlas learns its first advances: its "Description" template is laid out from them, so until
-    // it has them no window at that scale can be found. Each region must lie inside windows — see below.
+    // Regions given by hand (`--region <file> x,y,w,h`, repeatable) are read as they are, with nothing located: a glyph
+    // sheet's lines of text, or, for a new scale, the windows themselves. A new scale's atlas has to learn its first
+    // advances that way (`--regions-only`), because until its "Description" template has them no window at that scale
+    // can be found. Each region must lie inside a window — see below.
     var regions = new List<(string File, Rect Region)>();
     for (int i = 0; i < args.Length - 2; i++)
         if (args[i] == "--region")
@@ -466,7 +467,7 @@ static async Task<int> Advances(string[] args)
             regions.Add((args[i + 1], new Rect(r[0], r[1], r[2], r[3])));
         }
 
-    IReadOnlyList<string> files = regions.Count > 0 ? [] : CorpusRunner.EnumerateSampleFiles();
+    IReadOnlyList<string> files = args.Contains("--regions-only") ? [] : CorpusRunner.EnumerateSampleFiles();
     if (files.Count == 0 && regions.Count == 0)
     {
         Console.Error.WriteLine("  no samples/ on disk — advances can only be learned from real text");

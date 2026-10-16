@@ -579,10 +579,13 @@ reporting the item already checked.
       - **The sheet's punctuation row had its baseline 5 rows off at 2.00 and 3.00**: four of its glyphs descend by
         the same amount and four sit on the baseline, and the segmenter broke the tie downward. The atlas builder now
         rebases each row on the characters known to rest on the baseline; the 1.00 atlas is byte-identical.
-    - **Still to do: per-scale samples in the corpus**, fresh captures of items already in it (cleared chat, so no
-      auditing), so that the scaled reading is gated like 1.00 and the cells can be learned from more text: at 3.00
-      and 4.00 `m` and `Z` have none yet, so they fall back to the gap rule. The spike frames are not to be
-      committed.
+    - **Samples, 2026-10-16**: the user audited the spike frames and took eight more (`47a`-`52`: a lore item's two
+      tabs at 2.00 and 3.00, a busy item at 3.00 and 4.00, a covered window and a three-column weapon at 2.00), so all
+      22 are in the corpus, the unsupported scales as zero-window entries. Every item reads the same at every scale and
+      the same as at 1.00; the corpus is 76 samples, 2,737 correct and 0 for every error count. The cells were relearned
+      from every window at each scale plus the glyph sheets' lines, filling in `m` at 3.00 and 4.00 and `Z` at 3.00,
+      and no reading changed. At 3.00 and 4.00 a tall window (one with the upgrade block) does not fit a 1440-row
+      screen at all, which is the game's limit, not the Assistant's.
     - **Reading is slower at larger scales**, since there is more ink to match: in Release, 0.4s a window at 2.00,
       about 0.9 at 3.00 and 1.6 at 4.00, against 0.08 at 1.00. The tab search is unchanged (140 against 145ms a
       frame), with 0.2s more setup once a session. Worth speeding up if a tester at 4.00 finds it slow.

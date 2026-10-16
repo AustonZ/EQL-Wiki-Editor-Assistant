@@ -20,13 +20,21 @@ public class DescriptionTabFinderTests
     /// laid a glyph out a pixel off, or the advance between two letters were wrong, this fails, where the tolerant search
     /// might have quietly matched anyway. Checked in the brightest channel, the glyph reader's own measure.
     /// </summary>
+    ///
+    /// Above 1.00 the template is laid out from the label's measured positions (see
+    /// <see cref="DescriptionTabFinder.MeasuredLayouts"/>), and this is what proves them, at each scale.
     [Theory]
-    [InlineData("01-single-weapon-lvl0-tradeable-pink-background.png", UiFont.Arial)]
-    [InlineData("15a-eql-wiki-editor-assistant-font [font EqlWikiEditorAssistant].png", UiFont.EqlWikiEditorAssistant)]
-    public async Task TheTemplateIsTheRealLabelPixelForPixel(string sample, UiFont font)
+    [InlineData("01-single-weapon-lvl0-tradeable-pink-background.png", UiFont.Arial, 1)]
+    [InlineData("15a-eql-wiki-editor-assistant-font [font EqlWikiEditorAssistant].png", UiFont.EqlWikiEditorAssistant, 1)]
+    [InlineData("40a-scale-2.00-description.png", UiFont.Arial, 2)]
+    [InlineData("47b-scale-2.00-lore-lore.png", UiFont.Arial, 2)]
+    [InlineData("45a-scale-3.00.png", UiFont.Arial, 3)]
+    [InlineData("46b-scale-4.00-item.png", UiFont.Arial, 4)]
+    public async Task TheTemplateIsTheRealLabelPixelForPixel(string sample, UiFont font, int scale)
     {
         CapturedImage image = await Sample(sample);
-        LabelTemplate template = LabelTemplate.Render(GlyphAtlas.Bundled, DescriptionTabFinder.Label, font);
+        LabelTemplate template = LabelTemplate.Render(GlyphAtlas.BundledAt(scale), DescriptionTabFinder.Label, font,
+            scale, DescriptionTabFinder.MeasuredLayouts.GetValueOrDefault(scale));
 
         IReadOnlyList<DescriptionTab> tabs = DescriptionTabFinder.Find(image);
 
@@ -34,6 +42,7 @@ public class DescriptionTabFinderTests
         foreach (DescriptionTab tab in tabs)
         {
             Assert.Equal(font, tab.Font);
+            Assert.Equal(scale, tab.Scale);
             int At(int i) => GlyphRamp.Intensity(image.Pixels, image.Width, image.Height,
                 tab.Label.X + i % template.Width, tab.Label.Y + i / template.Width);
             int[] pixels = [.. Enumerable.Range(0, template.Fifteenths.Count)];

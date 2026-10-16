@@ -7999,6 +7999,1058 @@
       ]
     },
     {
+      "file": "40a-scale-2.00-description.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Fish Rolls",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "3 silver 2 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Tobrin's Mystical Eyepatch",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Face"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Intelligence",
+              "value": "21"
+            },
+            {
+              "label": "SV. Void",
+              "value": "4"
+            },
+            {
+              "label": "Wisdom",
+              "value": "21"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn",
+              "name": "Tobrin's Mystical Eyepatch"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Worn",
+              "name": "See Invisible",
+              "conditions": [],
+              "modifiers": []
+            }
+          ],
+          "merchantValue": "238 platinum 9 silver 5 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Fresh Fish",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "2 silver 4 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "40b-scale-2.00-moved.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Fresh Fish",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "2 silver 4 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Tobrin's Mystical Eyepatch",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Face"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Intelligence",
+              "value": "21"
+            },
+            {
+              "label": "SV. Void",
+              "value": "4"
+            },
+            {
+              "label": "Wisdom",
+              "value": "21"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn",
+              "name": "Tobrin's Mystical Eyepatch"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Worn",
+              "name": "See Invisible",
+              "conditions": [],
+              "modifiers": []
+            }
+          ],
+          "merchantValue": "238 platinum 9 silver 5 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Fish Rolls",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "3 silver 2 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "41a-scale-0.75.png",
+      "verified": true,
+      "windows": []
+    },
+    {
+      "file": "41b-scale-0.75-linear.png",
+      "verified": true,
+      "windows": []
+    },
+    {
+      "file": "42a-scale-1.25.png",
+      "verified": true,
+      "windows": []
+    },
+    {
+      "file": "42b-scale-1.25-linear.png",
+      "verified": true,
+      "windows": []
+    },
+    {
+      "file": "43b-scale-1.00-linear.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Tobrin's Mystical Eyepatch",
+          "level": 4,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Attunable"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Face"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            },
+            {
+              "label": "Intelligence",
+              "value": "21"
+            },
+            {
+              "label": "SV. Void",
+              "value": "4"
+            },
+            {
+              "label": "Wisdom",
+              "value": "21"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn",
+              "name": "Tobrin's Mystical Eyepatch"
+            },
+            {
+              "kind": "Proc"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Worn",
+              "name": "See Invisible",
+              "conditions": [],
+              "modifiers": []
+            }
+          ],
+          "merchantValue": "238 platinum 9 silver 5 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Fish Rolls",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "3 silver 2 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Fresh Fish",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "2 silver 4 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "44a-scale-1.75.png",
+      "verified": true,
+      "windows": []
+    },
+    {
+      "file": "44b-scale-1.75-moved.png",
+      "verified": true,
+      "windows": []
+    },
+    {
+      "file": "45a-scale-3.00.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Fresh Fish",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "2 silver 4 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Fish Rolls",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "3 silver 2 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "45b-scale-3.00-moved.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Fresh Fish",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "2 silver 4 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Fish Rolls",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "3 silver 2 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "46a-scale-4.00-glyph-sheet.png",
+      "verified": true,
+      "windows": []
+    },
+    {
+      "file": "46b-scale-4.00-item.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Fresh Fish",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "2 silver 4 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "46c-scale-4.00-item-moved.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Fresh Fish",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "2 silver 4 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "47a-scale-2.00-lore-description.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Tuft of Black Bear Fur",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "3 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "47b-scale-2.00-lore-lore.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Tuft of Black Bear Fur",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "lore": "Can be used to recreate a black bear head",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "48a-scale-3.00-lore-description.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Tuft of Black Bear Fur",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "3 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "48b-scale-3.00-lore-lore.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Tuft of Black Bear Fur",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "lore": "Can be used to recreate a black bear head",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "49-scale-3.00-busy-item.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Robe of the Oracle",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable",
+            "Quest"
+          ],
+          "classes": [
+            "MNK",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Chest"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "9"
+            },
+            {
+              "label": "Weight",
+              "value": "2.0"
+            },
+            {
+              "label": "Mana",
+              "value": "25"
+            },
+            {
+              "label": "Intelligence",
+              "value": "5"
+            },
+            {
+              "label": "Wisdom",
+              "value": "5"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "name": "Improved Damage I",
+              "conditions": [],
+              "modifiers": []
+            }
+          ],
+          "merchantValue": "5 platinum 7 gold 1 silver 4 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "50-scale-4.00-busy-item.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Halas 10lb Meat Pie",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "GIANT"
+            },
+            {
+              "label": "HP",
+              "value": "30"
+            },
+            {
+              "label": "Weight",
+              "value": "7.2"
+            },
+            {
+              "label": "Stamina",
+              "value": "5"
+            },
+            {
+              "label": "Agility",
+              "value": "5"
+            },
+            {
+              "label": "Dexterity",
+              "value": "5"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "9 silver 5 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "51-scale-2.00-overlapping-windows.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Robe of the Grove",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable"
+          ],
+          "classes": [
+            "CLR",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Chest"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "AC",
+              "value": "10"
+            },
+            {
+              "label": "Weight",
+              "value": "2.0"
+            },
+            {
+              "label": "Intelligence",
+              "value": "5"
+            },
+            {
+              "label": "Wisdom",
+              "value": "5"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "190 platinum 4 gold 7 silver 6 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "52-scale-2.00-three-column-item.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Orb of Tishan",
+          "level": 5,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Placeable"
+          ],
+          "classes": [
+            "BRD",
+            "NEC",
+            "WIZ",
+            "MAG",
+            "ENC"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Secondary"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Mana",
+              "value": "54"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "10"
+            },
+            {
+              "label": "Weight",
+              "value": "0.8"
+            },
+            {
+              "label": "Accuracy",
+              "value": "+14%"
+            },
+            {
+              "label": "Delay",
+              "value": "25"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Blunt"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "12"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.4"
+            },
+            {
+              "label": "Strength",
+              "value": "14"
+            },
+            {
+              "label": "SV. Void",
+              "value": "5"
+            },
+            {
+              "label": "Stamina",
+              "value": "14"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            },
+            {
+              "kind": "Focus",
+              "name": "Rokyls Channelling Crystal"
+            },
+            {
+              "kind": "Click"
+            },
+            {
+              "kind": "Worn"
+            },
+            {
+              "kind": "Proc",
+              "name": "Orb of Tishan"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "Focus",
+              "name": "Extended Enhancement III",
+              "conditions": [],
+              "modifiers": []
+            },
+            {
+              "kind": "Combat",
+              "name": "Tashania",
+              "conditions": [],
+              "modifiers": [
+                {
+                  "label": "Required Level",
+                  "value": "40"
+                }
+              ]
+            }
+          ],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "notepad-with-all-glyphs.png",
       "verified": true,
       "windows": []

@@ -2702,8 +2702,16 @@ supported scales.
     read "1 .0".
 - **The review shows a scaled window at its 1.00 size** (`Bitmaps.From`'s `uiScale`, a DPI of 96N), so it fits the
   screenshot pane and is pixel-exact on a monitor whose Windows scale matches.
-- The corpus has no scaled samples yet (see the plan); the tracing at each scale is pinned synthetically
-  (`WindowTopEdgeTests.AtEachUiScaleTheRectangleIsTheOneAt100TimesTheScale`), the rest by `UiScaleTests`.
+- **The corpus has every supported scale** (`samples/40a`-`52`, 2026-10-16): Fish Rolls, Fresh Fish and the Eyepatch
+  at 2.00-4.00 in two positions each, a lore item's two tabs at 2.00 and 3.00, a busy item at 3.00 and 4.00, a covered
+  window and a three-column weapon at 2.00 — and, as zero-window entries, 0.75, 1.25 and 1.75, so an unsupported scale
+  stays refused rather than misread. `43b` is 1.00 with Linear filtering, which reads exactly. Every item reads the
+  same at every scale it was captured at, and the same as the 1.00 reading of it. `40a`, `45a` and `46a` hold the
+  glyph sheets the 2x-4x atlases are built from. `TheTemplateIsTheRealLabelPixelForPixel` checks each scale's
+  measured layout against a real tab, and the tracing is also pinned synthetically
+  (`WindowTopEdgeTests.AtEachUiScaleTheRectangleIsTheOneAt100TimesTheScale`), so it runs on a fresh clone.
+- **Reading is slower at larger scales**, since there is more ink to match: a corpus pass went from about 15 seconds
+  to about 3 minutes in a Debug build when the scaled samples arrived.
 
 **Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to the
 reader, the locator or the parser rules must be judged by a number, not by eyeballing warning counts — a hundred-odd
@@ -2729,14 +2737,14 @@ way by definition.
 - Compare configurations **lexicographically**, not by a weighted score: a weighted total lets a tuner buy five
   recovered digits with one corrupted value, which is exactly the trade this project must never make.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
-  corpus pass is about 15 seconds since the windows are found without a model (it was minutes); in the default
+  corpus pass is about 3 minutes (15 seconds before the scaled samples, which read slowly; see "UI scales"); in the default
   `dotnet test` path it would get muted within a week. The pure comparer tests run always and need no samples.
   - **Its font check covers every sample on disk, scored or not.** It was narrowed to samples with ground truth on
     2026-10-09, while an unlisted sample's font was a guess; since every sample's font is now declared (ground truth or
     marker) or Arial, a mismatch is a mislabel wherever it is.
 - **The corpus runs several samples at once** (`CorpusRunner.RunAllAsync`, user, 2026-10-09); results come back in
   file order, so a report is identical at any worker count. The default (`CorpusRunner.DefaultWorkers`) is a quarter of
-  the logical cores, at most 8; `AccuracySpike --workers <n>` overrides it. The whole corpus takes ~15 s.
+  the logical cores, at most 8; `AccuracySpike --workers <n>` overrides it. The whole corpus takes ~3 minutes.
 - Baseline (2026-10-07): **52 samples — 48 in Arial, 4 in EQL Wiki Editor Assistant — 120 windows located (1 correctly
   occluded), 2442 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
   extra. Parser warnings are 2, not 0**: both are
@@ -2745,7 +2753,8 @@ way by definition.
   structural, silent-wrong, wrong and missing, never warnings. Those ratchets in `CorpusAccuracyTests` are all 0 and
   must stay there; a regression is a real defect rather than a known gap being re-measured. **54 samples since
   2026-10-09**: `30a` and `31a`, one window each in the game's other two skins, expected unreadable, take the correct
-  count to 2444 and nothing else. Under the text-recognition model the glyph reader replaced, the same corpus and
+  count to 2444 and nothing else. **76 samples since 2026-10-16**: the 22 UI-scale frames (see "UI scales") take it to
+  2737 correct, 171 windows located (18 occluded), every error count still 0. Under the text-recognition model the glyph reader replaced, the same corpus and
   ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them a glyph-level failure
   that exact template matching removed outright.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
@@ -2952,7 +2961,7 @@ dotnet run --project tools/AccuracySpike                 # summary
 dotnet run --project tools/AccuracySpike -- --diff       # plus every differing field
 dotnet run --project tools/AccuracySpike -- --bootstrap  # regenerate ground truth after a new capture batch
 
-# The corpus regression test (about 15 seconds, opt-in so it can't get muted):
+# The corpus regression test (about 3 minutes, opt-in so it can't get muted):
 $env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracyTests"
 
 # Glyph matching: read a region's raw pixel intensities (the --probe of this work; measure before tuning),
@@ -2981,11 +2990,12 @@ dotnet run --project tools/GlyphSpike -- atlas "samples/15a-eql-wiki-editor-assi
   --out src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font.atlas
 
 # Another UI scale (see "UI scales"): build its atlas from the sheet captured at that scale, then learn its cells. Until
-# its tab template has them no window at that scale can be found, so the first pass reads regions given by hand, each
-# inside a window; later passes learn from every sample window at that scale.
+# its tab template has them no window at that scale can be found, so the first pass reads only regions given by hand,
+# each inside a window (--regions-only); later passes learn from every sample window at that scale, plus any regions
+# given — the glyph sheet's own lines, which hold pairs ("tt", "rn", "11") windows rarely do.
 dotnet run --project tools/GlyphSpike -- atlas "samples/<sheet at 2.00>.png" x,y,w,h --scale 2 \
   --out src/EQLWikiEditorAssistant.Core/Glyphs/eql-ui-font-2x.atlas
-dotnet run --project tools/GlyphSpike -- advances --scale 2 --region "samples/<frame>.png" x,y,w,h [--region ...]
+dotnet run --project tools/GlyphSpike -- advances --scale 2 --region "samples/<frame>.png" x,y,w,h [--region ...] [--regions-only]
 
 # Wiki side. Reads are anonymous, so fetch/roundtrip/grammar need no credential:
 dotnet run --project tools/WikiSpike -- fetch "Earring of Bashing"       # page source + parsed v1 fields
@@ -3064,7 +3074,8 @@ tests reference those names directly, so renaming one means updating the tests. 
 and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*`), one race-restricted item
 (`14`), the custom UI font (`15*`, each marked `[font EqlWikiEditorAssistant]` in its name and in its ground truth as
 `"font": "EqlWikiEditorAssistant"`) and one window
-in each of the game's other two skins (`30a` `default`, `31a` `default_light`, reported as unsupported). Exaltations are
+in each of the game's other two skins (`30a` `default`, `31a` `default_light`, reported as unsupported), and every UI
+scale (`40a`-`52`, each named for its scale; see "UI scales"). Exaltations are
 covered already, though no sample was taken for them: 57 levelled windows carry 11 native and 27 foreign filled slots,
 and `ItemEligibilityTests.EveryRealWindowIsJudgedAsItsGroundTruthSays` judges every one. A foreign exaltation on a
 `+0` item cannot exist in game (an exaltation can only be added to a levelled item), and no sample has a filled
