@@ -510,12 +510,12 @@ reporting the item already checked.
 - **Fixed 2026-10-10: a false occlusion on `Speckled Molded Mushroom`** (user, 2026-10-09). Its title bar sat flush
   under a Storage Trunk's across the whole width, which the old top-edge rule refused; the top is now a fixed 16 rows
   above the bar's bottom (see CLAUDE.md, "Locating item windows"). Fully visible, reported as partly covered.
-  Frames `samples/21a-...-description.png` and `21b-...-lore.png` (both tabs, both now trace correctly), not audited
-  yet (they show chat), so they stay out of git until they are.
+  Frames `samples/21a-...-description.png` and `21b-...-lore.png` (both tabs, both now trace correctly), audited and in
+  the corpus since 2026-10-16.
 - **Fixed 2026-10-10: the icon check called `Spiderling Silk`'s icon a mismatch although it is plainly right** (user,
   2026-10-09). A cropping bug, not a limit: the old strip clipped the last column of an icon that uses its full width.
   Now fixed by comparing the whole fixed 44x44 cell against the best icon in the library (see CLAUDE.md, "Icon
-  comparison"). Frame: `samples/22-spiderling-silk-icon-false-mismatch.png`, not audited yet.
+  comparison"). Frame: `samples/22-spiderling-silk-icon-false-mismatch.png`, in the corpus since 2026-10-16.
 
 ### 1.0.0 (full release)
 - **The Assistant adapts to each player's setup** — priority for 1.0.0 (user, 2026-10-08). Resolution should not matter
@@ -524,7 +524,7 @@ reporting the item already checked.
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
   - **Spike, 2026-10-13: how the game draws text at other scales.** The game offers 0.75, 1.00, 2.00, 3.00 and 4.00,
     plus 1.25-2.75 in quarter steps marked Experimental, and a "UI Text Filtering" setting (None, Linear). Captured in
-    Arial (`samples/40a`-`43b`, gitignored, not audited) and measured with `GlyphSpike`:
+    Arial (`samples/40a`-`43b`, audited and in the corpus since 2026-10-16) and measured with `GlyphSpike`:
     - **Above 1.00 with filtering None, text is drawn fresh at the target size and exactly**: the same 7-level
       anti-aliasing ramp, 0 off-ramp pixels. At 1.25 all 90 sheet characters are distinct (`l` and `I` differ there),
       and an atlas built from the sheet alone read a whole item window exactly but for one learned spacing (`0. 1`).
@@ -597,7 +597,7 @@ reporting the item already checked.
   the UI-scale work** (user, 2026-10-10), since what calibration learns about fonts may settle it.
 - **The game's skins: `default_modern` is required, and the Assistant says so** (user, 2026-10-09, after a spike). The
   game ships three: `default`, `default_light` and `default_modern`. Everything so far was built on `default_modern`.
-  Measured on five frames of each other skin (`samples/30*`, `31*`, gitignored and not yet audited):
+  Measured on five frames of each other skin (`samples/30*`, `31*`, all in the corpus since 2026-10-16):
   - **Text is drawn the same way in all three**: the same glyphs on the same anti-aliasing ramp. The other two blend it
     over a textured background, channel by channel, so a partly covered pixel is that pixel's texture plus coverage times
     (peak - texture). In `default` the texture runs about 8-41 behind the window text, in `default_light` about 56-132.

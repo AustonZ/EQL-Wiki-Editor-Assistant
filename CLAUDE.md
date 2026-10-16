@@ -2761,7 +2761,9 @@ way by definition.
   must stay there; a regression is a real defect rather than a known gap being re-measured. **54 samples since
   2026-10-09**: `30a` and `31a`, one window each in the game's other two skins, expected unreadable, take the correct
   count to 2444 and nothing else. **76 samples since 2026-10-16**: the 22 UI-scale frames (see "UI scales") take it to
-  2737 correct, 171 windows located (18 occluded), every error count still 0. Under the text-recognition model the glyph reader replaced, the same corpus and
+  2737 correct, 171 windows located (18 occluded), every error count still 0. **87 samples since the same day**:
+  the last eleven frames on disk were audited and added (`21a`/`21b`, `22`, and four more in each other skin,
+  `30b`-`30e` and `31b`-`31e`), for 2858 correct and 0 errors, with nothing on disk left unscored. Under the text-recognition model the glyph reader replaced, the same corpus and
   ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them a glyph-level failure
   that exact template matching removed outright.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
@@ -3081,8 +3083,9 @@ tests reference those names directly, so renaming one means updating the tests. 
 and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*`), one race-restricted item
 (`14`), the custom UI font (`15*`, each marked `[font EqlWikiEditorAssistant]` in its name and in its ground truth as
 `"font": "EqlWikiEditorAssistant"`) and one window
-in each of the game's other two skins (`30a` `default`, `31a` `default_light`, reported as unsupported), and every UI
-scale (`40a`-`52`, each named for its scale; see "UI scales"). Exaltations are
+in the game's other two skins (`30a`-`30e` `default`, `31a`-`31e` `default_light`, reported as unsupported), the
+2026-10-10 locate and icon fixes (`21a`/`21b`, `22`), and every UI scale (`40a`-`52`, each named for its scale; see
+"UI scales"). Exaltations are
 covered already, though no sample was taken for them: 57 levelled windows carry 11 native and 27 foreign filled slots,
 and `ItemEligibilityTests.EveryRealWindowIsJudgedAsItsGroundTruthSays` judges every one. A foreign exaltation on a
 `+0` item cannot exist in game (an exaltation can only be added to a levelled item), and no sample has a filled

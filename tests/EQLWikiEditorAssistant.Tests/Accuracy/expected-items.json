@@ -7961,6 +7961,324 @@
       ]
     },
     {
+      "file": "21a-speckled-molded-mushroom-false-occlusion-description.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Shadowed Essence",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Weight",
+              "value": "0.5"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "9 gold 5 silver 2 copper",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Barkeep Compendium",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.5"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Essence of a Vampire",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Decrepit Hide",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "NONE"
+          ],
+          "races": [
+            "NONE"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.2"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Speckled Molded Mushroom",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade"
+          ],
+          "classes": [
+            "RNG",
+            "DRU"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "21b-speckled-molded-mushroom-false-occlusion-lore.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Shadowed Essence",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "lore": "Essence from those lurking in the shadows",
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Barkeep Compendium",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.5"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Essence of a Vampire",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "TINY"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Decrepit Hide",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "No Trade",
+            "Quest"
+          ],
+          "classes": [
+            "NONE"
+          ],
+          "races": [
+            "NONE"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.2"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": false,
+          "name": "Speckled Molded Mushroom",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "lore": "Old molded mushroom",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "22-spiderling-silk-icon-false-mismatch.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Spiderling Silk",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Quest"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "SMALL"
+            },
+            {
+              "label": "Weight",
+              "value": "0.1"
+            }
+          ],
+          "exaltations": [],
+          "effects": [],
+          "merchantValue": "1 silver 6 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "30a-skin-default.png",
       "verified": true,
       "windows": [
@@ -7980,9 +8298,239 @@
       ]
     },
     {
+      "file": "30b-skin-default.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "30c-skin-default.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "30d-skin-default.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "30e-skin-default.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "31a-skin-default-light.png",
       "verified": true,
       "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "31b-skin-default-light.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "31c-skin-default-light.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "31d-skin-default-light.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "31e-skin-default-light.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": true,
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [],
+          "classes": [],
+          "races": [],
+          "slots": [],
+          "stats": [],
+          "exaltations": [],
+          "effects": [],
+          "warningCount": 0
+        },
         {
           "occluded": true,
           "level": 0,
