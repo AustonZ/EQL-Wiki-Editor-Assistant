@@ -586,9 +586,11 @@ reporting the item already checked.
       from every window at each scale plus the glyph sheets' lines, filling in `m` at 3.00 and 4.00 and `Z` at 3.00,
       and no reading changed. At 3.00 and 4.00 a tall window (one with the upgrade block) does not fit a 1440-row
       screen at all, which is the game's limit, not the Assistant's.
-    - **Reading is slower at larger scales**, since there is more ink to match: in Release, 0.4s a window at 2.00,
-      about 0.9 at 3.00 and 1.6 at 4.00, against 0.08 at 1.00. The tab search is unchanged (140 against 145ms a
-      frame), with 0.2s more setup once a session. Worth speeding up if a tester at 4.00 finds it slow.
+    - **Reading grew as the scale to the fourth power, and no longer does** (2026-10-16): a 3.00 window took 1.5 s
+      and a corpus pass 3 minutes, because each wrong candidate walked all of a glyph's background pixels, and the tab
+      search did the same over a template's, before rejecting. Each now rejects in a few reads, with every sample's
+      output byte-identical: a 3.00 or 4.00 window reads in about 0.2 s in Release, the tab search is three or four
+      times faster at every scale, and the corpus runs in under a minute. See CLAUDE.md, "UI scales".
 - **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
   tester can have it, since it is never distributed, so choosing it only gets every capture refused. Options: show it
   only when it is already the saved choice, or publish the build instructions so anyone can make it. **Decided after

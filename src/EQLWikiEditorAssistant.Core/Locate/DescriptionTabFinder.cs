@@ -254,14 +254,17 @@ public sealed class LabelTemplate
         foreach (int offset in offsets.Full)
             if (Math.Abs(plane[origin + offset] - peak) > 1) return false;
 
+        // The contrast test is made as each background pixel is read rather than after them all, which is the same
+        // test: on a flat patch every fully covered pixel equals one value, so the first test passes everywhere a
+        // window's interior is, and above 1.00 a template has thousands of background pixels to walk before this.
         int low = 255, high = 0;
         foreach (int offset in offsets.None)
         {
             int v = plane[origin + offset];
+            if (peak - v < DescriptionTabFinder.MinContrast) return false;
             if (v < low) low = v;
             if (v > high) high = v;
         }
-        if (peak - high < DescriptionTabFinder.MinContrast) return false;
 
         int misses = 0;
         for (int i = 0; i < offsets.Part.Length; i++)

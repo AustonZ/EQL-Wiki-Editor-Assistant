@@ -2710,8 +2710,15 @@ supported scales.
   glyph sheets the 2x-4x atlases are built from. `TheTemplateIsTheRealLabelPixelForPixel` checks each scale's
   measured layout against a real tab, and the tracing is also pinned synthetically
   (`WindowTopEdgeTests.AtEachUiScaleTheRectangleIsTheOneAt100TimesTheScale`), so it runs on a fresh clone.
-- **Reading is slower at larger scales**, since there is more ink to match: a corpus pass went from about 15 seconds
-  to about 3 minutes in a Debug build when the scaled samples arrived.
+- **Matching has to reject a wrong candidate in a few reads, or its cost grows as the scale to the fourth power**: the
+  ink grows with the square of the scale, and so does every glyph and template the candidates are checked against.
+  When the scaled samples arrived a corpus pass went from 15 seconds to about 3 minutes, and a 3.00 window took 1.5 s
+  to read. Two fixes, each provably changing no answer (every sample's locate and parse output byte-identical, the
+  corpus unchanged): `GlyphReader`'s `Screening` checks a dozen of a glyph's pixels, against the background and peak
+  the full check would solve, before the full check walks every background pixel; and `DescriptionTabFinder` tests
+  contrast as it reads each background pixel rather than after them all, since on a window's flat interior every
+  position passes the first test. Reading a window at 3.00 or 4.00 is now about 0.2 s in Release, and the tab search
+  three or four times faster at every scale, 1.00 included.
 
 **Measuring extraction accuracy (`tools/AccuracySpike`, scorer in `TestSupport/Accuracy/`).** Any change to the
 reader, the locator or the parser rules must be judged by a number, not by eyeballing warning counts — a hundred-odd
@@ -2737,14 +2744,14 @@ way by definition.
 - Compare configurations **lexicographically**, not by a weighted score: a weighted total lets a tuner buy five
   recovered digits with one corrupted value, which is exactly the trade this project must never make.
 - `CorpusAccuracyTests` gates the baseline, behind `EQLWIKI_ACCURACY=1` (precedent: `EQLWIKI_LOCATE_DIAG`). A
-  corpus pass is about 3 minutes (15 seconds before the scaled samples, which read slowly; see "UI scales"); in the default
+  corpus pass is under a minute in a Debug build; in the default
   `dotnet test` path it would get muted within a week. The pure comparer tests run always and need no samples.
   - **Its font check covers every sample on disk, scored or not.** It was narrowed to samples with ground truth on
     2026-10-09, while an unlisted sample's font was a guess; since every sample's font is now declared (ground truth or
     marker) or Arial, a mismatch is a mislabel wherever it is.
 - **The corpus runs several samples at once** (`CorpusRunner.RunAllAsync`, user, 2026-10-09); results come back in
   file order, so a report is identical at any worker count. The default (`CorpusRunner.DefaultWorkers`) is a quarter of
-  the logical cores, at most 8; `AccuracySpike --workers <n>` overrides it. The whole corpus takes ~3 minutes.
+  the logical cores, at most 8; `AccuracySpike --workers <n>` overrides it. The whole corpus takes under a minute.
 - Baseline (2026-10-07): **52 samples — 48 in Arial, 4 in EQL Wiki Editor Assistant — 120 windows located (1 correctly
   occluded), 2442 correct fields, and 0 for every error count — structural, silent-wrong, wrong, missing and
   extra. Parser warnings are 2, not 0**: both are
@@ -2961,7 +2968,7 @@ dotnet run --project tools/AccuracySpike                 # summary
 dotnet run --project tools/AccuracySpike -- --diff       # plus every differing field
 dotnet run --project tools/AccuracySpike -- --bootstrap  # regenerate ground truth after a new capture batch
 
-# The corpus regression test (about 3 minutes, opt-in so it can't get muted):
+# The corpus regression test (about a minute, opt-in so it can't get muted):
 $env:EQLWIKI_ACCURACY=1; dotnet test --filter "FullyQualifiedName~CorpusAccuracyTests"
 
 # Glyph matching: read a region's raw pixel intensities (the --probe of this work; measure before tuning),

@@ -187,11 +187,16 @@ public static class GlyphReader
     /// ~90 entries x every pixel, which measured at 11.8s for one window — far too slow for a corpus run, let
     /// alone a hotkey. Ink is a small fraction of a window, and a glyph's brightest pixel must land on ink, so
     /// walking ink pixels and back-solving the implied top-left visits orders of magnitude fewer candidates and
-    /// cannot miss a match that the sweep would have found.</summary>
+    /// cannot miss a match that the sweep would have found.
+    ///
+    /// Each candidate is screened by <see cref="Screen"/> before the full check, which matters above 1.00: there the
+    /// ink grows with the square of the scale and so does every glyph, so the full check alone made reading cost the
+    /// scale to the fourth power (a 3.00 window took 1.5 s).</summary>
     public static List<GlyphMatch> FindMatches(CapturedImage image, Rect region, GlyphAtlas atlas)
     {
         var matches = new List<GlyphMatch>();
         var anchors = atlas.Entries.Select(BrightestPixel).ToList();
+        var screens = atlas.Entries.Select(e => Screening.For(e.Bitmap)).ToList();
 
         for (int y = region.Y; y < region.Bottom; y++)
             for (int x = region.X; x < region.Right; x++)
@@ -208,12 +213,68 @@ public static class GlyphReader
                         || left + entry.Bitmap.Width > region.Right
                         || top + entry.Bitmap.Height > region.Bottom) continue;
 
-                    if (Matches(image, left, top, entry.Bitmap))
+                    if (screens[i].Passes(image, left, top) && Matches(image, left, top, entry.Bitmap))
                         matches.Add(new GlyphMatch(entry, left, top, top + entry.Bitmap.Height - 1 - entry.BaselineOffset));
                 }
             }
 
         return matches;
+    }
+
+    /// <summary>
+    /// A cheap first look at a candidate: a dozen of the glyph's pixels, spread across it, checked against the background
+    /// and peak that <see cref="Matches"/> would solve — the first level-0 pixel in reading order and the brightest
+    /// pixel. Every condition here is one <see cref="Matches"/> also requires, so a candidate this rejects is one it
+    /// would reject too, and the matches found are exactly the same; it only gets there in a handful of reads instead
+    /// of walking every background pixel first. A shape with no level-0 pixels takes its background from a ring
+    /// around it, which this does not attempt, so those pass straight through.
+    /// </summary>
+    private sealed class Screening
+    {
+        private const int Samples = 12;
+
+        private readonly (int X, int Y) _background, _brightest;
+        private readonly int _brightestFifteenths;
+        private readonly (int X, int Y, int Fifteenths)[] _probes;
+        private readonly bool _applies;
+
+        private Screening(GlyphBitmap bitmap)
+        {
+            int firstZero = Array.IndexOf(bitmap.Levels, (byte)0);
+            byte brightest = bitmap.Levels.Max();
+            _applies = firstZero >= 0 && brightest > 0;
+            if (!_applies) { _probes = []; return; }
+
+            _background = (firstZero % bitmap.Width, firstZero / bitmap.Width);
+            int brightestAt = Array.IndexOf(bitmap.Levels, brightest);
+            _brightest = (brightestAt % bitmap.Width, brightestAt / bitmap.Width);
+            _brightestFifteenths = GlyphRamp.Fifteenths[brightest];
+
+            int count = bitmap.Levels.Length;
+            _probes = [.. Enumerable.Range(0, Math.Min(Samples, count))
+                .Select(k => (int)((long)k * count / Math.Min(Samples, count) + count / (2 * Math.Min(Samples, count))))
+                .Distinct()
+                .Select(i => (i % bitmap.Width, i / bitmap.Width, GlyphRamp.Fifteenths[bitmap.Levels[i]]))];
+        }
+
+        public static Screening For(GlyphBitmap bitmap) => new(bitmap);
+
+        public bool Passes(CapturedImage image, int left, int top)
+        {
+            if (!_applies) return true;
+            int background = GlyphRamp.Intensity(image.Pixels, image.Width, image.Height, left + _background.X, top + _background.Y);
+            int bright = GlyphRamp.Intensity(image.Pixels, image.Width, image.Height, left + _brightest.X, top + _brightest.Y);
+            int peak = background + (int)Math.Round((bright - background) * 15.0 / _brightestFifteenths);
+            if (peak - background < MinContrast) return false;
+
+            foreach ((int x, int y, int fifteenths) in _probes)
+            {
+                int expected = background + (int)Math.Round((peak - background) * (fifteenths / 15.0));
+                int actual = GlyphRamp.Intensity(image.Pixels, image.Width, image.Height, left + x, top + y);
+                if (Math.Abs(actual - expected) > IntensityTolerance) return false;
+            }
+            return true;
+        }
     }
 
     private static (int X, int Y) BrightestPixel(AtlasEntry entry)
