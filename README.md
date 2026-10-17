@@ -24,10 +24,10 @@ an item the wiki has no page for, it proposes the whole page.
 
 - Windows 10 (version 2004 or later) or Windows 11.
 - EverQuest Legends in **windowed or borderless windowed** mode.
-- The game's **default UI font (Arial), the `default_modern` UI skin and 100% UI scale.** The Assistant reads item
-  windows by their exact pixels, and other settings are not supported yet. In the `default` and `default_light` skins it
-  finds the windows but cannot read them, and says so. Developed at 2560x1440; other resolutions should work but are
-  untested.
+- The game's **default UI font (Arial), the `default_modern` UI skin, and UI Scaling 1.00, 2.00, 3.00 or 4.00**, with
+  **UI Text Filtering set to None** above 1.00. The Assistant reads item windows by their exact pixels, and other
+  settings are not supported yet. In the `default` and `default_light` skins it finds the windows but cannot read them,
+  and says so. Developed at 2560x1440; other resolutions should work but are untested.
 
 ## Getting started
 
