@@ -459,6 +459,14 @@ update had the Assistant find no window at all; a partly covered window shown as
 one findings row per group of categories; and a window lying over another's bottom no longer read as one with it. The
 update was about 20 MB rather than 3-4, because the .NET runtime it carries had a servicing update.
 
+### 1.0.0-beta.1 — released 2026-10-17
+The first beta, and the first release written for people who have never seen the Assistant (user): the README
+rewritten around what the Assistant checks and leaves alone and how a review goes, with a demo recording at the top of
+it and of the release notes, and the beta warning kept to the release notes. Since alpha.9, `Inventory Items` is out of
+the category order and the repository is in American English. Reading the UI font from the game's `.ini` and offering
+the custom font moved to after 1.0.0; the blueprint's effect line is still wanted for 1.0.0. The update from alpha.9
+was about 4 MB.
+
 ### Requested 2026-10-11, for next
 - **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
   whenever we can make them"), leveled items and Lore-tab captures included; with no page known, "Open wiki page"
