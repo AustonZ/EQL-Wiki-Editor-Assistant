@@ -683,6 +683,11 @@ any written value is suspect as well as unnecessary.
 - **193248 added the common categories pages already used** to that group: `Book`, `Focus Items`, `Foraged`, `Pet
   Illusion Items`, `Vendor Sold`, `Worn Effects`. The deity categories (`... Worshiper Equipment`) were left out for
   now, so they still sort last.
+- **`Inventory Items` was dropped on 2026-10-12**, deprecating the category, and another editor's bulk pass then
+  removed it from every page. It left `CategoryOrder` only once that pass was done (2026-10-17, checked against the
+  live category: no item page left in it), since taking it out sooner would have moved it to the end of every page
+  still carrying it, churning pages the pass was about to clean. A page that still has one now sorts it last. No
+  `CurrentVersion` bump: no page carries it, so nothing the Assistant writes changes.
 
 **The item window's trailing region.** Below the effects the game mixes real fields with developer help text,
 because there was nowhere else to put either. **Handled by rules on what a line *says*, never on where it sits.**
@@ -748,7 +753,7 @@ recorded an incomplete convention as the convention.
 - **`NONE` is to classes what `ANY` is to slots**: a real value with no category, neither emitted nor reported.
   `Guise of the Deceived` says `Class: NONE`, and reporting it would be a false alarm on every such item.
 - **The derived set is only ever a subset of a page's categories.** Real pages also carry zone names, `Quest Items`,
-  `Focus Items`, `Inventory Items` and `Fashion:` entries, none of them derivable from an item window.
+  `Focus Items` and `Fashion:` entries, none of them derivable from an item window.
   `CategoryRules.IsDerivable` is what marks the tool's own territory; everything else is preserved untouched.
 - **The data pass appends a new category at the end; the formatter puts it in its place** (see "The formatting
   pass"). Every category the tool derives has a place in the blueprint's order — `Pet Illusion Items` since oldid

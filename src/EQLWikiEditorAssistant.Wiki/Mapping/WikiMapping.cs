@@ -694,7 +694,8 @@ public sealed class WikiMapping
             [
                 "bookcontents", "dropsfrom", "soldby", "foraged", "playercrafted", "recipes", "relatedquests",
             ],
-            // The blueprint's category list as of 2026-10-11 (oldid 193248), group for group. Its last group,
+            // The blueprint's category list as of 2026-10-11 (oldid 193248), group for group, less `Inventory Items`,
+            // which it dropped on 2026-10-12 and a bulk pass then removed from every page. Its last group,
             // `Zone Name`, is a placeholder no list can stand in for; see CategoryOrder.
             CategoryOrder =
             [
@@ -714,9 +715,9 @@ public sealed class WikiMapping
                 ],
                 [
                     "Book", "Containers", "Drink", "Drink With Stats", "Fashion: ?", "Focus Items", "Food",
-                    "Food With Stats", "Foraged", "Increased Proc Rate", "Inventory Items", "Light source",
-                    "Pet Illusion Items", "Player Crafted", "Potion", "Quest Items", "Tradeskill Ingredient",
-                    "Vendor Sold", "Weapon Procs", "Worn Effects",
+                    "Food With Stats", "Foraged", "Increased Proc Rate", "Light source", "Pet Illusion Items",
+                    "Player Crafted", "Potion", "Quest Items", "Tradeskill Ingredient", "Vendor Sold", "Weapon Procs",
+                    "Worn Effects",
                 ],
             ],
         };

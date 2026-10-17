@@ -9,7 +9,7 @@ namespace EQLWikiEditorAssistant.Wiki.Mapping;
 /// Berserker).
 ///
 /// **The derived categories are only ever a subset of a page's categories.** Real pages also carry zone names,
-/// `Quest Items`, `Focus Items`, `Inventory Items`, `Fashion:` entries and more — none of which is derivable from an
+/// `Quest Items`, `Focus Items`, `Fashion:` entries and more — none of which is derivable from an
 /// item window. So this answers "which categories does the capture imply?" and never "which categories should the
 /// page have?"; anything outside these two families is preserved untouched.
 /// </summary>

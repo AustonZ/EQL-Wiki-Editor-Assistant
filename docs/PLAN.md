@@ -509,7 +509,9 @@ update was about 20 MB rather than 3-4, because the .NET runtime it carries had 
 - **Fixed 2026-10-12: a window laid over another's bottom, almost exactly aligned, was traced as part of it** (user, on
   `Shiverback-Hide Wristbands` under `Midnight Clad Straps`). A traced rectangle may now hold only its own Description
   tab; see CLAUDE.md, "Locating item windows".
-- **Take `Inventory Items` out of `WikiMapping.CategoryOrder` once no page uses it** (user, 2026-10-13). The blueprint
+- **Done 2026-10-17: `Inventory Items` is out of `WikiMapping.CategoryOrder`** (user, once the bulk pass was
+  complete; the live category then held one user page and no item page). The note as written: **Take `Inventory Items`
+  out of `WikiMapping.CategoryOrder` once no page uses it** (user, 2026-10-13). The blueprint
   dropped it on 2026-10-12, deprecating the category, and another editor is removing it from every page in a bulk pass.
   The Assistant never adds it, so only the sort order is left; taking it out first would move it to the end of every
   page still carrying it, churning pages the bulk pass is about to clean. Confirm the category is empty, then remove it.
@@ -533,8 +535,9 @@ update was about 20 MB rather than 3-4, because the .NET runtime it carries had 
   atlas belong to one scale and skin. Likely shape: a one-time calibration on a known window that measures the frame and
   learns the font, as the atlas was first built. The font alone could also be read from the game's UI `.ini`.
   **UI scale is done (2026-10-16)**, as one built-in measured profile per supported scale instead of a calibration step,
-  and tested by the user with a real capture and save at 2.00; skins are settled below. What remains of this item is
-  the font: reading it from the `.ini`, and the custom-font question.
+  and tested by the user with a real capture and save at 2.00; skins are settled below. What remained of this item was
+  the font, reading it from the `.ini` and the custom-font question, and both moved to after 1.0.0 (user, 2026-10-17;
+  see "Future features").
   - **Text brightness: learned per window, built 2026-10-16** (a tester, 2026-10-15). After installing a major Windows
     update, a tester's Assistant found no item window at all. His game drew the very same glyphs, pixel for pixel, with
     two of the seven anti-aliasing levels brighter: 4 and 7 fifteenths where every capture before had 3 and 6 (on white
@@ -635,7 +638,9 @@ update was about 20 MB rather than 3-4, because the .NET runtime it carries had 
       search did the same over a template's, before rejecting. Each now rejects in a few reads, with every sample's
       output byte-identical: a 3.00 or 4.00 window reads in about 0.2 s in Release, the tab search is three or four
       times faster at every scale, and the corpus runs in under a minute. See CLAUDE.md, "UI scales".
-- **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not for the alpha). No
+- **Moved to after 1.0.0 (user, 2026-10-17), as has reading the font from the game's `.ini`; see "Future features".**
+  The note as it stood: **Whether Settings should offer "EQL Wiki Editor Assistant" to testers** (user, 2026-10-08: not
+  for the alpha). No
   tester can have it, since it is never distributed, so choosing it only gets every capture refused. Options: show it
   only when it is already the saved choice, or publish the build instructions so anyone can make it. **Decided after
   the UI-scale work** (user, 2026-10-10), since what calibration learns about fonts may settle it. That work is done and
@@ -738,9 +743,19 @@ up. The Assistant was built for this (a field's location is part of the mapping)
 ### The blueprint's effect line
 Its 2026-10-06 wording is still being thought about by the user and its author; **the Assistant keeps its existing effect
 behaviour until they decide** (user, 2026-10-08). The `Seconds` half is settled: lowercase, as written (2026-10-11). What is
-left is whether `Can Equip`/`Must Equip` replace `Clicky` or follow it.
+left is whether `Can Equip`/`Must Equip` replace `Clicky` or follow it. **Needed for 1.0.0, not for beta.1** (user,
+2026-10-17).
 
 ## Future features (parked deliberately, revisit after real use)
+- **Read the UI font from the game's own settings** (moved here from 1.0.0, user, 2026-10-17). The per-character UI
+  ini (`UI_<character>_<server>_<loadout>.ini` under `C:\Users\Public\Daybreak Game Company\Installed Games\EverQuest
+  Legends\`) carries it as `[Fonts]` / `Font.us.0=Arial`. The hard part: the file is per character, server and loadout,
+  and the player switches loadout on the fly, so which file applies is itself a question. Until then the font is the
+  explicit setting it is now, guarded by the wrong-font refusal.
+- **Whether Settings offers the custom "EQL Wiki Editor Assistant" font to testers** (moved here from 1.0.0, user,
+  2026-10-17). No tester has it, since it is never distributed, so choosing it only gets every capture refused, and its
+  glyph sheet exists only at UI scale 1.00. Options: show it only when it is already the saved choice, or publish the
+  build instructions so anyone can make it.
 - **Warn when the item window's effects/info section is scrollable** (user, 2026-09-28). The game makes that section
   scrollable when it cannot fit the content, and past that simply clips it with no scrollbar at all. The clipped case
   has no reliable signal and the game normally expands the window to avoid it, so it stays the user's
