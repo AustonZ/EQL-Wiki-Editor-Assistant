@@ -10,7 +10,7 @@ They are NOT covered by this project's MIT license, and this project grants no
 license to them. The screenshots are here only as test inputs: the Assistant's
 tests read the item windows in them to check that it locates and reads those
 windows correctly. The recording is here only to show the Assistant at work in
-its README. Do not reuse them for anything else.
+its README and release notes. Do not reuse them for anything else.
 
 If the rights holder, or a player who appears in one, asks for a screenshot or
 the recording to be removed, it will be.

@@ -24,7 +24,7 @@ precedence = "override"
 SPDX-FileCopyrightText = "Daybreak Game Company LLC"
 SPDX-License-Identifier = "LicenseRef-EverQuest-Screenshots"
 
-# The README's demo recording. NOT MIT: it shows the publisher's artwork and a wiki page's text.
+# The demo recording in the README and the release notes. NOT MIT: it shows the publisher's artwork and a wiki page's text.
 [[annotations]]
 path = "docs/media/demo.gif"
 precedence = "override"
