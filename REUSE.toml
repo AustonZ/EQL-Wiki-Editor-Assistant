@@ -24,6 +24,13 @@ precedence = "override"
 SPDX-FileCopyrightText = "Daybreak Game Company LLC"
 SPDX-License-Identifier = "LicenseRef-EverQuest-Screenshots"
 
+# The README's demo recording. NOT MIT: it shows the publisher's artwork and a wiki page's text.
+[[annotations]]
+path = "docs/media/demo.gif"
+precedence = "override"
+SPDX-FileCopyrightText = ["Daybreak Game Company LLC", "EverQuest Legends Wiki contributors"]
+SPDX-License-Identifier = "LicenseRef-EverQuest-Screenshots AND LicenseRef-EQL-Wiki-Content"
+
 # A subset of the ENABLE word list, which its compilers released into the public domain. NOT MIT: see the license file.
 [[annotations]]
 path = "src/EQLWikiEditorAssistant.Core/Glyphs/enable-i-l-words.txt"

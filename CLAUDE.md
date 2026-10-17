@@ -33,7 +33,8 @@ The full design rationale, wiki research findings, and milestone plan live in
 - **The repository is MIT, except for what is not ours to license** (user, 2026-10-08): the game's item icons in
   `game_assets/item_icons` (the publisher's artwork, tolerated on fan wikis, licensed to nobody), the wiki pages copied
   as test fixtures (the wiki's contributors', under no stated license), the audited screenshots in `samples/` (the
-  publisher's artwork) and the ENABLE word list subset in `Core/Glyphs` (public domain, 2026-10-09). `REUSE.toml` records this and
+  publisher's artwork), the README's demo recording `docs/media/demo.gif` (both: the game beside a rendered wiki page,
+  2026-10-17) and the ENABLE word list subset in `Core/Glyphs` (public domain, 2026-10-09). `REUSE.toml` records this and
   `reuse lint` must keep passing: anything added that is not the project's own work — more wiki text, game data,
   artwork — gets its own annotation and `LICENSES/` entry rather than falling under MIT by default. Never describe the
   repository as wholly MIT, and never reuse the icons outside the Assistant's own purpose.
@@ -42,7 +43,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   were audited one by one before the repository went public (user, 2026-10-08) and added with `git add -f`, which is
   how any future sample gets in: look at the whole frame first, black out anything private (the private chat channel
   was the only thing redacted; character names were judged fine), then re-run `AccuracySpike` to prove the redaction
-  moved nothing. `samples/README.md` has the steps.
+  moved nothing. `samples/README.md` has the steps. A recording of the game, such as the README's demo, gets the
+  same look at its frames before it is committed.
 - **Wiki data is untrusted and often malformed.** Item pages are human-edited and partly imported from the old
   Project1999 wiki fork: expect wrong template usage, typos, missing/extra params, inconsistent casing. Wikitext
   parsing must degrade gracefully (flag "couldn't parse this part" rather than throw or silently corrupt), and

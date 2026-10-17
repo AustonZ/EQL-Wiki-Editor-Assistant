@@ -1,5 +1,8 @@
 # EQL Wiki Editor Assistant
 
+![Capturing two item windows from the game with the hotkey, then reviewing, previewing and saving the proposed edit to
+the Mithril Vambraces page](docs/media/demo.gif)
+
 A Windows app for contributors to the [EverQuest Legends Wiki](https://eqlwiki.com) that speeds up the process of
 verifying that the items listed on the wiki match the game.
 
@@ -192,12 +195,13 @@ dotnet run --project src/EQLWikiEditorAssistant.App
 
 ## License
 
-The Assistant's own code is [MIT licensed](LICENSE). **Four things in this repository are not**:
+The Assistant's own code is [MIT licensed](LICENSE). **Five things in this repository are not**:
 
 - the game's item icons in `game_assets/item_icons`, which belong to the game's publisher. See
   [game_assets/README.md](game_assets/README.md);
 - item pages copied from the wiki as test fixtures, which belong to the wiki's contributors;
 - the game screenshots in `samples/` that the tests run against, which show the publisher's artwork;
+- the demo recording at the top of this page, which shows the publisher's artwork and a wiki page;
 - a word list taken from ENABLE, which its compilers released into the public domain.
 
 Licensing is recorded machine-readably in [REUSE.toml](REUSE.toml). The components the Assistant is built on, such as
