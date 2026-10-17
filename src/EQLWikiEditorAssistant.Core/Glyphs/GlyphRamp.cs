@@ -23,7 +23,9 @@ namespace EQLWikiEditorAssistant.Core.Glyphs;
 /// </summary>
 public static class GlyphRamp
 {
-    /// <summary>The ramp as fifteenths, which is exactly what the measurements land on.</summary>
+    /// <summary>The ramp as fifteenths, which is exactly what the measurements land on. The atlas's levels are indices
+    /// into it. Not every machine draws it: a window is read with the ramp its own tab teaches (see
+    /// <see cref="CoverageRamp"/>), which is this one on every sample.</summary>
     public static readonly IReadOnlyList<int> Fifteenths = [0, 3, 6, 9, 11, 13, 15];
 
     public const int LevelCount = 7;

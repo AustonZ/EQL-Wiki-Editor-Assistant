@@ -29,11 +29,12 @@ public sealed class GlyphTextReader
         _atlas = atlas ?? GlyphAtlas.Bundled;
     }
 
-    /// <summary>Every line of text in <paramref name="image"/>, in reading order, drawn at the given UI scale.</summary>
-    public IReadOnlyList<TextLine> Read(CapturedImage image, int scale = 1)
+    /// <summary>Every line of text in <paramref name="image"/>, in reading order, drawn at the given UI scale with the
+    /// given coverage ramp (see <see cref="CoverageRamp"/>; the standard one when not given).</summary>
+    public IReadOnlyList<TextLine> Read(CapturedImage image, int scale = 1, CoverageRamp? ramp = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         GlyphAtlas atlas = scale == 1 ? _atlas : GlyphAtlas.BundledAt(scale);
-        return GlyphReader.Read(image, new Rect(0, 0, image.Width, image.Height), atlas, Font, scale);
+        return GlyphReader.Read(image, new Rect(0, 0, image.Width, image.Height), atlas, Font, scale, ramp);
     }
 }

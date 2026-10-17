@@ -66,8 +66,9 @@ public static class ItemWindowLocator
                 continue;
             }
 
+            // Read with the coverage ramp the window's own tab was drawn with (see CoverageRamp).
             CapturedImage crop = image.Crop(bounds.Value);
-            IReadOnlyList<TextLine> lines = reader.Read(crop, anchor.Scale);
+            IReadOnlyList<TextLine> lines = reader.Read(crop, anchor.Scale, anchor.Ramp);
             TextLine? loreTab = lines.FirstOrDefault(l => IsLoreTabLabel(l.Text));
             ItemWindowTab activeTab = loreTab is not null && IsActiveTabLabel(crop, loreTab.BoundingBox)
                 ? ItemWindowTab.Lore
@@ -77,7 +78,7 @@ public static class ItemWindowLocator
             // template — a whole label in that font — does instead.
             windows.Add(new LocatedWindow(
                 bounds.Value, lines, loreTab is not null, PossiblyOccluded: false, activeTab,
-                DrawnIn(lines) ?? anchor.Font, Scale: anchor.Scale));
+                DrawnIn(lines) ?? anchor.Font, Scale: anchor.Scale, Ramp: anchor.Ramp));
         }
 
         return windows.OrderBy(w => w.Bounds.Y).ThenBy(w => w.Bounds.X).ToList();

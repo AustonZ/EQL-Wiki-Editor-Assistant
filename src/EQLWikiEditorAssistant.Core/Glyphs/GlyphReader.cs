@@ -139,10 +139,14 @@ public static class GlyphReader
     /// the font it was actually drawn in when it held a character only one font draws.
     ///
     /// <paramref name="scale"/> is the game's UI scale, which <paramref name="atlas"/> must be drawn at: every distance
-    /// below was measured at 1.00 and is multiplied by it (see <see cref="UiScales"/>).</summary>
-    public static IReadOnlyList<TextLine> Read(CapturedImage image, Rect region, GlyphAtlas atlas, UiFont font, int scale = 1)
+    /// below was measured at 1.00 and is multiplied by it (see <see cref="UiScales"/>).
+    ///
+    /// <paramref name="ramp"/> is how bright this machine draws each coverage level, learned from the window's own tab;
+    /// <see cref="CoverageRamp.Standard"/> when not given.</summary>
+    public static IReadOnlyList<TextLine> Read(
+        CapturedImage image, Rect region, GlyphAtlas atlas, UiFont font, int scale = 1, CoverageRamp? ramp = null)
     {
-        List<GlyphMatch> matches = FindMatches(image, region, atlas);
+        List<GlyphMatch> matches = FindMatches(image, region, atlas, ramp);
         List<GlyphMatch> accepted = ResolveOverlaps(matches);
         return BuildLines(accepted, font, scale);
     }
@@ -192,11 +196,12 @@ public static class GlyphReader
     /// Each candidate is screened by <see cref="Screen"/> before the full check, which matters above 1.00: there the
     /// ink grows with the square of the scale and so does every glyph, so the full check alone made reading cost the
     /// scale to the fourth power (a 3.00 window took 1.5 s).</summary>
-    public static List<GlyphMatch> FindMatches(CapturedImage image, Rect region, GlyphAtlas atlas)
+    public static List<GlyphMatch> FindMatches(CapturedImage image, Rect region, GlyphAtlas atlas, CoverageRamp? ramp = null)
     {
+        ramp ??= CoverageRamp.Standard;
         var matches = new List<GlyphMatch>();
         var anchors = atlas.Entries.Select(BrightestPixel).ToList();
-        var screens = atlas.Entries.Select(e => Screening.For(e.Bitmap)).ToList();
+        var screens = atlas.Entries.Select(e => Screening.For(e.Bitmap, ramp)).ToList();
 
         for (int y = region.Y; y < region.Bottom; y++)
             for (int x = region.X; x < region.Right; x++)
@@ -213,7 +218,7 @@ public static class GlyphReader
                         || left + entry.Bitmap.Width > region.Right
                         || top + entry.Bitmap.Height > region.Bottom) continue;
 
-                    if (screens[i].Passes(image, left, top) && Matches(image, left, top, entry.Bitmap))
+                    if (screens[i].Passes(image, left, top) && Matches(image, left, top, entry.Bitmap, ramp))
                         matches.Add(new GlyphMatch(entry, left, top, top + entry.Bitmap.Height - 1 - entry.BaselineOffset));
                 }
             }
@@ -234,11 +239,11 @@ public static class GlyphReader
         private const int Samples = 12;
 
         private readonly (int X, int Y) _background, _brightest;
-        private readonly int _brightestFifteenths;
-        private readonly (int X, int Y, int Fifteenths)[] _probes;
+        private readonly double _brightestFifteenths;
+        private readonly (int X, int Y, double Fifteenths)[] _probes;
         private readonly bool _applies;
 
-        private Screening(GlyphBitmap bitmap)
+        private Screening(GlyphBitmap bitmap, CoverageRamp ramp)
         {
             int firstZero = Array.IndexOf(bitmap.Levels, (byte)0);
             byte brightest = bitmap.Levels.Max();
@@ -248,16 +253,16 @@ public static class GlyphReader
             _background = (firstZero % bitmap.Width, firstZero / bitmap.Width);
             int brightestAt = Array.IndexOf(bitmap.Levels, brightest);
             _brightest = (brightestAt % bitmap.Width, brightestAt / bitmap.Width);
-            _brightestFifteenths = GlyphRamp.Fifteenths[brightest];
+            _brightestFifteenths = ramp[brightest];
 
             int count = bitmap.Levels.Length;
             _probes = [.. Enumerable.Range(0, Math.Min(Samples, count))
                 .Select(k => (int)((long)k * count / Math.Min(Samples, count) + count / (2 * Math.Min(Samples, count))))
                 .Distinct()
-                .Select(i => (i % bitmap.Width, i / bitmap.Width, GlyphRamp.Fifteenths[bitmap.Levels[i]]))];
+                .Select(i => (i % bitmap.Width, i / bitmap.Width, ramp[bitmap.Levels[i]]))];
         }
 
-        public static Screening For(GlyphBitmap bitmap) => new(bitmap);
+        public static Screening For(GlyphBitmap bitmap, CoverageRamp ramp) => new(bitmap, ramp);
 
         public bool Passes(CapturedImage image, int left, int top)
         {
@@ -267,7 +272,7 @@ public static class GlyphReader
             int peak = background + (int)Math.Round((bright - background) * 15.0 / _brightestFifteenths);
             if (peak - background < MinContrast) return false;
 
-            foreach ((int x, int y, int fifteenths) in _probes)
+            foreach ((int x, int y, double fifteenths) in _probes)
             {
                 int expected = background + (int)Math.Round((peak - background) * (fifteenths / 15.0));
                 int actual = GlyphRamp.Intensity(image.Pixels, image.Width, image.Height, left + x, top + y);
@@ -299,15 +304,16 @@ public static class GlyphReader
     /// happens to contain one. The peak then follows from the brightest ramp level the bitmap uses, and every
     /// pixel is checked against the single intensity its own level now demands.
     /// </summary>
-    public static bool Matches(CapturedImage image, int left, int top, GlyphBitmap bitmap)
+    public static bool Matches(CapturedImage image, int left, int top, GlyphBitmap bitmap, CoverageRamp? ramp = null)
     {
+        ramp ??= CoverageRamp.Standard;
         if (!TrySolveBackground(image, left, top, bitmap, out int background)) return false;
-        if (!TrySolvePeak(image, left, top, bitmap, background, out int peak)) return false;
+        if (!TrySolvePeak(image, left, top, bitmap, background, ramp, out int peak)) return false;
 
         for (int y = 0; y < bitmap.Height; y++)
             for (int x = 0; x < bitmap.Width; x++)
             {
-                int expected = Expected(bitmap[x, y], background, peak);
+                int expected = Expected(bitmap[x, y], background, peak, ramp);
                 int actual = GlyphRamp.Intensity(image.Pixels, image.Width, image.Height, left + x, top + y);
                 if (Math.Abs(actual - expected) > IntensityTolerance) return false;
             }
@@ -315,8 +321,8 @@ public static class GlyphReader
         return true;
     }
 
-    private static int Expected(byte level, int background, int peak) =>
-        background + (int)Math.Round((peak - background) * (GlyphRamp.Fifteenths[level] / 15.0));
+    private static int Expected(byte level, int background, int peak, CoverageRamp ramp) =>
+        background + (int)Math.Round((peak - background) * (ramp[level] / 15.0));
 
     /// <summary>
     /// The background, taken from the glyph's <b>own</b> level-0 pixels — the counter of an 'o', the corners of
@@ -365,7 +371,7 @@ public static class GlyphReader
     /// the arithmetic well-conditioned: a dim level would divide by a small number and let a large error in the
     /// implied peak look acceptable.</summary>
     private static bool TrySolvePeak(
-        CapturedImage image, int left, int top, GlyphBitmap bitmap, int background, out int peak)
+        CapturedImage image, int left, int top, GlyphBitmap bitmap, int background, CoverageRamp ramp, out int peak)
     {
         peak = background;
         byte brightest = 0;
@@ -382,7 +388,7 @@ public static class GlyphReader
         if (brightest == 0) return false; // an all-background bitmap would match anywhere
 
         int intensity = GlyphRamp.Intensity(image.Pixels, image.Width, image.Height, left + brightestX, top + brightestY);
-        peak = background + (int)Math.Round((intensity - background) * 15.0 / GlyphRamp.Fifteenths[brightest]);
+        peak = background + (int)Math.Round((intensity - background) * 15.0 / ramp[brightest]);
         return peak - background >= MinContrast;
     }
 

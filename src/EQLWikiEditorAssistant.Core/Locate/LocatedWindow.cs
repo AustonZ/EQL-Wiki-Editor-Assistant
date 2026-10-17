@@ -34,6 +34,9 @@ public enum ItemWindowTab
 /// <see cref="Scale"/> is the game's UI scale the window is drawn at, from which scale's tab template matched (see
 /// <see cref="Glyphs.UiScales"/>). Every pixel distance measured inside the window, the icon cell included, is the 1.00
 /// one times it.
+///
+/// <see cref="Ramp"/> is the coverage ramp the window's text was drawn with, learned from its tab (see
+/// <see cref="CoverageRamp"/>); null when the tab could not teach one, which means the standard ramp was assumed.
 /// </summary>
 public sealed record LocatedWindow(
     Rect Bounds,
@@ -43,4 +46,5 @@ public sealed record LocatedWindow(
     ItemWindowTab ActiveTab = ItemWindowTab.Description,
     UiFont? DrawnIn = null,
     bool InOtherSkin = false,
-    int Scale = 1);
+    int Scale = 1,
+    CoverageRamp? Ramp = null);

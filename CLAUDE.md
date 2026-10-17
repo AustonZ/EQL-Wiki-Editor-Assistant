@@ -2267,6 +2267,12 @@ against the full real-sample set is very likely to reintroduce a bug this histor
     traced from the old anchors and the new and compared, before the switch; all identical. The accuracy corpus is
     unchanged too. The label's ink box sits a few pixels above the model's padded line box, which is why the rectangles
     were compared directly rather than trusted to the counts.
+  - **On a flat background the label teaches the coverage ramp** (2026-10-16; see "Glyph matching"). Its partly
+    covered pixels are not held to fixed values there: each level must be one value, rising with the level, and
+    those values (snapped to whole fifteenths where that reproduces the pixel) are the ramp. Where that fails, the
+    blend model is still tried, so nothing found before is lost. Free, because the fully covered pixels' test is what
+    rejects nearly every position: measured on all samples and a tester's frames, the same 155 flat tabs, no others,
+    and the tab search no slower.
   - **Only the whole label is looked for** (user, 2026-10-09). The model's fuzzy match accepted a label missing up to 3
     letters, which reported a window covered that far as occluded; now it is simply not found. "That much overlap should
     be obvious to the user," and a partial template would also match "inscription" in lore or chat. No sample has one.
@@ -2513,6 +2519,15 @@ builds the labelled atlas, `verify` reads a real region back.
   divided by `(peak - background)` all three are the same seven steps, exactly `k/15` for k in 0,3,6,9,11,13,15.
   So **one colour-blind atlas covers the whole UI**; no per-colour atlas is needed. Intensity is the **maximum**
   channel (the opposite of `WindowBoundsFinder`'s frame test, which needs the minimum — different question).
+- **The ramp is fixed per machine, not everywhere, so each window is read with the ramp its own tab teaches**
+  (`Core.Glyphs.CoverageRamp`; a tester, 2026-10-15). After a Windows update one tester's game drew the same glyphs
+  with levels 1 and 2 at 4 and 7 fifteenths, everything else unchanged, on every monitor; the Assistant found no
+  window. `DescriptionTabFinder` learns the ramp from the label (see "Locating item windows"), `LocatedWindow.Ramp`
+  carries it, and the reader's every expected value comes from it. Every sample teaches `CoverageRamp.Standard`
+  exactly, and the standard ramp does the same arithmetic the integer table did, so the corpus reads byte-identically.
+  The atlas's levels stay indices into `GlyphRamp.Fifteenths`, and an atlas is still built only from standard frames.
+  `CoverageRampTests` redraws every glyph of audited windows with other ramps and reads them back. See the plan,
+  "1.0.0 (full release)", for what was ruled out on the way.
 - **The off-ramp counter is the check on all of it.** Captures are lossless, so a pixel that doesn't land on a
   ramp step means the model no longer describes the image (rescaled? another skin or UI scale?) and the tool
   refuses to build an atlas rather than rounding. It caught both calibration bugs below before inspection did.

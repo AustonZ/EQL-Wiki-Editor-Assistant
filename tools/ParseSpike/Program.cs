@@ -28,7 +28,8 @@ Console.WriteLine($"Located {windows.Count} window(s):");
 foreach (LocatedWindow window in windows)
 {
     Console.WriteLine();
-    Console.WriteLine($"--- {window.Bounds} PossiblyOccluded={window.PossiblyOccluded} ---");
+    Console.WriteLine($"--- {window.Bounds} PossiblyOccluded={window.PossiblyOccluded}" +
+        (window.Ramp is { IsStandard: false } ramp ? $" Ramp=[{ramp}]" : "") + " ---");
     if (window.PossiblyOccluded)
     {
         Console.WriteLine("  (occluded, not parsed)");

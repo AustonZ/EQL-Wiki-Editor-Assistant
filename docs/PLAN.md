@@ -528,6 +528,37 @@ reporting the item already checked.
   **UI scale is done (2026-10-16)**, as one built-in measured profile per supported scale instead of a calibration step,
   and tested by the user with a real capture and save at 2.00; skins are settled below. What remains of this item is
   the font: reading it from the `.ini`, and the custom-font question.
+  - **Text brightness: learned per window, built 2026-10-16** (a tester, 2026-10-15). After installing a major Windows
+    update, a tester's Assistant found no item window at all. His game drew the very same glyphs, pixel for pixel, with
+    two of the seven anti-aliasing levels brighter: 4 and 7 fifteenths where every capture before had 3 and 6 (on white
+    text, 80 and 128 for 64 and 112). Everything that is not text was unchanged, and the shift was the same in every
+    text colour. It followed him to every monitor and survived a reboot. It is not the graphics driver or Windows HDR:
+    the user installed the same driver and turned HDR on, and still read normally. The Windows update is the one
+    difference left, so other testers may meet it as they update. (The same tester's screen also looked blurrier; that
+    was separate, and a reboot cleared it.)
+    - **Each window learns its ramp from its own Description tab**, as `CoverageRamp` (see CLAUDE.md, "Glyph
+      matching"). On a flat background the tab finder no longer holds the label's partly covered pixels to fixed
+      values: each level must be one value, rising with the level, and those values are the ramp the window is read
+      with. The finder's cost is the test of the fully covered pixels, which does not change, so learning is free:
+      timed over all 87 samples and the tester's 4 frames in Release, the tab search averaged 126-128 ms a frame
+      before and 127-128 after (two runs each). It finds the same 155 flat tabs plus the tester's 4 and no others, and
+      learns the standard ramp from every sample's tab at every scale. Reading is unchanged by construction: the same
+      comparisons, against values taken from the window's ramp instead of a fixed table.
+    - **On every capture, not calibrated once.** The user first asked for a calibration run once and repeated when
+      finding fails; since learning costs nothing, there is no stored state to go stale, and "finding failed" could not
+      be told apart from "no window was open" anyway.
+    - **Snapped to whole fifteenths when they reproduce the pixel.** A level measured from the label carries the game's
+      rounding of each pixel (the standard level 1 measures 3.01), and both ramps seen are whole fifteenths. Snapping
+      is what makes the corpus read with exactly the arithmetic it always did: every sample's locate and parse output
+      is byte-identical after the change, and the tester's frames read every field with no warnings.
+    - **Not yet seen in the app on the tester's machine**, and his frames are not in the corpus (not audited, and they
+      are his). The tests redraw every glyph of audited windows with his ramp and a darker one instead.
+    - Ruled out on the way: drawing the atlas from Windows' own font renderers (GDI, DirectWrite in every mode, plain
+      unhinted Arial) matches none of the game's glyphs exactly (best, DirectWrite grayscale, 37 of 88 ink patterns and
+      0 levels), so the game rasterizes its text itself and the atlas has to stay captured, not generated. And Linear
+      filtering at 1.25 is the None drawing blended a fraction of a pixel per glyph, but not exactly: fitted per 6x6
+      tile, the worst pixel is still 5 levels off at the median and only 18% of tiles come within 2. So a ramp learned
+      per window does not extend to Linear or the fractional scales; those would need tolerant recognition.
   - **Spike, 2026-10-13: how the game draws text at other scales.** The game offers 0.75, 1.00, 2.00, 3.00 and 4.00,
     plus 1.25-2.75 in quarter steps marked Experimental, and a "UI Text Filtering" setting (None, Linear). Captured in
     Arial (`samples/40a`-`43b`, audited and in the corpus since 2026-10-16) and measured with `GlyphSpike`:

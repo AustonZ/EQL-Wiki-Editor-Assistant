@@ -56,7 +56,8 @@ for (int i = 0; i < windows.Count; i++)
     LocatedWindow w = windows[i];
     Console.WriteLine();
     Console.WriteLine($"--- Window {i}: {w.Bounds}, {w.Lines.Count} line(s), " +
-        $"HasLoreTab={w.HasLoreTab}, PossiblyOccluded={w.PossiblyOccluded} ---");
+        $"HasLoreTab={w.HasLoreTab}, PossiblyOccluded={w.PossiblyOccluded}" +
+        (w.Ramp is { IsStandard: false } ramp ? $", Ramp=[{ramp}]" : "") + " ---");
     if (args.Contains("--icon"))
     {
         // Bounding box of everything that is not the content area's 16-grey, inside the strip left of the text.

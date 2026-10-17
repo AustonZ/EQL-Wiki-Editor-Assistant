@@ -43,6 +43,7 @@ public class DescriptionTabFinderTests
         {
             Assert.Equal(font, tab.Font);
             Assert.Equal(scale, tab.Scale);
+            Assert.True(tab.Ramp is { IsStandard: true }, $"learned {tab.Ramp?.ToString() ?? "no ramp"}");
             int At(int i) => GlyphRamp.Intensity(image.Pixels, image.Width, image.Height,
                 tab.Label.X + i % template.Width, tab.Label.Y + i / template.Width);
             int[] pixels = [.. Enumerable.Range(0, template.Fifteenths.Count)];
@@ -121,6 +122,61 @@ public class DescriptionTabFinderTests
 
         Assert.Equal(new Rect(left, top, template.Width, template.Height), tab.Label);
         Assert.Equal(textured, tab.Textured);
+    }
+
+    /// <summary>
+    /// **A label drawn with another coverage ramp is found, and teaches it** (a tester, 2026-10-15; see
+    /// <see cref="CoverageRamp"/>). The tester's own ramp, a darker one, and one between whole fifteenths, which is kept
+    /// as measured rather than snapped. A level the game rounds to a whole pixel can only be measured to within that
+    /// rounding, hence the tolerance on the last.
+    /// </summary>
+    [Theory]
+    [InlineData(new double[] { 0, 4, 7, 9, 11, 13, 15 })]
+    [InlineData(new double[] { 0, 2, 5, 8, 10, 12, 15 })]
+    [InlineData(new double[] { 0, 3.5, 6.5, 9.5, 11.5, 13.5, 15 })]
+    public void ALabelDrawnWithAnotherRampIsFoundAndTeachesIt(double[] fifteenths)
+    {
+        DescriptionTab tab = Assert.Single(DescriptionTabFinder.Find(FlatLabel(level => fifteenths[level], out Rect where)));
+
+        Assert.Equal(where, tab.Label);
+        Assert.NotNull(tab.Ramp);
+        for (int level = 0; level < fifteenths.Length; level++)
+            Assert.InRange(tab.Ramp[level], fifteenths[level] - 0.05, fifteenths[level] + 0.05);
+        if (fifteenths.All(f => f == Math.Round(f)))
+            Assert.Equal(new CoverageRamp(fifteenths).ToString(), tab.Ramp.ToString());
+    }
+
+    /// <summary>The ramp is learned only from levels that rise: a label whose levels 1 and 2 are swapped is not this
+    /// label, so nothing is found. The control is the same label with its levels in order.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ALabelWhoseLevelsDoNotRiseIsNotFound(bool swapped)
+    {
+        double[] fifteenths = swapped ? [0, 6, 3, 9, 11, 13, 15] : [0, 3, 6, 9, 11, 13, 15];
+        Assert.Equal(swapped ? 0 : 1, DescriptionTabFinder.Find(FlatLabel(level => fifteenths[level], out _)).Count);
+    }
+
+    /// <summary>The Arial label on the content area's flat grey, each coverage level drawn as <paramref name="fifteenths"/>
+    /// says, white on 16 as the game draws it.</summary>
+    private static CapturedImage FlatLabel(Func<int, double> fifteenths, out Rect where)
+    {
+        LabelTemplate template = LabelTemplate.Render(GlyphAtlas.Bundled, DescriptionTabFinder.Label, UiFont.Arial);
+        const int width = 120, height = 30, left = 20, top = 9, background = 16, peak = 255;
+        var pixels = new byte[width * height * 4];
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                int tx = x - left, ty = y - top;
+                int level = tx >= 0 && ty >= 0 && tx < template.Width && ty < template.Height
+                    ? GlyphRamp.Fifteenths.ToList().IndexOf(template.Fifteenths[ty * template.Width + tx]) : 0;
+                byte v = (byte)Math.Round(background + fifteenths(level) * (peak - background) / 15.0);
+                int i = (y * width + x) * 4;
+                pixels[i] = pixels[i + 1] = pixels[i + 2] = v;
+                pixels[i + 3] = 255;
+            }
+        where = new Rect(left, top, template.Width, template.Height);
+        return new CapturedImage(width, height, pixels);
     }
 
     /// <summary>
