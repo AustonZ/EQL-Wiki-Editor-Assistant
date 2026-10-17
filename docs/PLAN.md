@@ -452,6 +452,13 @@ and "The page's formatting is correct", "Needs reformatting", "Don't reformat" a
 page; and levelled items' icons in the list. A refresh after "the wiki is right" no longer leaves the next capture
 reporting the item already checked.
 
+### 1.0.0-alpha.9 — released 2026-10-16
+Item windows read at UI Scaling 2.00, 3.00 and 4.00 (Text Filtering None above 1.00), with the "no item window" message
+naming the supported scales; each window's text brightness learned from its own tab, for the tester whose Windows
+update had the Assistant find no window at all; a partly covered window shown as the whole capture with its tab ringed;
+one findings row per group of categories; and a window lying over another's bottom no longer read as one with it. The
+update was about 20 MB rather than 3-4, because the .NET runtime it carries had a servicing update.
+
 ### Requested 2026-10-11, for next
 - **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
   whenever we can make them"), levelled items and Lore-tab captures included; with no page known, "Open wiki page"
