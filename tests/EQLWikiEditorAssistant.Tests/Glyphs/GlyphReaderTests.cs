@@ -12,12 +12,12 @@ public class GlyphReaderTests
     /// <summary>'l' and 'I' are the same pixels in this font, so the reader picks from the word around them.
     /// These are the real words it has to get right, taken from the corpus.</summary>
     [Theory]
-    [InlineData("B\u0001adestopper", "Bladestopper")]      // mid-word, lowercase neighbours
+    [InlineData("B\u0001adestopper", "Bladestopper")]      // mid-word, lowercase neighbors
     [InlineData("Hea\u0001ing", "Healing")]
     [InlineData("Shie\u0001d", "Shield")]
     [InlineData("C\u0001ick Effect:", "Click Effect:")]
     [InlineData("Exa\u0001tation:", "Exaltation:")]
-    [InlineData("MED\u0001UM", "MEDIUM")]                  // mid-word, all-uppercase neighbours
+    [InlineData("MED\u0001UM", "MEDIUM")]                  // mid-word, all-uppercase neighbors
     [InlineData("G\u0001ANT", "GIANT")]
     [InlineData("\u0001mproved", "Improved")]              // word-initial in Title Case
     [InlineData("\u0001nstant", "Instant")]
@@ -52,7 +52,7 @@ public class GlyphReaderTests
         Assert.Equal(expected, GlyphReader.ResolveAmbiguous(text));
 
     /// <summary>
-    /// The controls: a word the dictionary does not know stays a capital I, because it is almost always a capitalised
+    /// The controls: a word the dictionary does not know stays a capital I, because it is almost always a capitalized
     /// name; a word that is real both ways stays I; roman numerals stay roman numerals, which is exactly what "All" could
     /// otherwise be mistaken for; and a quoted 'II' is not a contraction.
     /// </summary>

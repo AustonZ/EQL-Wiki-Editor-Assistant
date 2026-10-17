@@ -287,7 +287,7 @@ async Task<int> AnalyzeCorpusAsync()
         .ToList();
 
     // Eligibility (step 4b) runs before analysis in the real pipeline, and it must run here too or the numbers
-    // lie: a levelled item's stats are legitimately higher than the wiki's level-0 figures, so including one
+    // lie: a leveled item's stats are legitimately higher than the wiki's level-0 figures, so including one
     // reports a stale page where there is none. Bladestopper +7 shows AC 43 against the page's 25 for exactly that
     // reason. Foreign exaltations are excluded for the same kind of reason — the window includes another item's
     // contribution.
@@ -462,7 +462,7 @@ async Task<int> CompareIconsAsync()
         // the bytes directly and never touch a file — see the note in CLAUDE.md about needing a decoder port.
         string file = Path.Combine(scratch, $"item_{new string([.. iconId.Where(char.IsLetterOrDigit)])}.png");
         if (!File.Exists(file)) await File.WriteAllBytesAsync(file, bytes);
-        // Composited over the game's own background grey, so both sides are the same sprite on the same backdrop.
+        // Composited over the game's own background gray, so both sides are the same sprite on the same backdrop.
         CapturedImage wikiIcon = await ImageFile.LoadOverBackgroundAsync(file, background: 16);
 
         if (!IconHasher.TryFingerprint(wikiIcon, new Rect(0, 0, wikiIcon.Width, wikiIcon.Height), out IconFingerprint onWiki))
@@ -507,8 +507,8 @@ async Task<int> CompareIconsAsync()
 
 // Tests whether the game renders icons losslessly from the same asset the wiki files came from. If it does, the
 // comparison can be an exact pixel diff instead of a perceptual one, and every alert would be a real defect.
-// The discriminating question is whether the game *interpolates* when it scales: nearest-neighbour reuses the
-// source colours exactly, while any smoothing invents new ones.
+// The discriminating question is whether the game *interpolates* when it scales: nearest-neighbor reuses the
+// source colors exactly, while any smoothing invents new ones.
 async Task<int> DiffIconPixelsAsync()
 {
     if (args.Length < 2) { Console.Error.WriteLine("usage: WikiSpike icondiff <screenshot>"); return 1; }
@@ -542,30 +542,30 @@ async Task<int> DiffIconPixelsAsync()
         Rect onWiki = InkBox(wiki, new Rect(0, 0, wiki.Width, wiki.Height));
         if (captured.Width == 0 || onWiki.Width == 0) continue;
 
-        var wikiColours = new HashSet<int>();
+        var wikiColors = new HashSet<int>();
         for (int y = onWiki.Y; y < onWiki.Y + onWiki.Height; y++)
             for (int x = onWiki.X; x < onWiki.X + onWiki.Width; x++)
-                wikiColours.Add(ColourAt(wiki, x, y));
+                wikiColors.Add(ColorAt(wiki, x, y));
 
-        var capturedColours = new HashSet<int>();
+        var capturedColors = new HashSet<int>();
         for (int y = captured.Y; y < captured.Y + captured.Height; y++)
             for (int x = captured.X; x < captured.X + captured.Width; x++)
-                capturedColours.Add(ColourAt(image, x, y));
+                capturedColors.Add(ColorAt(image, x, y));
 
-        int shared = capturedColours.Count(c => wikiColours.Contains(c));
+        int shared = capturedColors.Count(c => wikiColors.Contains(c));
 
         Console.WriteLine($"--- {item.Name} (icon {iconId})");
         Console.WriteLine($"    captured ink {captured.Width}x{captured.Height} at window-rel " +
                           $"({captured.X - window.Bounds.X},{captured.Y - window.Bounds.Y})   " +
                           $"wiki ink {onWiki.Width}x{onWiki.Height} at ({onWiki.X},{onWiki.Y})");
         Console.WriteLine($"    scale x {(double)captured.Width / onWiki.Width:F3}  y {(double)captured.Height / onWiki.Height:F3}");
-        Console.WriteLine($"    distinct colours: captured {capturedColours.Count}, wiki {wikiColours.Count}, " +
-                          $"captured-also-in-wiki {shared} ({100.0 * shared / capturedColours.Count:F0}%)");
+        Console.WriteLine($"    distinct colors: captured {capturedColors.Count}, wiki {wikiColors.Count}, " +
+                          $"captured-also-in-wiki {shared} ({100.0 * shared / capturedColors.Count:F0}%)");
     }
 
     return 0;
 
-    static int ColourAt(CapturedImage img, int x, int y)
+    static int ColorAt(CapturedImage img, int x, int y)
     {
         int o = (y * img.Width + x) * 4;
         return (img.Pixels[o + 2] << 16) | (img.Pixels[o + 1] << 8) | img.Pixels[o];
@@ -578,7 +578,7 @@ async Task<int> DiffIconPixelsAsync()
             for (int x = Math.Max(0, region.X); x < Math.Min(region.X + region.Width, img.Width); x++)
             {
                 int o = (y * img.Width + x) * 4;
-                // Just above the window's 16-grey background.
+                // Just above the window's 16-gray background.
                 if (Math.Max(img.Pixels[o + 2], Math.Max(img.Pixels[o + 1], img.Pixels[o])) <= 28) continue;
                 minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
                 minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);

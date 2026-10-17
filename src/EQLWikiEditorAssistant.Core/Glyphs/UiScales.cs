@@ -7,7 +7,7 @@ namespace EQLWikiEditorAssistant.Core.Glyphs;
 /// **Whole-number scales only: 1.00, 2.00, 3.00 and 4.00, with Text Filtering set to None above 1.00.** At those the
 /// game draws its text fresh at the target size, on the same seven-step anti-aliasing ramp, and every glyph is
 /// identical wherever the window sits — so exact matching works exactly as it does at 1.00. And the window's chrome is
-/// the 1.00 chrome with every distance times the scale, colours unchanged (the frame 2N, the outline N, the title bar
+/// the 1.00 chrome with every distance times the scale, colors unchanged (the frame 2N, the outline N, the title bar
 /// 16N), so a scale is today's measured distances times N plus its own glyph atlas.
 ///
 /// **Refused, with a message, and why**:

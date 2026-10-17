@@ -18,10 +18,10 @@ namespace EQLWikiEditorAssistant.Core.Glyphs;
 /// </list>
 ///
 /// **A word it does not know leaves the reader's default alone**, and that default is a capital I — right for the case
-/// that matters, because an unknown word is almost always a name and names are capitalised ("Iksar", "Innoruuk"). What is
-/// left over is a lowercase word the list lacks (compounds like "lionskin", dialect like "lookin'") or a capitalised name
+/// that matters, because an unknown word is almost always a name and names are capitalized ("Iksar", "Innoruuk"). What is
+/// left over is a lowercase word the list lacks (compounds like "lionskin", dialect like "lookin'") or a capitalized name
 /// that happens to be a word ("Ias", read as "las"). There is deliberately no warning for either: it would fire on every
-/// capitalised name in lore and tell the user nothing.
+/// capitalized name in lore and tell the user nothing.
 /// </summary>
 public static class BarWords
 {

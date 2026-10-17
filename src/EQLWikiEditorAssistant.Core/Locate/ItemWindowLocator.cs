@@ -98,12 +98,12 @@ public static class ItemWindowLocator
     /// a substring — so it doesn't false-hit on flag text like "Lore Equipped, No Trade".</summary>
     private static bool IsLoreTabLabel(string text) => text.Trim() == "Lore";
 
-    /// <summary>True if a tab label is drawn in the active-tab colour. The game renders the selected tab's text
+    /// <summary>True if a tab label is drawn in the active-tab color. The game renders the selected tab's text
     /// yellow (measured: 191,191,4 / 159,159,6 / 255,255,0 — red≈green with blue near zero) and unselected tabs
-    /// in neutral white/grey, so this is a direct pixel read rather than an inference.
+    /// in neutral white/gray, so this is a direct pixel read rather than an inference.
     ///
     /// It lives here rather than in the parser because it is a question about pixels, and Locate is the layer
-    /// holding the image — the parser only ever sees recognized text, which carries no colour at all.</summary>
+    /// holding the image — the parser only ever sees recognized text, which carries no color at all.</summary>
     private static bool IsActiveTabLabel(CapturedImage crop, Rect labelBox)
     {
         const int GlyphMinChannel = 100;  // ignore the near-black background around the glyphs

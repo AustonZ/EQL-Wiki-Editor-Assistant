@@ -147,7 +147,7 @@ public sealed class ExpectedEffect
     /// <summary>The effect/spell name alone — what the game draws in magenta, and what a wiki lookup keys on.</summary>
     public string Name { get; set; } = "";
 
-    /// <summary>Parenthesised qualifiers such as "Must Equip" / "Can Equip". A "(Req Level N)" is normalized into
+    /// <summary>Parenthesized qualifiers such as "Must Equip" / "Can Equip". A "(Req Level N)" is normalized into
     /// <see cref="Modifiers"/> instead, so it matches the sub-line form other effect kinds use.</summary>
     public List<string> Conditions { get; set; } = [];
 

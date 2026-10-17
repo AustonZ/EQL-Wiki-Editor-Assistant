@@ -4,7 +4,7 @@ using EQLWikiEditorAssistant.Wiki.Wikitext;
 namespace EQLWikiEditorAssistant.Tests.Wiki;
 
 /// <summary>
-/// The formatting pass. Its whole licence to rearrange a public wiki's pages is that it can *prove* it changed
+/// The formatting pass. Its whole license to rearrange a public wiki's pages is that it can *prove* it changed
 /// nothing about what they say, so most of these tests are about what it refuses to do.
 /// </summary>
 public class ItemPagePrettifierTests

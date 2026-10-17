@@ -394,7 +394,7 @@ public class ItemFingerprintTests
             ItemFingerprint.Compute(Item()),
             ItemFingerprint.Compute(Item(warnings: ["couldn't read the merchant value"])));
 
-    /// <summary>Only `+0` items are processed today, so a levelled capture never reaches the ledger — but including
+    /// <summary>Only `+0` items are processed today, so a leveled capture never reaches the ledger — but including
     /// the level means a future version that does process them can never confuse the two.</summary>
     [Fact]
     public void TheCapturedLevelIsPartOfTheFingerprint() =>

@@ -65,7 +65,7 @@ finally {
 
 # The app finds game_assets\item_icons by walking up from its own folder, so beside the executable is enough.
 # The cached icon index is stamped with the files' names and sizes, not their dates, so this copy, the repo's and the
-# released app's are all recognised as the same library rather than rebuilt.
+# released app's are all recognized as the same library rather than rebuilt.
 Write-Host "Copying the icon library..."
 robocopy (Join-Path $repo 'game_assets\item_icons') (Join-Path $Destination 'game_assets\item_icons') `
     /MIR /NFL /NDL /NJH /NJS /NP | Out-Null

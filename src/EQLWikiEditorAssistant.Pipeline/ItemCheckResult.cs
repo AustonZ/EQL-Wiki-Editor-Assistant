@@ -25,7 +25,7 @@ public enum ItemCheckStatus
     /// find but not read (user, 2026-10-09). **No ledger row**, for the same reason as <see cref="Occluded"/>.</summary>
     UnsupportedSkin,
 
-    /// <summary>A foreign exaltation or a levelled item. **No ledger row**, for the same reason.</summary>
+    /// <summary>A foreign exaltation or a leveled item. **No ledger row**, for the same reason.</summary>
     Ineligible,
 
     /// <summary>The ledger already has this exact capture settled, so the wiki was never asked.</summary>
@@ -228,7 +228,7 @@ public sealed record ItemCheckResult
     public bool CanCreate => Status == ItemCheckStatus.NotOnWiki && Creation is not null;
 
     /// <summary>
-    /// Whether something here wants the user's judgement before the page is written — a field the analyzer could not
+    /// Whether something here wants the user's judgment before the page is written — a field the analyzer could not
     /// decide, something the editor declined to write, a title defect, a suspect icon, or a name the capture itself
     /// could not agree on.
     ///

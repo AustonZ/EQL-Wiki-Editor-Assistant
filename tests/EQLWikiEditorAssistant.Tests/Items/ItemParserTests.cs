@@ -614,8 +614,8 @@ public class ItemParserTests
         Assert.False(window.PossiblyOccluded);
 
         // This window is edge-to-edge with the inventory panel and has other dark UI directly above its
-        // title bar. An earlier tracer ran past the real edge into neighbouring windows entirely (one sample
-        // was traced 137px too far, parsing the neighbour's Class/Race/Size/Weight as this item's), so the
+        // title bar. An earlier tracer ran past the real edge into neighboring windows entirely (one sample
+        // was traced 137px too far, parsing the neighbor's Class/Race/Size/Weight as this item's), so the
         // width bound and the single-occurrence field checks below are what catch that class of bug.
         Assert.InRange(window.Bounds.Width, 380, 430);
 

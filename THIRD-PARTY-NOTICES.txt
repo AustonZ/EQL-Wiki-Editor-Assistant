@@ -1,12 +1,12 @@
 EQL Wiki Editor Assistant — third-party notices
 
 The EQL Wiki Editor Assistant is MIT licensed (see LICENSE). It is built on
-the components below, each under its own licence, whose full texts follow
+the components below, each under its own license, whose full texts follow
 this list. The .NET runtime ships long notices files of its own, which are
 included beside this one in the licenses folder.
 
 The item icons in game_assets/item_icons are not covered by any of these
-licences, nor by the Assistant's own: see game_assets/README.md.
+licenses, nor by the Assistant's own: see game_assets/README.md.
 
 
 Runtime
@@ -16,7 +16,7 @@ Runtime
   https://github.com/dotnet/runtime, https://github.com/dotnet/wpf
   Copyright (c) .NET Foundation and Contributors.
   Included in the installed app, which needs no separate .NET install.
-  Their licences and the runtime's own third-party notices:
+  Their licenses and the runtime's own third-party notices:
   licenses/dotnet-runtime-LICENSE.txt,
   licenses/dotnet-windowsdesktop-LICENSE.txt,
   licenses/dotnet-runtime-THIRD-PARTY-NOTICES.txt
@@ -85,7 +85,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ==============================================================================
-Microsoft.Web.WebView2 licence
+Microsoft.Web.WebView2 license
 ==============================================================================
 
 Copyright (C) Microsoft Corporation. All rights reserved.

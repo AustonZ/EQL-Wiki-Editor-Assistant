@@ -5,7 +5,7 @@ using System.Windows.Input;
 namespace EQLWikiEditorAssistant.App;
 
 /// <summary>
-/// Small attached behaviours the windows share, so a table or a block of text gets them by one attribute rather than
+/// Small attached behaviors the windows share, so a table or a block of text gets them by one attribute rather than
 /// a handler per window.
 /// </summary>
 public static class Behaviors

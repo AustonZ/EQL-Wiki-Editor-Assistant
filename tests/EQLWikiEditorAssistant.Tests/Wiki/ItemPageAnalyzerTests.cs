@@ -906,7 +906,7 @@ public class ItemPageAnalyzerTests
     /// The cause was that an effect was matched by the page it *links to* rather than the name it *displays*. The
     /// game shows `Firestrike`; the page links `Firestrike_(Effect)`; so nothing matched, the analyzer called the
     /// effect `MissingOnWiki`, and the editor inserted a second line. The line-count assertion is what fails against
-    /// the old behaviour — the finding's verdict alone would have read as a plausible "the page is missing this".
+    /// the old behavior — the finding's verdict alone would have read as a plausible "the page is missing this".
     /// </summary>
     [Fact]
     public void AnEffectLinkedUnderAQualifiedTitleIsStillTheSameEffect()

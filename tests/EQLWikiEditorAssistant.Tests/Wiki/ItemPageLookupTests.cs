@@ -120,7 +120,7 @@ public class ItemPageLookupTests
 
     /// <summary>The cap is only safe because the ordering is. Four quote characters over two positions is sixteen
     /// combinations — more than the cap — so an arbitrary order could discard the plausible apostrophe/grave swaps
-    /// in favour of curly-quote forms nobody has ever observed. Every all-plain variant must come first.</summary>
+    /// in favor of curly-quote forms nobody has ever observed. Every all-plain variant must come first.</summary>
     [Fact]
     public void QuoteVariants_TriesThePlausibleFormsBeforeTheCapCanDiscardThem()
     {

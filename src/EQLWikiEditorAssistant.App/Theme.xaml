@@ -1,20 +1,20 @@
 <!--
-    The dark palette, and the control styles needed to make WPF honour it.
+    The dark palette, and the control styles needed to make WPF honor it.
 
     **There is deliberately no theme *switch*** (user, 2026-09-30, asking for this ahead of the polish milestone):
-    one permanent palette, so every colour in the app resolves to a brush named here and nothing has to decide at
+    one permanent palette, so every color in the app resolves to a brush named here and nothing has to decide at
     runtime which set to use.
 
     **Why this file is as long as it is: WPF's default control templates hard-code light chrome**, so setting
-    `Background` on a window gets you dark panels with white buttons, a white combo popup and a light grey
-    scrollbar. A control appears below only when its own template had to be replaced to reach a colour the property
+    `Background` on a window gets you dark panels with white buttons, a white combo popup and a light gray
+    scrollbar. A control appears below only when its own template had to be replaced to reach a color the property
     does not expose — a Button's hover gradient, a CheckBox's box, a ComboBox's popup, a DataGrid's header and
     selection, a ScrollBar's track. Everything reachable through plain setters is set that way.
 
-    **Semantic colours are re-chosen for this background, not darkened versions of the old ones.** `SeaGreen` on
-    #1E1E1E measures a contrast ratio of 3.6, under the 4.5 a body-text colour needs, and the same is true of
+    **Semantic colors are re-chosen for this background, not darkened versions of the old ones.** `SeaGreen` on
+    #1E1E1E measures a contrast ratio of 3.6, under the 4.5 a body-text color needs, and the same is true of
     `Firebrick` and `SaddleBrown` — the three that carried the most meaning. The replacements below are all ≥ 5.0
-    against the window background, computed rather than eyeballed, because these are the colours that say whether an
+    against the window background, computed rather than eyeballed, because these are the colors that say whether an
     item is done or wants a human.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -45,7 +45,7 @@
     <!-- Selected *text* is a separate brush from the selected *row* above, and it has to be: a row's highlight is
          painted opaque behind its text, while a text selection is painted translucent over it. The two wants are
          opposite — this one must be light, because it is blended into the glyphs as well as the field.
-         This colour and SelectionOpacity below were measured as a pair (see the TextBox style), so they move
+         This color and SelectionOpacity below were measured as a pair (see the TextBox style), so they move
          together or not at all; pointing this at AccentBrush would let an accent change break the contrast floor
          silently, which is why it is its own value despite currently matching. -->
     <SolidColorBrush x:Key="TextSelectionBrush" Color="#4FA3E3" />
@@ -88,7 +88,7 @@
     <SolidColorBrush x:Key="DiffAddedTextBrush" Color="#7EE2A8" />
 
     <!-- The icon preview's backdrop is *not* chrome: it is the game's own near-black window interior, so a sprite
-         drawn with transparency is composited over the same colour the comparison used. It stays as measured. -->
+         drawn with transparency is composited over the same color the comparison used. It stays as measured. -->
     <SolidColorBrush x:Key="GameBackdropBrush" Color="#101010" />
 
     <!-- ============================ text ============================ -->
@@ -96,8 +96,8 @@
     <!-- **There is deliberately no implicit `TextBlock` style setting `Foreground`, and this is load-bearing.**
          `Foreground` is an inherited property, so the one on `Window` below reaches every TextBlock that does not
          set its own. An implicit style would *assign* it instead of letting it inherit, which beats the value a
-         `DataGridRow` sets — and both grids colour a whole row by what it means (red for a finding nobody has
-         judged, green for a settled ledger row). Every cell would have gone plain grey. -->
+         `DataGridRow` sets — and both grids color a whole row by what it means (red for a finding nobody has
+         judged, green for a settled ledger row). Every cell would have gone plain gray. -->
 
     <Style TargetType="Hyperlink">
         <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
@@ -123,7 +123,7 @@
          window behind them stayed white, which showed up as one white panel wherever nothing covered it.
 
          `Foreground` is here rather than on each control because it inherits: setting it once on the window is what
-         carries the text colour into every TextBlock that does not ask for its own. -->
+         carries the text color into every TextBlock that does not ask for its own. -->
     <Style x:Key="DarkWindow" TargetType="Window">
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
@@ -153,7 +153,7 @@
     <!-- ============================ buttons ============================ -->
 
     <!-- Templated because the default Button's hover and pressed states are a hard-coded light blue gradient: at
-         rest it would honour the dark Background and then flash white under the cursor. -->
+         rest it would honor the dark Background and then flash white under the cursor. -->
     <Style TargetType="Button">
         <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
@@ -200,7 +200,7 @@
         <Setter Property="Foreground" Value="#FFFFFF" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Padding" Value="14,5" />
-        <!-- Its own template, because the shared one's hover trigger paints the chrome grey by name, which no setter
+        <!-- Its own template, because the shared one's hover trigger paints the chrome gray by name, which no setter
              here can outrank. -->
         <Setter Property="Template">
             <Setter.Value>
@@ -242,7 +242,7 @@
 
     <!-- The icon the library suggests, and the button that puts it into the edit, in one bright green so they read as
          one call to action (feedback from a tester, 2026-10-11: with a 1px border and an ordinary button it was not
-         clear what to do). Brighter than DoneBrush, which colours a finished state rather than something to press.
+         clear what to do). Brighter than DoneBrush, which colors a finished state rather than something to press.
          White on #1F6B42 measures 6.2. -->
     <SolidColorBrush x:Key="SuggestionBrush" Color="#57E89C" />
     <Style x:Key="SuggestionButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
@@ -301,7 +301,7 @@
                         <Border x:Name="Box" Width="14" Height="14" CornerRadius="2" Background="{StaticResource SunkenBrush}"
                                 BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
                                 VerticalAlignment="Center" SnapsToDevicePixels="True">
-                            <Path x:Name="Tick" Visibility="Collapsed" Stretch="Uniform" Margin="2"
+                            <Path x:Name="CheckMark" Visibility="Collapsed" Stretch="Uniform" Margin="2"
                                   Stroke="{StaticResource AccentHoverBrush}" StrokeThickness="2"
                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                                   Data="M 0,4 L 3.2,7.2 L 9,1" />
@@ -310,7 +310,7 @@
                     </StackPanel>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
                             <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -338,11 +338,11 @@
              2026-10-02: selected text unreadable in the wikitext boxes). At 1 the highlight is painted opaque
              straight over the glyphs and nothing redraws them, so the selected text does not become hard to read —
              it disappears entirely. Measured by rendering: unselected ink is #E4E4E4 at contrast 10.8 against the
-             field, and selecting it left the band holding the highlight colour and nothing else.
+             field, and selecting it left the band holding the highlight color and nothing else.
              **`SelectionTextBrush` is not the fix, which was tested rather than assumed**: it reads as white here
              and setting it to pure red put no red pixel anywhere in the render, so WPF is not redrawing selected
              text in this configuration at all. Translucency is therefore the only lever.
-             The colour/opacity pair was then swept together, because they trade against each other — a heavier
+             The color/opacity pair was then swept together, because they trade against each other — a heavier
              highlight is more obvious but tints the glyphs it covers, and both the text and the highlight are
              blends of this one brush. 30 combinations across six hues; this pair is the most visible highlight
              (RGB distance 75 from the unselected field) that still clears the 4.5 contrast floor the rest of this
@@ -517,7 +517,7 @@
     </Style>
 
     <!-- Templated because the default item's selection fill is a system light blue. A selected row keeps its own
-         foreground bindings — the status colour is the point of the row — so only the backing changes. -->
+         foreground bindings — the status color is the point of the row — so only the backing changes. -->
     <Style TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
         <Setter Property="Padding" Value="6,2" />
@@ -687,7 +687,7 @@
 
     <!-- ============================ scroll bars ============================ -->
 
-    <!-- Worth the length: a light grey scrollbar down the side of every panel is the most visible thing left of
+    <!-- Worth the length: a light gray scrollbar down the side of every panel is the most visible thing left of
          the old palette, and no property on ScrollViewer reaches it. -->
     <Style x:Key="ScrollThumb" TargetType="Thumb">
         <Setter Property="IsTabStop" Value="False" />
@@ -708,7 +708,7 @@
         </Setter>
     </Style>
 
-    <!-- No arrow buttons: they are the fiddliest part of the default template to recolour and the least used part
+    <!-- No arrow buttons: they are the fiddliest part of the default template to recolor and the least used part
          of a scrollbar. The track takes their space. -->
     <Style x:Key="ScrollTrackButton" TargetType="RepeatButton">
         <Setter Property="IsTabStop" Value="False" />

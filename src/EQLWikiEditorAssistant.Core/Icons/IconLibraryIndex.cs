@@ -31,7 +31,7 @@ public static class IconLibraryIndex
     private const string Magic = "EQLICON2";
 
     /// <summary>
-    /// Writes the index: a header, then one record per icon. Deflated, because the signatures are smooth colour data
+    /// Writes the index: a header, then one record per icon. Deflated, because the signatures are smooth color data
     /// and compress to roughly half — worth it for a file that is read on every start.
     /// </summary>
     public static void Write(Stream stream, IReadOnlyList<LibraryIcon> icons)

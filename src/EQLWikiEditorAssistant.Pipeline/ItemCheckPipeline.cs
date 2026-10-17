@@ -62,7 +62,7 @@ public sealed class ItemCheckPipeline
     /// <param name="verified">The wiki's verified-pages list, or null to say nothing about verification. Optional
     /// for the same reason the icon cache is: the tool only ever reports this and never acts on it.</param>
     /// <param name="iconLibrary">Fingerprints of every icon the game ships, used to identify a new item's icon id.
-    /// Null simply leaves <c>lucy_img_ID</c> blank on a generated page, which is the behaviour that existed before
+    /// Null simply leaves <c>lucy_img_ID</c> blank on a generated page, which is the behavior that existed before
     /// the library did — degraded, not wrong.</param>
     /// <param name="iconFiles">The icon PNGs themselves, for showing a match and for uploading it. Needed alongside
     /// <paramref name="iconLibrary"/>; without it an id can still be identified and written, just not illustrated or
@@ -228,7 +228,7 @@ public sealed class ItemCheckPipeline
             };
 
         // Nothing read from a partly-covered window can be trusted. The parser's own title-vs-content check is a
-        // second line of defence, not a reason to proceed past this one.
+        // second line of defense, not a reason to proceed past this one.
         if (window.PossiblyOccluded)
             return new ItemCheckResult
             {
@@ -268,7 +268,7 @@ public sealed class ItemCheckPipeline
         // Cropped whatever the verdict: the review screen shows it beside the wiki's copy so the user can settle by
         // eye anything the comparison declines or gets wrong. The icon's own cell rather than the fingerprinted strip,
         // so it shows at the same scale as the wiki's file — see ItemIconReader.IconCell. **Before the eligibility
-        // check** (user, 2026-10-12): a levelled item is compared with nothing, but its entry in the list still shows
+        // check** (user, 2026-10-12): a leveled item is compared with nothing, but its entry in the list still shows
         // its icon like every other item's. The Lore tab draws no icon.
         CapturedImage? iconCrop = window.ActiveTab == ItemWindowTab.Description
             ? frame.Crop(ItemIconReader.CellIn(window))
@@ -280,7 +280,7 @@ public sealed class ItemCheckPipeline
                 "capture was obscured. Treat this item's data as unreliable.");
 
         // **Before the Lore branch, not after it** (bug found by the user, 2026-10-07, on `Arydryidriyorn +5`). The
-        // Lore tab shows the level in its title like the Description tab does, and a levelled item's Lore capture
+        // Lore tab shows the level in its title like the Description tab does, and a leveled item's Lore capture
         // used to be accepted — asking the user for a Description capture the pipeline would then refuse. A Lore
         // window has no exaltation rows, so for it only the level can block.
         ItemEligibility eligibility = ItemEligibility.Check(item);
@@ -748,7 +748,7 @@ public sealed class ItemCheckPipeline
         CapturedImage wikiIcon;
         try
         {
-            // The decoder composites over the game's own background grey, so both sides are the same sprite on the
+            // The decoder composites over the game's own background gray, so both sides are the same sprite on the
             // same backdrop — see AlphaComposite for why that is not a detail.
             wikiIcon = await _decoder.DecodeAsync(bytes, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
@@ -816,7 +816,7 @@ public sealed class ItemCheckPipeline
             EditResult edit = await _wiki
                 .EditAsync(title, wikitext, summary, current.Timestamp, cancellationToken).ConfigureAwait(false);
 
-            // **A commit does not settle a judgement the tool declined to make.** Writing a corrected AC says
+            // **A commit does not settle a judgment the tool declined to make.** Writing a corrected AC says
             // nothing about a lore difference the user was warned of on the same screen, and recording `Edited`
             // would count the whole item as done and never raise it again. `Flagged` keeps it coming back; the user
             // settles it deliberately with RecordCheckedByHand. This is the same rule a page that already agrees
@@ -940,8 +940,8 @@ public sealed class ItemCheckPipeline
     /// is one of the things the user may have just done (bug found by the user, 2026-10-07).
     ///
     /// **A result decided before the wiki was asked comes back as it was.** "Refresh wiki data" is offered on every
-    /// item whose name was read (user, 2026-10-12), a levelled item and a Lore-tab capture included, and comparing
-    /// either against its page would be wrong in a way that writes: a levelled item's stats are legitimately higher
+    /// item whose name was read (user, 2026-10-12), a leveled item and a Lore-tab capture included, and comparing
+    /// either against its page would be wrong in a way that writes: a leveled item's stats are legitimately higher
     /// than the page's, and a Lore capture has no stats at all, so every field would read as missing. Nothing about the
     /// wiki changes what was decided about them, so there is nothing to refresh.
     /// </summary>
@@ -1031,7 +1031,7 @@ public sealed class ItemCheckPipeline
 
     /// <summary>
     /// Records that the user looked at everything this item had flagged and is happy with it — their answer to a
-    /// judgement the tool deliberately declined to make.
+    /// judgment the tool deliberately declined to make.
     ///
     /// **This is the only way a flagged item becomes done**, and it has to exist, because both alternatives are
     /// worse: without it, an item whose page the user has decided is *correct* — most often lore the wiki states

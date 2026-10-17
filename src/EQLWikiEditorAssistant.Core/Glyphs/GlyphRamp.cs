@@ -9,17 +9,17 @@ namespace EQLWikiEditorAssistant.Core.Glyphs;
 /// glyph can be identified by exact comparison rather than by recognition. That is the whole basis of
 /// <c>GlyphTextReader</c>.
 ///
-/// **The ramp is the same in every text colour and on every background — but only after normalizing.** Measured
-/// absolute values differ per colour because the ramp is applied to whichever channels the colour uses and scaled
-/// to that colour's peak:
+/// **The ramp is the same in every text color and on every background — but only after normalizing.** Measured
+/// absolute values differ per color because the ramp is applied to whichever channels the color uses and scaled
+/// to that color's peak:
 /// <code>
 ///   white on content area (bg  16, peak 255):  16  64 112 159 191 223 255
-///   grey on title bar     (bg   0, peak 192):   0  38  77 115 141 166 192
+///   gray on title bar     (bg   0, peak 192):   0  38  77 115 141 166 192
 ///   magenta on content    (bg  16, peak 224):  16  58 100 141 169 196 224
 /// </code>
 /// Divide by (peak - background) and all three collapse onto one ramp: 0, 3/15, 6/15, 9/15, 11/15, 13/15, 15/15.
-/// So a single colour-blind atlas covers white labels, yellow tab text, magenta effect names and the dimmer
-/// title bar alike — no per-colour atlas is needed, which was an open question when this was planned.
+/// So a single color-blind atlas covers white labels, yellow tab text, magenta effect names and the dimmer
+/// title bar alike — no per-color atlas is needed, which was an open question when this was planned.
 /// </summary>
 public static class GlyphRamp
 {
@@ -42,8 +42,8 @@ public static class GlyphRamp
 
     /// <summary>Per-pixel text intensity: the maximum channel.
     ///
-    /// The ramp is applied to whichever channels the text colour uses — white moves all three, yellow R+G,
-    /// magenta R+B, green G alone — so the maximum channel recovers the same coverage whatever the colour.
+    /// The ramp is applied to whichever channels the text color uses — white moves all three, yellow R+G,
+    /// magenta R+B, green G alone — so the maximum channel recovers the same coverage whatever the color.
     /// (Note this is the opposite of <c>WindowBoundsFinder</c>'s frame test, which uses the *minimum* channel:
     /// there the question is whether a pixel is neutral-dark, not how much ink it carries.)</summary>
     public static int Intensity(byte[] pixels, int width, int height, int x, int y)

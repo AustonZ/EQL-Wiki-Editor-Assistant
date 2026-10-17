@@ -8,7 +8,7 @@ namespace EQLWikiEditorAssistant.Core.Items;
 ///
 /// **Matched exactly** (2026-10-10). It used to tolerate a character or two, for a text-recognition model's misreads
 /// (`Omamentation`); the glyph reader reads the game's text exactly, and a label that does not match is then a label
-/// this list lacks, which should reach the user as an unparsed line rather than be bent into a near neighbour.
+/// this list lacks, which should reach the user as an unparsed line rather than be bent into a near neighbor.
 /// </summary>
 public static class FieldLabelLexicon
 {

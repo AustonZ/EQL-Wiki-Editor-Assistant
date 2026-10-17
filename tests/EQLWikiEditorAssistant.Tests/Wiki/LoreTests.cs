@@ -54,7 +54,7 @@ public class LoreTests
     }
 
     /// <summary>The minimal-edit rule's third case: no parameter means no line to change, and inventing a position
-    /// is a judgement this codebase consistently refuses to make.</summary>
+    /// is a judgment this codebase consistently refuses to make.</summary>
     [Fact]
     public void APageWithoutANotesParameterRefusesRatherThanInventingOne()
     {

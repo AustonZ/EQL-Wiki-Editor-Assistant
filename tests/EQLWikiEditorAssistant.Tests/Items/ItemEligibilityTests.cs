@@ -6,7 +6,7 @@ namespace EQLWikiEditorAssistant.Tests.Items;
 
 /// <summary>
 /// Pipeline step 4b. The rule these mostly exist to protect is the ledger one: an ineligible item gets no row at
-/// all, so the next capture — a pristine copy, or a future version that supports levelling — is treated as new. A
+/// all, so the next capture — a pristine copy, or a future version that supports leveling — is treated as new. A
 /// "skipped" row would make the item look handled and quietly exclude it from ever being checked properly.
 /// </summary>
 public class ItemEligibilityTests
@@ -100,7 +100,7 @@ public class ItemEligibilityTests
     }
 
     [Fact]
-    public void ALevelledItemBlocksAndWritesNoLedgerRow()
+    public void ALeveledItemBlocksAndWritesNoLedgerRow()
     {
         ItemEligibility result = ItemEligibility.Check(Item(level: 7));
 
@@ -129,7 +129,7 @@ public class ItemEligibilityTests
     }
 
     /// <summary>
-    /// The rule against every real window in the verified corpus, which holds about twenty levelled items with filled
+    /// The rule against every real window in the verified corpus, which holds about twenty leveled items with filled
     /// exaltation slots, foreign and native both. The unit tests above use names chosen to make the point; these are
     /// the names the game actually produces, long and punctuated ones included (`Staff of Elemental Mastery: Earth`),
     /// which is where a fuzzy name comparison would misjudge if it ever does.
@@ -143,8 +143,8 @@ public class ItemEligibilityTests
     /// threshold loosened from a sixth of the name to half of it still passes. Treating every slot as native, or every
     /// slot as foreign, fails. The threshold's fine tuning is the unit tests' job, not this one's.
     ///
-    /// A foreign exaltation on an unlevelled item cannot exist in the game (user, 2026-10-07: an exaltation can only be
-    /// added to a levelled item), so every foreign case here is also levelled, and both blockers must be reported.
+    /// A foreign exaltation on an unleveled item cannot exist in the game (user, 2026-10-07: an exaltation can only be
+    /// added to a leveled item), so every foreign case here is also leveled, and both blockers must be reported.
     /// </summary>
     [Fact]
     public void EveryRealWindowIsJudgedAsItsGroundTruthSays()
@@ -156,7 +156,7 @@ public class ItemEligibilityTests
             .Where(w => !w.Occluded && !string.IsNullOrWhiteSpace(w.Name) && w.Name != ExpectedCorpus.TodoMarker)
             .ToList();
 
-        int natives = 0, foreigns = 0, levelled = 0;
+        int natives = 0, foreigns = 0, leveled = 0;
         foreach (ExpectedWindow window in windows)
         {
             List<ExaltationSlot> slots =
@@ -167,7 +167,7 @@ public class ItemEligibilityTests
                 (slot.Kind == ExaltationKind.Ornamentation || slot.Name != window.Name));
             natives += slots.Count(slot => slot.Name is not null) - expectedForeign;
             foreigns += expectedForeign;
-            if (window.Level > 0) levelled++;
+            if (window.Level > 0) leveled++;
 
             ItemEligibility result = ItemEligibility.Check(Item(window.Name!, window.Level, slots));
 
@@ -183,6 +183,6 @@ public class ItemEligibilityTests
         // this test had quietly stopped covering the case it exists for.
         Assert.True(natives >= 8, $"Only {natives} native exaltations in the corpus.");
         Assert.True(foreigns >= 20, $"Only {foreigns} foreign exaltations in the corpus.");
-        Assert.True(levelled >= 40, $"Only {levelled} levelled windows in the corpus.");
+        Assert.True(leveled >= 40, $"Only {leveled} leveled windows in the corpus.");
     }
 }

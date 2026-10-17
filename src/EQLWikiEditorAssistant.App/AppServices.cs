@@ -122,7 +122,7 @@ public sealed class AppServices : IDisposable
         // The icon library, for identifying a new item's lucy_img_ID. Loaded from a cached fingerprint index that
         // rebuilds itself when the icon folder changes; the first run after an asset re-export costs about eight
         // seconds. Absent entirely when the folder cannot be found, which simply leaves lucy_img_ID blank — the
-        // behaviour that existed before the library did. This runs off the UI thread with the rest of the
+        // behavior that existed before the library did. This runs off the UI thread with the rest of the
         // composition root, so the cost never blocks the window.
         string? iconFolder = AppPaths.IconLibraryDirectory;
         if (iconFolder is not null)

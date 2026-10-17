@@ -36,7 +36,7 @@
     <Page Include="App.xaml" />
   </ItemGroup>
 
-  <!-- Shipped beside the executable: the licence and the notices for everything the app is built on. The .NET
+  <!-- Shipped beside the executable: the license and the notices for everything the app is built on. The .NET
        runtime's own notices are added by tools/release.ps1, since only a self-contained build carries the runtime. -->
   <ItemGroup>
     <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />

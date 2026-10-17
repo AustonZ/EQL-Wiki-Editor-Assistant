@@ -13,7 +13,7 @@ namespace EQLWikiEditorAssistant.Wiki.MediaWiki;
 /// per-user by the OS, and it keeps the secret out of the repo's working tree entirely — which matters here
 /// because this repo has a public remote and a documented rule that credentials never live in it.
 ///
-/// **The password is written to unmanaged memory and zeroed after use** on both paths. This is not theatre: the
+/// **The password is written to unmanaged memory and zeroed after use** on both paths. This is not theater: the
 /// alternative leaves the secret in a managed <c>string</c>, which is immutable, may be copied by the GC and stays
 /// readable in a crash dump. The managed string still exists on the read path — .NET's API surface gives no way
 /// around that without a <c>SecureString</c>, which is itself documented as no longer providing meaningful

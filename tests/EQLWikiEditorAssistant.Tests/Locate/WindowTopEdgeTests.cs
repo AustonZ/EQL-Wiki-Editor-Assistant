@@ -9,8 +9,8 @@ namespace EQLWikiEditorAssistant.Tests.Locate;
 /// **These are built from a synthesized frame, which the rest of the locate suite deliberately avoids**, and the
 /// reason is worth stating. The golden tests run against real screenshots in `samples/`, which is gitignored — so
 /// every one of them skips on a fresh clone, and the three top-edge bugs this file covers all shipped with no test
-/// able to fail against them. The geometry here is not invented: the band height, the interior grey, the outline
-/// grey and the frame beyond it are the values measured on real captures and recorded in
+/// able to fail against them. The geometry here is not invented: the band height, the interior gray, the outline
+/// gray and the frame beyond it are the values measured on real captures and recorded in
 /// <see cref="WindowBoundsFinder"/>. What is synthetic is only the *arrangement*, which is exactly what each bug
 /// was about — a correct window with something awkward above it.
 /// </summary>
@@ -52,7 +52,7 @@ public class WindowTopEdgeTests
 
     /// <summary>
     /// A window as the chrome really draws it: world behind, a 16px pure-black title bar, then a content area
-    /// bounded by the grey outline with the window's near-black frame just beyond it.
+    /// bounded by the gray outline with the window's near-black frame just beyond it.
     /// </summary>
     private static Frame AWindow()
     {
@@ -74,7 +74,7 @@ public class WindowTopEdgeTests
     }
 
     /// <summary>The frame as the game draws it at a whole-number UI scale: every pixel N by N. Measured 2026-10-13, at
-    /// 2.00, 3.00 and 4.00 the window's chrome is exactly the 1.00 chrome enlarged, colours unchanged.</summary>
+    /// 2.00, 3.00 and 4.00 the window's chrome is exactly the 1.00 chrome enlarged, colors unchanged.</summary>
     private static Frame Enlarged(Frame f, int n)
     {
         var big = new Frame(f.Width * n, f.Height * n);

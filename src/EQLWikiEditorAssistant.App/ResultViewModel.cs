@@ -14,7 +14,7 @@ using EQLWikiEditorAssistant.Wiki.Ledger;
 
 namespace EQLWikiEditorAssistant.App;
 
-/// <summary>One line of the rendered diff, with its colour already decided — simpler than a value converter, and it
+/// <summary>One line of the rendered diff, with its color already decided — simpler than a value converter, and it
 /// keeps the palette in one place.</summary>
 public sealed record DiffLineViewModel(DiffLine Line)
 {
@@ -220,7 +220,7 @@ public sealed record StepViewModel(ReviewStep Step, int Number, string Label, St
         _ => Palette.Muted,
     };
 
-    /// <summary>The circle's fill: the accent for where the user is, the done colour for what is behind them. A skipped
+    /// <summary>The circle's fill: the accent for where the user is, the done color for what is behind them. A skipped
     /// step is hollow — passed over, with nothing in it.</summary>
     public Brush Marker => State switch
     {
@@ -540,7 +540,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// <summary>Whether there is anything to show in the icon section — at least one of the images.</summary>
     /// <remarks>Not for an item the ledger let skip the wiki: nothing was compared, so the section could only say
     /// "not compared" beside an empty wiki tile. It carries the icon for its list entry and a re-check.</remarks>
-    // Not for an item nothing was compared for: one the ledger let skip the wiki, or a levelled one, whose captured icon
+    // Not for an item nothing was compared for: one the ledger let skip the wiki, or a leveled one, whose captured icon
     // is there only for its entry in the list.
     public bool HasIcons =>
         Result.Status is not (ItemCheckStatus.AlreadyChecked or ItemCheckStatus.Ineligible) &&
@@ -695,7 +695,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
         if (Result.Edit is { } edit)
         {
-            // Laid out like the rest of the proposal, so a new lucy_img_ID line lines up with its neighbours.
+            // Laid out like the rest of the proposal, so a new lucy_img_ID line lines up with its neighbors.
             if (Result.Review is not null && ItemPagePrettifier.Format(wikitext, WikiMapping.Default) is { IsSafe: true } laidOut)
                 _wikitext = laidOut.Formatted;
 
@@ -802,7 +802,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// saying the wiki is right.
     ///
     /// **Skipping is deliberately not done.** `Skipped` means "not now": it never settles the ledger and the item
-    /// returns on the next capture, so showing it green would promise something the ledger does not honour.
+    /// returns on the next capture, so showing it green would promise something the ledger does not honor.
     /// </summary>
     public bool IsDone =>
         _settled ||
@@ -937,7 +937,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// <summary>
     /// Whether the item's name was read, which is all "Open wiki page" and "Refresh wiki data" need (user, 2026-10-12:
     /// "no special rules, just dumb links whenever we can make them"). Every result past the point where a window is
-    /// read has one — a levelled item and a Lore-tab capture included; a covered window, one in the other font and one
+    /// read has one — a leveled item and a Lore-tab capture included; a covered window, one in the other font and one
     /// in another skin do not, since nothing was read from them.
     /// </summary>
     public bool HasItemName => Result.Item is not null && Result.ItemName.Length > 0;
@@ -995,7 +995,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// The lore the tool refused to overwrite, when the page's copy differs from the captured one.
     ///
     /// **It gets its own panel because lore is the one field a table cannot show.** Every other finding is a short
-    /// token that fits in a grid cell; lore is a paragraph, and the user's decision here is a judgement about prose
+    /// token that fits in a grid cell; lore is a paragraph, and the user's decision here is a judgment about prose
     /// they have to actually read — most of the time the page's wording is the better one, which is exactly why the
     /// tool does not touch it and exactly why the user has to be able to see both.
     /// </summary>
@@ -1123,7 +1123,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// <summary>
     /// Whether "Refresh wiki data" can run now. It is shown on every item whose name was read (<see cref="HasItemName"/>,
     /// user, 2026-10-12), replacing a list of the statuses where the wiki was what stopped the comparison; this only
-    /// greys it out while the item is busy. A levelled item or a Lore-tab capture comes back unchanged, since nothing
+    /// grays it out while the item is busy. A leveled item or a Lore-tab capture comes back unchanged, since nothing
     /// on the wiki changes what was decided about it (<c>ItemCheckPipeline.ReanalyzeAsync</c>).
     /// </summary>
     public bool CanReCheck => !IsBusy && HasItemName && Result.WindowImage is not null;

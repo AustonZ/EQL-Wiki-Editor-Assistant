@@ -18,4 +18,4 @@ To add a sample:
    move, which proves the redaction touched nothing the tests read.
 4. `git add -f samples/NN-description.png`.
 
-These images show the game's artwork and are not covered by the project's MIT licence; see `REUSE.toml`.
+These images show the game's artwork and are not covered by the project's MIT license; see `REUSE.toml`.

@@ -3,7 +3,7 @@ using System.Text;
 namespace EQLWikiEditorAssistant.Core.Glyphs;
 
 /// <summary>
-/// One glyph, normalized to colour- and background-independent coverage levels (see <see cref="GlyphRamp"/>).
+/// One glyph, normalized to color- and background-independent coverage levels (see <see cref="GlyphRamp"/>).
 ///
 /// Equality is exact and structural, which is the point: because the font is a deterministic bitmap blit, two
 /// renderings of the same character are byte-identical, so a dictionary keyed on this type clusters glyphs with
@@ -64,7 +64,7 @@ public sealed class GlyphBitmap : IEquatable<GlyphBitmap>
         return new GlyphBitmap(width, height, levels);
     }
 
-    /// <summary>ASCII-art rendering, for eyeballing a cluster when labelling it.</summary>
+    /// <summary>ASCII-art rendering, for eyeballing a cluster when labeling it.</summary>
     public string Render()
     {
         const string shades = " .:-+*#@";

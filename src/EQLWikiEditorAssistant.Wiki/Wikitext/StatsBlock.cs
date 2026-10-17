@@ -47,7 +47,7 @@ public sealed record StatsBlockLine(string Raw)
     /// <summary>Label/value pairs found on the line, in source order. Empty for a flags-only or unparsed line.</summary>
     public IReadOnlyList<StatsField> Fields { get; private init; } = [];
 
-    /// <summary>Unlabelled tokens: the flags row (<c>MAGIC ITEM  LORE ITEM  NO DROP</c>), or the leading fragment
+    /// <summary>Unlabeled tokens: the flags row (<c>MAGIC ITEM  LORE ITEM  NO DROP</c>), or the leading fragment
     /// of a mixed line (<c>EXPENDABLE  Charges: 10</c> yields the flag <c>EXPENDABLE</c> and the field
     /// <c>Charges</c>).</summary>
     public IReadOnlyList<string> Flags { get; private init; } = [];
@@ -279,7 +279,7 @@ public sealed class StatsBlock
         int at = _lines.FindIndex(l => l.Fields.Any(f => string.Equals(f.Label, "Class", StringComparison.OrdinalIgnoreCase)));
         if (at < 0) at = LastContentLine() + 1;
 
-        // Match the neighbouring line's own line ending, so the insert does not introduce a style the page does not use.
+        // Match the neighboring line's own line ending, so the insert does not introduce a style the page does not use.
         string ending = at < _lines.Count && _lines[at].Raw.EndsWith("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
 
         var copy = new List<StatsBlockLine>(_lines);

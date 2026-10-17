@@ -94,7 +94,7 @@ public class PageTitleTests
     public void Compare_TreatsAMissingItemnameAsDivergent(string? itemName) =>
         Assert.Equal(TitleMatch.Divergent, PageTitle.Compare(itemName, "Water Flask"));
 
-    /// <summary>A qualifier has to actually be a parenthesised suffix; a title that merely starts with the same
+    /// <summary>A qualifier has to actually be a parenthesized suffix; a title that merely starts with the same
     /// letters is a divergence.</summary>
     [Fact]
     public void Compare_DoesNotMistakeAPrefixForADisambiguator() =>

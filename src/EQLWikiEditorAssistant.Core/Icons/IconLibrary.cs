@@ -73,10 +73,10 @@ public sealed class IconLibrary
     /// the same artwork (user, 2026-10-10).
     ///
     /// **Relative to the best match, not an absolute distance**, because the library already ranks correctly and an
-    /// absolute cutoff cannot: two recoloured twins of one drawing (icons 590 and 603, both swords) sit closer to
+    /// absolute cutoff cannot: two recolored twins of one drawing (icons 590 and 603, both swords) sit closer to
     /// each other than some genuine pairs sit to themselves, while against the best match each twin is clearly the
-    /// other's runner-up. And the game's own rendering quirks — the 1.1x interpolation, a grey outline it adds
-    /// around dark sprites — penalise every candidate alike, so they cancel.
+    /// other's runner-up. And the game's own rendering quirks — the 1.1x interpolation, a gray outline it adds
+    /// around dark sprites — penalize every candidate alike, so they cancel.
     ///
     /// Measured on the 16x16 grid over 96 captured items against 87 wiki icons: the worst genuine pair is 0.016 over
     /// the best, the closest different icon 0.043 over. The pairs above it are not false alarms: on four the page's

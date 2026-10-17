@@ -10,7 +10,7 @@ namespace EQLWikiEditorAssistant.App;
 /// **The title bar is the one part of a window WPF does not own.** Styling everything below it leaves a white
 /// caption sitting on top of a dark app, which reads as a rendering fault rather than a design. `DwmSetWindowAttribute`
 /// is how an application opts in, and it is the whole of the dark-mode surface Windows exposes — there is no way to
-/// set the caption's colours, only to pick the dark set.
+/// set the caption's colors, only to pick the dark set.
 ///
 /// **It must run after the handle exists**, so callers hook `SourceInitialized`; before that there is no HWND to
 /// set the attribute on.

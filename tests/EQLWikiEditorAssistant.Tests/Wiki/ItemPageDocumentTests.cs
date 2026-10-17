@@ -112,7 +112,7 @@ public class ItemPageDocumentTests
     }
 
     /// <summary>Without a blueprint order there is still no basis for a position, so it still refuses. Supplying the
-    /// order is what supplies the judgement.</summary>
+    /// order is what supplies the judgment.</summary>
     [Fact]
     public void WithParameter_RefusesToInventAMissingParameterWithNoOrderToPlaceItBy()
     {

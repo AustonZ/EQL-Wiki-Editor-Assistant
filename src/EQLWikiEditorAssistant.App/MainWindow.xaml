@@ -155,7 +155,7 @@
                             <StackPanel Grid.Column="1" Margin="0,5">
                                 <TextBlock Text="{Binding ItemName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                 <!-- A settled item reads green here rather than keeping its orange status with a
-                                     grey marker beside it: the list is scanned to find what still needs attention, so
+                                     gray marker beside it: the list is scanned to find what still needs attention, so
                                      done is what has to be obvious (user, 2026-09-29). -->
                                 <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}"
                                            FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
@@ -163,7 +163,7 @@
                             </StackPanel>
                             <!-- The list accumulates across captures, so finishing with an item has to be an
                                  explicit act rather than something the next capture does for you. -->
-                            <!-- The full height of the row, so the cross sits centred and is easy to hit (user,
+                            <!-- The full height of the row, so the cross sits centered and is easy to hit (user,
                                  2026-10-07). The row's vertical margin lives on the text for the same reason. -->
                             <Button Grid.Column="2" Content="✕" Click="OnCloseResultClick" Padding="8,0"
                                     Style="{StaticResource QuietButton}"
@@ -294,7 +294,7 @@
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
                                     <!-- Hit-testable only where going back is allowed, rather than disabled: a disabled
-                                         button greys its text, which would hide the step's own colour. -->
+                                         button grays its text, which would hide the step's own color. -->
                                     <Button Style="{StaticResource QuietButton}" Click="OnStepClick" Padding="4,2"
                                             IsHitTestVisible="{Binding CanJump}" Focusable="{Binding CanJump}"
                                             Cursor="Hand" ToolTip="{Binding Tip}">
@@ -361,7 +361,7 @@
                     <StackPanel x:Name="ComparisonPanel"
                                 Visibility="{Binding ShowsComparison, Converter={StaticResource BoolToVis}}">
                         <!-- **The capture comes first, above everything else** (user, 2026-10-01): the game is the
-                             source, so the panel reads from the source downward towards the finished wikitext. The
+                             source, so the panel reads from the source downward toward the finished wikitext. The
                              icons share this row rather than taking a section of their own further down — there is
                              spare width beside a ~400px window crop, and vertical space is what this panel runs out
                              of. A WrapPanel is what makes that safe: on a narrow window the icons drop below the
@@ -587,7 +587,7 @@
                              it has nothing to scroll, so the page under the cursor would not move (user, 2026-09-28). -->
                         <!-- Every cell is selectable text (user, 2026-10-07): the first click selects the whole value, later
                              ones pick out part of it. Rows are never selected, which did nothing useful. The text takes the
-                             row's colour, since a text box sets its own foreground rather than inheriting one. -->
+                             row's color, since a text box sets its own foreground rather than inheriting one. -->
                         <DataGrid ItemsSource="{Binding Findings}" AutoGenerateColumns="False" IsReadOnly="True"
                                   CanUserReorderColumns="False" CanUserResizeColumns="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="1"
@@ -688,7 +688,7 @@
                         </Border>
                     </StackPanel>
 
-                    <!-- Said in words, and in the warning colour, where the proposed edit would be (user, 2026-10-12:
+                    <!-- Said in words, and in the warning color, where the proposed edit would be (user, 2026-10-12:
                          "Only the layout changes" could be read as the rendered page's layout). -->
                     <Border x:Name="LayoutNotice" Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}"
                             BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,14,0,0"

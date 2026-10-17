@@ -5,8 +5,8 @@ client, taken by this project's developer. They show the game's artwork and
 interface, which belong to the game's publisher, Daybreak Game Company LLC, or
 its licensors, and other players' characters as anyone in the game sees them.
 
-They are NOT covered by this project's MIT licence, and this project grants no
-licence to them. They are here only as test inputs: the Assistant's tests read
+They are NOT covered by this project's MIT license, and this project grants no
+license to them. They are here only as test inputs: the Assistant's tests read
 the item windows in them to check that it locates and reads those windows
 correctly. Do not reuse them for anything else.
 

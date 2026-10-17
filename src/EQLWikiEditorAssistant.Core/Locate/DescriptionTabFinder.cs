@@ -54,7 +54,7 @@ public sealed record DescriptionTab(Rect Label, UiFont Font, bool Textured = fal
 /// scale has its own atlas, because the game draws its text fresh at each size (see <see cref="UiScales"/>). A window
 /// at a scale the Assistant does not support has no template and is simply not found.
 ///
-/// **Compared in the green channel**, not the brightest one the glyph reader uses. The blend happens per colour
+/// **Compared in the green channel**, not the brightest one the glyph reader uses. The blend happens per color
 /// channel: the selected tab's label is yellow, which has no blue, and the light skin's texture is not neutral, so the
 /// brightest channel of the background can be one the text never touches, and the prediction then starts from the wrong
 /// base. Green is at the peak in both the white and the yellow label. Measured: the brightest channel found 7 of the
@@ -77,7 +77,7 @@ public static class DescriptionTabFinder
     /// <summary>
     /// A label whose background pixels span more than this is on a texture, so its window is in one of the game's other
     /// skins, which the Assistant can find but not read (see the plan). Measured in the green channel: **exactly 0 on
-    /// all 131 tabs in `default_modern`**, whose background is one flat grey, and 40-73 on all 16 in `default` and
+    /// all 131 tabs in `default_modern`**, whose background is one flat gray, and 40-73 on all 16 in `default` and
     /// `default_light`. The threshold sits between with room on both sides.
     /// </summary>
     public const int TexturedSpread = 20;

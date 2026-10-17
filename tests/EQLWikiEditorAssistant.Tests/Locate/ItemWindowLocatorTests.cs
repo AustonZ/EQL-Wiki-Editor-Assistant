@@ -23,7 +23,7 @@ public class ItemWindowLocatorTests
     public ItemWindowLocatorTests(ITestOutputHelper output) => _output = output;
 
     /// <summary>A correctly traced window is the content area's own width — real captures measure 388-404px.
-    /// An earlier design returned 414-587px because it ran past the real edge into neighbouring UI, so this is
+    /// An earlier design returned 414-587px because it ran past the real edge into neighboring UI, so this is
     /// the assertion that catches that whole class of bug.</summary>
     private static void AssertPlausibleSingleWindowSize(LocatedWindow window)
     {
@@ -119,9 +119,9 @@ public class ItemWindowLocatorTests
         AssertPlausibleSingleWindowSize(window);
         Assert.True(window.HasLoreTab);
 
-        // Which tab is *showing* is read from the label's colour (the selected one is yellow), because the
+        // Which tab is *showing* is read from the label's color (the selected one is yellow), because the
         // two tabs lay their contents out completely differently and the parser has to be told which it is
-        // looking at. Text alone can't say — what was read carries no colour.
+        // looking at. Text alone can't say — what was read carries no color.
         Assert.Equal(ItemWindowTab.Lore, window.ActiveTab);
     }
 
@@ -145,7 +145,7 @@ public class ItemWindowLocatorTests
         // The front window is completely visible and must parse; only the one underneath is unreadable, and its
         // Description tab is covered so it is never even anchored. This regressed once: the two windows' title
         // bars sit ~7px apart, and a rule that tolerated any short non-black run while walking the title bar
-        // bridged that gap into the neighbour's chrome, overran the band-height cap, and reported the visible
+        // bridged that gap into the neighbor's chrome, overran the band-height cap, and reported the visible
         // window as occluded.
         if (await Load("06c-two-items-overlapping-tab-text-covered.png") is not { } l) return;
         IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Reader);
@@ -199,10 +199,10 @@ public class ItemWindowLocatorTests
     {
         // The covering window is fully visible and must trace cleanly; the one underneath has an edge hidden
         // beneath it and must NOT come back with confident bounds. Probe agreement alone can't tell these apart
-        // (a covered edge scores about the same as a clean window touching a neighbour) — what rejects it is
+        // (a covered edge scores about the same as a clean window touching a neighbor) — what rejects it is
         // that the traced rectangle doesn't close, because the covered window's own outline never reaches the
         // corner the consensus picked. Before that check it came back 587px wide, silently merged with its
-        // neighbour.
+        // neighbor.
         if (await Load("06a-two-items-overlapping.png") is not { } l) return;
         IReadOnlyList<LocatedWindow> windows = ItemWindowLocator.Locate(l.Image, l.Reader);
         Dump(windows);
@@ -232,7 +232,7 @@ public class ItemWindowLocatorTests
         Assert.Single(texts, t => t.Contains("Glassy Gauntlets"));
         Assert.Single(texts, t => t.Contains("Fruit"));
 
-        // No cross-contamination between neighbouring windows' content.
+        // No cross-contamination between neighboring windows' content.
         Assert.DoesNotContain("Glassy Gauntlets", rod);
     }
 

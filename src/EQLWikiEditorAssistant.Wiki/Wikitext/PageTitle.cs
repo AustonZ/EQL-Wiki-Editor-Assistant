@@ -7,7 +7,7 @@ public enum TitleMatch
     Exact,
 
     /// <summary>
-    /// The title is the <c>itemname</c> plus a parenthesised qualifier — the page
+    /// The title is the <c>itemname</c> plus a parenthesized qualifier — the page
     /// <c>Essence of Barbarian (Wormwood)</c> whose <c>itemname</c> is <c>Essence of Barbarian</c>.
     ///
     /// **This is still a defect**, distinguished from <see cref="Divergent"/> only because it has a recognizable

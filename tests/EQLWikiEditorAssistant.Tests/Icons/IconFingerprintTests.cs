@@ -11,7 +11,7 @@ namespace EQLWikiEditorAssistant.Tests.Icons;
 /// </summary>
 public class IconFingerprintTests
 {
-    /// <summary>A smooth, colourful picture sampled at a given size, so the same artwork can be drawn at 40 and at
+    /// <summary>A smooth, colorful picture sampled at a given size, so the same artwork can be drawn at 40 and at
     /// 44 the way the wiki's file and the game's 1.1x rendering are.</summary>
     private static CapturedImage Picture(int size, Action<byte[], int>? touch = null)
     {

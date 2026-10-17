@@ -7,7 +7,7 @@ namespace EQLWikiEditorAssistant.Core.Locate;
 /// Finds the item windows in a captured frame.
 ///
 /// **A port because the real implementation needs real pixels.** <see cref="ItemWindowLocator"/> finds each window's
-/// tab, traces the window's own grey outline and reads what is inside, so exercising anything downstream of it means
+/// tab, traces the window's own gray outline and reads what is inside, so exercising anything downstream of it means
 /// either a real screenshot or a frame synthesized to satisfy a dozen measured pixel thresholds. Neither is a
 /// reasonable way to test the pipeline's *sequencing* — whether the ledger is consulted before the wiki, whether an
 /// ineligible item gets a row — which is what this interface exists to make testable. The tracer keeps its own golden

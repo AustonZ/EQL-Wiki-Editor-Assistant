@@ -134,7 +134,7 @@ public class EffectLineTests
     ///
     /// The `(Spell)` and `(Effect)` rows are the regression: this used to return the link target, so a page writing
     /// a qualified title matched nothing and the editor added a second effect line beside the one already there
-    /// (`Rain Caller`, 2026-10-03). Both fail against the old behaviour.
+    /// (`Rain Caller`, 2026-10-03). Both fail against the old behavior.
     /// </summary>
     [Theory]
     [InlineData("[[Burn|<span class='itemeff'>Burn</span>]] (Combat) at Level 10", "Burn")]

@@ -16,7 +16,7 @@
             <Setter Property="Margin" Value="6,3" />
         </Style>
 
-        <!-- Every cell centres its content, and never shows as selected. -->
+        <!-- Every cell centers its content, and never shows as selected. -->
         <Style x:Key="HistoryCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Template">
@@ -46,7 +46,7 @@
     <DockPanel>
         <Border DockPanel.Dock="Top" Background="{StaticResource ChromeBrush}" BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="0,0,0,1" Padding="10,8">
             <StackPanel>
-                <!-- The count of things still wanting a human comes first and in its own colour: it is the number
+                <!-- The count of things still wanting a human comes first and in its own color: it is the number
                      the user opened this window to read. -->
                 <StackPanel Orientation="Horizontal">
                     <TextBlock x:Name="AttentionText" FontWeight="SemiBold" Foreground="{StaticResource AttentionBrush}"
@@ -80,7 +80,7 @@
 
         <Grid>
             <!-- No lines between rows; the row under the pointer is highlighted instead, and none is ever selected,
-                 which did nothing useful (user, 2026-10-08). Every cell centres its content, so a row reads as one
+                 which did nothing useful (user, 2026-10-08). Every cell centers its content, so a row reads as one
                  line whatever its height. -->
             <DataGrid x:Name="RowsGrid" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
                       GridLinesVisibility="None" BorderThickness="0" CanUserSortColumns="True"
@@ -153,7 +153,7 @@
                                         ElementStyle="{StaticResource PlainCell}" />
 
                     <DataGridTemplateColumn Header="" Width="Auto">
-                        <!-- The full height of the row, so the cross sits centred and is easy to hit — the same fix as
+                        <!-- The full height of the row, so the cross sits centered and is easy to hit — the same fix as
                              the main window's close buttons (user, 2026-10-07). The theme's cell pins its content to
                              the top, so this column gets a cell that stretches it instead. -->
                         <DataGridTemplateColumn.CellStyle>

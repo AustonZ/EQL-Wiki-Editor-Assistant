@@ -9,7 +9,7 @@ namespace EQLWikiEditorAssistant.Pipeline;
 /// **The tool proposes an id; it never writes one on its own.** On a page being created the id is filled into the
 /// generated text, which the user reads before saving. On a page that already exists it reaches the wikitext only
 /// when the user presses the button (user, 2026-10-02) — because there the tool cannot tell a wrong page from an odd
-/// capture, and that judgement was always meant to be a human's rather than a threshold's. What changed is only that
+/// capture, and that judgment was always meant to be a human's rather than a threshold's. What changed is only that
 /// the human is now shown the answer instead of being left to look it up: the search has already run, since it is
 /// what noticed the mismatch.
 ///

@@ -7,7 +7,7 @@ using Velopack;
 namespace EQLWikiEditorAssistant.App;
 
 /// <summary>
-/// The application, and the last line of defence under it.
+/// The application, and the last line of defense under it.
 ///
 /// **There is no debug log and deliberately so** (user, 2026-09-29, asking for a non-invasive option). What was
 /// actually missing was somewhere for an exception nobody caught to *go*: the review screen's click handlers are

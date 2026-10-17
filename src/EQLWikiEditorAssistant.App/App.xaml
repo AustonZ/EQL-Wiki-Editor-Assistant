@@ -5,7 +5,7 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- The dark palette and the control styles that make WPF honour it. Application-level so both
+                <!-- The dark palette and the control styles that make WPF honor it. Application-level so both
                      windows and every dialog share one set of brushes. -->
                 <ResourceDictionary Source="Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>

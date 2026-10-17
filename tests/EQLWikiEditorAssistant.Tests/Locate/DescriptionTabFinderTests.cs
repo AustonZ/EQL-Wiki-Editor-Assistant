@@ -157,7 +157,7 @@ public class DescriptionTabFinderTests
         Assert.Equal(swapped ? 0 : 1, DescriptionTabFinder.Find(FlatLabel(level => fifteenths[level], out _)).Count);
     }
 
-    /// <summary>The Arial label on the content area's flat grey, each coverage level drawn as <paramref name="fifteenths"/>
+    /// <summary>The Arial label on the content area's flat gray, each coverage level drawn as <paramref name="fifteenths"/>
     /// says, white on 16 as the game draws it.</summary>
     private static CapturedImage FlatLabel(Func<int, double> fifteenths, out Rect where)
     {

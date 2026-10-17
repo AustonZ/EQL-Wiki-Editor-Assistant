@@ -110,7 +110,7 @@ public sealed record ProposedEdit(
 /// owes that flow is honesty about when it has left something unformatted, which is what
 /// <see cref="ProposedEdit.NeedsReformatting"/> reports.
 ///
-/// **Nothing here decides anything.** Every judgement was already made by the analyzer and the compliance checker;
+/// **Nothing here decides anything.** Every judgment was already made by the analyzer and the compliance checker;
 /// this only applies what they concluded, which is what keeps "what would change" reviewable separately from "how
 /// it gets written".
 /// </summary>
@@ -121,7 +121,7 @@ public static class ItemPageEditor
     ///
     /// **The one edit in this file the analyzer did not decide**, and that is the point rather than an exception to
     /// it: the icon check is flag-only because the tool cannot tell a wrong page from an odd capture, so the
-    /// judgement is the user's — they look at the two images and press the button (user, 2026-10-02, on
+    /// judgment is the user's — they look at the two images and press the button (user, 2026-10-02, on
     /// <c>Molten Coil</c>, whose page says 765 against the library's 617). This function exists so that pressing it
     /// writes the id the same way every other value is written: in place through
     /// <see cref="ItemPageDocument.WithParameter"/>, so the diff shows the id changing and nothing else, and in the
@@ -190,7 +190,7 @@ public static class ItemPageEditor
             if (finding.Field == ItemPageAnalyzer.MerchantValueField && finding.Captured is { } merchantValue)
             {
                 // **A missing parameter is written, not deferred** (user, 2026-09-29). This used to be left for the
-                // user on the grounds that placement is a judgement — but the blueprint makes that judgement, and
+                // user on the grounds that placement is a judgment — but the blueprint makes that judgment, and
                 // the case is common rather than exotic: a legacy page usually has no merchant_value at all, because
                 // legacy EverQuest gave a player no easy way to learn a value. EQL states it in the window outright.
                 bool creating = edited.Template.Find(mapping.MerchantValueParameter) is null;
@@ -268,7 +268,7 @@ public static class ItemPageEditor
                     continue;
                 }
 
-                // An ordinary labelled field: change it where it stands, or add a line if it is genuinely new.
+                // An ordinary labeled field: change it where it stands, or add a line if it is genuinely new.
                 int index = block.IndexOfField(finding.Field);
                 if (index >= 0 && block.Lines[index].ReplaceFieldValue(finding.Field, wanted) is { } rewritten)
                 {

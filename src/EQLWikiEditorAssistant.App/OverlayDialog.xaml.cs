@@ -5,7 +5,7 @@ using System.Windows.Media;
 
 namespace EQLWikiEditorAssistant.App;
 
-/// <summary>How serious a dialog is, which decides the colour of its title.</summary>
+/// <summary>How serious a dialog is, which decides the color of its title.</summary>
 public enum DialogTone
 {
     Info,
@@ -68,7 +68,7 @@ public partial class OverlayDialog : UserControl
     /// <summary>
     /// Shows <paramref name="title"/> while <paramref name="work"/> runs, with the message as the work reports it and one
     /// button that cancels it — for a wait the user must not act through, such as downloading an update that ends in a
-    /// restart. Escape cancels too. Answers false when the user cancelled, whatever the work then threw; any other
+    /// restart. Escape cancels too. Answers false when the user canceled, whatever the work then threw; any other
     /// failure is passed on.
     /// </summary>
     public async Task<bool> RunAsync(

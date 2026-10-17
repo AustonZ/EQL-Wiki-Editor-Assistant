@@ -6,13 +6,13 @@ namespace EQLWikiEditorAssistant.App;
 /// <summary>
 /// The view models' side of the palette, **read out of Theme.xaml rather than restated here**.
 ///
-/// The view models decide colour in C# (a settled item is green, a finding nobody has judged is red) because a
-/// value converter per case would be more code for the same decision. That leaves two places a colour could be
+/// The view models decide color in C# (a settled item is green, a finding nobody has judged is red) because a
+/// value converter per case would be more code for the same decision. That leaves two places a color could be
 /// written down, and a second copy of a palette is the kind that drifts — one half of the app would go on using
 /// `SeaGreen` after the other stopped. So every brush here resolves by name against the application's merged
 /// dictionaries, and Theme.xaml stays the only file with a hex value in it.
 ///
-/// A missing key throws rather than falling back to a default, which is the right failure: a silently grey status
+/// A missing key throws rather than falling back to a default, which is the right failure: a silently gray status
 /// column is exactly the kind of wrong this tool tries not to be, and the key is a compile-time constant in
 /// practice — one typo, caught the first time the window opens.
 /// </summary>
@@ -28,7 +28,7 @@ internal static class Palette
     /// <summary>Matched or edited: the item is done and will not come back.</summary>
     public static Brush Done => Named("DoneBrush");
 
-    /// <summary>Something wants a human. The one colour the user must not learn to skim past.</summary>
+    /// <summary>Something wants a human. The one color the user must not learn to skim past.</summary>
     public static Brush Attention => Named("AttentionBrush");
 
     /// <summary>An edit is proposed, or the page does not exist yet — real work, but nothing is wrong.</summary>

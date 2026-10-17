@@ -8,7 +8,7 @@ public enum IneligibilityReason
     /// window's stats include contributions from a different item.</summary>
     ForeignExaltation,
 
-    /// <summary>The item has been levelled (<c>+X</c> where X &gt; 0). The wiki stores level-0 data and the
+    /// <summary>The item has been leveled (<c>+X</c> where X &gt; 0). The wiki stores level-0 data and the
     /// per-stat downscaling formula is deferred to milestone 8, so v1 refuses rather than guessing.</summary>
     UnsupportedLevel,
 }
@@ -21,7 +21,7 @@ public sealed record IneligibilityDetail(IneligibilityReason Reason, string Expl
 ///
 /// **The load-bearing rule here is the ledger one, and it is easy to get backwards**: an ineligible item gets
 /// <em>no ledger row at all</em> — not <c>flagged</c>, not <c>skipped</c>. It was never actually checked, so the
-/// next capture (a pristine copy, or a future version that supports levelling) must be treated as new. Writing any
+/// next capture (a pristine copy, or a future version that supports leveling) must be treated as new. Writing any
 /// row would make the item look handled and quietly exclude it from ever being checked properly.
 /// </summary>
 public sealed record ItemEligibility(IReadOnlyList<IneligibilityDetail> Blockers)
@@ -47,8 +47,8 @@ public sealed record ItemEligibility(IReadOnlyList<IneligibilityDetail> Blockers
         if (item.Level > 0)
             blockers.Add(new IneligibilityDetail(
                 IneligibilityReason.UnsupportedLevel,
-                $"'{item.Name}' is levelled (+{item.Level}). The wiki records level-0 data and this version does " +
-                "not know how to scale a levelled item's stats back down, so it is skipped rather than guessed at."));
+                $"'{item.Name}' is leveled (+{item.Level}). The wiki records level-0 data and this version does " +
+                "not know how to scale a leveled item's stats back down, so it is skipped rather than guessed at."));
 
         foreach (ExaltationSlot slot in item.ExaltationSlots)
         {

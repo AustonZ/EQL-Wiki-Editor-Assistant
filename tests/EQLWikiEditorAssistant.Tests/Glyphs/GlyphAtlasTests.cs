@@ -6,12 +6,12 @@ namespace EQLWikiEditorAssistant.Tests.Glyphs;
 /// on every <c>dotnet test</c> even on a fresh clone where <c>samples/</c> is absent.</summary>
 public class GlyphAtlasTests
 {
-    /// <summary>The three ramps measured in real captures — white on a window's content area, the dimmer grey of
+    /// <summary>The three ramps measured in real captures — white on a window's content area, the dimmer gray of
     /// a title bar over black, and magenta effect text — must all normalize to the same seven levels. This is the
-    /// claim that lets one colour-blind atlas read the whole UI, so it is worth pinning rather than assuming.</summary>
+    /// claim that lets one color-blind atlas read the whole UI, so it is worth pinning rather than assuming.</summary>
     [Theory]
     [InlineData(16, 255, new[] { 16, 64, 112, 159, 191, 223, 255 })]   // white on content area
-    [InlineData(0, 192, new[] { 0, 38, 77, 115, 141, 166, 192 })]      // title bar grey on black
+    [InlineData(0, 192, new[] { 0, 38, 77, 115, 141, 166, 192 })]      // title bar gray on black
     [InlineData(16, 224, new[] { 16, 58, 100, 141, 169, 196, 224 })]   // magenta effect name
     public void Quantize_EveryMeasuredRamp_MapsToTheSameLevels(int background, int peak, int[] measured)
     {
@@ -94,19 +94,19 @@ public class GlyphAtlasTests
     }
 
     [Fact]
-    public void FromLabelledBands_GlyphCountMismatch_Throws()
+    public void FromLabeledBands_GlyphCountMismatch_Throws()
     {
-        // Labelling is positional against known text, so a miscount would shift every label after it and bake
+        // Labeling is positional against known text, so a miscount would shift every label after it and bake
         // wrong characters into the atlas. Refusing is the only safe response.
         var band = Band(Glyph(0), Glyph(1));
-        Assert.Throws<ArgumentException>(() => GlyphAtlas.FromLabelledBands([band], ["abc"]));
+        Assert.Throws<ArgumentException>(() => GlyphAtlas.FromLabeledBands([band], ["abc"]));
     }
 
     [Fact]
-    public void FromLabelledBands_IdenticalShapes_CollapseToOneAmbiguousEntry()
+    public void FromLabeledBands_IdenticalShapes_CollapseToOneAmbiguousEntry()
     {
         var band = Band(Glyph(0), Glyph(10));
-        GlyphAtlas atlas = GlyphAtlas.FromLabelledBands([band], ["lI"]);
+        GlyphAtlas atlas = GlyphAtlas.FromLabeledBands([band], ["lI"]);
 
         Assert.Single(atlas.Entries);
         Assert.Equal(["l", "I"], atlas.Entries[0].Labels);

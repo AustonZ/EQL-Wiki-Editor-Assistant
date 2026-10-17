@@ -46,7 +46,7 @@ stays gitignored, and audited frames are added deliberately).
     in the stronger form: the formatter runs over a generated page before the proposal is shown, so a creation needs
     one commit rather than two.
   - **v1 runs it automatically as a follow-up step after any change**, and prompts the user to commit the
-    reformatting if it finds any needed — modelled on a CI formatting gate, with the twist that this codebase starts
+    reformatting if it finds any needed — modeled on a CI formatting gate, with the twist that this codebase starts
     messy and the reformat must not bury the data change. The goal is to make leaving a page pretty the
     lowest-friction option.
   - **A brand-new page must be pretty from its first revision.** There is no reason for a page's history to start
@@ -54,7 +54,7 @@ stays gitignored, and audited frames are added deliberately).
     than being committed and then tidied.
   - **MVP milestone**: the flag-only version — the tool marks a page as needing reformatting (it knows, because it
     knows when it added an unformatted line) and the user runs the prettifier separately.
-  - **BUILT 2026-09-28** as `Wiki.Formatting.ItemPagePrettifier`. Its licence to rearrange pages is that it *proves*
+  - **BUILT 2026-09-28** as `Wiki.Formatting.ItemPagePrettifier`. Its license to rearrange pages is that it *proves*
     it preserved the content: every format is verified by re-parsing and comparing field by field, and a mismatch
     returns the original untouched. That caught a real bug on 14 pages (a line carrying a flag *and* a field). It
     only touches the inside of the template call, and it leaves alone — completely, not even the spacing — anything
@@ -70,7 +70,7 @@ stays gitignored, and audited frames are added deliberately).
       verified.
     - Baseline: 744 real item pages, 0 refusals, 478 statsblocks left alone (469 of them for legacy flags — the
       wiki is still mostly P1999-imported), median size change +5 bytes.
-  - Two design constraints this has always implied, both already honoured and both still binding: **the data edit
+  - Two design constraints this has always implied, both already honored and both still binding: **the data edit
     never reformats incidentally** (no whitespace normalization, no tidying re-render, no "while we're here" fixes —
     which is why the wikitext layer treats raw source as the source of truth), and **non-compliance is reported
     rather than fixed** by the data pass, so parsing must be able to describe what is off without changing it.
@@ -83,7 +83,7 @@ stays gitignored, and audited frames are added deliberately).
     when there is no `Class:` line.
   - **A template parameter that does not exist at all** is a third case the rule needs, since there is no line to
     add it to: insert it in the blueprint's parameter order (`ItemPageDocument.WithParameter` currently refuses to
-    invent one, deliberately, because placement is a judgement).
+    invent one, deliberately, because placement is a judgment).
   - The rule's whole virtue is that it never requires the tool to understand a layout it did not create, which is
     where any cleverer placement rule would go wrong on a messy page.
 - **Expected wiki-side change (user, 2026-09-24): most of `statsblock` promoted to explicit `Itempage`
@@ -104,9 +104,9 @@ stays gitignored, and audited frames are added deliberately).
   reasoning.)*
   EQL supports both. The tool is currently built and validated against one player's fixed UI scale and default
   skin, and that assumption is baked deeper than it looks: **every constant in `WindowBoundsFinder` is a measured
-  pixel value** — the content outline's 50-62 grey, the 0-8 outer frame, the ~16 interior, the probe distances,
+  pixel value** — the content outline's 50-62 gray, the 0-8 outer frame, the ~16 interior, the probe distances,
   the size ceilings (600x700), the line-verification run length. A different UI scale changes the distances; a
-  different skin can change the colours outright, and would break outline tracing completely rather than
+  different skin can change the colors outright, and would break outline tracing completely rather than
   degrading gracefully. `ItemParser`'s 8px row-grouping tolerance is scale-dependent too.
   - Design implication accepted for now: keep those constants together, named, and documented with their measured
     values (already done) so they can later be lifted into a per-skin/per-scale profile rather than hunted down.
@@ -183,10 +183,10 @@ reference artwork was the wiki's own 796 files. The user then extracted **every 
   performance one — a cached list of which icons exist that misses newly added ones would match those items against
   the closest *older* icon, confidently. The index records what it was built from and rebuilds when that changes.
 
-## Offline behaviour (user, 2026-09-29)
+## Offline behavior (user, 2026-09-29)
 **A wiki outage aborts the chain of actions that hit it, with a critical dialog** — it does not degrade. The tool
 exists to compare captures against the wiki, so without it there is nothing useful left to do, and the previous
-behaviour (one `Failed` row per window under a "3 item windows checked" status line) read like a tool malfunction
+behavior (one `Failed` row per window under a "3 item windows checked" status line) read like a tool malfunction
 rather than an outage. `WikiUnavailableException` carries this and is deliberately distinct from `MediaWikiException`,
 which means the wiki *answered* about one page and stays per-window. See CLAUDE.md for the split and its traps.
 - **An explicit offline mode is a future feature**, not a fallback to slide into: caching captures for processing once
@@ -215,7 +215,7 @@ Full detail and the live-risk analysis are in CLAUDE.md — the parts that belon
   sees nothing wrong at all. Agreeing a single marker is a precondition for handling it reliably, and belongs with
   the user's other template conversations.
 - **Methodological note worth keeping, because this number was wrong twice before it was right.** Counting titles
-  that differ only in capitalisation gives 1,778 groups; excluding redirects drops it to 64; checking which are item
+  that differ only in capitalization gives 1,778 groups; excluding redirects drops it to 64; checking which are item
   pages gives 39; and spot-checking those finds they are **duplicate pages for one item**, not two items sharing a
   name. Three successive measurements, each an order of magnitude apart, and only the last one answers the question
   that was asked. The duplicates are a real cleanup job, but a different one.
@@ -224,7 +224,7 @@ Full detail and the live-risk analysis are in CLAUDE.md — the parts that belon
 
 The last work before calling v1 done. Grouped and ordered by agreement:
 
-1. **Quick fixes**: tab close buttons vertically centred (and taller), 650px minimum window width, in-game and wiki
+1. **Quick fixes**: tab close buttons vertically centered (and taller), 650px minimum window width, in-game and wiki
    icons at the same size (the wiki's current size), icon comparison reads "appears to be correct" / "may be
    incorrect" with no distance figure, hotkey hint beside Capture, "N need attention" opens History filtered to
    them, "Checked items" renamed "History", the progress step split into "Taking game screenshot" and "Finding item
@@ -280,12 +280,12 @@ The last work before calling v1 done. Grouped and ordered by agreement:
 - **Pre-releases** go `-alpha.N` → `-beta.N` → `-rc.N`; the first release is **`1.0.0-alpha.1`**. Each release is a git
   tag (`v1.0.0-alpha.1`), and the version is visible in the app so a tester can quote it.
 - **Older terms in this plan map across as**: "v1" = 1.0.0; "v2" items are 1.1.0 candidates unless found necessary for
-  1.0.0 (items sharing a name, writing the verified list, scrollbar detection, asking the era); stat scaling for levelled
+  1.0.0 (items sharing a name, writing the verified list, scrollbar detection, asking the era); stat scaling for leveled
   items (milestone 8) may be big enough for 2.0.0. The mapping version stays separate and internal.
 
 ### 1.0.0-alpha.1 — for the first tester, a fellow wiki editor
 **Order agreed** (user, 2026-10-08): (1) Arial default, version shown, edit-summary tag — **DONE 2026-10-08**; (2) tester
-README, licence, third-party notices, icon marking — **DONE 2026-10-08** (see "Licensing as built" below); (3) history and screenshot audit, results to the user before anything is
+README, license, third-party notices, icon marking — **DONE 2026-10-08** (see "Licensing as built" below); (3) history and screenshot audit, results to the user before anything is
 public — **DONE 2026-10-08**; (4) the installer and the update notice — **built 2026-10-08** (`tools/release.ps1`,
 `Pipeline.ReleaseCheck`; see CLAUDE.md, "Releases"); install, repair and uninstall tested by the user 2026-10-09, after
 which the updater and the uninstall question were added (below) and tested by the user 2026-10-09 between two local
@@ -314,12 +314,12 @@ font default changes.
     (`samples/` is gitignored, but verify no commit ever added one), the Arial-derived font in `fonts/`, credentials,
     and personal details (the commit author's email, paths naming the developer's machine, the developer's wiki
     account). Decide what is fine to keep.
-  - **Licence: MIT** (user, 2026-10-08), with every third-party notice shipped alongside.
+  - **License: MIT** (user, 2026-10-08), with every third-party notice shipped alongside.
   - **The icons must be marked as not MIT** (user, 2026-10-08), chiefly so an AI agent that finds them later does not
     take them for permissively licensed and reuse them in a way the publisher would object to — humans rarely reach
     them without the context already. Standard machine-readable route: a **REUSE** `REUSE.toml` at the root declaring
-    `game_assets/**` as the publisher's copyright under a `LicenseRef-` licence whose text sits in `LICENSES/`. Plus a
-    plain `game_assets/README.md` saying what they are and that they are not covered by the MIT licence, a line in the
+    `game_assets/**` as the publisher's copyright under a `LicenseRef-` license whose text sits in `LICENSES/`. Plus a
+    plain `game_assets/README.md` saying what they are and that they are not covered by the MIT license, a line in the
     root `LICENSE` excepting the folder, and a line in CLAUDE.md, the first thing an agent here reads.
   - **Audit the screenshots too, aiming to publish everything the automated tests use** (user, 2026-10-08). The
     golden and corpus tests skip on a fresh clone today because `samples/` is gitignored — which is how three top-edge
@@ -344,7 +344,7 @@ font default changes.
 - **Reporting problems**: GitHub issues, plus a "copy diagnostics" link in the app (version, settings, the end of
   `errors.log` — never screenshots). The README warns that the saved-captures folder holds full-screen screenshots.
 - **Code signing, if it can be had for $0**: an unsigned installer gets SmartScreen's "unknown publisher" warning. To
-  look into: SignPath Foundation's free signing for open-source projects (needs the public repo and an OSI licence) and
+  look into: SignPath Foundation's free signing for open-source projects (needs the public repo and an OSI license) and
   the Microsoft Store's terms for individual developers. Otherwise ship unsigned and say so in the README.
 - **An "update available" notice** (in the alpha, user, 2026-10-08): on start, ask GitHub's releases API for the latest
   version and show a link if it is newer. One small request to GitHub, nothing sent; the README says so.
@@ -365,11 +365,11 @@ font default changes.
 
 ### Licensing as built (2026-10-08)
 - `LICENSE` is plain MIT, copyright "EQL Wiki Editor Assistant contributors" (user's choice). **The exception is not
-  written into `LICENSE` itself**, departing from the plan above: GitHub recognises a licence by near-exact text, and an
+  written into `LICENSE` itself**, departing from the plan above: GitHub recognizes a license by near-exact text, and an
   added paragraph would lose the MIT badge. The exception lives in `REUSE.toml` (lints compliant, 11,796 files),
-  `LICENSES/LicenseRef-*.txt`, `game_assets/README.md`, the README's Licence section and a CLAUDE.md hard constraint.
-- **The wiki fixtures needed marking too**: they are wiki contributors' text, and the wiki names no content licence
-  (its edit notice says "released under the" and leaves the licence blank — worth raising with the wiki's admins).
+  `LICENSES/LicenseRef-*.txt`, `game_assets/README.md`, the README's License section and a CLAUDE.md hard constraint.
+- **The wiki fixtures needed marking too**: they are wiki contributors' text, and the wiki names no content license
+  (its edit notice says "released under the" and leaves the license blank — worth raising with the wiki's admins).
 - `THIRD-PARTY-NOTICES.txt` covers the app's whole package closure. **For step 4, the installer must ship**: `LICENSE`,
   `THIRD-PARTY-NOTICES.txt`, and in a `licenses/` folder the notices of any native package that carries its own
   (two did until alpha.3 removed the text-recognition model); plus the .NET runtime's own notices if the build is
@@ -449,7 +449,7 @@ The data edit and its formatting reviewed and saved together, in one step and on
 legacy flags removed and the classic window's food and book lines moved into the notes; Preview and Done running the
 wiki's scripts behind a write guard, so they show the level slider and the damage figures; "The item matches the wiki"
 and "The page's formatting is correct", "Needs reformatting", "Don't reformat" and Reset; one button order on every
-page; and levelled items' icons in the list. A refresh after "the wiki is right" no longer leaves the next capture
+page; and leveled items' icons in the list. A refresh after "the wiki is right" no longer leaves the next capture
 reporting the item already checked.
 
 ### 1.0.0-alpha.9 — released 2026-10-16
@@ -461,13 +461,13 @@ update was about 20 MB rather than 3-4, because the .NET runtime it carries had 
 
 ### Requested 2026-10-11, for next
 - **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
-  whenever we can make them"), levelled items and Lore-tab captures included; with no page known, "Open wiki page"
-  opens the item's own name. Refreshing a levelled item or a Lore capture compares nothing, since either comparison
+  whenever we can make them"), leveled items and Lore-tab captures included; with no page known, "Open wiki page"
+  opens the item's own name. Refreshing a leveled item or a Lore capture compares nothing, since either comparison
   would propose a wrong edit, and refreshing over unsaved typing asks first. The two requests as recorded:
 - **Always show "Refresh wiki data" on every item** (user). Today it appears only for an item the ledger let skip the
   wiki and where the wiki stopped the comparison (not an item page, no page, a failed lookup), and only with a
   readable capture (`ResultViewModel.CanReCheck`). To settle when building it: what it does for an item that was never
-  compared — levelled, covered, wrong font or skin, a Lore-only capture — and whether it asks first on an item with
+  compared — leveled, covered, wrong font or skin, a Lore-only capture — and whether it asks first on an item with
   edits in progress, which a refresh would replace.
 - **Always show "Open wiki page" on every item** (user). Today it appears only when a page title is known, from the
   lookup or the ledger (`ResultViewModel.HasPage`), so an item with no page or one never looked up has none. To
@@ -493,7 +493,7 @@ update was about 20 MB rather than 3-4, because the .NET runtime it carries had 
 - **Built 2026-10-12: start minimized** (tester). Settings > Window > Start minimized, off unless chosen: to the
   taskbar, or straight to the tray, never shown, when "Minimize to system tray" is on too. A start Velopack makes after
   an update is always shown, since the user has just pressed Update and is waiting for the app.
-- **Built 2026-10-12: the main window opens where it was last closed** (tester; standard behaviour, no setting, by the
+- **Built 2026-10-12: the main window opens where it was last closed** (tester; standard behavior, no setting, by the
   user's decision). Its restored position and size and whether it was maximized, in `window.json` in the data folder
   (`App.WindowPlacement`, Windows' own window placement, which also brings back a window whose monitor has gone).
   Checked with a throwaway harness across shown, maximized, minimized and hidden starts, with a saved normal and a
@@ -542,7 +542,7 @@ update was about 20 MB rather than 3-4, because the .NET runtime it carries had 
     update, a tester's Assistant found no item window at all. His game drew the very same glyphs, pixel for pixel, with
     two of the seven anti-aliasing levels brighter: 4 and 7 fifteenths where every capture before had 3 and 6 (on white
     text, 80 and 128 for 64 and 112). Everything that is not text was unchanged, and the shift was the same in every
-    text colour. It followed him to every monitor and survived a reboot. It is not the graphics driver or Windows HDR:
+    text color. It followed him to every monitor and survived a reboot. It is not the graphics driver or Windows HDR:
     the user installed the same driver and turned HDR on, and still read normally. The Windows update is the one
     difference left, so other testers may meet it as they update. (The same tester's screen also looked blurrier; that
     was separate, and a reboot cleared it.)
@@ -595,7 +595,7 @@ update was about 20 MB rather than 3-4, because the .NET runtime it carries had 
       window chrome at each scale (outline widths, title bar, icon cell, row and column gaps), and the atlas tool must
       take `"`, which from 1.75 up is two separate marks.
     - **Measured 2026-10-13: at 2.00-4.00 the window is the 1.00 window with every distance times the scale**, the
-      colours unchanged: frame 2N, interior gap 3N, outline N (always 57/60/57), title bar 16N, and the icon cell
+      colors unchanged: frame 2N, interior gap 3N, outline N (always 57/60/57), title bar 16N, and the icon cell
       (12N, 54N, 44N square; the Fresh Fish icon's 43x43 ink 1px inside at 1.00 is 86x86, 2px inside, at 2.00). Only
       text is drawn fresh rather than enlarged. So a scale's profile is today's distances times N, plus its own
       atlas and Description template — no per-scale tracing rules. `GlyphSpike atlas --scale N` builds the atlases
@@ -694,15 +694,15 @@ tooltips and bags too, and the "Description" anchor is what has kept tooltips ou
    last letters, "cription", also occur inside "inscription" in lore or chat. No corpus sample has a partly covered
    label (`06c`'s covered tab was missed by both methods), so nothing measured changes.
 3. **`ItemWindowLocator` takes its anchors from the finder; nothing after it changes.** `WindowBoundsFinder` uses the
-   anchor's centre x and bottom edge, and the ink box's bottom sits a few pixels above the model's padded box. **Every
+   anchor's center x and bottom edge, and the ink box's bottom sits a few pixels above the model's padded box. **Every
    window rectangle in the corpus must come out byte-identical**, checked by listing them before and after, not by the
    accuracy counts, which once stayed the same while a rectangle moved a pixel.
-4. **The other skins are recognized and named.** The background just inside a found tab is the flat modern grey or a
+4. **The other skins are recognized and named.** The background just inside a found tab is the flat modern gray or a
    texture. Measure the separation on `30*`/`31*` against the corpus, then report such a window as a new
    `ItemCheckStatus` ("This looks like the `default` skin; the Assistant needs `default_modern`"), with no ledger row,
    like a wrong font. README Requirements gains the skin.
 5. **RapidOCR leaves the app**: `OnDemandRapidOcrEngine`, the package reference, the full-frame path in
-   `RoutingOcrEngine`, and ONNX Runtime's and Skia's notices from the shipped licences and THIRD-PARTY-NOTICES. The tools
+   `RoutingOcrEngine`, and ONNX Runtime's and Skia's notices from the shipped licenses and THIRD-PARTY-NOTICES. The tools
    kept it for comparisons until 2026-10-10, when it left the repository too (user).
 6. **Verification**: the accuracy corpus unchanged (2442 correct, 0 in every error count); the rectangles identical;
    every tab in `21*`, `22`, `30*` and `31*` found; capture time and peak memory measured in the app; CLAUDE.md's locate,
@@ -742,7 +742,7 @@ up. The Assistant was built for this (a field's location is part of the mapping)
 
 ### The blueprint's effect line
 Its 2026-10-06 wording is still being thought about by the user and its author; **the Assistant keeps its existing effect
-behaviour until they decide** (user, 2026-10-08). The `Seconds` half is settled: lowercase, as written (2026-10-11). What is
+behavior until they decide** (user, 2026-10-08). The `Seconds` half is settled: lowercase, as written (2026-10-11). What is
 left is whether `Can Equip`/`Must Equip` replace `Clicky` or follow it. **Needed for 1.0.0, not for beta.1** (user,
 2026-10-17).
 
@@ -768,16 +768,16 @@ left is whether `Can Equip`/`Must Equip` replace `Clicky` or follow it. **Needed
   `<br>` picked out, so a hand edit is easier to read and harder to break.
 - **A per-skin profile**, if a tester asks for one of the other skins (per-scale profiles are built in since
   2026-10-16; see "1.0.0 (full release)").
-- **Show a levelled item's icon in its list entry** (user, 2026-10-12). Not knowing level-0 stats is no reason to show
+- **Show a leveled item's icon in its list entry** (user, 2026-10-12). Not knowing level-0 stats is no reason to show
   no icon. Today `ItemCheckPipeline.CheckWindowAsync` returns `Ineligible` before the icon is read, so the result
   carries none. Reading it earlier is cheap; the care needed is that an ineligible result still writes no ledger row and
   nothing else starts comparing it. **Built 2026-10-12**: the icon's cell is cropped before the eligibility check and
   carried on the `Ineligible` result for the list only; it is not fingerprinted, writes no row, and the review's icon
   panel stays hidden (`AnIneligibleItemStillCarriesItsIcon`).
-- **Let the Assistant correct a levelled item's non-stat details and formatting** (user, 2026-10-12). Levelling changes
+- **Let the Assistant correct a leveled item's non-stat details and formatting** (user, 2026-10-12). Leveling changes
   the stats, which is why such an item is refused (see "Item leveling"), but much of a page does not depend on them:
   flags, class and race, slot, lore, effects, categories, the era banner, compliance and layout. To settle first:
-  - **Which fields really are level-independent**, measured rather than assumed. The corpus has 57 levelled windows,
+  - **Which fields really are level-independent**, measured rather than assumed. The corpus has 57 leveled windows,
     many with a `+0` capture or a live page to compare against; merchant value and effect details are the ones to
     check.
   - **What the ledger records.** Today an ineligible item gets no row, deliberately; a partial check needs one that
@@ -927,7 +927,7 @@ flag-line parser/diff so it doesn't over-claim confidence.
   instruction was "add a sample if a restricted item ever turns up".
   - One did: `Feir`Dal Fletching Kit`, `Race: ELF DEF VAH`, now `samples/14-race-restricted-item.png` with ground
     truth in the tracked corpus. It parsed correctly first time, so the gap really was evidential rather than
-    behavioural — but it is the difference between believing that and knowing it, and there is now a corpus entry
+    behavioral — but it is the difference between believing that and knowing it, and there is now a corpus entry
     that fails if anyone simplifies the field to a single string.
   - **Worth repeating as a method note**: the sample came out of the Debug build's own capture archive rather than
     a fresh capture. An interesting item the user has already inspected is usually sitting in
@@ -1054,24 +1054,24 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
 
    **SUPERSEDED — attempt 2, tracing the edge of the dark interior.** Kept because the reason it failed is the
    design lesson. This traced "the border" as the point where the near-black interior stops being dark, since
-   inspection had concluded there was no distinctly-coloured border line to follow. That conclusion was simply
+   inspection had concluded there was no distinctly-colored border line to follow. That conclusion was simply
    wrong, and the approach silently assumed whatever sits *outside* a window is brighter than the window. Often
    it isn't: the player's own 3D character model standing behind a window measures ~33-75, and an adjacent dark
-   UI panel measures about the same as the interior, so scans tunnelled straight through the real edge and ran
+   UI panel measures about the same as the interior, so scans tunneled straight through the real edge and ran
    to the scan limit. That produced two visible symptoms and one invisible one: a window with the Lore tab
    active failed outright; "The Tenderizer +7" against a Bank window was written off as an unresolvable hard
-   case; and, worst because nobody noticed, bounds routinely ran past the true edge into neighbouring UI — one
-   sample's window was traced 137px too far left, so the *neighbouring* window's Class/Race/Size/Weight rows were
+   case; and, worst because nobody noticed, bounds routinely ran past the true edge into neighboring UI — one
+   sample's window was traced 137px too far left, so the *neighboring* window's Class/Race/Size/Weight rows were
    parsed as if they belonged to the item. That last one also manufactured the "partial title occlusion" gap
    that Parse was then required to close: the title had never been occluded at all, the bounds were just wrong.
 
    **Current design — trace the content area's own outline, per the user's correction.** The user pushed back on
-   the "no distinctly-coloured line" conclusion with a zoomed corner screenshot showing four clearly distinct
-   regions — window interior, a thin grey line around the tab contents, the window's outer frame, and the world
-   behind — and directed: *"Just follow that thin grey line and contain the reading to the region within it."* Direct
+   the "no distinctly-colored line" conclusion with a zoomed corner screenshot showing four clearly distinct
+   regions — window interior, a thin gray line around the tab contents, the window's outer frame, and the world
+   behind — and directed: *"Just follow that thin gray line and contain the reading to the region within it."* Direct
    pixel measurement (which is why `tools/LocateSpike` gained `--probe x,y,dx,dy,count`, dumping raw RGB along a
    ray) confirmed it exactly:
-   - Window interior `R=G=B≈16` (10-25 with JPEG noise); **content outline a 1px neutral grey line at 50-62**,
+   - Window interior `R=G=B≈16` (10-25 with JPEG noise); **content outline a 1px neutral gray line at 50-62**,
      essentially constant along its own length (20 consecutive pixels all reading 59-60); the outer frame just
      beyond it at **0-8**, i.e. *darker* than the interior; world 150-170; text up to 255.
    - The outline is drawn by the window, so unlike a brightness transition it does not depend on what is behind
@@ -1082,25 +1082,25 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
      (a glyph edge spans a few px, a stat value-box outline a few tens). That run check is also what implements
      the user's original "if the border is broken at any point, error out as an occluded case".
    - **Requiring the outer frame just beyond a candidate** is what separates the content area's real boundary
-     from the internal divider rules the window also draws (identical grey lines, but with more window beyond
-     them). It must be tested on the **minimum** channel: JPEG bleed from a bright neighbour lifts individual
+     from the internal divider rules the window also draws (identical gray lines, but with more window beyond
+     them). It must be tested on the **minimum** channel: JPEG bleed from a bright neighbor lifts individual
      channels of that thin frame unevenly — against a red element below one real window it reads `(11,0,0)` then
      `(34,0,0)`, which a max-channel test rejects — but never lifts all three at once, so the minimum stays at 0
-     while the interior's neutral grey keeps a minimum of ~16. This cost one wrong iteration to find.
+     while the interior's neutral gray keeps a minimum of ~16. This cost one wrong iteration to find.
    - **Both tab states matter.** An *active* `Description` tab merges into the content area (no chrome line below
      the label); an *inactive* one (Lore selected) is a raised box with a short stack of chrome lines below it,
      all of which must be stepped past — stopping between them makes the content area's top outline itself look
      like the window's bottom on the next downward scan. Getting this wrong broke every Description-active window
      for one iteration.
-   - **The top edge is deliberately left on the old brightness scan**: there is no grey line at the window's
+   - **The top edge is deliberately left on the old brightness scan**: there is no gray line at the window's
      outer top (the title bar is pure black meeting the world), and the title bar must stay in the crop for
-     Parse's title-vs-content check. It has been unanimous across every real sample; the edges the dark-neighbour
+     Parse's title-vs-content check. It has been unanimous across every real sample; the edges the dark-neighbor
      problem actually broke are left/right/bottom.
    - **Results**: all 15 real samples validated. Traced widths are now consistently ~394-404px (the true content
      width) against 414-546px before, i.e. the old design was over-reaching on most windows, not just the
      obviously-broken ones. The Lore-tab window and the zero-gap Tenderizer/Bank case both now resolve. Merchant
      values, previously missing on several items, now parse because the windows are no longer truncated.
-   - **Retired claims** (both were load-bearing and both were wrong): "the border isn't a distinctly-coloured
+   - **Retired claims** (both were load-bearing and both were wrong): "the border isn't a distinctly-colored
      line", and the "known residual gap" about a ~20%-occluded title. Parse's title-vs-content reconciliation is
      still implemented and still worth keeping — on the 4-window sample it correctly rejected a Bank/Tradeskill
      panel whose text read as a literal "Description" and became a false-positive window — but it is no longer propping
@@ -1219,12 +1219,12 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
 2d. **Extraction accuracy — accuracy harness, then glyph matching for the window-crop pass.** See the
    "Extraction accuracy" section below for the full plan and the measurements behind it. Short version: the game's
    UI font is pixel-deterministic (two `7`s are byte-identical; the anti-aliasing ramp is identical across text
-   colours), so the window-crop pass is exact template matching rather than a recognition problem. Build the
+   colors), so the window-crop pass is exact template matching rather than a recognition problem. Build the
    accuracy harness first — there is currently no repeatable way to score extraction, so any tuning or rewrite is
    unmeasurable. **DONE 2026-09-24.**
 2b. **Eligibility check — DONE (2026-09-25)**, unblocked by the user resolving the Ornamentation question.
    `Core.Items.ItemEligibility.Check` reports every blocker (not just the first): a foreign exaltation, or a
-   levelled item (`X>0`). `ShouldWriteLedgerEntry` carries the no-ledger-row rule on the result itself rather than
+   leveled item (`X>0`). `ShouldWriteLedgerEntry` carries the no-ledger-row rule on the result itself rather than
    leaving each caller to remember it, because getting that backwards makes an unchecked item look handled forever.
    - **Ornamentation is treated as a foreign exaltation** (user, 2026-09-25). This plan left it open on the grounds
      that ornamentation is cosmetic and blocking on it might be over-strict; the user's call is to block.
@@ -1232,7 +1232,7 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
      ornamentation named like the item itself would otherwise read as "native", and for this one slot that
      inference is knowably false since ornamentation is never native.
    - The pipeline orchestration that calls this landed with milestone 5 (`ItemCheckPipeline`). The `ILevelNormalizer`
-     seam was never built and is not needed for v1: a levelled item is simply ineligible. It belongs with milestone 8.
+     seam was never built and is not needed for v1: a leveled item is simply ineligible. It belongs with milestone 8.
      No stat-scaling math — v1 only fully processes `+0` items.
 3. **Wiki client — read half DONE (2026-09-24); the live login/edit check is waiting on the user's bot password.**
    `Wiki.MediaWiki` has `MediaWikiClient`/`IMediaWikiClient` (anonymous fetch, bot-password login,
@@ -1329,7 +1329,7 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
      attempts a three-way merge when a base timestamp is supplied, so a non-conflicting concurrent edit is merged
      rather than refused — meaning the guard catches *unmergeable* concurrency, not all of it. Proving the
      rejection needs a genuinely unmergeable conflict, which costs real revisions on a real page. Left unverified
-     deliberately; milestone 5's review flow re-fetches before writing regardless, so the guard is defence in
+     deliberately; milestone 5's review flow re-fetches before writing regardless, so the guard is defense in
      depth rather than the only protection.
    Eleven real pages are tracked as fixtures in `tests/EQLWikiEditorAssistant.Tests/Wiki/Fixtures/` (public wikitext —
    nothing private, unlike screenshots).
@@ -1345,7 +1345,7 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
    **Icon comparison DONE 2026-09-25** (`Core.Icons`, `Wiki.MediaWiki.IconCache`), flag-only as planned. The
    in-game icon has no frame — the sprite is drawn with transparency straight onto the window background — so its
    strip was measured across all 43 screenshots rather than traced. Comparison resamples each side's ink bounding
-   box onto a 12x12 colour signature, which is what makes a 40x40 wiki PNG comparable to a sprite the game draws
+   box onto a 12x12 color signature, which is what makes a 40x40 wiki PNG comparable to a sprite the game draws
    ~1.1x larger.
 
    **Three designs failed before this one, and the negative control is the only reason that was noticed.** A check
@@ -1357,7 +1357,7 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
 
    **The user asked whether an exact pixel diff would work, and it was tested rather than argued** (2026-09-25). It
    will not, against these files: the game draws every icon at a consistent ~1.10x the wiki file, and only 2-7% of
-   the captured colours appear anywhere in the source — nearest-neighbour cannot invent a colour, so the game is
+   the captured colors appear anywhere in the source — nearest-neighbor cannot invent a color, so the game is
    interpolating. Crucially this is *not* a UI-scale setting: glyph matching proves the UI text is a byte-identical
    blit, so nothing global is resampled. Either the game renders a 40x40 asset into a larger cell, or the wiki files
    were downscaled to 40x40 during extraction — and if it is the latter, re-extracting at native size would make an
@@ -1400,8 +1400,8 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
      slot names in the corpus so it is known complete.
    - **A case where the wiki legitimately holds more detail than the window** — `Range: 50 / 75 / 100` against a
      captured `50`. Now `NeedsReview` rather than an overwrite that discards the alternatives.
-   - **A measurement error of my own**: the first run analyzed levelled items too and reported 300 differing fields,
-     which would have read as "the wiki is badly stale". A levelled item's stats are *legitimately* higher than the
+   - **A measurement error of my own**: the first run analyzed leveled items too and reported 300 differing fields,
+     which would have read as "the wiki is badly stale". A leveled item's stats are *legitimately* higher than the
      wiki's level-0 figures (Bladestopper +7 shows AC 43 against a correct 25). Eligibility has to run before
      analysis, in the tool *and* in the measurement. Filtering dropped it to 19.
 
@@ -1444,12 +1444,12 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
      `No Trade` capture is unverifiable. `absolutely nothing` never co-occurs with `No Trade`, so "verified
      worthless" and "couldn't see it" stay distinguishable.
    - **`itemname` must equal the page title, and any mismatch is a defect.** 10 of 538 real item pages mismatch.
-     **Corrected 2026-09-25**: an earlier note here said those pages render fine and treated the parenthesised-title
+     **Corrected 2026-09-25**: an earlier note here said those pages render fine and treated the parenthesized-title
      pattern as a legitimate convention. Both were wrong — the user pointed at a live broken page and inspection
      confirmed the mechanism. `Itempage` renders the item as a hover box anchored on a link to `[[itemname]]`, so a
      mismatch links elsewhere: either a red "page does not exist" where the item should be
      (`Essence of Barbarian (Wormwood)`), or — worse, because it is invisible — a silent link to an unrelated
-     article (`Tailoring (Item)` points at the Tailoring *skill*). 8 of the 10 are the parenthesised shape, which
+     article (`Tailoring (Item)` points at the Tailoring *skill*). 8 of the 10 are the parenthesized shape, which
      is kept as its own outcome only to tell the user what kind of problem it is.
      - **The fix is not obvious, so the tool only reports.** The in-game item genuinely shares one name across its
        craft-material/deity/quest variants, so setting `itemname` to the qualified title would render a name the
@@ -1511,10 +1511,10 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
    window rather than abandoning the frame.
 
    **Committing re-fetches and refuses a page that changed since the check.** This plan left `basetimestamp`'s
-   rejection behaviour deliberately unverified, on the grounds that a collision is effectively impossible here —
+   rejection behavior deliberately unverified, on the grounds that a collision is effectively impossible here —
    that reasoning stands, but it is not the whole guard: MediaWiki merges what it can, and this tool's edits are
    wholesale parameter replacements, exactly the shape that merges cleanly while discarding somebody's work. So the
-   re-fetch is the real protection and the parameter is defence in depth, which is the opposite of how the plan
+   re-fetch is the real protection and the parameter is defense in depth, which is the opposite of how the plan
    framed it.
 
    **The UI's one non-negotiable**: what is on screen is what gets saved. The proposed wikitext is editable and the
@@ -1533,7 +1533,7 @@ useful for ongoing parse-logic tuning and any future capture/locate debugging.
      their experience but not every time. So a difference warns in the review screen's strip *and* gets its own panel
      showing both texts in full — lore is the one field a findings grid cannot display.
    - **Which exposed a hole worth recording**: a flagged item that gets committed for some *other* reason would have
-     been recorded `Edited` and never raised again, silently settling a judgement nobody made. A commit on an item
+     been recorded `Edited` and never raised again, silently settling a judgment nobody made. A commit on an item
      that still needs a human now records `Flagged`, and `RecordCheckedByHand` ("Looks right — mark as checked") is
      the only thing that settles it. Without that action such an item would re-fetch on every capture forever, and
      the only other escape would be overwriting the very thing the user just approved.
@@ -1576,8 +1576,8 @@ measurement that answered it:
 - **The game renders text with a deterministic bitmap font.** Two separate `7` glyphs in one window are
   **byte-identical**, anti-aliasing intermediates included, and the same 'A' in an item window and in the Notes Window
   matches exactly.
-- **The anti-aliasing is one fixed ramp in every colour** (`16, 64, 112, 159, 191, 223, 255` for white; the same seven
-  steps scaled for any other colour), with no subpixel fringing.
+- **The anti-aliasing is one fixed ramp in every color** (`16, 64, 112, 159, 191, 223, 255` for white; the same seven
+  steps scaled for any other color), with no subpixel fringing.
 
 **So this is not a machine-learning problem**, and the answer to "would AI help" was *less* inference, not more.
 **A local vision-language model was rejected outright**, not deferred: its failure mode is wrong for this tool. A lost

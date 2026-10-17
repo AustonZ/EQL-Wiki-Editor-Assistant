@@ -2,7 +2,7 @@ using System.Text;
 
 namespace EQLWikiEditorAssistant.Core.Glyphs;
 
-/// <summary>One labelled glyph shape. <see cref="Labels"/> is a list because two characters can be genuinely
+/// <summary>One labeled glyph shape. <see cref="Labels"/> is a list because two characters can be genuinely
 /// pixel-identical in a font — measured, not hypothetical: in Arial, lowercase 'l' and uppercase 'I' are both a bare
 /// 2x9 vertical bar with no serif or crossbar to separate them.
 ///
@@ -28,7 +28,7 @@ public sealed record AtlasEntry(
 }
 
 /// <summary>
-/// The labelled glyph shapes of the game's UI font: the lookup table that turns an exactly-matched bitmap back
+/// The labeled glyph shapes of the game's UI font: the lookup table that turns an exactly-matched bitmap back
 /// into a character.
 ///
 /// Built by <c>GlyphSpike atlas</c> from the in-game Notes Window sheet the user typed (a-z, A-Z, digits and
@@ -93,7 +93,7 @@ public sealed class GlyphAtlas
 
     /// <summary>Builds an atlas from segmented glyphs and the text they are known to spell.
     ///
-    /// The bands come from a sheet whose contents are known in advance, so labelling is positional rather than a
+    /// The bands come from a sheet whose contents are known in advance, so labeling is positional rather than a
     /// manual pass — and the count check below is what makes that safe: if a band's glyph count doesn't match the
     /// string it should spell, the segmentation is wrong and every label after that point would be silently
     /// shifted, which is far worse than refusing.</summary>
@@ -118,7 +118,7 @@ public sealed class GlyphAtlas
         return -1;
     }
 
-    public static GlyphAtlas FromLabelledBands(IReadOnlyList<TextBand> bands, IReadOnlyList<string> expectedRows)
+    public static GlyphAtlas FromLabeledBands(IReadOnlyList<TextBand> bands, IReadOnlyList<string> expectedRows)
     {
         int start = FindSheetStart(bands, expectedRows);
         if (start < 0)
@@ -178,7 +178,7 @@ public sealed class GlyphAtlas
     /// <b>A shared shape must not gain a label it did not have</b>, or this would silently assert that two
     /// characters look alike in a font where they were never seen to: the new sheet may only spell a subset of
     /// what the existing entry already says (EQL Wiki Editor Assistant's bar is "l" where Arial's is "l" or "I"), and
-    /// anything else is refused as a mislabelled sheet. Entries already tagged with another font are kept as they
+    /// anything else is refused as a mislabeled sheet. Entries already tagged with another font are kept as they
     /// are, so fonts can be merged in one at a time.
     /// </summary>
     public static GlyphAtlas MergeFont(GlyphAtlas existing, UiFont existingFont, GlyphAtlas sheet, UiFont sheetFont)
@@ -202,7 +202,7 @@ public sealed class GlyphAtlas
                 if (novel.Any())
                     throw new ArgumentException(
                         $"The {sheetFont} sheet labels a shape '{string.Concat(same.Labels)}' that the atlas has as " +
-                        $"'{string.Concat(entry.Labels)}'. A shared shape may not gain a label; the sheet is mislabelled.");
+                        $"'{string.Concat(entry.Labels)}'. A shared shape may not gain a label; the sheet is mislabeled.");
                 merged.Add(entry with { Font = null });
             }
             else if (entry.Font is null)

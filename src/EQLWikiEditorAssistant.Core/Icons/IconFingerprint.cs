@@ -3,7 +3,7 @@ using EQLWikiEditorAssistant.Core.Imaging;
 namespace EQLWikiEditorAssistant.Core.Icons;
 
 /// <summary>
-/// An item icon reduced to a small colour grid, for telling "this page points at the right artwork" from "it does
+/// An item icon reduced to a small color grid, for telling "this page points at the right artwork" from "it does
 /// not", and for finding the artwork among the game's whole library.
 ///
 /// **The whole icon cell, every pixel, on both sides** (user, 2026-10-10). The game draws every icon in the same
@@ -25,7 +25,7 @@ public sealed record IconFingerprint(byte[] Signature)
     ///
     /// Measured on the 16x16 grid over 96 captured items against 87 distinct wiki icons (8,256 different-icon pairs):
     /// 0.059 is the largest threshold with no false match, at 11 false alerts. The two closest different icons are a
-    /// pair of recoloured twins of one sword drawing (590 and 603), which no absolute threshold can tell apart.
+    /// pair of recolored twins of one sword drawing (590 and 603), which no absolute threshold can tell apart.
     /// </summary>
     public const double SameIconThreshold = 0.055;
 
@@ -48,7 +48,7 @@ public sealed record IconFingerprint(byte[] Signature)
     /// Below this there is not enough variation in the cell to tell one icon from another.
     ///
     /// **Measured on the whole-cell signature (2026-10-10)**: the darkest captured icon in the corpus is 0.039
-    /// (`Nightmare Hide`, black on the window's grey, at 0.044, is comparable now), while 100 of the library's 11,592
+    /// (`Nightmare Hide`, black on the window's gray, at 0.044, is comparable now), while 100 of the library's 11,592
     /// icons fall under 0.02 — blank or near-blank artwork no capture could identify anyway.
     /// </summary>
     public const double MinimumContrast = 0.02;
@@ -96,14 +96,14 @@ public sealed record IconFingerprint(byte[] Signature)
 public static class IconHasher
 {
     /// <summary>
-    /// The signature is a <see cref="GridSize"/> x <see cref="GridSize"/> grid of average colour, one byte per
-    /// channel. **Colour is kept deliberately**: small icons on a dark field look alike in brightness, and what tells
+    /// The signature is a <see cref="GridSize"/> x <see cref="GridSize"/> grid of average color, one byte per
+    /// channel. **Color is kept deliberately**: small icons on a dark field look alike in brightness, and what tells
     /// a brown leather band from a silver one is hue.
     ///
     /// **16, measured (2026-10-10)** against 8, 10, 12, 14, 20, 24 and 40, comparing each capture's own icon with the
     /// best match in the library and with every other icon: 16 left the widest gap between the worst genuine pair
     /// and the closest different icon (0.016 against 0.043). Finer grids feel the game's 1.1x interpolation and its
-    /// edge outline; coarser ones merge recoloured twins.
+    /// edge outline; coarser ones merge recolored twins.
     /// </summary>
     public const int GridSize = 16;
 

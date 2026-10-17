@@ -572,17 +572,17 @@ public class MediaWikiClientTests
     [Fact]
     public async Task ACancellationTheCallerAskedForIsNotAnOutage()
     {
-        using var cancelled = new CancellationTokenSource();
-        await cancelled.CancelAsync();
+        using var canceled = new CancellationTokenSource();
+        await canceled.CancelAsync();
 
         using var client = new MediaWikiClient(
             new HttpClient(new ThrowingHandler(new TaskCanceledException())), Endpoint);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => client.FetchPageAsync("Water Flask", cancelled.Token));
+            () => client.FetchPageAsync("Water Flask", canceled.Token));
     }
 
-    /// <summary>Whereas the same exception with nobody having cancelled is `HttpClient`'s timeout — an outage.</summary>
+    /// <summary>Whereas the same exception with nobody having canceled is `HttpClient`'s timeout — an outage.</summary>
     [Fact]
     public async Task ATimeoutWithNoCancellationIsAnOutage()
     {

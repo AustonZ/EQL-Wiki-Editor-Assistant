@@ -265,7 +265,7 @@ public class WikiMappingBlueprintTests
 
     /// <summary>
     /// A value the format does not recognize comes back untouched. **This is the control that keeps the transform
-    /// from being a licence to reshape anything** — a value this does not understand is one to leave alone, not one
+    /// from being a license to reshape anything** — a value this does not understand is one to leave alone, not one
     /// to tidy into something that reads well and says something else.
     /// </summary>
     [Theory]

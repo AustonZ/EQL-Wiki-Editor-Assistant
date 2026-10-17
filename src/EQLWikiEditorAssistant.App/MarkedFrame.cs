@@ -31,8 +31,8 @@ internal static class MarkedFrame
 
         var grid = new Grid { Width = frame.Width, Height = frame.Height, ClipToBounds = true };
         grid.Children.Add(new Image { Source = Bitmaps.From(frame), Stretch = Stretch.None });
-        // A dark ring under the coloured one, so it reads against a bright game world as well as a dark UI. Both follow
-        // one centre line with one corner radius, so the dark one is an even outline either side of the red; a radius
+        // A dark ring under the colored one, so it reads against a bright game world as well as a dark UI. Both follow
+        // one center line with one corner radius, so the dark one is an even outline either side of the red; a radius
         // taken from each ring's own thickness rounded the dark one twice as much (user, 2026-10-13).
         double radius = stroke * 2;
         grid.Children.Add(Ring(tab, pad, stroke * 2, radius, Brushes.Black));
@@ -40,8 +40,8 @@ internal static class MarkedFrame
         return grid;
     }
 
-    /// <summary>A ring whose stroke is centred <paramref name="pad"/> outside the tab. WPF draws a Rectangle's stroke
-    /// inside its bounds and rounds that inset outline, so growing the bounds by half the stroke puts the centre line
+    /// <summary>A ring whose stroke is centered <paramref name="pad"/> outside the tab. WPF draws a Rectangle's stroke
+    /// inside its bounds and rounds that inset outline, so growing the bounds by half the stroke puts the center line
     /// in the same place for any thickness, and the same radius then gives the same corner.</summary>
     private static Rectangle Ring(Rect tab, double pad, double thickness, double radius, Brush brush)
     {
@@ -87,7 +87,7 @@ internal static class MarkedFrame
         {
             if (e.Key == Key.Escape) window.Close();
         };
-        // Centre the ring once the scroller knows its viewport. Out-of-range offsets are clamped by the scroller.
+        // Center the ring once the scroller knows its viewport. Out-of-range offsets are clamped by the scroller.
         window.Loaded += (_, _) =>
         {
             scroller.ScrollToHorizontalOffset(tab.X + tab.Width / 2.0 - scroller.ViewportWidth / 2);

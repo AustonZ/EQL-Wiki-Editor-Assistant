@@ -24,7 +24,7 @@ internal static class Bitmaps
 
         if (magnify <= 1) return bitmap;
 
-        // Nearest-neighbour, so a magnified icon shows the artwork rather than a blurred guess at it — the user is
+        // Nearest-neighbor, so a magnified icon shows the artwork rather than a blurred guess at it — the user is
         // being asked to compare two sprites, and interpolation would invent detail in both.
         var scaled = new TransformedBitmap(bitmap, new ScaleTransform(magnify, magnify));
         scaled.Freeze();

@@ -54,7 +54,7 @@ public enum StatValueFormat
 /// <remarks>Those 32 pages are not reached by anything today: the data pass signs a stat only when it is already
 /// writing another signed one, and the formatter preserves every value byte for byte. Raised with the user
 /// 2026-09-30 rather than changed, since closing it means either reversing their sign-only decision or letting
-/// the formatter edit a value — and the latter would break the content check that is its whole licence to
+/// the formatter edit a value — and the latter would break the content check that is its whole license to
 /// rearrange a page.</remarks>
 public sealed record StatMapping(
     string GameLabel,
@@ -192,7 +192,7 @@ public sealed class WikiMapping
     /// **The blueprint's 2026-09-30 revision (oldid 179818) did not on its own warrant a bump**, which is worth
     /// recording because it looked like it should: the sign convention it newly states was already the mapping's and
     /// the `Recommended level` line it dropped was dead on both sides, so the formatter's census over all 1,183
-    /// cached pages came out byte-identical. What earned the bump below was the *behaviour* change the user then
+    /// cached pages came out byte-identical. What earned the bump below was the *behavior* change the user then
     /// asked for, not the mapping edit that preceded it.
     /// **4** (2026-09-30): the formatting pass now signs a positive attribute or resist (user: a sign is formatting,
     /// not data). This is the bump the note above is about, and it is the awkward kind — a *settled* row means the
@@ -647,7 +647,7 @@ public sealed class WikiMapping
             FocusEffectKinds = ["Focus"],
             StatsBlockLineOrder =
             [
-                // The flags line is unlabelled, so it is named here by convention rather than by a wiki label.
+                // The flags line is unlabeled, so it is named here by convention rather than by a wiki label.
                 ["(flags)"],
                 // `Type` sits with `Slot` and `Items` with `Size Capacity` by the user's decision (2026-09-25);
                 // the blueprint omits both, and the user is having them added to the template's vocabulary.

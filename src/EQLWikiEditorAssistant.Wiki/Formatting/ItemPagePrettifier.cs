@@ -115,7 +115,7 @@ public static class ItemPagePrettifier
 
         // Ordered by the blueprint; anything the blueprint does not name keeps its relative position afterwards,
         // because an unrecognized parameter is somebody's content and sorting it somewhere nobody chose is a
-        // judgement this codebase consistently declines to make.
+        // judgment this codebase consistently declines to make.
         List<TemplateParameter> ordered =
         [
             .. template.Parameters
@@ -253,7 +253,7 @@ public static class ItemPagePrettifier
     /// bites.** A <c>*</c> makes a bullet only when it begins a line — written inline it renders as a literal
     /// asterisk — so moving a one-line <c>|relatedquests = * [[Some Quest]]</c> onto the parameter's line silently
     /// turns a list into prose. The *content* is untouched, which is exactly why the verification pass cannot see
-    /// it: this is a rendering change, and the only defence is not making it.
+    /// it: this is a rendering change, and the only defense is not making it.
     /// </summary>
     private static bool NeedsOwnLine(string value) =>
         value.Contains('\n') ||
@@ -542,7 +542,7 @@ public static class ItemPagePrettifier
 
         // Everything outside the call must be untouched apart from the order of the categories that end the page —
         // a property this pass gets by only ever splicing those two places, so a failure here means a real bug, not
-        // a judgement call.
+        // a judgment call.
         if (!string.Equals(before.Wikitext[..before.Template.Start], formattedText[..after.Template.Start], StringComparison.Ordinal))
             refusals.Add("The text before the template call changed, which this pass must never do.");
 

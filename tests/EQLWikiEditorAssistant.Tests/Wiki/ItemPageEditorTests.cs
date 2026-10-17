@@ -169,7 +169,7 @@ public class ItemPageEditorTests
     // --- what it refuses to do --------------------------------------------------------------------------
 
     /// <summary>A parameter that does not exist has no line to change in place, and inventing a position is a
-    /// judgement the tool declines — so it is deferred to the user rather than guessed at.</summary>
+    /// judgment the tool declines — so it is deferred to the user rather than guessed at.</summary>
     [Fact]
     public void AMissingParameterIsWrittenInTheBlueprintsOrder()
     {

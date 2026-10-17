@@ -50,7 +50,7 @@ public sealed record ItemPageLookupResult(
     ///   the exact failure the variant search was built to prevent.
     /// - <see cref="LookupOutcome.NameUnusable"/> — the in-game name cannot be a MediaWiki title, so there is no
     ///   title to create at. The page very likely exists under a name a human chose (<c>Cell Key #5</c> living at
-    ///   <c>Cell Key No. 5</c>), and picking a replacement is a permanent, URL-defining judgement the tool never
+    ///   <c>Cell Key No. 5</c>), and picking a replacement is a permanent, URL-defining judgment the tool never
     ///   makes.
     ///
     /// Both still reach the user as a warning; what they do not reach is a Create button.
@@ -67,7 +67,7 @@ public sealed record ItemPageLookupResult(
 ///    <c>Engraved Di`Zok Deathbringer</c> whose <c>itemname</c> is <c>Engraved Di'Zok Deathbringer</c>, and others
 ///    the other way round. Because glyph matching keeps the two characters distinct (the atlas has separate entries
 ///    and a test pins that), the captured name is authoritative — so a lookup that misses can check the quote
-///    variants and tell the user "this probably exists, spelt wrong" instead of silently reporting a new item.
+///    variants and tell the user "this probably exists, spelled wrong" instead of silently reporting a new item.
 ///    That matters because the user's only remedy is to create a correctly-named page and redirect the old one
 ///    (they cannot rename), so a missed candidate means a duplicate nobody can delete.
 /// 2. **A name containing a title-illegal character cannot be queried at all** — the API errors or returns nothing.
@@ -76,7 +76,7 @@ public sealed record ItemPageLookupResult(
 ///    second one would be the wrong move.
 ///
 /// Redirects are followed by the client, so an already-redirected misspelt page resolves to the right one and this
-/// never sees it — which is the desired behaviour, not a gap.
+/// never sees it — which is the desired behavior, not a gap.
 /// </summary>
 public static class ItemPageLookup
 {
@@ -133,7 +133,7 @@ public static class ItemPageLookup
     /// <remarks>
     /// **The ordering is what makes the cap safe.** Four quote characters across two positions is sixteen
     /// combinations, more than <see cref="MaxVariants"/>, so an arbitrary order would let the cap discard a
-    /// perfectly plausible apostrophe/grave swap in favour of a curly-quote form that has never been observed.
+    /// perfectly plausible apostrophe/grave swap in favor of a curly-quote form that has never been observed.
     /// Sorting by how many curly quotes a variant uses puts every likely candidate ahead of every unlikely one, so
     /// the cap only ever trims the tail.
     /// </remarks>

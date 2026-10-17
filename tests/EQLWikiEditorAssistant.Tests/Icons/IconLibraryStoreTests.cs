@@ -184,7 +184,7 @@ public class IconLibraryStoreTests : IDisposable
     }
 
     /// <summary>No folder is a normal outcome: the library is optional, and without it a generated page simply has a
-    /// blank lucy_img_ID — the behaviour that existed before the library did.</summary>
+    /// blank lucy_img_ID — the behavior that existed before the library did.</summary>
     [Fact]
     public async Task AMissingFolderIsNotAnError()
     {

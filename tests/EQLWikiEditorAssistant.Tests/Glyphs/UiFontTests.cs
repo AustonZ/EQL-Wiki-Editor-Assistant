@@ -97,16 +97,16 @@ public class UiFontTests
         Assert.Equal(0, merged.Entries.Single(e => e.Bitmap.Equals(Wide)).Advance);   // not learned yet
     }
 
-    /// <summary>A shared shape may not gain a label. If it could, a mislabelled sheet would silently teach the
+    /// <summary>A shared shape may not gain a label. If it could, a mislabeled sheet would silently teach the
     /// reader that two characters look alike in a font where nobody ever saw them do so.</summary>
     [Fact]
     public void MergingRefusesASharedShapeGainingALabel()
     {
         var arial = new GlyphAtlas([new AtlasEntry(["l", "I"], 0, Bar, 3)]);
-        var mislabelled = new GlyphAtlas([new AtlasEntry(["1"], 0, Bar)]);
+        var mislabeled = new GlyphAtlas([new AtlasEntry(["1"], 0, Bar)]);
 
         Assert.Throws<ArgumentException>(() =>
-            GlyphAtlas.MergeFont(arial, UiFont.Arial, mislabelled, UiFont.EqlWikiEditorAssistant));
+            GlyphAtlas.MergeFont(arial, UiFont.Arial, mislabeled, UiFont.EqlWikiEditorAssistant));
     }
 
     // ---- what the bare bar means ----
@@ -226,7 +226,7 @@ public class UiFontTests
         ?? Atlas.Entries.Single(e => e.Labels.Contains(label) && e.Font is null);
 
     /// <summary>
-    /// Paints words onto the game's content-area grey exactly as the game draws them: each glyph's ramp levels as
+    /// Paints words onto the game's content-area gray exactly as the game draws them: each glyph's ramp levels as
     /// white text, glyphs one learned cell apart, words a space apart. The atlas shapes are the real ones, measured
     /// from in-game captures, so this is the game's own pixels with only the layout made up.
     /// </summary>

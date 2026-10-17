@@ -99,7 +99,7 @@ public enum LedgerVerdict
 /// captured fingerprint and answers from disk. A design where the ledger were consulted after fetching would be
 /// pointless.
 ///
-/// **An ineligible item must never reach this store at all.** A foreign exaltation or a levelled item writes *no
+/// **An ineligible item must never reach this store at all.** A foreign exaltation or a leveled item writes *no
 /// row* — not `Skipped`, not `Flagged` (see `Core.Items.ItemEligibility`). It was never actually checked, and any
 /// row would make it look handled and quietly exclude it from ever being checked properly.
 ///

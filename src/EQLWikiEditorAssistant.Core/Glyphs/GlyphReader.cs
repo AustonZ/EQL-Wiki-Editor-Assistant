@@ -23,7 +23,7 @@ public sealed record GlyphMatch(AtlasEntry Entry, int Left, int Top, int Baselin
 /// uniform), and the peak is solved from the brightest level the bitmap actually uses. Every remaining pixel then
 /// has exactly one permitted intensity. That is a very strong constraint — a glyph with three or four distinct
 /// levels pins both unknowns and then verifies dozens of pixels against them — so chrome does not accidentally
-/// satisfy it, and text reads identically whether it sits on a window's 16-grey content area, the title bar's
+/// satisfy it, and text reads identically whether it sits on a window's 16-gray content area, the title bar's
 /// black, or beside a bright icon.
 ///
 /// Matching is also position-free in the vertical direction: every row is tried as a candidate baseline rather
@@ -125,10 +125,10 @@ public static class GlyphReader
 
     /// <summary>Least separation between solved background and peak for a match to be believed.
     ///
-    /// Without this, self-calibration has a degenerate solution and finds it: a flat-coloured piece of UI art
+    /// Without this, self-calibration has a degenerate solution and finds it: a flat-colored piece of UI art
     /// solves to background 149 and peak 150, and with a one-unit span *every* ramp level rounds to the same
     /// intensity, so the whole bitmap "matches" inside the tolerance. That is how a scroll-bar arrow read as '!'
-    /// and 'j'. Real text is nowhere near: the narrowest span measured in any colour is 192 (title-bar grey on
+    /// and 'j'. Real text is nowhere near: the narrowest span measured in any color is 192 (title-bar gray on
     /// black), against 239 for white on a content area, so this threshold rejects the degenerate case by a wide
     /// margin without coming close to legitimate text.</summary>
     public const int MinContrast = 64;
@@ -181,7 +181,7 @@ public static class GlyphReader
     }
 
     /// <summary>Any pixel brighter than this is ink. The two backgrounds a window uses measure exactly 16 (the
-    /// content area) and 0 (the title bar), while the dimmest real ink step measured in any colour is 38, so this
+    /// content area) and 0 (the title bar), while the dimmest real ink step measured in any color is 38, so this
     /// separates them with room to spare and without needing to know which background it is looking at.</summary>
     public const int InkFloor = 24;
 
@@ -424,7 +424,7 @@ public static class GlyphReader
     /// '.', '\'', ',' — are a handful of pixels, which is little enough evidence that window chrome occasionally
     /// satisfies even an exact match; a real isolated value like a stat's "7" is far heavier (measured: every
     /// punctuation shape is 7-52, every digit 81-145). Glyphs sitting alongside others are exempt, because their
-    /// neighbours are the corroboration.</summary>
+    /// neighbors are the corroboration.</summary>
     public const int LoneGlyphMinInk = 20;
 
     /// <summary>

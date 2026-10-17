@@ -71,7 +71,7 @@ dotnet publish $project -c Release -r win-x64 --self-contained -o $publish --nol
     "-p:Version=$version" "-p:SourceRevisionId=$revision"
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed (exit code $LASTEXITCODE)." }
 
-# A self-contained build ships the .NET runtime and WPF, so their licence and notices ship too. Found through the
+# A self-contained build ships the .NET runtime and WPF, so their license and notices ship too. Found through the
 # versions the build itself recorded, since those follow the SDK; the app's other notices come from its project file.
 $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $HOME '.nuget\packages' }
 $runtimeConfig = Get-Content (Join-Path $publish 'EQLWikiEditorAssistant.App.runtimeconfig.json') -Raw | ConvertFrom-Json

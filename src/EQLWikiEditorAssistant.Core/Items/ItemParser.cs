@@ -193,7 +193,7 @@ public static class ItemParser
             MerchantValue: null, Lore: lore.Length == 0 ? null : lore, Warnings: warnings);
     }
 
-    /// <summary>Splits an effect's raw text into its name and its parenthesised qualifiers, and normalizes the
+    /// <summary>Splits an effect's raw text into its name and its parenthesized qualifiers, and normalizes the
     /// two ways a required level reaches us into one. See <see cref="EffectEntry"/>.</summary>
     private static EffectEntry BuildEffect(string kind, string rawDescription, List<KeyValuePair<string, string>> modifiers)
     {
@@ -300,7 +300,7 @@ public static class ItemParser
     /// codebase already puts "the game says one thing two different ways" (see the required level and cast time
     /// qualifiers above). The user's read is that representing a pet illusion as a bare <c>Effect:</c> line was a
     /// hack around a legacy system; either way it is the game's spelling of the property, not the wiki's, so the
-    /// parser is what should know about it. Everything downstream then sees an ordinary labelled field, and the
+    /// parser is what should know about it. Everything downstream then sees an ordinary labeled field, and the
     /// mapping translates it like any other.
     ///
     /// The casting time is dropped because it is not part of what the wiki records — <c>Pet Illusion: Dark Elf</c>

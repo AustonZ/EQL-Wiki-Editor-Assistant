@@ -51,7 +51,7 @@ public sealed record ItemPageAnalysis(
 
 /// <summary>
 /// Compares a captured item against its wiki page, field by field, and says what it concluded — without changing
-/// anything. Rendering the actual edit is a separate step, so that every judgement here is reviewable on its own.
+/// anything. Rendering the actual edit is a separate step, so that every judgment here is reviewable on its own.
 ///
 /// **The rules that are easy to get wrong, all confirmed by the user or by measurement:**
 /// - **A field absent from the page is only a problem if the capture has data for it.** Don't demand a full
@@ -205,7 +205,7 @@ public static class ItemPageAnalyzer
     /// worse problem than a large diff.
     ///
     /// **This belongs to the data pass and not to the formatting pass**, though it is arguably a lint. Two reasons,
-    /// either sufficient: the formatter's licence to rearrange pages is that it *proves* it changed nothing about
+    /// either sufficient: the formatter's license to rearrange pages is that it *proves* it changed nothing about
     /// what they say, and adding a category changes what the page says — its own verification would refuse the
     /// edit. And the formatter declines to touch a statsblock carrying legacy flags, which is exactly the
     /// P1999-imported set that is missing Beastlord and Berserker; it would skip the pages that need this most.
@@ -412,7 +412,7 @@ public static class ItemPageAnalyzer
             findings.Add(new FieldFinding(FlagsField, FieldVerdict.Differs, string.Join(", ", wanted), string.Join(", ", onWiki)));
     }
 
-    /// <summary>The flags line is the first line of the block carrying unlabelled tokens and no fields.</summary>
+    /// <summary>The flags line is the first line of the block carrying unlabeled tokens and no fields.</summary>
     /// <summary>
     /// Whether two flag lines say the same thing. **Order is not part of what a flags line means** (user,
     /// 2026-09-29): `Brell's Girdle` lists its flags alphabetically where the game lists them in its own order, and

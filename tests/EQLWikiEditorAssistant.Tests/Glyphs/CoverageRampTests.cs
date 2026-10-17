@@ -35,7 +35,7 @@ public class CoverageRampTests
     /// **A real window redrawn with another ramp locates and reads exactly as the original does**, and says which ramp
     /// it learned. The control is the same redrawn window read with the standard ramp, which must not read the same —
     /// otherwise the redrawing changed nothing the reader looks at, and the test would prove nothing. Covers a frame
-    /// of three windows with effect and value colours, a window whose Lore tab is selected (so its Description label is
+    /// of three windows with effect and value colors, a window whose Lore tab is selected (so its Description label is
     /// white and raised), and windows at 2.00 and 4.00.
     /// </summary>
     [Theory]

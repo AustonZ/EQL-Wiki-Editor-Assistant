@@ -8,7 +8,7 @@ namespace EQLWikiEditorAssistant.Tests.Icons;
 ///
 /// **These are synthetic fingerprints on purpose.** Whether the search picks the right icon out of 11,562 real ones is
 /// a corpus question and is measured by `WikiSpike iconsearch` (87/90 top-1, which is where
-/// <see cref="IconLibrary.ConfidentMargin"/> comes from); what belongs here is the behaviour around that — how a tie
+/// <see cref="IconLibrary.ConfidentMargin"/> comes from); what belongs here is the behavior around that — how a tie
 /// is reported, that a duplicate does not steal the margin, that an uncomparable fingerprint is refused rather than
 /// answered. Those are rules, and a rule tested against real artwork would be testing the artwork.
 /// </summary>

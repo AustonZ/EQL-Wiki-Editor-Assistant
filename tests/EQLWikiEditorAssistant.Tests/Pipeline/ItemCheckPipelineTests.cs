@@ -47,8 +47,8 @@ public class ItemCheckPipelineTests
         L("8", 229, 241),
     ];
 
-    /// <summary>The same item with a levelled name — ineligible, because the wiki stores level-0 data only.</summary>
-    private static readonly TextLine[] LevelledLines =
+    /// <summary>The same item with a leveled name — ineligible, because the wiki stores level-0 data only.</summary>
+    private static readonly TextLine[] LeveledLines =
         [.. EarringLines.Select(l => new TextLine(l.Text.Replace("Earring of Bashing", "Earring of Bashing +3"), l.BoundingBox, l.Words))];
 
     private static readonly TextLine[] LoreTabLines =
@@ -700,7 +700,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task AnIneligibleItemWritesNoLedgerRowAndNeverReachesTheWiki()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LeveledLines));
 
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
@@ -710,12 +710,12 @@ public class ItemCheckPipelineTests
         Assert.Equal(0, wiki.Fetches);
     }
 
-    /// <summary>A levelled item is compared with nothing, but its entry in the list shows its icon like any other's
+    /// <summary>A leveled item is compared with nothing, but its entry in the list shows its icon like any other's
     /// (user, 2026-10-12). The icon used to be cropped only after the eligibility check had returned.</summary>
     [Fact]
     public async Task AnIneligibleItemStillCarriesItsIcon()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LeveledLines));
 
         ItemCheckResult result = (await pipeline.CheckAsync(FrameWithIcon()))[0];
 
@@ -726,14 +726,14 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
-    /// "Refresh wiki data" is offered on an ineligible item too (user, 2026-10-12), and must not compare it: a levelled
+    /// "Refresh wiki data" is offered on an ineligible item too (user, 2026-10-12), and must not compare it: a leveled
     /// item's stats are legitimately higher than the page's, so the comparison would propose overwriting a correct
     /// page. It comes back exactly as it was, with no wiki request and no row.
     /// </summary>
     [Fact]
     public async Task RefreshingAnIneligibleItemComparesNothing()
     {
-        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+        (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) = Build(Window(LeveledLines));
         ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
 
         ItemCheckResult refreshed = await pipeline.ReanalyzeAsync(result, refreshVerification: true);
@@ -747,7 +747,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task SkippingAnIneligibleItemStillWritesNoRow()
     {
-        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(LeveledLines));
         IReadOnlyList<ItemCheckResult> results = await pipeline.CheckAsync(BlankFrame());
 
         pipeline.RecordSkipped(results[0]);
@@ -1155,7 +1155,7 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
-    /// **Committing a stat fix must not quietly settle a judgement the tool declined to make.** Writing a corrected
+    /// **Committing a stat fix must not quietly settle a judgment the tool declined to make.** Writing a corrected
     /// AC says nothing about the lore difference the user was warned of on the same screen, and recording `Edited`
     /// would count the whole item as done and never raise it again. The outcome must not depend on whether some
     /// unrelated stat happened to change too.
@@ -1166,7 +1166,7 @@ public class ItemCheckPipelineTests
         TextLine[] lines = [.. EarringLines];
         lines[Array.IndexOf(lines, lines.First(l => l.Text == "5"))] = L("6", 228, 193);
 
-        // A Lore tab that has not been captured is an outstanding judgement, and the edit is real and unrelated.
+        // A Lore tab that has not been captured is an outstanding judgment, and the edit is real and unrelated.
         (ItemCheckPipeline pipeline, FakeWiki wiki, CheckedItemsLedger ledger) =
             Build(Window(lines, hasLoreTab: true), EarringPage());
         ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
@@ -1182,7 +1182,7 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
-    /// The user's answer to a judgement the tool refused to make — most often "the page's lore is the better
+    /// The user's answer to a judgment the tool refused to make — most often "the page's lore is the better
     /// wording". It has to exist: without it such an item re-fetches on every capture forever, and the only other
     /// escape would be overwriting the very thing the user just approved.
     /// </summary>
@@ -1207,7 +1207,7 @@ public class ItemCheckPipelineTests
     [Fact]
     public async Task MarkingAnIneligibleItemAsCheckedStillWritesNoRow()
     {
-        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(LevelledLines));
+        (ItemCheckPipeline pipeline, _, CheckedItemsLedger ledger) = Build(Window(LeveledLines));
         ItemCheckResult result = (await pipeline.CheckAsync(BlankFrame()))[0];
 
         pipeline.RecordCheckedByHand(result);
@@ -1395,21 +1395,21 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
-    /// A levelled item is refused from its Lore tab too (bug found by the user, 2026-10-07, on `Arydryidriyorn +5`).
+    /// A leveled item is refused from its Lore tab too (bug found by the user, 2026-10-07, on `Arydryidriyorn +5`).
     /// The Lore branch returned before eligibility was checked, so the capture was accepted and the list asked for
     /// the Description tab — of an item that capture would then refuse. Its lore is not kept either: an ineligible
     /// window leaves nothing behind, in the ledger or anywhere else.
     /// </summary>
     [Fact]
-    public async Task ALoreCaptureOfALevelledItemIsIneligibleAndKeepsNothing()
+    public async Task ALoreCaptureOfALeveledItemIsIneligibleAndKeepsNothing()
     {
         var wiki = new FakeWiki();
         wiki.Pages["Earring of Bashing"] =
             new WikiPage("Earring of Bashing", EarringPage(), 100, DateTimeOffset.UnixEpoch);
 
-        TextLine[] levelledLore =
+        TextLine[] leveledLore =
             [.. LoreTabLines.Select(l => new TextLine(l.Text.Replace("Earring of Bashing", "Earring of Bashing +3"), l.BoundingBox, l.Words))];
-        var locator = new FakeLocator(Window(levelledLore, hasLoreTab: true, tab: ItemWindowTab.Lore));
+        var locator = new FakeLocator(Window(leveledLore, hasLoreTab: true, tab: ItemWindowTab.Lore));
         var ledger = new CheckedItemsLedger();
         var pipeline = new ItemCheckPipeline(wiki, locator, ledger);
 
@@ -1465,7 +1465,7 @@ public class ItemCheckPipelineTests
         Assert.Equal(fetchesBefore, wiki.Fetches);
     }
 
-    /// <summary>The data commit honours the same gate, since the rule now lives in one place rather than in the
+    /// <summary>The data commit honors the same gate, since the rule now lives in one place rather than in the
     /// handler that happened to remember it.</summary>
     [Fact]
     public async Task TheDataCommitWillNotWriteWhenTheGateRefuses()
@@ -1603,7 +1603,7 @@ public class ItemCheckPipelineTests
     }
 
     /// <summary>
-    /// **The control, and the rule that keeps this safe**: with no library the behaviour is exactly what it was
+    /// **The control, and the rule that keeps this safe**: with no library the behavior is exactly what it was
     /// before — a blank id, reported as a gap. The feature degrades rather than guessing.
     /// </summary>
     [Fact]

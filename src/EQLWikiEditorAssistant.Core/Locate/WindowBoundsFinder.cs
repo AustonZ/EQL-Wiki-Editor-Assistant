@@ -3,27 +3,27 @@ using EQLWikiEditorAssistant.Core.Imaging;
 namespace EQLWikiEditorAssistant.Core.Locate;
 
 /// <summary>
-/// Finds an item window's bounds by tracing the **content area's own outline** — the thin neutral-grey line the
+/// Finds an item window's bounds by tracing the **content area's own outline** — the thin neutral-gray line the
 /// game draws around the Description/Lore tab contents — outward from a known interior point (the tab label's box).
 /// Returns null rather than guessing when that line can't be found consistently, which the caller treats as
 /// "occluded, don't parse".
 ///
-/// **Why the grey line and not a brightness transition.** Two earlier designs failed, and the reasons are the
+/// **Why the gray line and not a brightness transition.** Two earlier designs failed, and the reasons are the
 /// design: (1) clustering recognized lines by text proximity can't tell a window's own content from an adjacent dark
 /// window's; (2) tracing the edge of the near-black interior — "scan out until it stops being dark" — works only
 /// while whatever is *outside* the window is brighter than the window. It isn't, often: the player's own 3D
 /// character model standing behind the window measures ~33-75, and another dark UI panel measures about the same
-/// as the interior, so those scans tunnelled straight through the real edge and ran to the scan limit. The grey
+/// as the interior, so those scans tunneled straight through the real edge and ran to the scan limit. The gray
 /// outline is immune to all of that, because it's the window drawing itself rather than a contrast accident.
 ///
-/// **Measured colour profile** (via <c>tools/LocateSpike --probe x,y,dx,dy,count</c>, which dumps raw pixel RGB
+/// **Measured color profile** (via <c>tools/LocateSpike --probe x,y,dx,dy,count</c>, which dumps raw pixel RGB
 /// along a ray — use it before changing any constant here):
 /// <list type="bullet">
 /// <item>Window interior: R=G=B≈16, widened to roughly 10-25 by JPEG noise.</item>
-/// <item>Content outline: a 1px neutral grey line, 50-62 on every edge of every real sample, and essentially
+/// <item>Content outline: a 1px neutral gray line, 50-62 on every edge of every real sample, and essentially
 /// constant along its own length (e.g. 20 consecutive pixels all reading 59-60).</item>
 /// <item>Outer window frame, just outside that line: 0-8, i.e. *darker* than the interior.</item>
-/// <item>World background: 150-170. Text: up to 255, with anti-aliased edges that pass through the grey range.</item>
+/// <item>World background: 150-170. Text: up to 255, with anti-aliased edges that pass through the gray range.</item>
 /// </list>
 ///
 /// **Brightness alone can't identify the line** — anti-aliased text edges hit the same 50-62 band, and so does the
@@ -33,14 +33,14 @@ namespace EQLWikiEditorAssistant.Core.Locate;
 /// brightness line pixels perpendicular to the scan direction. That check is also what implements "if the border
 /// is broken at any point, treat it as occluded": something drawn over part of an edge breaks the run.
 ///
-/// **The top edge uses a different piece of the window's chrome.** There is no grey outline at the window's outer
+/// **The top edge uses a different piece of the window's chrome.** There is no gray outline at the window's outer
 /// top, and the parser needs the title bar inside the crop (it reconciles the title-bar name against the
 /// content-area name), so the top is placed from the *title bar's own pure-black band* instead — see
 /// <see cref="ScanToTitleBarBottom"/>.
 ///
 /// **Every distance here is the 1.00 one, and is multiplied by the UI scale** (the <c>scale</c> passed in, written
 /// <c>n</c> below). Measured 2026-10-13: at 2.00, 3.00 and 4.00 the frame, the gaps, the outline and the title bar are
-/// the 1.00 ones times the scale, with the same colours (see <see cref="Glyphs.UiScales"/>). The colour thresholds are
+/// the 1.00 ones times the scale, with the same colors (see <see cref="Glyphs.UiScales"/>). The color thresholds are
 /// not distances and do not change.
 ///
 /// Every threshold here was measured against real screenshots, not derived on paper. Re-tune only with
@@ -54,8 +54,8 @@ public static class WindowBoundsFinder
     private const int InteriorMaxChannel = 30;      // interior ≈16; headroom for JPEG noise
     private const int LineMinChannel = 38;          // outline measured 50-62 …
     private const int LineMaxChannel = 110;         // … with generous headroom either side
-    private const int LineMaxColourSpread = 16;     // the outline is neutral grey (R≈G≈B)
-    private const int LineBrightnessTolerance = 16; // how close a neighbour must be to be "the same line"
+    private const int LineMaxColorSpread = 16;     // the outline is neutral gray (R≈G≈B)
+    private const int LineBrightnessTolerance = 16; // how close a neighbor must be to be "the same line"
     private const int LineVerifyHalfRun = 60;       // px sampled each way along a candidate line
     private const double LineVerifyMinMatch = 0.85; // fraction of those that must match
     private const int LineClusterGapPx = 10;        // chrome lines this close together are one stack
@@ -63,13 +63,13 @@ public static class WindowBoundsFinder
     // Just outside the window's outline sits its outer frame: a ~2px run measuring 0, i.e. *darker* than the ~16
     // interior. Requiring it beyond a candidate is what separates the content area's real boundary from the
     // internal divider rules the window also draws (e.g. the dropdown outline by the "Modified" row), which are
-    // identical grey lines but have more window beyond them, not frame. It's also why this survives a dark
-    // neighbour: the frame belongs to the window, so it's there whatever is behind it.
+    // identical gray lines but have more window beyond them, not frame. It's also why this survives a dark
+    // neighbor: the frame belongs to the window, so it's there whatever is behind it.
     //
     // Tested on the **minimum** channel, not the maximum. JPEG bleed from whatever is adjacent lifts individual
     // channels of this thin run unevenly — against a red element below one real window the frame reads (11,0,0)
     // then (34,0,0), which a max-channel test rejects — but the bleed never lifts all three at once, so the
-    // minimum stays at 0 while the interior's neutral grey keeps a minimum of ~16.
+    // minimum stays at 0 while the interior's neutral gray keeps a minimum of ~16.
     private const int FrameMaxMinChannel = 8;
     private const int FrameMinRun = 2;
     private const int FrameSearchDistance = 25;
@@ -98,7 +98,7 @@ public static class WindowBoundsFinder
     // set with EQLWIKI_LOCATE_DIAG=1, which prints every probe's answer:
     //  - Outline-traced edges score 64-100% on clean windows and 55-67% on the one genuinely part-covered edge
     //    in the set. Those overlap, so **agreement alone cannot decide occlusion** — a threshold strict enough
-    //    to reject the covered edge (0.7) also rejects a legitimately clean window touching a neighbour and one
+    //    to reject the covered edge (0.7) also rejects a legitimately clean window touching a neighbor and one
     //    sitting at the screen edge. So this stays permissive and <see cref="IsRectangleClosed"/> does the real
     //    work of rejecting a partly-covered window.
     //  - The title bar's bottom is clean: every column reads the same row.
@@ -117,7 +117,7 @@ public static class WindowBoundsFinder
     // the 600x700 ceiling and 700px scan that used to sit here refused any that were. The ceiling was a backstop for
     // an occluder flush along a window's entire side, where every probe agrees on the same oversized answer — but
     // measured, it never fired: all 119 windows in the corpus trace to byte-identical rectangles with and without it.
-    // IsRectangleClosed and Parse's title-vs-content name check remain the defences for that case.
+    // IsRectangleClosed and Parse's title-vs-content name check remain the defenses for that case.
 
     /// <summary>Returns the window's pixel bounds, or null if its outline can't be traced consistently (treat as
     /// occluded — don't parse it).</summary>
@@ -292,7 +292,7 @@ public static class WindowBoundsFinder
     /// This is what rejects a partly-covered window, and it does the job that probe agreement can't: on the real
     /// sample set, a clean window's edge agreement (64-100%) overlaps a covered edge's (55-67%), so no threshold
     /// separates them. Closure does, because a covered edge's consensus lands on the *occluding* window's
-    /// outline — and this window's own bottom outline then doesn't reach that corner, since the neighbour's
+    /// outline — and this window's own bottom outline then doesn't reach that corner, since the neighbor's
     /// interior is there instead. Geometry that can't close is exactly "the border is broken somewhere".</summary>
     private static bool IsRectangleClosed(CapturedImage image, int left, int right, int bottom, int interiorY, int n)
     {
@@ -420,7 +420,7 @@ public static class WindowBoundsFinder
 
     private static bool IsInterior(CapturedImage image, int x, int y) => MaxChannel(image, x, y) <= InteriorMaxChannel;
 
-    /// <summary>The window's outer frame, tested on the minimum channel so channel bleed from a bright neighbour
+    /// <summary>The window's outer frame, tested on the minimum channel so channel bleed from a bright neighbor
     /// doesn't hide it — see <see cref="FrameMaxMinChannel"/>.</summary>
     private static bool IsFrameBlack(CapturedImage image, int x, int y) => MinChannel(image, x, y) <= FrameMaxMinChannel;
 
@@ -437,6 +437,6 @@ public static class WindowBoundsFinder
         int b = image.Pixels[i], g = image.Pixels[i + 1], r = image.Pixels[i + 2];
         int max = Math.Max(r, Math.Max(g, b));
         int min = Math.Min(r, Math.Min(g, b));
-        return max >= LineMinChannel && max <= LineMaxChannel && max - min <= LineMaxColourSpread;
+        return max >= LineMinChannel && max <= LineMaxChannel && max - min <= LineMaxColorSpread;
     }
 }

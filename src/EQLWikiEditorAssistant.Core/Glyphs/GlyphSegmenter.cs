@@ -8,11 +8,11 @@ namespace EQLWikiEditorAssistant.Core.Glyphs;
 public sealed record GlyphBox(GlyphBitmap Bitmap, int X, int Y, int BaselineOffset);
 
 /// <summary>A maximal group of glyphs with no word-sized gap between them — roughly a word. <see cref="Mask"/> is
-/// which colour channels its text uses, which is how runs of different colours on one line are told apart.</summary>
+/// which color channels its text uses, which is how runs of different colors on one line are told apart.</summary>
 public sealed record GlyphRun(int Left, int Right, int Mask, int Peak, IReadOnlyList<GlyphBox> Glyphs);
 
 /// <summary>A line of text: a maximal group of consecutive rows containing ink. Background and peak are measured
-/// per band (and, for peak, per colour within it) rather than per region — see <see cref="GlyphSegmenter"/>.</summary>
+/// per band (and, for peak, per color within it) rather than per region — see <see cref="GlyphSegmenter"/>.</summary>
 public sealed record TextBand(int Top, int Bottom, int Background, int Baseline, IReadOnlyList<GlyphRun> Runs)
 {
     public IEnumerable<GlyphBox> Glyphs => Runs.SelectMany(r => r.Glyphs);
@@ -38,14 +38,14 @@ public sealed record SegmentResult(int Background, IReadOnlyList<TextBand> Bands
 /// word whose glyphs happen not to touch.</item>
 /// </list>
 ///
-/// <b>Background is measured per band and peak per colour within a band</b>, which took two corrections to get
+/// <b>Background is measured per band and peak per color within a band</b>, which took two corrections to get
 /// right and both were caught by the off-ramp counter rather than by inspection:
 /// <list type="bullet">
 /// <item>Peak cannot come from a single run. A 2px-wide 'i' or 'l' tops out at ramp level 4 (measured 191 where
 /// white's true peak is 255) because its stem is never fully covered, so calibrating on its own maximum
-/// mis-normalizes the whole glyph. Peak is therefore the brightest pixel of the <i>same colour</i> anywhere in
+/// mis-normalizes the whole glyph. Peak is therefore the brightest pixel of the <i>same color</i> anywhere in
 /// the band, which any real line of text supplies from its wider letters.</item>
-/// <item>Peak cannot come from the band either without splitting by colour, because one line routinely carries
+/// <item>Peak cannot come from the band either without splitting by color, because one line routinely carries
 /// two: a white "Focus Effect:" label peaking at 255 sits on the same row as a magenta effect name peaking at
 /// 224. Runs are grouped by which channels their brightest pixel uses (white = all three, yellow = R+G,
 /// magenta = R+B, green = G alone).</item>
@@ -76,15 +76,15 @@ public static class GlyphSegmenter
         {
             int background = DetectBackground(image, region with { Y = top, Height = bottom - top + 1 });
 
-            // Two passes over the band's runs: the first only to learn each run's colour and the brightest pixel
-            // of that colour anywhere in the band, because a run cannot be normalized until its colour's true
+            // Two passes over the band's runs: the first only to learn each run's color and the brightest pixel
+            // of that color anywhere in the band, because a run cannot be normalized until its color's true
             // peak is known (see the class remarks — a narrow 'i' never reaches it on its own).
             var extents = FindRuns(image, region, background, top, bottom, WordGapColumns * scale);
             var peakByMask = new Dictionary<int, int>();
             var masks = new List<int>(extents.Count);
             foreach ((int left, int right) in extents)
             {
-                (int mask, int localPeak) = ColourOf(image, background, left, right, top, bottom);
+                (int mask, int localPeak) = ColorOf(image, background, left, right, top, bottom);
                 masks.Add(mask);
                 peakByMask[mask] = Math.Max(peakByMask.GetValueOrDefault(mask), localPeak);
             }
@@ -114,9 +114,9 @@ public static class GlyphSegmenter
     /// Fixes each band's baseline — the row where most glyphs' ink ends — then restates every glyph's vertical
     /// position relative to it.
     ///
-    /// <b>Ties are broken towards the lower row, and that is load-bearing.</b> On a line of letters the mode is
+    /// <b>Ties are broken toward the lower row, and that is load-bearing.</b> On a line of letters the mode is
     /// unambiguous, but the sheet's <c>&lt;&gt;?|:~</c> row has only '?' and ':' actually sitting on the
-    /// baseline while '&lt;' and '&gt;' float above it — a 2-2 tie. Breaking it towards the higher row put that
+    /// baseline while '&lt;' and '&gt;' float above it — a 2-2 tie. Breaking it toward the higher row put that
     /// band's baseline 2px up, so the ':' went into the atlas with a bogus offset and never matched a real
     /// "Race:", which then read as "Race." — a silent character substitution, exactly the failure class this
     /// engine exists to remove. Descenders are the only thing that sits lower than the baseline and they are
@@ -226,11 +226,11 @@ public static class GlyphSegmenter
         return columns;
     }
 
-    /// <summary>A run's text colour, as the set of channels its brightest pixel uses, plus that pixel's
-    /// intensity. The brightest pixel is the one to read the colour from: a partly-covered pixel of white text
+    /// <summary>A run's text color, as the set of channels its brightest pixel uses, plus that pixel's
+    /// intensity. The brightest pixel is the one to read the color from: a partly-covered pixel of white text
     /// still has all three channels raised, just less, so any pixel identifies the channel set — but only the
     /// brightest is guaranteed not to have been dimmed below the ink threshold on a weakly-used channel.</summary>
-    private static (int Mask, int Peak) ColourOf(
+    private static (int Mask, int Peak) ColorOf(
         CapturedImage image, int background, int left, int right, int top, int bottom)
     {
         int peak = 0, peakIndex = -1;
@@ -281,7 +281,7 @@ public static class GlyphSegmenter
         return new GlyphBox(new GlyphBitmap(width, height, levels), left, inkTop, 0);
     }
 
-    /// <summary>Most common value, ties broken towards the <b>larger</b> value — see
+    /// <summary>Most common value, ties broken toward the <b>larger</b> value — see
     /// <see cref="AssignBaselines"/> for why that direction is not arbitrary.</summary>
     private static int Mode(IEnumerable<int> values)
     {

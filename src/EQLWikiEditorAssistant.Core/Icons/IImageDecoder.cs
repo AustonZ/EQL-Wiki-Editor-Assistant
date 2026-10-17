@@ -19,7 +19,7 @@ public interface IImageDecoder
     /// <summary>
     /// Decodes <paramref name="bytes"/>, flattening any transparency onto <paramref name="background"/>.
     /// </summary>
-    /// <param name="background">The grey to composite over — <see cref="AlphaComposite.GameBackground"/> for a wiki
+    /// <param name="background">The gray to composite over — <see cref="AlphaComposite.GameBackground"/> for a wiki
     /// icon that will be compared against one the game drew.</param>
     Task<CapturedImage> DecodeAsync(
         byte[] bytes,

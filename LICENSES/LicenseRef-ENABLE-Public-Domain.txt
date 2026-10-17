@@ -7,5 +7,5 @@ compilers credited as the originators of the list, and that nobody copyright or 
 itself.
 
 The file src/EQLWikiEditorAssistant.Core/Glyphs/enable-i-l-words.txt is a subset of that list, taken from enable1.txt
-(172,823 words) as distributed at https://github.com/dolph/dictionary. It remains in the public domain: the MIT licence
+(172,823 words) as distributed at https://github.com/dolph/dictionary. It remains in the public domain: the MIT license
 that covers the rest of this repository does not apply to it, and nothing here restricts its redistribution.

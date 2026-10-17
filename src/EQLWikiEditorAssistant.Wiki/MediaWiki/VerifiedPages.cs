@@ -84,7 +84,7 @@ public sealed class VerifiedPages
     /// **An unreachable wiki propagates** (<see cref="WikiUnavailableException"/>), because the capture that follows
     /// would fail on every page anyway — and since this runs first, it is the tool's earliest and cheapest notice
     /// that the wiki is gone (user, 2026-09-29). An error *about this page* is a different matter and is swallowed:
-    /// whether somebody has ticked a box on a web page is not a reason to fail an item.
+    /// whether somebody has checked a box on a web page is not a reason to fail an item.
     /// </summary>
     public Task RefreshAsync(CancellationToken cancellationToken = default) => RefreshAsync(false, cancellationToken);
 

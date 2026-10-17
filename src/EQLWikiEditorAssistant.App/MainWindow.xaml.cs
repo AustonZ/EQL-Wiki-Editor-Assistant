@@ -19,7 +19,7 @@ namespace EQLWikiEditorAssistant.App;
 /// <summary>
 /// The review screen: capture, then look at every item window the frame held and decide what to do with each.
 ///
-/// **Nothing here decides anything about an item.** Every judgement was made by the analyzer, the compliance checker
+/// **Nothing here decides anything about an item.** Every judgment was made by the analyzer, the compliance checker
 /// and the editor; this shows them and carries the user's answer back. The one thing it owns is that the text on
 /// screen is the text that gets saved.
 /// </summary>
@@ -97,7 +97,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Shows the window, or doesn't: **where it was when it last closed, always** (a tester's request, 2026-10-12, made
-    /// standard behaviour by the user rather than a setting), and **minimized if Settings > Window > Start minimized
+    /// standard behavior by the user rather than a setting), and **minimized if Settings > Window > Start minimized
     /// says so** — to the tray, never shown at all, when Minimize to system tray is on too. The settings are read here
     /// rather than waiting for <see cref="AppServices"/>, which takes seconds to build, since a window that appeared
     /// and then vanished into the tray would be the thing the option exists to avoid.
@@ -282,7 +282,7 @@ public partial class MainWindow : Window
             });
             if (!downloaded)
             {
-                StatusText.Text = "Update cancelled.";
+                StatusText.Text = "Update canceled.";
                 return;
             }
 

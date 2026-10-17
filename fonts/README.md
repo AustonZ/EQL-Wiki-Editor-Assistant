@@ -3,7 +3,7 @@
 Everything in this folder except this README is gitignored, and must stay that way.
 
 **EQL Wiki Editor Assistant** is a personal modification of Windows' own Arial, made so the in-game item window is easier
-for a human to read and exactly readable by the tool. Arial's licence forbids modifying it at all, let alone
+for a human to read and exactly readable by the tool. Arial's license forbids modifying it at all, let alone
 distributing it; the user chose to make this copy for their own machine. So the font files never enter git, never
 get attached to an issue, and never get shared. This folder is the one place they live.
 

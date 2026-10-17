@@ -8,7 +8,7 @@ using EQLWikiEditorAssistant.TestSupport;
 // screenshot. --save draws a rectangle around each found window (green = clean, red = occluded) for visual
 // verification.
 //
-// --probe dumps raw pixel RGB along a ray instead of locating, which is how the window-chrome colour profile
+// --probe dumps raw pixel RGB along a ray instead of locating, which is how the window-chrome color profile
 // (interior / content-outline line / outer frame / world background) was actually measured rather than guessed
 // at — keep using it before changing any threshold in WindowBoundsFinder.
 //
@@ -60,11 +60,11 @@ for (int i = 0; i < windows.Count; i++)
         (w.Ramp is { IsStandard: false } ramp ? $", Ramp=[{ramp}]" : "") + " ---");
     if (args.Contains("--icon"))
     {
-        // Bounding box of everything that is not the content area's 16-grey, inside the strip left of the text.
+        // Bounding box of everything that is not the content area's 16-gray, inside the strip left of the text.
         // Measuring this is the only way to find out whether the item icon sits at a fixed offset in the window;
         // the plan's locate history is a long argument for measuring rather than assuming exactly this sort of thing.
         // The icon sits in the strip left of the content text, drawn with transparency straight onto the window's
-        // 16-grey — there is no frame around it. Chrome rules and the content outline live in the 26-70 band, so
+        // 16-gray — there is no frame around it. Chrome rules and the content outline live in the 26-70 band, so
         // requiring a brighter pixel keeps them out; x starts at 2 to clear the outline column entirely.
         // Distances are the 1.00 ones, times the window's UI scale.
         const int inkFloor = 70;

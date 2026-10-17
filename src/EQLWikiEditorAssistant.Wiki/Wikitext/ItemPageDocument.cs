@@ -432,7 +432,7 @@ public sealed class ItemPageDocument
     /// which is where the <c>{{Item Lore Missing}}</c> placeholder it replaces also sat.
     ///
     /// Throws when the page has no <c>notes</c> parameter at all: that is the minimal-edit rule's third case, where
-    /// there is no line to change and choosing a position is a judgement — <see cref="WithParameter"/> refuses it
+    /// there is no line to change and choosing a position is a judgment — <see cref="WithParameter"/> refuses it
     /// for the same reason.
     /// </summary>
     public ItemPageDocument WithLore(string loreText, IReadOnlyList<string>? blueprintOrder = null)

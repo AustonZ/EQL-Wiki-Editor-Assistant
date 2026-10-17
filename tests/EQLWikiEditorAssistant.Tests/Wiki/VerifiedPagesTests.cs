@@ -130,7 +130,7 @@ public class VerifiedPagesTests : IDisposable
         Assert.Null(pages.IsVerified("Dragon Bone Bracelet"));
     }
 
-    /// <summary>An error *about this page* is swallowed: whether somebody ticked a box on a web page is not a reason
+    /// <summary>An error *about this page* is swallowed: whether somebody checked a box on a web page is not a reason
     /// to fail a capture, and whatever was already known stays.</summary>
     [Fact]
     public async Task KeepsWhatItHasWhenTheListItselfCannotBeRead()

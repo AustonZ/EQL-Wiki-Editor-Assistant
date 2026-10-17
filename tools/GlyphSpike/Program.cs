@@ -6,7 +6,7 @@ using EQLWikiEditorAssistant.TestSupport.Accuracy;
 using EQLWikiEditorAssistant.TestSupport;
 
 // Milestone 2d / stage 2 spike tool: the measuring instrument and atlas builder for the glyph-matching work, in
-// the same spirit as LocateSpike's --probe (which is how the window-chrome colour profile was measured rather
+// the same spirit as LocateSpike's --probe (which is how the window-chrome color profile was measured rather
 // than guessed). Keep using this rather than recreating an ad hoc version.
 //
 //   GlyphSpike dump <image> <x,y,w,h> [--raw]   2D intensity map of a region, so a glyph's actual pixels can be
@@ -14,7 +14,7 @@ using EQLWikiEditorAssistant.TestSupport;
 //   GlyphSpike segment <image> [x,y,w,h]        text bands / runs / glyph boxes the segmenter finds
 //   GlyphSpike cluster <image> [x,y,w,h]        cluster glyphs by exact equality and render each distinct shape
 //   GlyphSpike atlas <image> [x,y,w,h] [--scale N] --out f
-//                                               build the labelled atlas from the Notes Window glyph sheet, captured
+//                                               build the labeled atlas from the Notes Window glyph sheet, captured
 //                                               at UI scale N (a whole number; 1 if not given)
 //   GlyphSpike atlas <image> [x,y,w,h] --font <sheet font> --merge-into <atlas> [--existing-font Arial] --out f
 //                                               add a second UI font's sheet to an existing atlas: shapes both
@@ -144,7 +144,7 @@ static int Cluster(CapturedImage image, Rect region, string path)
 }
 
 /// <summary>Rows of the in-game Notes Window sheet, in the order the user typed them, each character separated by
-/// a space so it segments cleanly. Labelling is positional against these strings rather than a manual pass — the
+/// a space so it segments cleanly. Labeling is positional against these strings rather than a manual pass — the
 /// atlas builder refuses if any row's glyph count disagrees, which is what makes that safe.</summary>
 static string[] SheetRows() =>
 [
@@ -168,7 +168,7 @@ static int Atlas(CapturedImage image, Rect region, string[] args)
     GlyphAtlas atlas;
     try
     {
-        atlas = GlyphAtlas.FromLabelledBands(result.Bands, SheetRows());
+        atlas = GlyphAtlas.FromLabeledBands(result.Bands, SheetRows());
     }
     catch (ArgumentException ex)
     {

@@ -8,7 +8,7 @@ namespace EQLWikiEditorAssistant.App;
 
 /// <summary>
 /// Where the main window was when it last closed: its restored position and size, and whether it was maximized. The
-/// next start puts it back (a tester's request, 2026-10-12, made standard behaviour by the user rather than a setting).
+/// next start puts it back (a tester's request, 2026-10-12, made standard behavior by the user rather than a setting).
 ///
 /// **It is Windows' own window placement, not WPF's <c>Left</c>/<c>Top</c>/<c>Width</c>/<c>Height</c>.** The placement
 /// records the *restored* rectangle even while the window is maximized or minimized, which is what has to be kept, and

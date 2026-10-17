@@ -27,7 +27,7 @@ public sealed record LedgerRowViewModel(LedgerEntry Entry, LedgerVerdict Verdict
             : "";
 
     /// <summary>Collapses the line when there is no title to show: an empty one still took a line's height, which made
-    /// every row two lines tall and pushed the name above the row's centre (user, 2026-10-08).</summary>
+    /// every row two lines tall and pushed the name above the row's center (user, 2026-10-08).</summary>
     public bool HasPageTitle => PageTitle.Length > 0;
 
     public string Outcome => Entry.Outcome switch
@@ -41,7 +41,7 @@ public sealed record LedgerRowViewModel(LedgerEntry Entry, LedgerVerdict Verdict
         _ => Entry.Outcome.ToString(),
     };
 
-    /// <summary>The same palette the review screen uses: green settled, red wanting a human, grey neither.</summary>
+    /// <summary>The same palette the review screen uses: green settled, red wanting a human, gray neither.</summary>
     public Brush OutcomeBrush => Entry.Outcome switch
     {
         CheckOutcome.Matched or CheckOutcome.Edited or CheckOutcome.Created => Palette.Done,

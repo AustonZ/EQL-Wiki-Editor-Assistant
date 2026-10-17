@@ -1,7 +1,7 @@
 namespace EQLWikiEditorAssistant.Wiki.Wikitext;
 
 /// <summary>
-/// Splits a statsblock line into <c>Label: Value</c> pairs and leading unlabelled flags.
+/// Splits a statsblock line into <c>Label: Value</c> pairs and leading unlabeled flags.
 ///
 /// Every rule here was measured against 2,514 statsblock lines from 414 real item pages (eqlwiki.com, 2026-09-24),
 /// not taken from the template blueprint. The blueprint describes an idealized block; the pages are a mix of a
@@ -12,7 +12,7 @@ namespace EQLWikiEditorAssistant.Wiki.Wikitext;
 /// nonsense. Parentheses, wikilinks and nested templates all nest.
 ///
 /// **A label may not contain a double space.** This is the one rule that is not obvious and the one that pays for
-/// itself: without it <c>EXPENDABLE  Charges: 10</c> reads as a field labelled "EXPENDABLE  Charges", because a
+/// itself: without it <c>EXPENDABLE  Charges: 10</c> reads as a field labeled "EXPENDABLE  Charges", because a
 /// label legitimately may contain a single space (<c>SV FIRE</c>, <c>Mount Speed</c>, <c>HP Regen</c>). Real pages
 /// use a double space as the separator between two fields on one line, which makes it available as the boundary.
 ///
@@ -68,7 +68,7 @@ internal static class StatsBlockGrammar
         return fields;
     }
 
-    /// <summary>Splits an unlabelled fragment into flag tokens. See the type comment for why the separator set is
+    /// <summary>Splits an unlabeled fragment into flag tokens. See the type comment for why the separator set is
     /// exactly "comma" and "two or more spaces".</summary>
     public static IReadOnlyList<string> ReadFlags(string leading)
     {

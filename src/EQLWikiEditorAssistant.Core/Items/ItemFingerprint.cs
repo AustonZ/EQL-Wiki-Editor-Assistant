@@ -13,7 +13,7 @@ namespace EQLWikiEditorAssistant.Core.Items;
 ///
 /// **The captured level is part of it**, even though only `+0` items are processed today. A `+7` capture is
 /// ineligible and writes no ledger row at all, so it never reaches here — but including the level means that if a
-/// future version *does* process levelled items, a `+0` entry and a `+7` entry can never be confused for one
+/// future version *does* process leveled items, a `+0` entry and a `+7` entry can never be confused for one
 /// another.
 ///
 /// **Parser warnings are deliberately excluded.** They quote fragments of text and churn with every parser change,
