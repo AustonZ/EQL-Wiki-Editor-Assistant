@@ -1077,10 +1077,32 @@ public partial class MainWindow : Window
     /// the notice, the section's header and note, the source editor's header and the buttons, held between 10 and 20
     /// rows of the diff's 12px Consolas.
     /// </summary>
+    /// <remarks>
+    /// Read from the event's new size, not the ScrollViewer's <c>ViewportHeight</c> (bug found by the user,
+    /// 2026-10-20): a ScrollViewer updates that only once layout has finished, after this event, so the first time a
+    /// page appears it still reads 0 and the diff opened at its minimum height. Neither ScrollViewer scrolls sideways,
+    /// so its height is its viewport's.
+    /// </remarks>
     private void OnDetailScrollerSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        const double row = 14, reserved = 210;
-        ReformattingScroller.MaxHeight = Math.Clamp(DetailScroller.ViewportHeight - reserved, 10 * row, 20 * row);
+        const double reserved = 210;
+        ReformattingScroller.MaxHeight = FittedDiffHeight(e.NewSize.Height, reserved);
+    }
+
+    /// <summary>
+    /// The same on the Submit page (user, 2026-10-20), where what has to stay in view is the title, the summary and
+    /// Save.
+    /// </summary>
+    private void OnSubmitPageSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        const double reserved = 230;
+        SubmitReformattingScroller.MaxHeight = FittedDiffHeight(e.NewSize.Height, reserved);
+    }
+
+    private static double FittedDiffHeight(double paneHeight, double reserved)
+    {
+        const double row = 14;
+        return Math.Clamp(paneHeight - reserved, 10 * row, 20 * row);
     }
 
     /// <summary>Done closes the item, like its ✕ in the list: nothing on the wiki or in the ledger changes.</summary>

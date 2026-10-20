@@ -1805,7 +1805,8 @@ a global hotkey is worth having.
        buttons changed, and the status that said why was elsewhere on screen). Warnings, icon, lore, findings and the
        proposed edit go (`ShowsComparison`); what stays is a yellow "The page still needs to be reformatted (no data
        changes)." and the reformatting section, open. The same notice, not "Only the layout changes" — which could be
-       read as the rendered page's layout — marks any layout-only proposal, on Submit too.
+       read as the rendered page's layout — marks any layout-only proposal on the Edit page. **Not on Submit** (user,
+       2026-10-20): the save proposed there *is* the reformatting, so "still needs to be reformatted" would be untrue.
      - **The change is animated** (user, 2026-10-12, `OfferLayoutAnimatedAsync`): the notice appears above the
        reformatting, the comparison fades out in 120 ms, then over 300 ms the reformatting opens while the faded
        comparison closes up and the pane scrolls back, so the notice ends at the top of the pane. The view model's
@@ -1834,7 +1835,18 @@ a global hotkey is worth having.
        button was clipped, and capturing again is the hotkey or Capture now like any capture.
   2. **Preview**: the wiki's own rendering of the text on screen — see the next bullet.
   3. **Submit**: the title it goes to (large, for a creation), the final diff of the text on screen against the page
-     laid out, the same collapsed reformatting, the summary, and Save or Create. **This page is the confirmation** (user, 2026-10-07): there is no "are you sure?"
+     laid out, the same collapsed reformatting, the summary, and Save or Create. **A layout-only save shows no final
+     diff, only the reformatting, open** (user, 2026-10-20): the final diff compares the page laid out with itself,
+     and `WikitextDiff` answers "no change" with the whole page, which repeated it in full above the diff that says
+     what changes. The reformatting scrolls past 10 to 20 rows, as on the Edit page, sized from the page's new size in
+     `SizeChanged` — never `ViewportHeight`, which reads 0 the first time a page appears (bug found by the user).
+     **A hand edit to a layout-only page blanks the layout summary** (bug found by the user, 2026-10-20, on `Book of
+     Scale`), since "no data changes" is then untrue; undoing the edit restores it. A summary the user typed is kept.
+     **Any other hand edit only gets a reminder** beside the summary (`SummaryMayNeedChanging`, user, 2026-10-20):
+     working out which of the Assistant's changes a hand edit undid would mean understanding the edit, which is hard
+     to get right and to test, but a summary tagged with the Assistant's name that misdescribes the revision costs
+     trust. It shows while the text differs from the Assistant's own and the summary is still the Assistant's; setting
+     the icon moves that baseline, and a new page never shows it. **This page is the confirmation** (user, 2026-10-07): there is no "are you sure?"
      after it. The missing-`lucy_img_ID` warning a creation used to put in its confirmation sits here instead, asked of
      the text on screen as before.
   4. **Done**: the live page, with Done (closes the item) and Edit again. Its own marker shows a green check, since

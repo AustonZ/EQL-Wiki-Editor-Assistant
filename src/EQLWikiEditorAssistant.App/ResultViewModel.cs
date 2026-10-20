@@ -276,6 +276,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     private bool _sourceExpanded;
     private string _loadedWikitext = "";
     private string _loadedSummary = "";
+    // The Assistant's own text and summary: what it loaded, or moved to itself (the layout offer, setting the icon).
+    // The summary warning compares against these, so a change the Assistant made never reads as the user's.
+    private string _proposedWikitext = "";
+    private string _proposedSummary = "";
     private bool _written;
     private string? _submitNotice;
 
@@ -307,6 +311,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
             ?? (result.Edit is { HasChanges: true } proposed ? proposed.Summary : "");
         _loadedWikitext = _wikitext;
         _loadedSummary = _summary;
+        _proposedWikitext = _wikitext;
+        _proposedSummary = _summary;
         _outcome = null;
         _settled = false;
         // Every reload starts the review over: a re-capture, a lore capture joining, or "Edit again" after a save all
@@ -381,7 +387,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     /// <summary>Nothing about the data changes, only the layout: said in words where the proposed edit would be.</summary>
     public bool HasOnlyLayoutProposed => (!HasProposedDiff || _settled) && HasReformatting && IsLayoutOnly;
 
-    /// <summary>The same on the Submit page, from the text on screen.</summary>
+    /// <summary>The same on the Submit page, from the text on screen. Not said there in words (user, 2026-10-20): the
+    /// save is the reformatting, so a notice that it is still needed would be untrue. It opens the reformatting.</summary>
     public bool HasOnlyLayoutToSubmit => !HasDiff && HasReformatting && IsLayoutOnly;
 
     /// <summary>
@@ -413,6 +420,8 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         _loadedWikitext = _wikitext;
         _summary = ReviewText.LayoutOnlySummary;
         _loadedSummary = _summary;
+        _proposedWikitext = _wikitext;
+        _proposedSummary = _summary;
         _settled = true;
         RebuildSteps();
         OnPropertyChanged(null);
@@ -691,6 +700,10 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         ArgumentException.ThrowIfNullOrWhiteSpace(iconId);
 
         _iconActioned = true;
+        // The icon is the Assistant's change, so it moves the baseline the summary warning compares against — but
+        // only where nothing was changed by hand, or a hand edit made before pressing the button would be absorbed.
+        bool textByHand = !string.Equals(_wikitext, _proposedWikitext, StringComparison.Ordinal);
+        bool summaryByHand = !string.Equals(_summary, _proposedSummary, StringComparison.Ordinal);
         _wikitext = wikitext;
 
         if (Result.Edit is { } edit)
@@ -714,6 +727,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         else if (!_summary.Contains("lucy_img_ID", StringComparison.OrdinalIgnoreCase) &&
                  !_summary.Contains("icon", StringComparison.OrdinalIgnoreCase))
             _summary += "; updated lucy_img_ID";
+
+        if (!textByHand) _proposedWikitext = _wikitext;
+        if (!summaryByHand) _proposedSummary = _summary;
 
         Replace(Warnings, BuildWarnings());
 
@@ -977,13 +993,32 @@ public sealed class ResultViewModel : INotifyPropertyChanged
     public bool HasEditor => Result.Edit is not null && !IsCreation;
 
     /// <summary>Rebuilds <see cref="Diff"/> from the text on screen. What Save writes is what is in the editor, so
-    /// the diff shown beside it has to be of that, not of the tool's proposal.</summary>
+    /// the diff shown beside it has to be of that, not of the tool's proposal.
+    ///
+    /// A diff that changes nothing is left empty (user, 2026-10-20). That is a save of the layout alone — the text
+    /// on screen is the page laid out — and <see cref="WikitextDiff"/> answers "no change" with the whole page, which
+    /// filled Submit with a box repeating the page, however long, above the reformatting diff that says what actually
+    /// changes. The reformatting is then all there is to look at, so it is shown open.
+    ///
+    /// The layout-only summary follows the text too (bug found by the user, 2026-10-20, on `Book of Scale`). A hand
+    /// edit to a page offered only its layout left "Reformatted to the Item Page Blueprint (no data changes)" on a save
+    /// that changes data, so it is blanked and the user writes their own, as for any hand-written edit; undoing the
+    /// edit brings it back. Only the summary as the tool wrote it is touched, never one the user typed.</summary>
     public void RefreshSubmitDiff()
     {
         string before = IsCreation ? "" : Result.Review?.FormattedOriginal ?? Result.Edit?.OriginalWikitext ?? "";
-        Replace(Diff, WikitextDiff.Compute(before, _wikitext).Select(l => new DiffLineViewModel(l)));
+        IReadOnlyList<DiffLine> diff = WikitextDiff.Compute(before, _wikitext);
+        Replace(Diff, diff.Any(l => l.Kind is DiffLineKind.Added or DiffLineKind.Removed)
+            ? diff.Select(l => new DiffLineViewModel(l))
+            : []);
+        if (HasOnlyLayoutToSubmit) ReformattingExpanded = true;
         OnPropertyChanged(nameof(HasDiff));
-        OnPropertyChanged(nameof(HasOnlyLayoutToSubmit));
+
+        if (!IsCreation && _loadedSummary == ReviewText.LayoutOnlySummary)
+        {
+            if (HasDiff && _summary == ReviewText.LayoutOnlySummary) Summary = "";
+            else if (!HasDiff && _summary.Length == 0) Summary = ReviewText.LayoutOnlySummary;
+        }
     }
     public bool HasFindings => Findings.Count > 0;
 
@@ -1032,6 +1067,7 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         set
         {
             Set(ref _wikitext, value);
+            OnPropertyChanged(nameof(SummaryMayNeedChanging));
             // Typing a correction into a page the tool judged correct is what makes saving possible at all.
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanCreatePage));
@@ -1047,12 +1083,27 @@ public sealed class ResultViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// The note beside the summary on Submit (user, 2026-10-20): the text was changed by hand and the summary is still
+    /// the one the Assistant wrote for its own proposal, so it may describe a change that is no longer there. Every
+    /// edit is tagged with the Assistant's name, so a summary that misdescribes the revision costs trust in it. Only
+    /// reminds: working out what the hand edit undid would mean understanding it, which the Assistant does not try to
+    /// do. A summary the user has changed, or one the Assistant left blank, raises nothing; nor does a new page, whose
+    /// summary says where the page came from rather than listing changes, and which the user is asked to edit (its
+    /// <c>lucy_img_ID</c>).
+    /// </summary>
+    public bool SummaryMayNeedChanging =>
+        !IsCreation && _proposedSummary.Length > 0 &&
+        string.Equals(_summary, _proposedSummary, StringComparison.Ordinal) &&
+        !string.Equals(_wikitext, _proposedWikitext, StringComparison.Ordinal);
+
     public string Summary
     {
         get => _summary;
         set
         {
             Set(ref _summary, value);
+            OnPropertyChanged(nameof(SummaryMayNeedChanging));
             OnPropertyChanged(nameof(CanAct));
             OnPropertyChanged(nameof(CanCreatePage));
             OnPropertyChanged(nameof(CanSave));

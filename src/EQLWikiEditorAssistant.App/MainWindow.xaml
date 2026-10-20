@@ -815,7 +815,8 @@
 
             <!-- 3. Submit: the last look before anything is written. **This page is the confirmation** (user,
                  2026-10-07): it shows exactly what Save writes, so there is no "are you sure?" after it. -->
-            <ScrollViewer x:Name="SubmitPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer x:Name="SubmitPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
+                          SizeChanged="OnSubmitPageSizeChanged">
                 <StackPanel Margin="16,10,16,16">
                     <StackPanel x:Name="SubmitShotHost" Margin="0,0,0,4" Visibility="Collapsed" />
 
@@ -837,17 +838,17 @@
                             <local:DiffView Lines="{Binding Diff}" />
                         </Border>
                     </StackPanel>
-                    <Border Background="{StaticResource NoticeWarnBackBrush}" BorderBrush="{StaticResource NoticeWarnBorderBrush}"
-                            BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,14,0,0"
-                            Visibility="{Binding HasOnlyLayoutToSubmit, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="The page still needs to be reformatted (no data changes)." TextWrapping="Wrap"
-                                   Foreground="{StaticResource NoticeWarnTextBrush}" />
-                    </Border>
+                    <!-- No "still needs to be reformatted" notice here, unlike the Edit page (user, 2026-10-20): this save
+                         is the reformatting, so saying it is still needed would be untrue. -->
                     <Expander Header="{Binding ReformattingHeader}" Margin="0,10,0,0"
                               IsExpanded="{Binding ReformattingExpanded}"
                               Visibility="{Binding HasReformatting, Converter={StaticResource BoolToVis}}">
+                        <!-- Scrolls past a height fitted to the page, like the Edit page's (user, 2026-10-20), so a long
+                             reformatting does not push the summary and Save off the screen. -->
                         <Border BorderBrush="{StaticResource BorderBrushKey}" BorderThickness="1" CornerRadius="3" Margin="0,6,0,0">
-                            <local:DiffView Lines="{Binding ReformattingDiff}" />
+                            <ScrollViewer x:Name="SubmitReformattingScroller" VerticalScrollBarVisibility="Auto">
+                                <local:DiffView Lines="{Binding ReformattingDiff}" />
+                            </ScrollViewer>
                         </Border>
                     </Expander>
                     <ItemsControl ItemsSource="{Binding FormattingNotes}" Margin="0,8,0,0"
@@ -863,6 +864,10 @@
                     <TextBlock Text="Edit summary" Style="{StaticResource SectionHeading}" />
                     <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Padding="4,3"
                              FontFamily="Consolas" FontSize="12" />
+                    <!-- See ResultViewModel.SummaryMayNeedChanging. Goes away once the summary is edited. -->
+                    <TextBlock Text="Warning: Summary may need to be modified due to your manual changes."
+                               Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Visibility="{Binding SummaryMayNeedChanging, Converter={StaticResource BoolToVis}}" />
 
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                         <!-- A TextBlock rather than string content, so no underscore in it is eaten as an access key. -->
