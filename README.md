@@ -3,7 +3,7 @@
 ![Capturing two item windows from the game with the hotkey, then reviewing, previewing and saving the proposed edit to
 the Mithril Vambraces page](docs/media/demo.gif)
 
-> **Download now: [1.0.0-beta.3](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/releases/download/v1.0.0-beta.3/EQLWikiEditorAssistant-win-Setup.exe)**
+> **Download now: [1.0.0-beta.4](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/releases/download/v1.0.0-beta.4/EQLWikiEditorAssistant-win-Setup.exe)**
 
 A Windows app for contributors to the [EverQuest Legends Wiki](https://eqlwiki.com) that speeds up the process of
 verifying that the items listed on the wiki match the game.

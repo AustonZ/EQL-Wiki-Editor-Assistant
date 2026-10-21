@@ -482,6 +482,12 @@ beside a Charge or Consumable Effect with no count, since most items show it onl
 beside neither. Also in it, and left out of the notes as dev-only: a development build's screenshot hotkey (Settings >
 Dev-only), which checks a saved PNG as if it had just been captured. The update from beta.2 was about 4 MB.
 
+### 1.0.0-beta.4 — released 2026-10-21
+Only one copy of the Assistant runs per data folder: a second launch brings the running copy's window to the front,
+from the tray too, and exits, so two copies can no longer save the ledger over each other's rows or fight over the
+capture hotkey (bug found by the user). The release and a dev build keep separate folders and may still run side by
+side. Auto-update from beta.3 tested by the user before announcing; the update was about 4 MB.
+
 ### Requested 2026-10-11, for next
 - **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
   whenever we can make them"), leveled items and Lore-tab captures included; with no page known, "Open wiki page"
