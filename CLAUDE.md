@@ -2871,6 +2871,12 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
   to that commit, and uploads through `gh`, because `vpk upload` takes the GitHub token only on its command line.
   Raising `<Version>` in the app's project file is the whole of "making a new version"; the script refuses a tag
   GitHub already has.
+- **Release notes cover only what is new** (user, 2026-10-20): no demo recording and no introduction, which read as
+  describing that release's changes. New users are sent to the README, whose "Download now" link under the demo
+  recording names the newest release and links its `Setup.exe` directly, for readers who do not know GitHub.
+  **That link is updated after every release is published**, with the release's entry in the plan — not before:
+  `releases/download/<tag>/...` is a 404 until the release is published. It names the version because GitHub's
+  `/releases/latest` skips pre-releases, and every beta is one.
 - **`<Version>` is the last release; every other build carries a development version after it** (user, 2026-10-11):
   `1.0.0-alpha.4.dev.170`, the number being `git rev-list --count HEAD`, which rises with every commit on this linear
   history. `install.ps1` and `release.ps1` without `-Draft` build it; `-Draft` builds the plain `<Version>`. It sorts

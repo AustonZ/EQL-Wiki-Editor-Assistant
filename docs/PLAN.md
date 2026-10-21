@@ -467,6 +467,14 @@ the category order and the repository is in American English. Reading the UI fon
 the custom font moved to after 1.0.0; the blueprint's effect line is still wanted for 1.0.0. The update from alpha.9
 was about 4 MB.
 
+### 1.0.0-beta.2 — released 2026-10-20
+A layout-only save's Submit page shows only the reformatting, open and scrolling at a height fitted to the page, without
+the whole page repeated above it or the "still needs to be reformatted" notice; a hand edit to such a page clears its
+"no data changes" summary, and any other hand edit gets a reminder under the summary the Assistant wrote. From this
+release on the notes cover only what is new (user): the demo recording and the introduction are the README's, which
+now carries a quick download link to the newest release's installer, updated as each release is published. The update
+from beta.1 was about 4 MB.
+
 ### Requested 2026-10-11, for next
 - **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
   whenever we can make them"), leveled items and Lore-tab captures included; with no page known, "Open wiki page"

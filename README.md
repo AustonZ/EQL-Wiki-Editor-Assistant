@@ -3,6 +3,8 @@
 ![Capturing two item windows from the game with the hotkey, then reviewing, previewing and saving the proposed edit to
 the Mithril Vambraces page](docs/media/demo.gif)
 
+> **Download now: [1.0.0-beta.2](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/releases/download/v1.0.0-beta.2/EQLWikiEditorAssistant-win-Setup.exe)**
+
 A Windows app for contributors to the [EverQuest Legends Wiki](https://eqlwiki.com) that speeds up the process of
 verifying that the items listed on the wiki match the game.
 
@@ -75,8 +77,9 @@ Any screen resolution _should_ work. It was developed at 2560x1440.
 
 ## Getting started
 
-1. **Install it.** Download `EQLWikiEditorAssistant-win-Setup.exe` from the newest release on the
-   [Releases](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/releases) page and run it. It installs for your
+1. **Install it.** Go to the [Releases](https://github.com/AustonZ/EQL-Wiki-Editor-Assistant/releases) page. The
+   newest release is at the top; scroll to its **Assets** heading (click it if the list is folded away) and click
+   `EQLWikiEditorAssistant-win-Setup.exe`, then run the downloaded file. It installs for your
    Windows account only, needs no administrator rights and no separate .NET install, and adds a Start menu and a desktop
    shortcut. The installer is not code-signed yet, so Windows SmartScreen may warn about an unknown publisher. If it
    does, choose *More info*, then *Run anyway*.
