@@ -475,6 +475,13 @@ release on the notes cover only what is new (user): the demo recording and the i
 now carries a quick download link to the newest release's installer, updated as each release is published. The update
 from beta.1 was about 4 MB.
 
+### 1.0.0-beta.3 — released 2026-10-21
+A charge count the item window states (`Charges: 2` under a Charge Effect, reported by a tester on `Essence of Earth`)
+is written to the statsblock's `Charges:` line instead of the effect being refused; a page's `Charges:` line is kept
+beside a Charge or Consumable Effect with no count, since most items show it only on the inventory icon, and reported
+beside neither. Also in it, and left out of the notes as dev-only: a development build's screenshot hotkey (Settings >
+Dev-only), which checks a saved PNG as if it had just been captured. The update from beta.2 was about 4 MB.
+
 ### Requested 2026-10-11, for next
 - **Built 2026-10-12: both links on every item whose name was read** (user: "no special rules, just dumb links
   whenever we can make them"), leveled items and Lore-tab captures included; with no page known, "Open wiki page"
