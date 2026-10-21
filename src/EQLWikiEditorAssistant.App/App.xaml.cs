@@ -49,10 +49,20 @@ public partial class App : Application
             .OnBeforeUninstallFastCallback(_ => UninstallCleanup.OfferToRemoveData())
             .OnRestarted(version => UpdatedTo = version.ToString())
             .Run();
+
+        // One copy per data folder; a second launch shows the first and ends here. A start after an update waits for
+        // the old copy to let go rather than deferring to it.
+        using SingleInstance? instance = SingleInstance.Claim(waitForPrevious: UpdatedTo is not null);
+        if (instance is null) return;
+        Instance = instance;
+
         var app = new App();
         app.InitializeComponent();
         app.Run();
     }
+
+    /// <summary>This process's claim on its data folder, held for its whole life — see <see cref="SingleInstance"/>.</summary>
+    private static SingleInstance? Instance { get; set; }
 
     /// <summary>
     /// Whether this copy is one Velopack installed — Setup's or the portable zip's, which both put the app in a folder
@@ -87,6 +97,9 @@ public partial class App : Application
         var window = new MainWindow();
         MainWindow = window;
         window.Start();
+
+        // Another launch of the Assistant brings this one forward, from the tray if it is hidden there.
+        Instance?.Listen(() => Dispatcher.BeginInvoke(window.ShowForAnotherLaunch));
     }
 
     private void Report(Exception ex)

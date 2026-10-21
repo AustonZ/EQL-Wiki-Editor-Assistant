@@ -2893,6 +2893,12 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
 - **`App.Main` exists for Velopack**, which must run before anything else so Setup and the uninstaller can call the app
   with their hook arguments; that is why `App.xaml` is a Page rather than the generated entry point. `vpk pack` checks
   the call is there. From a build folder it does nothing.
+- **One running copy per data folder** (`App.SingleInstance`, bug found by the user, 2026-10-21). Two copies would
+  save one ledger over each other's rows and fight over the capture hotkey. A second launch asks the running copy to
+  show itself (from the tray too) through a named event, hands it the right to take the foreground, and exits. The
+  release and a dev build have separate folders and may still run side by side. Claimed after Velopack's hooks, which
+  exit inside `Run`; a start after an update waits up to 10 seconds for the old copy to let go instead of deferring to
+  it. Verified live by the user (2026-10-21).
 - **`vpk` is pinned as a repo-local tool** (`dotnet-tools.json`) and must match the `Velopack` package's version.
 - **Every license ships beside the executable.** The project file copies `LICENSE` and `THIRD-PARTY-NOTICES.txt`. The
   .NET runtime's and WPF's are added by the script from the versions the published build

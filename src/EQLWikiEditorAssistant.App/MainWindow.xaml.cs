@@ -504,6 +504,10 @@ public partial class MainWindow : Window
     /// is not interacting with. Flicking <see cref="Window.Topmost"/> is the long-standing way to ask anyway, and it
     /// leaves the window ordinary afterwards rather than permanently pinned above the game.
     /// </summary>
+    /// <summary>The Assistant was launched again while this copy runs (<see cref="SingleInstance"/>): the user wants
+    /// the window, wherever it is.</summary>
+    internal void ShowForAnotherLaunch() => ComeToTheFront();
+
     private void ComeToTheFront()
     {
         if (_neverShown)
