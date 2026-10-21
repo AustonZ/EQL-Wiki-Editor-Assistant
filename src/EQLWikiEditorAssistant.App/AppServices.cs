@@ -50,7 +50,16 @@ public sealed class AppServices : IDisposable
 
     private readonly GlyphTextReader _windowReader;
     private readonly HttpClient _http;
-    private GlobalHotKey? _hotKey;
+    private readonly HotKeySlot _captureHotKey;
+    private readonly HotKeySlot _screenshotHotKey;
+
+    /// <summary>
+    /// Whether this is a development build — <c>dotnet run</c> or <c>tools/install.ps1</c>'s copy, anything Velopack
+    /// did not install — which adds Settings > Dev-only and its screenshot hotkey (user, 2026-10-21). Decided by the
+    /// same test as the data folder (<see cref="AppPaths.IsRelease"/>), so a copy using the release's data never offers
+    /// anything dev-only.
+    /// </summary>
+    public static bool IsDevBuild => !AppPaths.IsRelease;
 
     public MediaWikiClient Wiki { get; }
     public CheckedItemsLedger Ledger { get; }
@@ -87,7 +96,17 @@ public sealed class AppServices : IDisposable
 
     /// <summary>Why the saved hotkey is not registered — usually another program holding the same combination — or
     /// null when it is. Capturing still works from the button either way.</summary>
-    public string? HotKeyProblem { get; private set; }
+    public string? HotKeyProblem => _captureHotKey.Problem;
+
+    /// <summary>A development build's settings (<see cref="DevSettings"/>); the defaults, unused, in a release.</summary>
+    public DevSettings DevSettings { get; private set; }
+
+    /// <summary>The dev-only screenshot hotkey was pressed. Raised on the hotkey's own thread, like
+    /// <see cref="HotKeyPressed"/>. Never raised in a release, which registers no such hotkey.</summary>
+    public event EventHandler? ScreenshotHotKeyPressed;
+
+    /// <summary>Why the saved screenshot hotkey is not registered, or null when it is or none is set.</summary>
+    public string? ScreenshotHotKeyProblem => _screenshotHotKey.Problem;
 
     /// <param name="progress">Told each slow step as it starts, so the window can say what it is waiting for: the icon
     /// index, loaded, or built with a running count the first time (user, 2026-10-09: "Starting…" alone looked like a
@@ -101,7 +120,10 @@ public sealed class AppServices : IDisposable
         // the pipeline's wrong-font guard, so they cannot disagree — here, and afterwards only through UseFontAsync,
         // which sets both.
         Settings = AppSettings.Load(AppPaths.SettingsFile);
+        DevSettings = IsDevBuild ? DevSettings.Load(AppPaths.DevSettingsFile) : DevSettings.Default;
         _windowReader = new GlyphTextReader(Settings.Font);
+        _captureHotKey = new HotKeySlot(() => HotKeyPressed?.Invoke(this, EventArgs.Empty));
+        _screenshotHotKey = new HotKeySlot(() => ScreenshotHotKeyPressed?.Invoke(this, EventArgs.Empty));
 
         Wiki = MediaWikiClient.Create(Endpoint, UserAgent);
         // Every edit and upload says which app and version made it — see MediaWikiClient.SummaryTag.
@@ -171,8 +193,8 @@ public sealed class AppServices : IDisposable
 
         // Last, so a refused combination costs nothing else: the tool starts, the Capture button works, and the
         // settings window says why the hotkey does not.
-        _hotKey = TryRegister(Settings.HotKey, out string? problem);
-        HotKeyProblem = problem;
+        _captureHotKey.Register(Settings.HotKey);
+        if (IsDevBuild) _screenshotHotKey.Register(DevSettings.ScreenshotHotKey);
     }
 
     /// <summary>
@@ -181,7 +203,7 @@ public sealed class AppServices : IDisposable
     ///
     /// **The new combination is registered before the old one is released**, so a refusal — another program already
     /// holding it, which is the common case — changes nothing. While suspended for recording there is no old one
-    /// registered, and <see cref="ResumeHotKey"/> puts it back after a refusal. Choosing the combination already in use
+    /// registered, and <see cref="ResumeHotKeys"/> puts it back after a refusal. Choosing the combination already in use
     /// is accepted rather than refused (user, 2026-10-07: re-entering the same keys is how someone backs out of a
     /// mistake), and simply re-registers it.
     /// </summary>
@@ -189,15 +211,11 @@ public sealed class AppServices : IDisposable
     {
         ArgumentNullException.ThrowIfNull(chord);
         if (chord.Problem is { } unacceptable) return unacceptable;
-        if (chord == Settings.HotKey && _hotKey is not null) return null;
+        if (IsDevBuild && chord == DevSettings.ScreenshotHotKey)
+            return $"{chord} is the screenshot hotkey (Settings > Dev-only).";
+        if (chord == Settings.HotKey && _captureHotKey.IsRegistered) return null;
 
-        GlobalHotKey? registered = TryRegister(chord, out string? problem);
-        if (registered is null) return problem;
-
-        _hotKey?.Dispose();
-        _hotKey = registered;
-        _hotKeySuspended = false;
-        HotKeyProblem = null;
+        if (_captureHotKey.Use(chord) is { } problem) return problem;
 
         Settings = Settings with { HotKey = chord };
         await Settings.SaveAsync(AppPaths.SettingsFile);
@@ -205,45 +223,127 @@ public sealed class AppServices : IDisposable
     }
 
     /// <summary>
-    /// Releases the hotkey while the settings window records a new one. **Windows delivers a registered combination to
-    /// its hotkey and never to a window**, so without this the current combination could not be recorded at all —
-    /// pressing it while recording did nothing visible (bug found by the user, 2026-10-07). Nothing is lost: captures
-    /// are ignored while the settings window is open anyway. Always paired with <see cref="ResumeHotKey"/>.
+    /// Makes <paramref name="chord"/> the dev-only screenshot hotkey, or removes it when null, and saves the choice.
+    /// Returns why not, leaving the current one working — the same rules as <see cref="UseHotKeyAsync"/>, plus that it
+    /// cannot be the capture hotkey.
     /// </summary>
-    public void SuspendHotKey()
+    public async Task<string?> UseScreenshotHotKeyAsync(HotKeyChord? chord)
     {
-        _hotKey?.Dispose();
-        _hotKey = null;
-        _hotKeySuspended = true;
+        if (!IsDevBuild) throw new InvalidOperationException("The screenshot hotkey exists only in a development build.");
+        if (chord?.Problem is { } unacceptable) return unacceptable;
+        if (chord is not null && chord == Settings.HotKey) return $"{chord} is the capture hotkey.";
+        if (chord == DevSettings.ScreenshotHotKey && (chord is null || _screenshotHotKey.IsRegistered)) return null;
+
+        if (_screenshotHotKey.Use(chord) is { } problem) return problem;
+
+        DevSettings = DevSettings with { ScreenshotHotKey = chord };
+        await DevSettings.SaveAsync(AppPaths.DevSettingsFile);
+        return null;
     }
 
-    /// <summary>Re-registers the saved hotkey after recording, unless a new one has already replaced it. Safe to call
-    /// more than once. If the saved combination was taken in the meantime, <see cref="HotKeyProblem"/> says so.</summary>
-    public void ResumeHotKey()
+    /// <summary>Remembers the folder a screenshot was last opened from, for the next file picker.</summary>
+    public async Task UseScreenshotFolderAsync(string folder)
     {
-        if (!_hotKeySuspended) return;
-        _hotKeySuspended = false;
-        _hotKey = TryRegister(Settings.HotKey, out string? problem);
-        HotKeyProblem = problem;
+        DevSettings = DevSettings with { ScreenshotFolder = folder };
+        await DevSettings.SaveAsync(AppPaths.DevSettingsFile);
     }
 
-    private bool _hotKeySuspended;
-
-    private GlobalHotKey? TryRegister(HotKeyChord chord, out string? problem)
+    /// <summary>
+    /// Releases every hotkey while the settings window records a new one. **Windows delivers a registered combination
+    /// to its hotkey and never to a window**, so without this the current combination could not be recorded at all —
+    /// pressing it while recording did nothing visible (bug found by the user, 2026-10-07). Both are released, so either
+    /// page can record a combination the other holds and be told why it cannot have it. Nothing is lost: hotkeys are
+    /// ignored while the settings window is open anyway. Always paired with <see cref="ResumeHotKeys"/>.
+    /// </summary>
+    public void SuspendHotKeys()
     {
-        try
+        _captureHotKey.Suspend();
+        _screenshotHotKey.Suspend();
+    }
+
+    /// <summary>Re-registers the saved hotkeys after recording, unless a new one has already replaced it. Safe to call
+    /// more than once. If a saved combination was taken in the meantime, its problem property says so.</summary>
+    public void ResumeHotKeys()
+    {
+        _captureHotKey.Resume(Settings.HotKey);
+        if (IsDevBuild) _screenshotHotKey.Resume(DevSettings.ScreenshotHotKey);
+    }
+
+    /// <summary>
+    /// One global hotkey and its state: registered, refused (<see cref="Problem"/>), or released while the settings
+    /// window records. The capture hotkey and the dev-only screenshot hotkey follow the same rules, so they share this.
+    /// </summary>
+    private sealed class HotKeySlot(Action pressed) : IDisposable
+    {
+        private GlobalHotKey? _registered;
+        private bool _suspended;
+
+        /// <summary>Why the saved combination is not registered, or null.</summary>
+        public string? Problem { get; private set; }
+
+        public bool IsRegistered => _registered is not null;
+
+        /// <summary>Registers the saved combination at start-up or after a suspension; null registers nothing.</summary>
+        public void Register(HotKeyChord? chord)
         {
-            var hotKey = new GlobalHotKey(chord);
-            hotKey.Pressed += (_, _) => HotKeyPressed?.Invoke(this, EventArgs.Empty);
-            problem = null;
-            return hotKey;
+            _registered?.Dispose();
+            _registered = null;
+            Problem = null;
+            if (chord is null) return;
+
+            _registered = TryRegister(chord, out string? problem);
+            Problem = problem;
         }
-        catch (InvalidOperationException)
+
+        /// <summary>Changes the combination, registering the new one before releasing the old, so a refusal leaves the
+        /// old one working; null removes it. Returns why not.</summary>
+        public string? Use(HotKeyChord? chord)
         {
-            // RegisterHotKey's only ordinary failure: the combination is taken, by another program or by Windows.
-            problem = $"Windows would not register {chord}: another program, or Windows itself, already uses it.";
+            GlobalHotKey? next = null;
+            if (chord is not null && (next = TryRegister(chord, out string? problem)) is null) return problem;
+
+            _registered?.Dispose();
+            _registered = next;
+            _suspended = false;
+            Problem = null;
             return null;
         }
+
+        public void Suspend()
+        {
+            _registered?.Dispose();
+            _registered = null;
+            _suspended = true;
+        }
+
+        public void Resume(HotKeyChord? saved)
+        {
+            if (!_suspended) return;
+            _suspended = false;
+            Register(saved);
+        }
+
+        private GlobalHotKey? TryRegister(HotKeyChord chord, out string? problem)
+        {
+            try
+            {
+                var hotKey = new GlobalHotKey(chord);
+                hotKey.Pressed += (_, _) => pressed();
+                problem = null;
+                return hotKey;
+            }
+            catch (InvalidOperationException)
+            {
+                // RegisterHotKey's only ordinary failure: the combination is taken, by another program or by Windows.
+                problem = Refusal(chord);
+                return null;
+            }
+        }
+
+        private static string Refusal(HotKeyChord chord) =>
+            $"Windows would not register {chord}: another program, or Windows itself, already uses it.";
+
+        public void Dispose() => _registered?.Dispose();
     }
 
     /// <summary>
@@ -277,6 +377,27 @@ public sealed class AppServices : IDisposable
             : $"'{window.Title}'";
 
         return (frame, null, captured);
+    }
+
+    /// <summary>
+    /// Reads a saved screenshot to check as though it had just been captured — the dev-only screenshot hotkey, for a
+    /// tester's screenshot. Returns null with a reason when the file cannot be read as an image.
+    /// </summary>
+    public static async Task<(CapturedImage? Frame, string? Problem, string? Captured)> LoadScreenshotAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        string name = $"'{Path.GetFileName(path)}'";
+        try
+        {
+            byte[] bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+            return (await WindowsImageDecoder.DecodeScreenshotAsync(bytes, cancellationToken), null, name);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                       or System.Runtime.InteropServices.COMException)
+        {
+            return (null, $"{name} could not be read as an image: {ex.Message}", null);
+        }
     }
 
     /// <summary>
@@ -415,7 +536,8 @@ public sealed class AppServices : IDisposable
 
     public void Dispose()
     {
-        _hotKey?.Dispose();
+        _captureHotKey.Dispose();
+        _screenshotHotKey.Dispose();
         Capturer.Dispose();
         Wiki.Dispose();
         _http.Dispose();

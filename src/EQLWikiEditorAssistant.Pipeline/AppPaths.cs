@@ -54,6 +54,11 @@ public static class AppPaths
     /// <summary>The user's settings — today only the UI font the game draws in. See <c>AppSettings</c>.</summary>
     public static string SettingsFile => Path.Combine(Root, "settings.json");
 
+    /// <summary>A development build's own settings — see <c>DevSettings</c>. Never written by a release, which is what
+    /// keeps it: <c>install.ps1</c> copies the release's files over this folder, <see cref="SettingsFile"/>
+    /// included.</summary>
+    public static string DevSettingsFile => Path.Combine(Root, "dev-settings.json");
+
     /// <summary>Where the main window was when it last closed, so the next start puts it back.</summary>
     public static string WindowPlacementFile => Path.Combine(Root, "window.json");
 

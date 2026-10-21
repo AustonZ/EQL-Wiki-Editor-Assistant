@@ -45,4 +45,28 @@ public sealed class WindowsImageDecoder : IImageDecoder
 
         return new CapturedImage(bitmap.PixelWidth, bitmap.PixelHeight, pixels);
     }
+
+    /// <summary>
+    /// A saved screenshot, with any alpha ignored: a frame has no transparency, and a file some other program wrote
+    /// may carry an alpha channel it never meant. Used by a dev build's screenshot hotkey and by the tools' sample
+    /// loader alike, so a file the app checks is decoded exactly as the corpus was measured.
+    /// </summary>
+    public static async Task<CapturedImage> DecodeScreenshotAsync(byte[] bytes, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        if (bytes.Length == 0) throw new ArgumentException("No image data.", nameof(bytes));
+
+        using var stream = new InMemoryRandomAccessStream();
+        await stream.WriteAsync(bytes.AsBuffer()).AsTask(cancellationToken).ConfigureAwait(false);
+        stream.Seek(0);
+
+        BitmapDecoder decoder = await BitmapDecoder.CreateAsync(stream).AsTask(cancellationToken).ConfigureAwait(false);
+        using SoftwareBitmap bitmap = await decoder
+            .GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore)
+            .AsTask(cancellationToken).ConfigureAwait(false);
+
+        var pixels = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4];
+        bitmap.CopyToBuffer(pixels.AsBuffer());
+        return new CapturedImage(bitmap.PixelWidth, bitmap.PixelHeight, pixels);
+    }
 }

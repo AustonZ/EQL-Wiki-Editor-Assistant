@@ -8,26 +8,15 @@ using Windows.Storage.Streams;
 namespace EQLWikiEditorAssistant.TestSupport;
 
 /// <summary>
-/// Loads a screenshot file (JPEG/PNG/etc.) from disk into a <see cref="CapturedImage"/>. Dev/test tooling
-/// only — the real capture pipeline (EQLWikiEditorAssistant.Capture) never reads from files, it captures the live
-/// game window. Used by golden-file tests and the spike tools to feed real sample screenshots (from the
-/// samples/ folder) through the same locator and reader the app uses.
+/// Loads a screenshot file (JPEG/PNG/etc.) from disk into a <see cref="CapturedImage"/>. Used by golden-file tests
+/// and the spike tools to feed real sample screenshots (from the samples/ folder) through the same locator and
+/// reader the app uses. The app itself reads a file only through a dev build's screenshot hotkey, with the same
+/// decoder (<see cref="WindowsImageDecoder.DecodeScreenshotAsync"/>).
 /// </summary>
 public static class ImageFile
 {
-    public static async Task<CapturedImage> LoadAsync(string path)
-    {
-        StorageFile file = await StorageFile.GetFileFromPathAsync(Path.GetFullPath(path));
-        using IRandomAccessStream stream = await file.OpenAsync(FileAccessMode.Read);
-        BitmapDecoder decoder = await BitmapDecoder.CreateAsync(stream);
-        using SoftwareBitmap bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore);
-
-        int width = bitmap.PixelWidth;
-        int height = bitmap.PixelHeight;
-        var pixels = new byte[width * height * 4];
-        bitmap.CopyToBuffer(pixels.AsBuffer());
-        return new CapturedImage(width, height, pixels);
-    }
+    public static async Task<CapturedImage> LoadAsync(string path) =>
+        await WindowsImageDecoder.DecodeScreenshotAsync(await File.ReadAllBytesAsync(Path.GetFullPath(path)));
 
     /// <summary>
     /// Loads an image that has transparency, compositing it over a flat background instead of discarding the alpha.

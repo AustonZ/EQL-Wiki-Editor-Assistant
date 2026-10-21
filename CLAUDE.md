@@ -92,8 +92,8 @@ The full design rationale, wiki research findings, and milestone plan live in
 - `tests/EQLWikiEditorAssistant.Tests` (`net10.0-windows10.0.19041.0`) — unit and golden-file tests across all projects.
 - `tools/EQLWikiEditorAssistant.TestSupport`, `tools/CaptureSpike`, `tools/LocateSpike`,
   `tools/ParseSpike` (`net10.0-windows10.0.19041.0`, dev-only, not shipped) — `TestSupport.ImageFile` loads a
-  screenshot file from disk into a `CapturedImage` (the real app only ever captures a live window, never reads a
-  file — this exists for tests/tooling), `TestSupport.RepoPaths` for finding `samples/` reliably from a
+  screenshot file from disk into a `CapturedImage` (a release only ever captures a live window; a dev build's
+  screenshot hotkey reads a file through the same decoder, `WindowsImageDecoder.DecodeScreenshotAsync`), `TestSupport.RepoPaths` for finding `samples/` reliably from a
   test/tool's output directory, `TestSupport.DebugDraw` for drawing debug rectangle overlays, and
   `TestSupport.SampleFonts` for the font a screenshot is read in (see "Two UI fonts"); `CaptureSpike` exercises `WindowFinder`/`WindowCapturer`/`GlobalHotKey` (list
   windows, capture one to a PNG, test-fire a hotkey); `LocateSpike` runs `ItemWindowLocator` over a whole screenshot
@@ -2022,9 +2022,24 @@ a global hotkey is worth having.
 
 **The settings window (`App.SettingsWindow`, milestone 6, 2026-10-05).** Seven pages: the UI font, the capture hotkey,
 how the window gets out of the way, whether captures are kept (see the archive bullet under "The review UI"), the wiki icon cache, the wiki login, and the
-wiki mapping. Modal
+wiki mapping — plus an eighth, Dev-only, in a development build. Modal
 and disabled during a capture, like the ledger window — and here for a reason of its own: the capture in progress is
 reading with the configured font.
+- **Dev-only: a screenshot hotkey** (user, 2026-10-21, for testers' screenshots). It opens a file picker and checks the
+  chosen PNG exactly as a capture is checked: the same pipeline, the ledger, the review, saving to the wiki. A dev build
+  is anything Velopack did not install (`AppServices.IsDevBuild`, the same test as the data folder); a release removes
+  the page and never registers the hotkey.
+  - **No hotkey unless one is set**: a global hotkey takes its combination from every other program, and any default
+    would collide with something (Ctrl+Shift+O is VS Code's Go to Symbol). It cannot be the capture hotkey.
+  - **Saved in `dev-settings.json` (`Pipeline.DevSettings`), not `settings.json`**, which `install.ps1` overwrites
+    with the release's on every run. The picker starts in the folder last used.
+  - **Read in the configured UI font**, so a screenshot taken in another font is refused as Wrong font, not misread.
+  - **Decoded as the corpus is** (`WindowsImageDecoder.DecodeScreenshotAsync`, alpha ignored); `TestSupport.ImageFile`
+    delegates to it, and the accuracy corpus read identically through it (2,858 correct, 0 errors).
+  - The two hotkeys share their register-before-release, suspend and resume logic (`AppServices.HotKeySlot`), and the
+    settings window records either with the same code (`SettingsWindow.HotKeyEditor`). Recording suspends both, so
+    a combination the other one holds is refused by name rather than swallowed by Windows.
+  - The item's list tooltip names the file it was read from, as it names an archived capture.
 - **The capture hotkey is saved beside the font and changes without a restart** (2026-10-07). `AppServices` owns it
   rather than the main window, so `UseHotKeyAsync` is its one home the way `UseFontAsync` is the font's.
   - **The new combination is registered before the old one is released**, so a refusal — another program already
@@ -2873,7 +2888,8 @@ developer's own quick install stays `tools/install.ps1`. Versioning rules are in
   the portable zip); every other copy, the tools included, uses the dev folders. `install.ps1` copies the release's
   data over the dev folder on every run — ledger, settings, caches, not `errors.log` or `debug-captures` — so the
   dev build works on real data and anything done only in it lasts until the next install. The wiki login is one
-  Credential Manager entry, still shared.
+  Credential Manager entry, still shared. **A dev-only setting therefore lives in `dev-settings.json`**, which a
+  release never writes and so the copy never overwrites (see "The settings window").
 - **`App.Main` exists for Velopack**, which must run before anything else so Setup and the uninstaller can call the app
   with their hook arguments; that is why `App.xaml` is a Page rather than the generated entry point. `vpk pack` checks
   the call is there. From a build folder it does nothing.

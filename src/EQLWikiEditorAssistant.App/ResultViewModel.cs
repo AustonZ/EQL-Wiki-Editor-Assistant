@@ -1133,8 +1133,9 @@ public sealed class ResultViewModel : INotifyPropertyChanged
 
     public bool HasOutcome => !string.IsNullOrEmpty(_outcome);
 
-    /// <summary>Where the frame this item came from was archived, in debug builds. Shown as the list entry's tooltip
-    /// so a bug can be reported by pointing at the item — see <see cref="CaptureArchive"/>.</summary>
+    /// <summary>Where the frame this item came from is on disk: archived when Settings > Saved captures is on (see
+    /// <see cref="CaptureArchive"/>), or the screenshot a dev build's screenshot hotkey read. Shown as the list entry's
+    /// tooltip so a bug can be reported by pointing at the item.</summary>
     public string? CaptureFile
     {
         get => _captureFile;

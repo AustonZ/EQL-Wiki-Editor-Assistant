@@ -93,6 +93,8 @@
             <ListBoxItem Content="Icon cache" Padding="12,6" />
             <ListBoxItem Content="Wiki account" Padding="12,6" />
             <ListBoxItem Content="Wiki mapping" Padding="12,6" />
+            <!-- Removed in a release; last, so removing it moves no other page's index. -->
+            <ListBoxItem x:Name="DevOnlyItem" Content="Dev-only" Padding="12,6" />
         </ListBox>
 
         <Grid>
@@ -342,6 +344,32 @@
 
                     <TextBlock Text="Template" Style="{StaticResource SectionHeading}" />
                     <ItemsControl x:Name="TemplateTable" Style="{StaticResource MappingTable}" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ============================ Dev-only ============================ -->
+            <ScrollViewer x:Name="DevPage" VerticalScrollBarVisibility="Auto" Padding="24,18" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Dev-only" Style="{StaticResource PageHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="Only in a development build: an installed release has none of this. Saved in dev-settings.json, beside settings.json, because installing a dev build copies the release's settings.json over this folder." />
+
+                    <TextBlock Text="Screenshot hotkey" Style="{StaticResource SectionHeading}" />
+                    <TextBlock Style="{StaticResource Prose}"
+                               Text="Opens a saved screenshot and checks it exactly as a capture is checked, for trying a tester's screenshot. It is read in the font chosen under UI font, so one taken in another font is refused as Wrong font. Its items are recorded in this build's history, and saving an edit writes to the wiki as usual." />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                        <Border x:Name="ScreenshotHotKeyBox" Background="{StaticResource SunkenBrush}" BorderThickness="1"
+                                BorderBrush="{StaticResource BorderStrongBrush}" Padding="12,5" MinWidth="220">
+                            <TextBlock x:Name="ScreenshotHotKeyText" FontWeight="SemiBold" FontSize="14" />
+                        </Border>
+                        <Button x:Name="ChangeScreenshotHotKeyButton" Content="Change…" Click="OnChangeScreenshotHotKeyClick"
+                                MinWidth="80" Padding="12,4" Margin="10,0,0,0" />
+                        <Button x:Name="RemoveScreenshotHotKeyButton" Content="Remove" Click="OnRemoveScreenshotHotKeyClick"
+                                Padding="12,4" Margin="8,0,0,0" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="ScreenshotHotKeyStatus" Style="{StaticResource Prose}" Margin="0,12,0,0" />
                 </StackPanel>
             </ScrollViewer>
         </Grid>

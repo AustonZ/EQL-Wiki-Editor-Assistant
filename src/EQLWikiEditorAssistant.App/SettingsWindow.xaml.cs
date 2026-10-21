@@ -36,8 +36,11 @@ public partial class SettingsWindow : Window
     /// <summary>True while the controls are being filled in, so selecting the saved font does not save it again.</summary>
     private bool _loading = true;
 
-    /// <summary>True while the next key combination pressed in this window becomes the hotkey.</summary>
-    private bool _recording;
+    /// <summary>The hotkey the next key combination pressed in this window becomes, while one is being recorded.</summary>
+    private HotKeyEditor? _recording;
+
+    private readonly HotKeyEditor _captureHotKey;
+    private readonly HotKeyEditor _screenshotHotKey;
 
     public SettingsWindow(AppServices services, SettingsPage page = SettingsPage.Font)
     {
@@ -56,9 +59,26 @@ public partial class SettingsWindow : Window
         FontBox.SelectedIndex = Array.IndexOf(Fonts, services.Settings.Font);
         DescribeFont(services.Settings.Font);
 
+        _captureHotKey = new HotKeyEditor(
+            HotKeyBox, HotKeyText, ChangeHotKeyButton, HotKeyStatus, "captures the game window",
+            () => _services.Settings.HotKey, chord => _services.UseHotKeyAsync(chord!));
+        _screenshotHotKey = new HotKeyEditor(
+            ScreenshotHotKeyBox, ScreenshotHotKeyText, ChangeScreenshotHotKeyButton, ScreenshotHotKeyStatus,
+            "opens a screenshot to check", () => _services.DevSettings.ScreenshotHotKey, _services.UseScreenshotHotKeyAsync);
+
         ResetHotKeyButton.Content = $"Reset to {HotKeyChord.Default}";
-        ShowHotKey();
-        if (services.HotKeyProblem is { } problem) ShowHotKeyStatus(problem, Palette.Attention);
+        ShowHotKeys();
+        if (services.HotKeyProblem is { } problem) ShowHotKeyStatus(_captureHotKey, problem, Palette.Attention);
+
+        if (AppServices.IsDevBuild)
+        {
+            if (services.ScreenshotHotKeyProblem is { } refused)
+                ShowHotKeyStatus(_screenshotHotKey, refused, Palette.Attention);
+        }
+        else
+        {
+            PageList.Items.Remove(DevOnlyItem);
+        }
 
         MinimizeToTrayBox.IsChecked = services.Settings.MinimizeToTray;
         AutoMinimizeBox.IsChecked = services.Settings.AutoMinimize;
@@ -82,9 +102,10 @@ public partial class SettingsWindow : Window
         // Fires during InitializeComponent, before the pages exist as fields.
         if (FontPage is null) return;
 
-        if (_recording) StopRecording();
+        if (_recording is not null) StopRecording();
 
-        ScrollViewer[] pages = [FontPage, HotKeyPage, WindowPage, CapturesPage, IconCachePage, AccountPage, MappingPage];
+        ScrollViewer[] pages =
+            [FontPage, HotKeyPage, WindowPage, CapturesPage, IconCachePage, AccountPage, MappingPage, DevPage];
         for (int i = 0; i < pages.Length; i++)
             pages[i].Visibility = PageList.SelectedIndex == i ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -301,62 +322,85 @@ public partial class SettingsWindow : Window
 
     // ============================ Capture hotkey ============================
 
-    private void ShowHotKey()
+    /// <summary>
+    /// One hotkey's controls and what to do with them: the capture hotkey, and a dev build's screenshot hotkey. Both
+    /// are recorded the same way, so one set of methods serves both.
+    /// </summary>
+    private sealed record HotKeyEditor(
+        Border Box, TextBlock Text, Button Change, TextBlock Status, string Purpose,
+        Func<HotKeyChord?> Saved, Func<HotKeyChord?, Task<string?>> Use);
+
+    /// <summary>Both hotkeys as they stand: the live combination, "(not active)" when Windows refused it, and the
+    /// screenshot hotkey's "None" when there is none.</summary>
+    private void ShowHotKeys()
     {
         HotKeyText.Foreground = _services.HotKeyProblem is null ? Palette.Text : Palette.Attention;
         HotKeyText.Text = _services.HotKeyProblem is null
             ? _services.Settings.HotKey.ToString()
             : $"{_services.Settings.HotKey} (not active)";
         ResetHotKeyButton.IsEnabled = _services.Settings.HotKey != HotKeyChord.Default || _services.HotKeyProblem is not null;
+
+        HotKeyChord? screenshot = _services.DevSettings.ScreenshotHotKey;
+        ScreenshotHotKeyText.Foreground = screenshot is null ? Palette.Muted
+            : _services.ScreenshotHotKeyProblem is null ? Palette.Text : Palette.Attention;
+        ScreenshotHotKeyText.Text = screenshot is null ? "None"
+            : _services.ScreenshotHotKeyProblem is null ? screenshot.ToString() : $"{screenshot} (not active)";
+        RemoveScreenshotHotKeyButton.IsEnabled = screenshot is not null;
     }
 
-    private void ShowHotKeyStatus(string text, Brush brush)
+    private static void ShowHotKeyStatus(HotKeyEditor editor, string text, Brush brush)
     {
-        HotKeyStatus.Foreground = brush;
-        HotKeyStatus.Text = text;
+        editor.Status.Foreground = brush;
+        editor.Status.Text = text;
     }
 
-    private void OnChangeHotKeyClick(object sender, RoutedEventArgs e)
+    private void OnChangeHotKeyClick(object sender, RoutedEventArgs e) => StartOrCancelRecording(_captureHotKey);
+
+    private void OnChangeScreenshotHotKeyClick(object sender, RoutedEventArgs e) =>
+        StartOrCancelRecording(_screenshotHotKey);
+
+    private void StartOrCancelRecording(HotKeyEditor editor)
     {
-        if (_recording)
+        if (_recording is { } current)
         {
             StopRecording();
-            ShowHotKeyStatus("", Palette.Muted);
-            return;
+            ShowHotKeyStatus(current, "", Palette.Muted);
+            if (current == editor) return;
         }
 
         // Released while recording, or the current combination could never be recorded: Windows hands a registered
-        // combination to its hotkey and never to a window. Every way out of recording puts it back.
-        _services.SuspendHotKey();
-        _recording = true;
+        // combination to its hotkey and never to a window. Every way out of recording puts them back.
+        _services.SuspendHotKeys();
+        _recording = editor;
         // Esc cancels the recording rather than closing the window, so the Close button gives up its claim on it.
         CloseButton.IsCancel = false;
-        ChangeHotKeyButton.Content = "Cancel";
-        HotKeyBox.BorderBrush = (Brush)FindResource("AccentBrush");
-        HotKeyText.Foreground = Palette.Muted;
-        HotKeyText.Text = "Press the new combination…";
-        ShowHotKeyStatus(
+        editor.Change.Content = "Cancel";
+        editor.Box.BorderBrush = (Brush)FindResource("AccentBrush");
+        editor.Text.Foreground = Palette.Muted;
+        editor.Text.Text = "Press the new combination…";
+        ShowHotKeyStatus(editor,
             "Hold Ctrl, Alt or Win and press a key. Esc cancels. Windows keeps some Win combinations for itself: if a " +
             "key does nothing, Windows has it, and no program can use it.", Palette.Muted);
-        Keyboard.Focus(HotKeyBox);
+        Keyboard.Focus(editor.Box);
     }
 
     /// <summary>Ends recording. <paramref name="resume"/> is false only when a combination is about to be applied,
     /// which re-registers a hotkey itself — and the caller resumes afterwards in case it was refused.</summary>
     private void StopRecording(bool resume = true)
     {
-        _recording = false;
+        if (_recording is not { } editor) return;
+        _recording = null;
         CloseButton.IsCancel = true;
-        ChangeHotKeyButton.Content = "Change…";
-        HotKeyBox.BorderBrush = (Brush)FindResource("BorderStrongBrush");
-        if (resume) _services.ResumeHotKey();
-        ShowHotKey();
+        editor.Change.Content = "Change…";
+        editor.Box.BorderBrush = (Brush)FindResource("BorderStrongBrush");
+        if (resume) _services.ResumeHotKeys();
+        ShowHotKeys();
     }
 
     /// <summary>However the window closes, a hotkey suspended for recording comes back.</summary>
     protected override void OnClosed(EventArgs e)
     {
-        _services.ResumeHotKey();
+        _services.ResumeHotKeys();
         base.OnClosed(e);
     }
 
@@ -367,7 +411,7 @@ public partial class SettingsWindow : Window
     /// </summary>
     private async void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (!_recording) return;
+        if (_recording is not { } editor) return;
         e.Handled = true;
 
         // Alt combinations arrive as Key.System, with the real key alongside.
@@ -377,55 +421,66 @@ public partial class SettingsWindow : Window
         if (key == Key.Escape && modifiers == HotKeyModifiers.None)
         {
             StopRecording();
-            ShowHotKeyStatus("", Palette.Muted);
+            ShowHotKeyStatus(editor, "", Palette.Muted);
             return;
         }
 
         var chord = new HotKeyChord(modifiers, (uint)KeyInterop.VirtualKeyFromKey(key));
         if (HotKeyChord.IsModifierKey(chord.VirtualKey))
         {
-            HotKeyText.Text = $"{chord}+…";
+            editor.Text.Text = $"{chord}+…";
             return;
         }
 
         if (chord.Problem is { } problem)
         {
             StopRecording();
-            ShowHotKeyStatus($"{chord} was not used. {problem}", Palette.Attention);
+            ShowHotKeyStatus(editor, $"{chord} was not used. {problem}", Palette.Attention);
             return;
         }
 
         StopRecording(resume: false);
-        await ApplyHotKeyAsync(chord);
+        await ApplyHotKeyAsync(editor, chord);
     }
 
     private async void OnResetHotKeyClick(object sender, RoutedEventArgs e)
     {
-        if (_recording) StopRecording();
-        await ApplyHotKeyAsync(HotKeyChord.Default);
+        StopRecording();
+        await ApplyHotKeyAsync(_captureHotKey, HotKeyChord.Default);
     }
 
-    private async Task ApplyHotKeyAsync(HotKeyChord chord)
+    private async void OnRemoveScreenshotHotKeyClick(object sender, RoutedEventArgs e)
     {
-        bool unchanged = chord == _services.Settings.HotKey;
+        StopRecording();
+        await ApplyHotKeyAsync(_screenshotHotKey, null);
+    }
+
+    /// <summary>Makes <paramref name="chord"/> the editor's hotkey, or removes it when null, and says what
+    /// happened.</summary>
+    private async Task ApplyHotKeyAsync(HotKeyEditor editor, HotKeyChord? chord)
+    {
+        HotKeyChord? before = editor.Saved();
         try
         {
-            string? problem = await _services.UseHotKeyAsync(chord);
-            // A refused combination leaves the recording's suspension in place; this puts the old hotkey back.
-            _services.ResumeHotKey();
-            ShowHotKey();
+            string? problem = await editor.Use(chord);
+            // A refused combination leaves the recording's suspension in place; this puts the old hotkeys back.
+            _services.ResumeHotKeys();
+            ShowHotKeys();
             if (problem is not null)
-                ShowHotKeyStatus($"{problem} {_services.Settings.HotKey} is still the hotkey.", Palette.Attention);
-            else if (unchanged)
-                ShowHotKeyStatus($"{chord} is still the hotkey.", Palette.Done);
+                ShowHotKeyStatus(editor, before is null ? problem : $"{problem} {before} is still the hotkey.",
+                    Palette.Attention);
+            else if (chord is null)
+                ShowHotKeyStatus(editor, before is null ? "" : "Removed.", Palette.Done);
+            else if (chord == before)
+                ShowHotKeyStatus(editor, $"{chord} is still the hotkey.", Palette.Done);
             else
-                ShowHotKeyStatus($"Saved. {chord} now captures the game window.", Palette.Done);
+                ShowHotKeyStatus(editor, $"Saved. {chord} now {editor.Purpose}.", Palette.Done);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // The hotkey is already live for this session; only remembering it failed.
-            ShowHotKey();
-            ShowHotKeyStatus($"In use now, but could not be saved: {ex.Message}", Palette.Attention);
+            ShowHotKeys();
+            ShowHotKeyStatus(editor, $"In use now, but could not be saved: {ex.Message}", Palette.Attention);
         }
     }
 
@@ -701,6 +756,8 @@ public enum SettingsPage
     IconCache,
     Account,
     Mapping,
+    /// <summary>Only in a development build; a release removes it from the list.</summary>
+    DevOnly,
 }
 
 /// <summary>One row of a mapping table: what the game says, what the wiki writes, and why when it is not obvious.</summary>

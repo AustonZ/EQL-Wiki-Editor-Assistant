@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.IO;
 using System.Net.Http;
 using Velopack;
 using System.Windows;
@@ -151,6 +152,51 @@ public partial class MainWindow : Window
         _ = CaptureAsync();
     });
 
+    /// <summary>
+    /// The dev-only screenshot hotkey fired (Settings > Dev-only, user, 2026-10-21): pick a saved screenshot, a tester's
+    /// usually, and check it exactly as a capture would be checked. Never raised in a release.
+    /// </summary>
+    private void OnScreenshotHotKeyPressed(object? sender, EventArgs e) => Dispatcher.Invoke(() =>
+    {
+        if (_dialogOpen || Dialog.IsOpen || _capturing || _services is null) return;
+        ComeToTheFront();
+        _ = OpenScreenshotAsync(_services);
+    });
+
+    private async Task OpenScreenshotAsync(AppServices services)
+    {
+        var picker = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Check a saved screenshot",
+            Filter = "Screenshots (*.png)|*.png|All files (*.*)|*.*",
+        };
+        if (services.DevSettings.ScreenshotFolder is { } folder && Directory.Exists(folder))
+            picker.InitialDirectory = folder;
+
+        // A dialog like any other: the hotkeys wait until it is answered.
+        _dialogOpen = true;
+        bool picked;
+        try
+        {
+            picked = picker.ShowDialog(this) == true;
+        }
+        finally
+        {
+            _dialogOpen = false;
+        }
+        if (!picked) return;
+
+        try
+        {
+            await services.UseScreenshotFolderAsync(Path.GetDirectoryName(picker.FileName)!);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Only remembering the folder failed; the check goes ahead.
+        }
+        await CaptureAsync(picker.FileName);
+    }
+
     /// <summary>Says which hotkey is live — or, when Windows refused the saved one, that none is and why. A refused
     /// hotkey is a degraded tool rather than a broken one, since the Capture button still works.</summary>
     private void UpdateHotKeyLabel()
@@ -180,6 +226,7 @@ public partial class MainWindow : Window
             _services = await Task.Run(() => new AppServices(progress));
             BusyPanel.Visibility = Visibility.Collapsed;
             _services.HotKeyPressed += OnHotKeyPressed;
+            _services.ScreenshotHotKeyPressed += OnScreenshotHotKeyPressed;
             UpdateHotKeyLabel();
             UpdateTrayIcon();
             CaptureButton.IsEnabled = true;
@@ -303,9 +350,11 @@ public partial class MainWindow : Window
     private void OnCaptureClick(object sender, RoutedEventArgs e) => _ = CaptureAsync();
 
 
-    private async Task CaptureAsync()
+    /// <param name="screenshotFile">A saved screenshot to check instead of capturing the game window — the dev-only
+    /// screenshot hotkey. Null captures the game.</param>
+    private async Task CaptureAsync(string? screenshotFile = null)
     {
-        if (!await CaptureAndCheckAsync()) return;
+        if (!await CaptureAndCheckAsync(screenshotFile)) return;
 
         // **The memory a capture used goes back to Windows once it is over** (user, 2026-10-09). .NET keeps the space
         // freed screenshot buffers took, expecting to need it again: measured in the running app, 238 MB reserved for
@@ -318,7 +367,7 @@ public partial class MainWindow : Window
 
     /// <summary>One capture, start to finish. False when none ran, because one already is or start-up has not
     /// finished.</summary>
-    private async Task<bool> CaptureAndCheckAsync()
+    private async Task<bool> CaptureAndCheckAsync(string? screenshotFile)
     {
         if (_capturing || _services is null) return false;
         _capturing = true;
@@ -340,9 +389,10 @@ public partial class MainWindow : Window
             // behind it. The ledger and the pending-lore table are locked for exactly this,
             // since the review screen's buttons stay live while a capture runs.
             AppServices services = _services;
-            ShowBusy("Taking game screenshot…");
-            (CapturedImage? frame, string? problem, string? captured) =
-                await Task.Run(() => services.CaptureGameWindowAsync());
+            ShowBusy(screenshotFile is null ? "Taking game screenshot…" : "Reading the screenshot…");
+            (CapturedImage? frame, string? problem, string? captured) = screenshotFile is null
+                ? await Task.Run(() => services.CaptureGameWindowAsync())
+                : await Task.Run(() => AppServices.LoadScreenshotAsync(screenshotFile));
             if (frame is null)
             {
                 ReportCaptureProblem(problem ?? "The game window could not be captured.");
@@ -361,11 +411,12 @@ public partial class MainWindow : Window
 
             // Kept when Settings > Saved captures says so, named after what was in it, so a bug can be reported by
             // naming an item rather than by keeping it in the game — see CaptureArchive. Encoding a full frame as PNG
-            // takes long enough to be felt, so it is off the UI thread too.
+            // takes long enough to be felt, so it is off the UI thread too. A screenshot read from a file is already on
+            // disk, so the item points at that file instead.
             UiFont font = services.Settings.Font;
-            string? archived = services.Settings.KeepCaptures
+            string? archived = screenshotFile ?? (services.Settings.KeepCaptures
                 ? await Task.Run(() => CaptureArchive.Save(frame, results.Select(r => r.ItemName).ToList(), font))
-                : null;
+                : null);
 
             // Results accumulate across captures rather than replacing each other (user, 2026-09-28), so an item
             // just updated stays on screen to refer back to while working on the next one. Closing one is explicit.
