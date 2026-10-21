@@ -237,8 +237,11 @@ public sealed class WikiMapping
     /// **15** (2026-10-12): the legacy statsblock vocabulary is recognized by name (see <c>LegacyStatsText</c>). Legacy
     /// flags on any line are removed — `EXPENDABLE  Charges: 10` used to be missed, and a page settled with it kept
     /// it — food and book lines move to notes, and the formatter lays out legacy pages.
+    /// **16** (2026-10-21): an effect's `Charges` is written as the statsblock's `Charges:` line (see
+    /// <see cref="EffectModifierStats"/>). 8's reasoning: an item carrying one that was settled anyway would never be
+    /// offered the line.
     /// </summary>
-    public const int CurrentVersion = 15;
+    public const int CurrentVersion = 16;
 
     public int Version { get; init; } = CurrentVersion;
 
@@ -291,6 +294,24 @@ public sealed class WikiMapping
     /// spelling. The comparison is case-insensitive, so `Dmg Bonus` is covered too.
     /// </summary>
     public IReadOnlySet<string> RemovedStatLabels { get; init; } =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Effect sub-lines the wiki writes as statsblock fields rather than in the effect line, by game label. The
+    /// analyzer moves each out of its effect into the item's stats before comparing, so it goes through
+    /// <see cref="Stats"/> like any other field.
+    ///
+    /// **`Charges` is the only one** (bug found by a tester, 2026-10-21, on `Essence of Earth`). The game draws it
+    /// under a Charge Effect (`Charges: 2`, beside `Cast Time` and `Required Level`), and the blueprint gives it a
+    /// line of its own, `Charges: XX`, after the effects. The effect renderer had no place for it and refused the whole
+    /// line.
+    ///
+    /// **Only some charged items state the count in the window** (user, 2026-10-21). All of them show it as a number on
+    /// the icon in the inventory, which the Assistant deliberately does not read. So a stated count overrides the
+    /// page's, and a page's `Charges:` line is left alone when the window does not state one — the corpus's charged
+    /// items (`Prayers of Life`, `Puppet Strings`, `Nightmare Hide`) are all like that.
+    /// </summary>
+    public IReadOnlySet<string> EffectModifierStats { get; init; } =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Whether a page's statsblock label is one the data pass removes.</summary>
@@ -629,10 +650,14 @@ public sealed class WikiMapping
         map["Skill Mod"] = new StatMapping(
             "Skill Mod", "Skill Mod", StatDisposition.Stored, Format: StatValueFormat.SkillModifier);
 
+        // An effect sub-line in the window, a statsblock line on the wiki — see EffectModifierStats.
+        map["Charges"] = new StatMapping("Charges", "Charges", StatDisposition.Stored);
+
         return new WikiMapping
         {
             Stats = map,
             UnmappedGameLabels = [],
+            EffectModifierStats = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Charges" },
             RemovedStatLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "DMG Bonus", "Dmg Bon" },
             Slots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Fingers"] = "FINGER" },
             EffectKinds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

@@ -170,8 +170,8 @@ public class WikiMappingBlueprintTests
     public void EveryBlueprintStatsblockLabelIsMappedOrKnownToBeElsewhere()
     {
         // Written by other parts of the Assistant, not from a stat: the flags line, the slot, the effect lines, the
-        // charges flag, the class and race lines, and the blank line the order uses as a separator.
-        string[] handledElsewhere = ["(flags)", "Slot", "Effect", "Charges", "Class", "Race", WikiMapping.BlankLine];
+        // class and race lines, and the blank line the order uses as a separator.
+        string[] handledElsewhere = ["(flags)", "Slot", "Effect", "Class", "Race", WikiMapping.BlankLine];
         // In the blueprint, never yet captured, so the game's label for them is unknown. Map one the first time a
         // capture reports it.
         string[] neverCaptured = ["Attack", "Clairvoyance", "Spell Dmg", "Heal Amount"];

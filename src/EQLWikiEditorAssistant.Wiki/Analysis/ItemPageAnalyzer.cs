@@ -105,6 +105,7 @@ public static class ItemPageAnalyzer
         ArgumentNullException.ThrowIfNull(page);
         ArgumentNullException.ThrowIfNull(pageTitle);
         mapping ??= WikiMapping.Default;
+        captured = WithEffectModifiersAsStats(captured, mapping);
 
         var findings = new List<FieldFinding>();
         StatsBlock? block = page.ReadStatsBlock();
@@ -119,6 +120,7 @@ public static class ItemPageAnalyzer
         AddListFinding(findings, SlotsField, [.. captured.Slots.Select(mapping.ToWikiSlot)], block);
         AddStatFindings(findings, captured, block, mapping);
         AddRemovedStatFindings(findings, block, mapping);
+        AddUnexplainedChargesFinding(findings, captured, block);
         AddCategoryFindings(findings, captured, page, mapping);
         AddEffectFindings(findings, captured, page, block, mapping, effectLinkTargets);
         NormalizeSignsIfTheEditWouldBeInconsistent(findings);
@@ -127,6 +129,30 @@ public static class ItemPageAnalyzer
             pageTitle,
             findings,
             ComplianceChecker.Check(page, wholePageWikitext ?? page.Wikitext, mapping));
+    }
+
+    /// <summary>
+    /// The capture with each effect sub-line the wiki writes as a statsblock field (<see
+    /// cref="WikiMapping.EffectModifierStats"/>, which is `Charges`) moved out of its effect and into the stats, so the
+    /// effect line is rendered without it and the field is compared like any other. Done once, before anything
+    /// branches, so the stat, category and effect comparisons all see the same item.
+    /// </summary>
+    private static ParsedItem WithEffectModifiersAsStats(ParsedItem captured, WikiMapping mapping)
+    {
+        if (!captured.Effects.Any(e => e.Modifiers.Any(m => mapping.EffectModifierStats.Contains(m.Key))))
+            return captured;
+
+        var moved = new List<KeyValuePair<string, string>>();
+        EffectEntry[] effects =
+        [
+            .. captured.Effects.Select(e =>
+            {
+                moved.AddRange(e.Modifiers.Where(m => mapping.EffectModifierStats.Contains(m.Key)));
+                return e with { Modifiers = [.. e.Modifiers.Where(m => !mapping.EffectModifierStats.Contains(m.Key))] };
+            }),
+        ];
+
+        return captured with { Effects = effects, Stats = [.. captured.Stats, .. moved] };
     }
 
     /// <summary>
@@ -545,6 +571,32 @@ public static class ItemPageAnalyzer
                 findings.Add(new FieldFinding(
                     field.Label, FieldVerdict.Differs, null, field.Value, RemovedStatExplanation));
     }
+
+    /// <summary>
+    /// A page's `Charges:` line is reported, never removed, when the window shows neither a Charge nor a Consumable
+    /// Effect (user, 2026-10-21). Most charged items do not state their count in the window (it is a number on the
+    /// inventory icon, which the Assistant does not read), so the line is kept beside one of those with no count; with
+    /// neither, there is nothing to explain it, and only a human can say whether the item has charges.
+    ///
+    /// **Consumable counts too, by measurement**: the report first fired only beside a Charge Effect, and on the
+    /// verified corpus its only hits were three potions, each a Consumable Effect against a correct-looking
+    /// `Charges: 1` (`Greater Potion of Accuracy`, `Kilva's Skin of Flame`, `Vial of Tamed Mercury`). Every potion page
+    /// recording its charges would have stayed unsettled.
+    /// </summary>
+    private static void AddUnexplainedChargesFinding(List<FieldFinding> findings, ParsedItem captured, StatsBlock? block)
+    {
+        if (block?.Find(ChargesLabel) is not { } onPage) return;
+        if (captured.Stats.Any(s => string.Equals(s.Key, ChargesLabel, StringComparison.OrdinalIgnoreCase))) return;
+        if (captured.Effects.Any(e => ChargedEffectKinds.Contains(e.Kind))) return;
+
+        findings.Add(new FieldFinding(
+            ChargesLabel, FieldVerdict.NeedsReview, null, onPage.Value,
+            "The page records charges, but the window shows no Charge or Consumable Effect. Remove the line by hand " +
+            "if the item has no charges."));
+    }
+
+    private const string ChargesLabel = "Charges";
+    private static readonly HashSet<string> ChargedEffectKinds = new(StringComparer.OrdinalIgnoreCase) { "Charge", "Consumable" };
 
     internal const string RemovedStatExplanation =
         "The wiki calculates damage bonus for the reader's level, and a value written on the page overrides that, " +

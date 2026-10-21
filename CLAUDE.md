@@ -897,6 +897,20 @@ recorded an incomplete convention as the convention.
   whether it changes what the page *does* or only how it looks. `EffectLine.HasTooltipLink` is what distinguishes
   them; `TryReadName` reads the name the link *displays* and `TryReadTarget` the page it points at, so "same effect
   written the old way" is never confused with "a different effect".
+- **An effect's `Charges` is the statsblock's own `Charges:` line, not part of the effect line** (bug found by a
+  tester, 2026-10-21, on `Essence of Earth`). The game draws `Charges: 2` under the Charge Effect; the effect renderer
+  had no place for it and refused the whole line. `WikiMapping.EffectModifierStats` lists it, and the analyzer moves it
+  into the stats before comparing, so it is compared and written like any other field. `CurrentVersion` 16.
+  - **The game shows a charge count in two ways, and only one is read** (user, 2026-10-21). Every charged item shows
+    it as a small number on its icon in the inventory; only some also state it in the item window. **The inventory
+    number is deliberately never read.** So a count the window states overrides the page's, and where the window
+    shows a Charge Effect and no count, the page's `Charges:` line is left exactly as it is — `Prayers of Life`,
+    `Puppet Strings` and `Nightmare Hide` are like that. Pinned by `ChargesTheWindowStatesOverrideThePages` and
+    `ChargesThePageRecordsSurviveAWindowThatDoesNotStateThem`.
+  - **A `Charges:` line is reported, never removed, when the window shows neither a Charge nor a Consumable Effect**
+    (user, 2026-10-21): nothing explains it, and only a human can say whether the item has charges. Consumable is
+    included by measurement: beside a Charge Effect only, the report's sole corpus hits were three potions with a
+    correct-looking `Charges: 1`. With both, `WikiSpike analyze` reports none.
 - **A cast time is written without its unit.** The game says `12.0 seconds`, every real page says
   `Casting Time: 12.0`. Found by the corpus run flagging `Careless Lightning` as differing when only the unit did.
 - **Parenthetical order is fixed regardless of the order the window listed things**: kind, conditions,

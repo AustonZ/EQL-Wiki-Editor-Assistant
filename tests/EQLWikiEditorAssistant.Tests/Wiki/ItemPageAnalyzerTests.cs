@@ -720,6 +720,128 @@ public class ItemPageAnalyzerTests
         Assert.Contains("Charges Remaining", finding.Explanation);
     }
 
+    /// <summary>`Essence of Earth` (a tester, 2026-10-21): the game draws `Charges: 2` under the Charge Effect, and the
+    /// wiki writes it as a `Charges:` line of its own. It used to be refused as having no place in the effect line.
+    /// </summary>
+    [Fact]
+    public void AnEffectsChargesAreTheStatsblocksChargesLine()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Essence of Earth\n|statsblock = \n" +
+            "Lore Equipped, Attunable<br>\n" +
+            "Effect: [[Illusion: Earth Elemental|<span class='itemeff'>Illusion: Earth Elemental</span>]] " +
+            "(Charge Clicky, Can Equip, Casting Time: Instant) at Level 30<br>\n" +
+            "Class: ALL<br>\n}}")!;
+        ParsedItem captured = Captured(name: "Essence of Earth", flags: ["Lore Equipped", "Attunable"],
+            classes: ["ALL"]) with
+        {
+            Effects =
+            [
+                new EffectEntry("Charge", "Illusion: Earth Elemental", ["Can Equip"],
+                    [new("Cast Time", "Instant"), new("Charges", "2"), new("Required Level", "30")]),
+            ],
+        };
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, "Essence of Earth");
+
+        Assert.Equal(FieldVerdict.Matches, analysis.Find("Charge Effect")!.Verdict);
+        FieldFinding charges = analysis.Find("Charges")!;
+        Assert.Equal(FieldVerdict.MissingOnWiki, charges.Verdict);
+        Assert.Equal("2", charges.Captured);
+
+        string written = ItemPageEditor.BuildEdit(page, analysis).NewWikitext;
+        Assert.Contains("Charges: 2<br>\nClass: ALL<br>", written);
+        Assert.Equal(1, Occurrences(written, "Charges"));
+
+        ItemPageDocument settled = ItemPageDocument.Parse(written)!;
+        Assert.True(ItemPageAnalyzer.Analyze(captured, settled, "Essence of Earth").Find("Charges")!.Verdict
+            is FieldVerdict.Matches);
+    }
+
+    /// <summary>A window that states the count overrides the page's (user, 2026-10-21).</summary>
+    [Fact]
+    public void ChargesTheWindowStatesOverrideThePages()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \n" +
+            "Effect: [[Allure|<span class='itemeff'>Allure</span>]] (Charge Clicky, Casting Time: Instant)<br>\n" +
+            "Charges: 10<br>\n}}")!;
+        ParsedItem captured = Captured(name: "Thing") with
+        {
+            Effects = [new EffectEntry("Charge", "Allure", [], [new("Cast Time", "Instant"), new("Charges", "2")])],
+        };
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, "Thing");
+
+        Assert.Equal(FieldVerdict.Differs, analysis.Find("Charges")!.Verdict);
+        Assert.Contains("Charges: 2<br>", ItemPageEditor.BuildEdit(page, analysis).NewWikitext);
+    }
+
+    /// <summary>**Most charged items do not state their count in the window**, only as a number on the item's icon in
+    /// the inventory, which the Assistant deliberately does not read (user, 2026-10-21). So a page's `Charges:` line is
+    /// left exactly as it is when the window shows a Charge Effect and no count — `Puppet Strings` is like this.</summary>
+    [Fact]
+    public void ChargesThePageRecordsSurviveAWindowThatDoesNotStateThem()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Puppet Strings\n|statsblock = \n" +
+            "Effect: [[Allure|<span class='itemeff'>Allure</span>]] (Charge Clicky, Casting Time: Instant)<br>\n" +
+            "Charges: 5<br>\n}}")!;
+        ParsedItem captured = Captured(name: "Puppet Strings") with
+        {
+            Effects = [new EffectEntry("Charge", "Allure", [], [new("Cast Time", "Instant")])],
+        };
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, "Puppet Strings");
+
+        Assert.Null(analysis.Find("Charges"));
+        Assert.Equal(FieldVerdict.Matches, analysis.Find("Charge Effect")!.Verdict);
+        Assert.Contains("Charges: 5<br>", ItemPageEditor.BuildEdit(page, analysis).NewWikitext);
+    }
+
+    /// <summary>With neither a Charge nor a Consumable Effect in the window, a page's `Charges:` line has nothing to
+    /// explain it, so it is reported and kept (user, 2026-10-21).</summary>
+    [Fact]
+    public void ChargesWithNoChargeEffectInTheWindowAreReportedAndKept()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Thing\n|statsblock = \n" +
+            "Effect: [[Allure|<span class='itemeff'>Allure</span>]] (Clicky, Casting Time: Instant)<br>\n" +
+            "Charges: 5<br>\n}}")!;
+        ParsedItem captured = Captured(name: "Thing") with
+        {
+            Effects = [new EffectEntry("Click", "Allure", [], [new("Cast Time", "Instant")])],
+        };
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, "Thing");
+
+        FieldFinding charges = analysis.Find("Charges")!;
+        Assert.Equal(FieldVerdict.NeedsReview, charges.Verdict);
+        Assert.Equal("5", charges.OnWiki);
+        Assert.False(analysis.IsClean);
+        Assert.Contains("Charges: 5<br>", ItemPageEditor.BuildEdit(page, analysis).NewWikitext);
+    }
+
+    /// <summary>A potion's `Charges: 1` beside its Consumable Effect is kept without a word: on the verified corpus the
+    /// only pages the report fired on were three potions like this one.</summary>
+    [Fact]
+    public void ChargesBesideAConsumableEffectAreKeptWithoutAReport()
+    {
+        ItemPageDocument page = ItemPageDocument.Parse(
+            "{{Itempage\n|itemname = Greater Potion of Accuracy\n|statsblock = \n" +
+            "Effect: [[Accuracy|<span class='itemeff'>Accuracy</span>]] (Consumable Clicky, Casting Time: 4.0)<br>\n" +
+            "Charges: 1<br>\n}}")!;
+        ParsedItem captured = Captured(name: "Greater Potion of Accuracy") with
+        {
+            Effects = [new EffectEntry("Consumable", "Accuracy", [], [new("Cast Time", "4.0 seconds")])],
+        };
+
+        ItemPageAnalysis analysis = ItemPageAnalyzer.Analyze(captured, page, "Greater Potion of Accuracy");
+
+        Assert.Null(analysis.Find("Charges"));
+        Assert.Contains("Charges: 1<br>", ItemPageEditor.BuildEdit(page, analysis).NewWikitext);
+    }
+
     /// <summary>A cooldown used to be unexpressible and is not any more (user, 2026-09-25), so Bladestopper's click
     /// effect now renders rather than being held back.</summary>
     [Fact]
