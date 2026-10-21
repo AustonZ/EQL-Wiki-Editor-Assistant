@@ -43,7 +43,8 @@ The full design rationale, wiki research findings, and milestone plan live in
   were audited one by one before the repository went public (user, 2026-10-08) and added with `git add -f`, which is
   how any future sample gets in: look at the whole frame first, black out anything private (the private chat channel
   was the only thing redacted; character names were judged fine), then re-run `AccuracySpike` to prove the redaction
-  moved nothing. `samples/README.md` has the steps. A recording of the game, such as the README's demo, gets the
+  moved nothing. A frame from someone else needs their permission and follows their conditions: a tester's five
+  (`60a`-`61`, 2026-10-21) have his character name and both chat windows blacked out, as he asked. `samples/README.md` has the steps. A recording of the game, such as the README's demo, gets the
   same look at its frames before it is committed.
 - **Wiki data is untrusted and often malformed.** Item pages are human-edited and partly imported from the old
   Project1999 wiki fork: expect wrong template usage, typos, missing/extra params, inconsistent casing. Wikitext
@@ -2575,8 +2576,10 @@ builds the labeled atlas, `verify` reads a real region back.
   (`Core.Glyphs.CoverageRamp`; a tester, 2026-10-15). After a Windows update one tester's game drew the same glyphs
   with levels 1 and 2 at 4 and 7 fifteenths, everything else unchanged, on every monitor; the Assistant found no
   window. `DescriptionTabFinder` learns the ramp from the label (see "Locating item windows"), `LocatedWindow.Ramp`
-  carries it, and the reader's every expected value comes from it. Every sample teaches `CoverageRamp.Standard`
-  exactly, and the standard ramp does the same arithmetic the integer table did, so the corpus reads byte-identically.
+  carries it, and the reader's every expected value comes from it. Every sample but that tester's teaches
+  `CoverageRamp.Standard` exactly, and the standard ramp does the same arithmetic the integer table did, so the corpus
+  read byte-identically; his five frames (`60a`-`61`, in the corpus since 2026-10-21) teach the brighter ramp and read
+  every field.
   The atlas's levels stay indices into `GlyphRamp.Fifteenths`, and an atlas is still built only from standard frames.
   `CoverageRampTests` redraws every glyph of audited windows with other ramps and reads them back. See the plan,
   "1.0.0 (full release)", for what was ruled out on the way.
@@ -2830,7 +2833,9 @@ way by definition.
   count to 2444 and nothing else. **76 samples since 2026-10-16**: the 22 UI-scale frames (see "UI scales") take it to
   2737 correct, 171 windows located (18 occluded), every error count still 0. **87 samples since the same day**:
   the last eleven frames on disk were audited and added (`21a`/`21b`, `22`, and four more in each other skin,
-  `30b`-`30e` and `31b`-`31e`), for 2858 correct and 0 errors, with nothing on disk left unscored. Under the text-recognition model the glyph reader replaced, the same corpus and
+  `30b`-`30e` and `31b`-`31e`), for 2858 correct and 0 errors, with nothing on disk left unscored. **92 samples since
+  2026-10-21**: a tester's five frames on the brighter text ramp (`60a`-`60d`, `61`) take it to 2972 correct, 176
+  windows located (18 occluded), every error count still 0. Under the text-recognition model the glyph reader replaced, the same corpus and
   ground truth scored 24 missing, 32 wrong, 13 silent-wrong and 24 warnings — every one of them a glyph-level failure
   that exact template matching removed outright.
   - **`verified` is a provenance label, not a filter.** An entry is scored and gated whether or not it is set, so a
@@ -3164,8 +3169,9 @@ and negative cases, the slot/category sweep (`12*`), the parser edge cases (`13*
 (`14`), the custom UI font (`15*`, each marked `[font EqlWikiEditorAssistant]` in its name and in its ground truth as
 `"font": "EqlWikiEditorAssistant"`) and one window
 in the game's other two skins (`30a`-`30e` `default`, `31a`-`31e` `default_light`, reported as unsupported), the
-2026-10-10 locate and icon fixes (`21a`/`21b`, `22`), and every UI scale (`40a`-`52`, each named for its scale; see
-"UI scales"). Exaltations are
+2026-10-10 locate and icon fixes (`21a`/`21b`, `22`), every UI scale (`40a`-`52`, each named for its scale; see
+"UI scales"), and a tester's frames on the brighter text ramp (`60a`-`60d`, and `61`, whose window states a charge
+count under its Charge Effect; see "Glyph matching" and "Effects"). Exaltations are
 covered already, though no sample was taken for them: 57 leveled windows carry 11 native and 27 foreign filled slots,
 and `ItemEligibilityTests.EveryRealWindowIsJudgedAsItsGroundTruthSays` judges every one. A foreign exaltation on a
 `+0` item cannot exist in game (an exaltation can only be added to a leveled item), and no sample has a filled

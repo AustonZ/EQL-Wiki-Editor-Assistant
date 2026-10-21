@@ -590,8 +590,12 @@ side. Auto-update from beta.3 tested by the user before announcing; the update w
       rounding of each pixel (the standard level 1 measures 3.01), and both ramps seen are whole fifteenths. Snapping
       is what makes the corpus read with exactly the arithmetic it always did: every sample's locate and parse output
       is byte-identical after the change, and the tester's frames read every field with no warnings.
-    - **Not yet seen in the app on the tester's machine**, and his frames are not in the corpus (not audited, and they
-      are his). The tests redraw every glyph of audited windows with his ramp and a darker one instead.
+    - **Seen working in the app on the tester's machine**: his `Essence of Earth` capture of 2026-10-21, the one that
+      found the charges bug, is on the brighter ramp. The tests also redraw every glyph of audited windows with his
+      ramp and a darker one.
+    - **His frames are in the corpus since 2026-10-21** (`samples/60a`-`60d`, `61`), with his permission, his character
+      name and both chat windows blacked out as he asked. Each learns the ramp 0, 4, 7, 9, 11, 13, 15 and reads every
+      field.
     - Ruled out on the way: drawing the atlas from Windows' own font renderers (GDI, DirectWrite in every mode, plain
       unhinted Arial) matches none of the game's glyphs exactly (best, DirectWrite grayscale, 37 of 88 ink patterns and
       0 levels), so the game rasterizes its text itself and the atlas has to stay captured, not generated. And Linear

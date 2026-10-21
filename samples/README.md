@@ -12,8 +12,9 @@ To add a sample:
 1. Capture it (see CLAUDE.md, "The sample set") and name it `NN-description.png`. A frame taken in a UI font other
    than Arial keeps the Assistant's `[font <name>]` marker: `NN-description [font EqlWikiEditorAssistant].png`. The
    tools read an unmarked frame as Arial.
-2. Look at the whole frame. Black out anything private with a solid box (a private chat channel's name is the
-   example so far), editing the PNG losslessly, never re-encoding it as JPEG.
+2. Look at the whole frame. Black out anything private with a solid box (a private chat channel's name, and in a
+   tester's frames his character name and both chat windows), editing the PNG losslessly, never re-encoding it as
+   JPEG. A frame someone else took goes in only with their permission and on their conditions.
 3. Add its ground truth (`AccuracySpike --bootstrap --only <name>`) and re-run `AccuracySpike`: the scores must not
    move, which proves the redaction touched nothing the tests read.
 4. `git add -f samples/NN-description.png`.

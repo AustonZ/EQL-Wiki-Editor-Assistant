@@ -9599,6 +9599,363 @@
       ]
     },
     {
+      "file": "60a-brighter-text-ramp.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Empyran Jerkin",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable"
+          ],
+          "classes": [
+            "MNK"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Chest"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "5"
+            },
+            {
+              "label": "Weight",
+              "value": "0.5"
+            },
+            {
+              "label": "HP",
+              "value": "30"
+            },
+            {
+              "label": "Strength",
+              "value": "10"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "10"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "2 platinum 4 gold 7 silver 6 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "60b-brighter-text-ramp.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Mudman Enforcer",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "DRU",
+            "MNK",
+            "BRD",
+            "ROG",
+            "SHM",
+            "BST"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Primary",
+            "Secondary"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "8"
+            },
+            {
+              "label": "Weight",
+              "value": "1.9"
+            },
+            {
+              "label": "Delay",
+              "value": "20"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Blunt"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "10"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.4"
+            },
+            {
+              "label": "Strength",
+              "value": "3"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "45 platinum 7 gold 1 silver 4 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "60c-brighter-text-ramp.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Empyran Jerkin",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable"
+          ],
+          "classes": [
+            "MNK"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Chest"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "5"
+            },
+            {
+              "label": "Weight",
+              "value": "0.5"
+            },
+            {
+              "label": "HP",
+              "value": "30"
+            },
+            {
+              "label": "Strength",
+              "value": "10"
+            },
+            {
+              "label": "SV. Magic",
+              "value": "10"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "2 platinum 4 gold 7 silver 6 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "60d-brighter-text-ramp.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Mudman Enforcer",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable",
+            "Placeable"
+          ],
+          "classes": [
+            "WAR",
+            "CLR",
+            "PAL",
+            "RNG",
+            "SHD",
+            "DRU",
+            "MNK",
+            "BRD",
+            "ROG",
+            "SHM",
+            "BST"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Primary",
+            "Secondary"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "Base Dmg",
+              "value": "8"
+            },
+            {
+              "label": "Weight",
+              "value": "1.9"
+            },
+            {
+              "label": "Delay",
+              "value": "20"
+            },
+            {
+              "label": "Skill",
+              "value": "1H Blunt"
+            },
+            {
+              "label": "Dmg Bon",
+              "value": "10"
+            },
+            {
+              "label": "Ratio",
+              "value": "0.4"
+            },
+            {
+              "label": "Strength",
+              "value": "3"
+            }
+          ],
+          "exaltations": [
+            {
+              "kind": "Ornamentation"
+            }
+          ],
+          "effects": [],
+          "merchantValue": "45 platinum 7 gold 1 silver 4 copper",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
+      "file": "61-charges-under-charge-effect.png",
+      "verified": true,
+      "windows": [
+        {
+          "occluded": false,
+          "name": "Essence of Earth",
+          "level": 0,
+          "titleContentNameMismatch": false,
+          "flags": [
+            "Lore Equipped",
+            "Attunable"
+          ],
+          "classes": [
+            "ALL"
+          ],
+          "races": [
+            "ALL"
+          ],
+          "slots": [
+            "Neck"
+          ],
+          "stats": [
+            {
+              "label": "Size",
+              "value": "MEDIUM"
+            },
+            {
+              "label": "AC",
+              "value": "4"
+            },
+            {
+              "label": "Weight",
+              "value": "1.0"
+            },
+            {
+              "label": "Strength",
+              "value": "5"
+            },
+            {
+              "label": "SV. Fire",
+              "value": "2"
+            },
+            {
+              "label": "Stamina",
+              "value": "5"
+            },
+            {
+              "label": "Dexterity",
+              "value": "-2"
+            }
+          ],
+          "exaltations": [],
+          "effects": [
+            {
+              "kind": "Charge",
+              "name": "Illusion: Earth Elemental",
+              "conditions": [
+                "Can Equip"
+              ],
+              "modifiers": [
+                {
+                  "label": "Cast Time",
+                  "value": "Instant"
+                },
+                {
+                  "label": "Charges",
+                  "value": "2"
+                },
+                {
+                  "label": "Required Level",
+                  "value": "30"
+                }
+              ]
+            }
+          ],
+          "merchantValue": "absolutely nothing",
+          "warningCount": 0
+        }
+      ]
+    },
+    {
       "file": "notepad-with-all-glyphs.png",
       "verified": true,
       "windows": []
